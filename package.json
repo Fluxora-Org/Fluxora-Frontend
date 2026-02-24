@@ -9,15 +9,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stellar/freighter-api": "^6.0.1",
+    "@tailwindcss/vite": "^4.2.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0"
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^6.22.0",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.0",
     "@types/react": "^18.2.56",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
+    "tailwindcss": "^4.2.0",
     "typescript": "^5.3.3",
-    "vite": "^5.1.4"
+    "vite": "^7.3.1"
   }
 }

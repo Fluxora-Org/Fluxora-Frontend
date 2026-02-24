@@ -1,0 +1,57 @@
+.skeleton {
+  background: linear-gradient(90deg, #e9e9ee 25%, #f4f4f7 50%, #e9e9ee 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+
+.skeleton-static {
+  background-color: #e9e9ee;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.treasury-loading-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.treasury-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+}
+
+.metric-text { flex: 1; }
+.metric-label { height: 10px; width: 45%; margin-bottom: 8px; }
+.metric-value { height: 16px; width: 65%; }
+
+.recent-header { display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem; }
+.recent-table { width:100%; border-collapse: collapse; margin-top:0.75rem; }
+.recent-table th { text-align:left; color: var(--muted); font-size:0.8rem; padding: 0.5rem 0; }
+.recent-table td { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.stream-two-lines { display:flex; flex-direction:column; gap:6px; }
+.action-placeholder { width:28px; height:28px; border-radius:6px; }

@@ -1,0 +1,197 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: #0d1421;
+  border: 1px solid #1e2d42;
+  border-radius: 20px;
+  
+  width: 558.6px;
+  padding: 2.5rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.successIconWrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0;
+  margin-top: 1rem; /* Offsetting the white space in the SVG */
+}
+
+.successIconImg {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  color: #ffffff;
+}
+
+.description {
+  font-size: 1rem;
+  color: #99A1AF;
+  line-height: 1.5;
+  margin: 0 0 2rem;
+  max-width: 400px;
+}
+
+.streamInfoCard {
+  width: 100%;
+  background: #141e30;
+  border: 1px solid #1e2d42;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.streamIdRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.streamIdLabel {
+  color: #6b7a94;
+  font-size: 0.9rem;
+}
+
+.streamIdValue {
+  color: #00B8D4;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.urlContainer {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.urlBar {
+  flex: 1;
+  background: #0d1421;
+  border: 1px solid #1e2d42;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #6b7a94;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.copyButton {
+  background: #1e2d42;
+  border: none;
+  border-radius: 8px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #e8ecf4;
+  transition: all 0.2s;
+}
+
+.copyButton:hover {
+  background: #2a3d58;
+}
+
+.copyButton.copied {
+  background: #00d4aa;
+  color: #ffffff;
+}
+
+.nextStepsBox {
+  width: 100%;
+  background: #1C398E33;
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: left;
+  margin-bottom: 2rem;
+}
+
+.nextStepsTitle {
+  display: block;
+  font-weight: 700;
+  color: #8EC5FF;
+  margin-bottom: 0.5rem;
+}
+
+.nextStepsText {
+  color: #8EC5FF;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.875rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btnSecondary {
+  background: #2626264D;
+  color: #ffffff;
+}
+
+.btnSecondary:hover {
+  background: #2a3d58;
+}
+
+.btnPrimary {
+  background: #00B8D4;
+  color: #ffffff;
+}
+
+.btnPrimary:hover {
+  background: #0099b3;
+}
+
+@media (max-width: 480px) {
+  .modal {
+    padding: 1.5rem;
+  }
+  .actions {
+    flex-direction: column;
+  }
+  .title {
+    font-size: 1.5rem;
+  }
+}

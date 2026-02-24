@@ -43,6 +43,22 @@ const streams: stream[] = [
 ];
 
 export default function Streams() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [createdStream, setCreatedStream] = useState({
+    id: "529",
+    url: "https://fluxora.io/stream/529",
+  });
+
+  const handleCreateStreamClick = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  const handleStreamCreated = () => {
+    setCreatedStream({ id: "529", url: "https://fluxora.io/stream/529" });
+    setIsSuccessModalOpen(true);
+  };
+
   return (
     <div>
       <div
@@ -234,9 +250,38 @@ export default function Streams() {
           </tbody>
         </table>
       </div>
+
+      <CreateStreamModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onStreamCreated={handleStreamCreated}
+      />
+      <StreamCreatedModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        streamId={createdStream.id}
+        streamUrl={createdStream.url}
+        onCreateAnother={() => {
+          setIsSuccessModalOpen(false);
+          setIsCreateModalOpen(true);
+        }}
+      />
+      <RecentStreams streams={sampleStreams} />
     </div>
   );
 }
+
+const createBtn: React.CSSProperties = {
+  background: "var(--accent)",
+  color: "#000",
+  border: "none",
+  borderRadius: 8,
+  padding: "0.6rem 1rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+};
 
 const tableWrap: React.CSSProperties = {
   marginTop: "1.5rem",

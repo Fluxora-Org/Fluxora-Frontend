@@ -1,0 +1,508 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  font-family: inherit;
+  color: var(--text);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Create stream modal: responsive, no scrollbar, consistent spacing */
+.create-stream-overlay {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-stream-modal {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  max-height: min(90vh, 600px);
+  padding: clamp(1rem, 4vw, 1.25rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.create-stream-modal::-webkit-scrollbar {
+  display: none;
+}
+
+.create-stream-modal .modal-body-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.create-stream-modal .modal-body-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-height: 640px) {
+  .create-stream-modal {
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 380px) {
+  .create-stream-overlay {
+    padding: 0.5rem;
+  }
+  .create-stream-modal {
+    padding: 0.75rem;
+  }
+}
+
+/* Active step: teal circle with white number for contrast */
+.step-item.active .step-circle {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Cancel: dark charcoal, white text */
+.btn-cancel {
+  background: #1a1d26;
+  color: #ffffff;
+  border: none;
+}
+
+/* Next: teal gradient to match progress accent */
+.btn-next {
+  background: linear-gradient(135deg, #00B8D4, #0097A7);
+  color: #ffffff;
+  border: none;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.close-button:hover {
+  color: var(--text);
+}
+
+/* Progress Tracker */
+.progress-tracker {
+  display: flex;
+  position: relative;
+  margin-bottom: 1.25rem;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  flex-shrink: 0;
+}
+
+.progress-line {
+  position: absolute;
+  top: 16px;
+  left: .5rem;
+  right: 3.5rem;
+  height: 2px;
+  background: var(--border);
+  z-index: 1;
+  width: 100%;
+}
+
+.progress-line-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--primary);
+  width: 50%;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  width: 80px;
+}
+
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  background: var(--surface-highest);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.step-item.completed .step-circle {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.step-item.active .step-circle {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.step-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.step-item.active .step-label,
+.step-item.completed .step-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Section Header */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0 0 1rem 0;
+}
+
+.section-header {
+  margin-bottom: 1rem;
+}
+
+.section-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.section-header p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--text);
+}
+
+.required {
+  color: var(--danger);
+}
+
+.form-helper {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.input-container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.input-container:focus-within {
+  border-color: var(--accent);
+}
+
+.input-container.narrow {
+  flex: 0 0 100px;
+  justify-content: space-between;
+  padding: 0 1rem;
+  cursor: pointer;
+}
+
+.input-icon {
+  padding-left: 1rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+
+.input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  outline: none;
+  min-width: 0;
+}
+
+.select-chevron {
+  position: absolute;
+  right: 0.75rem;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.segmented-control {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.segment-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.segment-btn.active {
+  background: rgba(0, 212, 170, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.toggle-switch {
+  width: 36px;
+  height: 20px;
+  background: var(--surface-switch);
+  border-radius: 20px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-switch.on {
+  background: var(--accent);
+}
+
+.toggle-knob {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+}
+
+.toggle-switch.on .toggle-knob {
+  transform: translateX(16px);
+}
+
+/* Deposit summary */
+.deposit-summary {
+  display: flex;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 0;
+}
+
+.deposit-box {
+  flex: 1;
+}
+
+.deposit-box:first-child {
+  border-right: 1px solid var(--border);
+  padding-right: 1rem;
+}
+.deposit-box:last-child {
+  padding-left: 1rem;
+  text-align: right;
+}
+
+.deposit-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.deposit-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Footer */
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.btn:hover {
+  opacity: 0.9;
+}
+
+/* Override global button min-height (e.g. index.css @media 768px) so modal buttons stay short */
+.create-stream-modal .modal-footer .btn {
+  min-height: unset;
+}
+
+.btn-back {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-next {
+  background: var(--primary);
+  color: var(--text);
+}
+
+/* Form error message */
+.form-error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 77, 79, 0.1);
+  border-radius: 8px;
+  border: 1px solid var(--danger);
+}
+
+/* Info box: teal/light blue border and muted blue background (works in dark theme) */
+.info-box {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 184, 212, 0.5);
+  background: rgba(0, 184, 212, 0.08);
+}
+
+.info-box-title {
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.info-box-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+/* Deposit amount: prefix $ and suffix USDC pill */
+.input-with-prefix-suffix {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.input-prefix {
+  padding-left: 1rem;
+  font-size: 1rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.input-suffix-pill {
+  padding: 0.35rem 0.75rem;
+  margin-right: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  background: var(--surface-highest);
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
