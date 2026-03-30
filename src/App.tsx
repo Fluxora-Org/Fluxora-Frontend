@@ -7,7 +7,8 @@ import Recipient from "./pages/Recipient";
 import ConnectWallet from "./pages/ConnectWallet";
 import { useState, useEffect } from "react";
 import Landing from "./pages/Landing";
-import Navbar from "./components/Navbar";
+import UnifiedNavbar from "./components/UnifiedNavbar";
+import TreasuryPage from "./pages/TreasuryPage";
 import ErrorPage from './pages/ErrorPage';
 import NotFound from "./pages/NotFound";
 
@@ -84,8 +85,12 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* always show the top navbar */}
-      <Navbar onThemeToggle={handleThemeToggle} theme={theme} />
+      {/* Unified navbar for all routes */}
+      <UnifiedNavbar 
+        theme={theme} 
+        onThemeToggle={handleThemeToggle}
+        onWalletClick={() => {}}
+      />
 
       <Routes>
         <Route path="/" element={<Home />} />
@@ -93,12 +98,7 @@ export default function App() {
         <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
         <Route
           path="/landing"
-          element={
-            <>
-              <Navbar onThemeToggle={handleThemeToggle} theme={theme} />
-              <Landing theme={theme} />
-            </>
-          }
+          element={<Landing theme={theme} />}
         />
         <Route path="/app" element={<Layout onThemeToggle={handleThemeToggle} theme={theme} />}>
           <Route index element={<Dashboard />} />

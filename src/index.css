@@ -76,6 +76,25 @@ body {
   min-height: 100vh;
 }
 
+/* Skip link - hidden by default, visible on focus */
+a[href="#main-content"] {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent);
+  color: #0a0e17;
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 100;
+  border-radius: 0 0 4px 0;
+  font-weight: 600;
+}
+
+a[href="#main-content"]:focus {
+  top: 0;
+  outline: none;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;

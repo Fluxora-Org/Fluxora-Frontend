@@ -1,15 +1,8 @@
-import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import Footer from './Footer';
-import './layout.css';
-import ConnectWalletModal from './ConnectWalletModal';
+import { Outlet, Link, useLocation } from "react-router-dom";
+import Sidebar from "./Sidebar";
 import { useState } from "react";
-import { Link, Outlet } from "react-router-dom";
-import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
-import AppNavbar from "./AppNavbar";
+import ConnectWalletModal from "./ConnectWalletModal";
 import "./layout.css";
 
 type NavItem = {
@@ -34,6 +27,7 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const { pathname } = useLocation();
 
   const handleConnectFreighter = () => {
     setWalletAddress("GABC1234567890XYZ1");
@@ -59,45 +53,10 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
   };
 
   return (
-    <div style={styles.layout}>
-      <Sidebar />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.logo}>Fluxora</div>
-        <nav style={styles.nav}>
-          <Link to="/" style={styles.navLink}>Dashboard</Link>
-          <Link to="/streams" style={styles.navLink}>Streams</Link>
-          <Link to="/recipient" style={styles.navLink}>Recipient</Link>
-    <div className="app-layout">
-      <aside className="app-layout__sidebar">
-      
-        <nav className="app-layout__nav">
-          <Link to="" className="app-layout__nav-link flex ">
-            <img src={DashboardIcon} alt="Dashboard" className="w-5 h-5 mr-2" />
-            Dashboard
-          </Link>
-          <Link to="streams" className="app-layout__nav-link flex">
-            <img src={StreamsIcon} alt="Streams" className="w-5 h-5 mr-2" />
-            Streams
-          </Link>
-          <Link to="recipient" className="app-layout__nav-link flex">
-            <img src={RecipientIcon} alt="Recipient" className="w-5 h-5 mr-2" />
-            Recipient
-          </Link>
-        </nav>
-         
     <div
       className={`app-layout${isSidebarCollapsed ? " is-collapsed" : ""}${isMobileSidebarOpen ? " is-mobile-open" : ""}`}
     >
-      {/* App Navbar — spans full width above everything */}
-      <AppNavbar
-        onThemeToggle={onThemeToggle}
-        theme={theme}
-        network="TESTNET"
-        walletAddress={walletAddress}
-        onDisconnect={handleDisconnect}
-      />
-
+      {/* Sidebar — with collapse toggle, nav links, wallet button */}
       <aside id="app-sidebar" className="app-sidebar" aria-label="Primary navigation">
         <div className="app-sidebar-header">
           <div className="app-logo" aria-label="Fluxora">
@@ -147,30 +106,16 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
         </button>
       </aside>
 
+      {/* Main content area */}
       <div className="app-content-area">
-        <header className="app-mobile-topbar">
-          <button
-            type="button"
-            className="app-mobile-menu-btn"
-            onClick={() => setIsMobileSidebarOpen((prev) => !prev)}
-            aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
-            aria-expanded={isMobileSidebarOpen}
-            aria-controls="app-sidebar"
-          >
-            <span /><span /><span />
-          </button>
-          <div className="app-mobile-title">Fluxora</div>
-        </header>
-
-        <main className="app-main">
+        <main id="main-content" className="app-main" role="main">
           <Outlet />
         </main>
-        
-        {location.pathname.includes('treasurypage') ? null : <Footer />}
 
-        <Footer />
+        {!pathname.includes("treasurypage") && <Footer />}
       </div>
 
+      {/* Sidebar backdrop (mobile overlay close) */}
       <button
         type="button"
         aria-label="Close sidebar"
@@ -178,6 +123,7 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
         onClick={closeMobileSidebar}
       />
 
+      {/* Wallet connection modal */}
       <ConnectWalletModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -185,7 +131,6 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
         onConnectAlbedo={handleConnectAlbedo}
         onConnectWalletConnect={handleConnectWalletConnect}
       />
-      </div>
     </div>
   );
 }
