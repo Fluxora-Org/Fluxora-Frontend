@@ -1,11 +1,132 @@
+import { useState } from "react";
+import TransactionFeedbackModal, {
+  type TransactionFeedbackState,
+} from "../components/TransactionFeedbackModal";
+import { simulateTransaction } from "../lib/transactionFeedback";
+
+type WithdrawFeedback = {
+  amount: number;
+  completedAt?: string;
+  destination: string;
+  errorMessage?: string;
+  ledgerLabel?: string;
+  status: TransactionFeedbackState;
+  transactionHash?: string;
+};
+
 export default function Recipient() {
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
+  const [balance, setBalance] = useState(22600.0);
+  const [activeStreams] = useState(2);
+  const [totalAccrued] = useState(43250.0);
+  const [totalWithdrawn, setTotalWithdrawn] = useState(20650.0);
+  const [withdrawFeedback, setWithdrawFeedback] =
+    useState<WithdrawFeedback | null>(null);
   const walletConnected = true;
+  const walletAddress = "GBRP...9XZ2";
 
   const disabled = !walletConnected || balance === 0;
+
+  const handleWithdraw = async () => {
+    if (disabled) return;
+
+    const amountToWithdraw = balance;
+
+    setWithdrawFeedback({
+      amount: amountToWithdraw,
+      destination: walletAddress,
+      status: "pending",
+    });
+
+    try {
+      const outcome = await simulateTransaction({
+        actionLabel: "Withdrawal",
+        delayMs: 1600,
+      });
+
+      setBalance(0);
+      setTotalWithdrawn((current) => current + amountToWithdraw);
+      setWithdrawFeedback({
+        amount: amountToWithdraw,
+        completedAt: outcome.completedAt,
+        destination: walletAddress,
+        ledgerLabel: outcome.ledgerLabel,
+        status: "success",
+        transactionHash: outcome.transactionHash,
+      });
+    } catch (error) {
+      setWithdrawFeedback({
+        amount: amountToWithdraw,
+        destination: walletAddress,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "We couldn't submit the withdrawal right now.",
+        status: "failure",
+      });
+    }
+  };
+
+  const withdrawActions = withdrawFeedback
+    ? withdrawFeedback.status === "success"
+      ? [
+          {
+            label: "Close receipt",
+            onClick: () => setWithdrawFeedback(null),
+            autoFocus: true,
+          },
+        ]
+      : withdrawFeedback.status === "failure"
+        ? [
+            {
+              label: "Retry withdrawal",
+              onClick: () => void handleWithdraw(),
+              autoFocus: true,
+            },
+            {
+              label: "Dismiss",
+              onClick: () => setWithdrawFeedback(null),
+              variant: "ghost" as const,
+            },
+          ]
+        : []
+    : [];
+
+  const withdrawDetails = withdrawFeedback
+    ? withdrawFeedback.status === "success"
+      ? [
+          {
+            label: "Amount released",
+            value: `${withdrawFeedback.amount.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })} USDC`,
+          },
+          { label: "Destination", value: withdrawFeedback.destination, mono: true },
+          {
+            label: "Transaction hash",
+            value: withdrawFeedback.transactionHash ?? "Pending hash",
+            mono: true,
+          },
+          {
+            label: "Finalized",
+            value: `${withdrawFeedback.completedAt} • ${withdrawFeedback.ledgerLabel}`,
+          },
+        ]
+      : [
+          {
+            label: "Amount requested",
+            value: `${withdrawFeedback.amount.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })} USDC`,
+          },
+          { label: "Destination", value: withdrawFeedback.destination, mono: true },
+          {
+            label: "Streams covered",
+            value: `${activeStreams} active incoming streams`,
+          },
+        ]
+    : [];
 
   return (
     <div>
@@ -50,10 +171,16 @@ export default function Recipient() {
               </span>
             </div>
             <div style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-              Available to withdraw immediately
+              {balance > 0
+                ? "Available to withdraw immediately"
+                : "Your available balance is fully settled"}
             </div>
           </div>
-          <button style={button(disabled)} disabled={disabled}>
+          <button
+            style={button(disabled)}
+            disabled={disabled}
+            onClick={() => void handleWithdraw()}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               height="15px"
@@ -95,6 +222,37 @@ export default function Recipient() {
           </div>
         </div>
       </div>
+
+      <TransactionFeedbackModal
+        isOpen={!!withdrawFeedback}
+        state={withdrawFeedback?.status ?? "pending"}
+        title={
+          withdrawFeedback?.status === "success"
+            ? "Withdrawal complete"
+            : withdrawFeedback?.status === "failure"
+              ? "We couldn't release your funds"
+              : "Submitting withdrawal"
+        }
+        description={
+          withdrawFeedback?.status === "success"
+            ? "Your accrued USDC was released to the connected wallet successfully."
+            : withdrawFeedback?.status === "failure"
+              ? withdrawFeedback?.errorMessage ??
+                "The wallet or network rejected the withdrawal before final submission."
+              : "Confirm the withdrawal in your wallet. We'll keep this screen updated until the transaction settles."
+        }
+        details={withdrawDetails}
+        note={
+          withdrawFeedback?.status === "success"
+            ? "Balances on this page were updated after settlement. If another stream accrues, a new withdrawable balance will appear here."
+            : withdrawFeedback?.status === "failure"
+              ? "No funds were moved on-chain. Retry when your wallet is ready or when your connection is stable."
+              : "Pending withdrawals can take a few seconds on testnet. Keep this screen open until the final status appears."
+        }
+        actions={withdrawActions}
+        dismissible={withdrawFeedback?.status !== "pending"}
+        onClose={() => setWithdrawFeedback(null)}
+      />
     </div>
   );
 }

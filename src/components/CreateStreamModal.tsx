@@ -18,11 +18,21 @@ function isValidStellarAddress(value: string): boolean {
 interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void;
+  onSubmit?: (payload: CreateStreamFormData) => void;
 }
 
-export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: CreateStreamModalProps) {
+export interface CreateStreamFormData {
+  recipient: string;
+  depositAmount: number;
+  accrualRate: number;
+  durationInMonths: number;
+  startTimeOption: 'now' | 'custom';
+  customStartDate: string;
+  cliffEnabled: boolean;
+  cliffDate: string;
+}
+
+export default function CreateStreamModal({ isOpen, onClose, onSubmit }: CreateStreamModalProps) {
   const [recipient, setRecipient] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
   const [accrualRate, setAccrualRate] = useState('38.62');
@@ -42,6 +52,7 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isSubmitting) return;
         onClose();
       }
       if (e.key === 'Tab') {
@@ -62,7 +73,24 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isSubmitting, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const buildSubmissionPayload = (): CreateStreamFormData => ({
+    recipient: recipient.trim(),
+    depositAmount: parseFloat(depositAmount.replace(/,/g, '')),
+    accrualRate: parseFloat(accrualRate),
+    durationInMonths: parseFloat(duration),
+    startTimeOption,
+    customStartDate,
+    cliffEnabled,
+    cliffDate,
+  });
 
   const validateStep1 = (): boolean => {
     if (!recipient.trim()) {
@@ -137,12 +165,14 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
       setError(null);
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (isSubmitting) return;
       setIsSubmitting(true);
-      onStreamCreated?.();
-      setTimeout(() => {
-        onClose();
+      setError(null);
+      onSubmit?.(buildSubmissionPayload());
+      if (!onSubmit) {
         setIsSubmitting(false);
-      }, 400);
+        onClose();
+      }
     }
   };
 
@@ -157,13 +187,14 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
   };
 
   const handleCancel = () => {
+    if (isSubmitting) return;
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay create-stream-overlay" onClick={onClose}>
+    <div className="modal-overlay create-stream-overlay" onClick={isSubmitting ? undefined : onClose}>
       <div
         className="modal-content create-stream-modal"
         ref={modalRef}
@@ -174,7 +205,7 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
       >
         <div className="modal-header">
           <h2 id="create-stream-title">Create stream</h2>
-          <button type="button" className="close-button" onClick={onClose} aria-label="Close modal">
+          <button type="button" className="close-button" onClick={onClose} aria-label="Close modal" disabled={isSubmitting}>
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -369,12 +400,14 @@ export default function CreateStreamModal({ isOpen, onClose, onStreamCreated }: 
           <label className="form-label">Start time</label>
           <div className="segmented-control">
             <button
+              type="button"
               className={`segment-btn ${startTimeOption === 'now' ? 'active' : ''}`}
               onClick={() => setStartTimeOption('now')}
             >
               Start now
             </button>
             <button
+              type="button"
               className={`segment-btn ${startTimeOption === 'custom' ? 'active' : ''}`}
               onClick={() => setStartTimeOption('custom')}
             >

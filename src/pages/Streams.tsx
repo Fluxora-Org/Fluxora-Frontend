@@ -1,17 +1,32 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import CreateStreamModal from "../components/CreateStreamModal";
-import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
+import CreateStreamModal, {
+  type CreateStreamFormData,
+} from "../components/CreateStreamModal";
+import TransactionFeedbackModal, {
+  type TransactionFeedbackState,
+} from "../components/TransactionFeedbackModal";
 import {
-  getStreamRecord,
   streamRecords,
   type StreamHealth,
   type StreamRecord,
   type StreamStatus,
 } from "../data/streamRecords";
+import { simulateTransaction } from "../lib/transactionFeedback";
 import "./Streams.css";
 
 type StatusFilter = "All" | StreamStatus;
+
+type CreateTransactionFeedback = {
+  status: TransactionFeedbackState;
+  streamId: string;
+  streamUrl: string;
+  payload: CreateStreamFormData;
+  completedAt?: string;
+  errorMessage?: string;
+  ledgerLabel?: string;
+  transactionHash?: string;
+};
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 
@@ -40,6 +55,81 @@ function getStatusClassName(status: StreamStatus) {
 
 function getHealthClassName(health: StreamHealth) {
   return health.toLowerCase();
+}
+
+function formatAddress(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length <= 16) return trimmed;
+  return `${trimmed.slice(0, 6)}...${trimmed.slice(-6)}`;
+}
+
+function addMonths(value: Date, months: number) {
+  const nextDate = new Date(value);
+  nextDate.setMonth(nextDate.getMonth() + months);
+  return nextDate;
+}
+
+function toIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function createStreamRecord(
+  payload: CreateStreamFormData,
+  streamId: string,
+): StreamRecord {
+  const startDate =
+    payload.startTimeOption === "custom" && payload.customStartDate
+      ? new Date(payload.customStartDate)
+      : new Date();
+  const roundedDuration = Math.max(1, Math.round(payload.durationInMonths));
+  const endDate = addMonths(startDate, roundedDuration);
+  const nextUnlockDate = addMonths(startDate, 1);
+
+  return {
+    id: streamId,
+    name: `Treasury stream ${streamId}`,
+    recipientName: `Wallet ${payload.recipient.slice(1, 7)}`,
+    recipientAddress: payload.recipient,
+    treasuryName: "Protocol Growth Treasury",
+    treasuryAddress: "GD3T...8PQ2",
+    asset: "USDC",
+    status: "Active",
+    monthlyRate: payload.accrualRate,
+    depositAmount: payload.depositAmount,
+    streamedAmount: 0,
+    withdrawableAmount: 0,
+    remainingAmount: payload.depositAmount,
+    progress: 0,
+    startDate: toIsoDate(startDate),
+    endDate: toIsoDate(endDate),
+    cliffDate: payload.cliffEnabled && payload.cliffDate ? payload.cliffDate : undefined,
+    nextUnlockDate: toIsoDate(nextUnlockDate),
+    summary:
+      "Freshly submitted treasury stream. Funding is reserved and the contract is waiting for the first accrual window to open.",
+    health: "Healthy",
+    healthNote:
+      "The stream has just been created. Confirm the recipient receives the share link and validate the first unlock against the expected schedule.",
+    auditNote:
+      "Created from the treasury create flow in this branch. Review the first settlement after the next unlock window.",
+    tags: ["Newly created", "Treasury action", "Monitor first unlock"],
+    timeline: [
+      {
+        date: toIsoDate(startDate),
+        title: "Transaction submitted",
+        detail: "Treasury initiated the stream from the create flow and funded the contract.",
+      },
+      {
+        date: toIsoDate(nextUnlockDate),
+        title: "Projected first unlock",
+        detail: "Recipient should begin seeing withdrawable balance once the first interval completes.",
+      },
+      {
+        date: toIsoDate(endDate),
+        title: "Scheduled completion",
+        detail: "The stream is expected to complete if the treasury keeps the current schedule unchanged.",
+      },
+    ],
+  };
 }
 
 function StatusPill({ status }: { status: StreamStatus }) {
@@ -483,16 +573,14 @@ export default function Streams() {
   const navigate = useNavigate();
   const { streamId } = useParams();
 
+  const [createdStreams, setCreatedStreams] = useState<StreamRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [expandedStreamId, setExpandedStreamId] = useState<string>(
     streamRecords[0]?.id ?? "",
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [createdStream, setCreatedStream] = useState({
-    id: "STR-NEW",
-    url: "https://fluxora.io/stream/STR-NEW",
-  });
+  const [createFeedback, setCreateFeedback] =
+    useState<CreateTransactionFeedback | null>(null);
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
@@ -502,12 +590,13 @@ export default function Streams() {
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
 
-  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
+  const allStreams = [...createdStreams, ...streamRecords];
+  const activeStreams = allStreams.filter((stream) => stream.status === "Active");
   const monthlyOutflow = activeStreams.reduce(
     (total, stream) => total + stream.monthlyRate,
     0,
   );
-  const withdrawableNow = streamRecords.reduce(
+  const withdrawableNow = allStreams.reduce(
     (total, stream) => total + stream.withdrawableAmount,
     0,
   );
@@ -517,9 +606,11 @@ export default function Streams() {
     .sort()[0];
   const visibleStreams =
     statusFilter === "All"
-      ? streamRecords
-      : streamRecords.filter((stream) => stream.status === statusFilter);
-  const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
+      ? allStreams
+      : allStreams.filter((stream) => stream.status === statusFilter);
+  const selectedStream = streamId
+    ? allStreams.find((stream) => stream.id === streamId)
+    : undefined;
   const effectiveExpandedId = visibleStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
@@ -530,16 +621,6 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   };
 
-  const handleStreamCreated = () => {
-    const generatedId = `STR-${String(streamRecords.length + 1).padStart(3, "0")}`;
-    setCreatedStream({
-      id: generatedId,
-      url: `https://fluxora.io/stream/${generatedId}`,
-    });
-    setIsCreateModalOpen(false);
-    setIsSuccessModalOpen(true);
-  };
-
   const handleCopyRecipient = async (stream: StreamRecord) => {
     try {
       await navigator.clipboard.writeText(stream.recipientAddress);
@@ -548,6 +629,162 @@ export default function Streams() {
       setToastMessage("Clipboard access is unavailable in this browser.");
     }
   };
+
+  const runCreateStreamTransaction = async (
+    payload: CreateStreamFormData,
+    previousFeedback?: CreateTransactionFeedback,
+  ) => {
+    const streamNumber = streamRecords.length + createdStreams.length + 1;
+    const generatedId =
+      previousFeedback?.streamId ??
+      `STR-${String(streamNumber).padStart(3, "0")}`;
+    const streamUrl =
+      previousFeedback?.streamUrl ??
+      new URL(`/app/streams/${generatedId}`, window.location.origin).toString();
+
+    setIsCreateModalOpen(false);
+    setCreateFeedback({
+      status: "pending",
+      streamId: generatedId,
+      streamUrl,
+      payload,
+    });
+
+    try {
+      const outcome = await simulateTransaction({
+        actionLabel: "Stream creation",
+      });
+      const createdRecord = createStreamRecord(payload, generatedId);
+
+      setCreatedStreams((current) =>
+        current.some((stream) => stream.id === generatedId)
+          ? current
+          : [createdRecord, ...current],
+      );
+      setCreateFeedback({
+        status: "success",
+        streamId: generatedId,
+        streamUrl,
+        payload,
+        completedAt: outcome.completedAt,
+        ledgerLabel: outcome.ledgerLabel,
+        transactionHash: outcome.transactionHash,
+      });
+    } catch (error) {
+      setCreateFeedback({
+        status: "failure",
+        streamId: generatedId,
+        streamUrl,
+        payload,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "We couldn't create the stream right now.",
+      });
+    }
+  };
+
+  const createFeedbackDetails = createFeedback
+    ? createFeedback.status === "success"
+      ? [
+          { label: "Stream ID", value: createFeedback.streamId, mono: true },
+          {
+            label: "Recipient",
+            value: formatAddress(createFeedback.payload.recipient),
+            mono: true,
+          },
+          {
+            label: "Locked amount",
+            value: `${createFeedback.payload.depositAmount.toFixed(2)} USDC`,
+          },
+          {
+            label: "Transaction hash",
+            value: createFeedback.transactionHash ?? "Pending hash",
+            mono: true,
+          },
+          {
+            label: "Finalized",
+            value: `${createFeedback.completedAt} • ${createFeedback.ledgerLabel}`,
+          },
+        ]
+      : [
+          {
+            label: "Recipient",
+            value: formatAddress(createFeedback.payload.recipient),
+            mono: true,
+          },
+          {
+            label: "Funding request",
+            value: `${createFeedback.payload.depositAmount.toFixed(2)} USDC`,
+          },
+          {
+            label: "Stream rate",
+            value: `${createFeedback.payload.accrualRate.toFixed(2)} USDC / month`,
+          },
+          {
+            label: "Start",
+            value:
+              createFeedback.payload.startTimeOption === "custom" &&
+              createFeedback.payload.customStartDate
+                ? new Date(createFeedback.payload.customStartDate).toLocaleString()
+                : "Immediately after approval",
+          },
+        ]
+    : [];
+
+  const createFeedbackActions = createFeedback
+    ? createFeedback.status === "success"
+      ? [
+          {
+            label: "View stream",
+            onClick: () => {
+              const currentStreamId = createFeedback.streamId;
+              setCreateFeedback(null);
+              navigate(`/app/streams/${currentStreamId}`);
+            },
+            autoFocus: true,
+          },
+          {
+            label: "Create another",
+            onClick: () => {
+              setCreateFeedback(null);
+              setIsCreateModalOpen(true);
+            },
+            variant: "secondary" as const,
+          },
+          {
+            label: "Close",
+            onClick: () => setCreateFeedback(null),
+            variant: "ghost" as const,
+          },
+        ]
+      : createFeedback.status === "failure"
+        ? [
+            {
+              label: "Retry transaction",
+              onClick: () =>
+                void runCreateStreamTransaction(
+                  createFeedback.payload,
+                  createFeedback,
+                ),
+              autoFocus: true,
+            },
+            {
+              label: "Back to form",
+              onClick: () => {
+                setCreateFeedback(null);
+                setIsCreateModalOpen(true);
+              },
+              variant: "secondary" as const,
+            },
+            {
+              label: "Dismiss",
+              onClick: () => setCreateFeedback(null),
+              variant: "ghost" as const,
+            },
+          ]
+        : []
+    : [];
 
   if (streamId && !selectedStream) {
     return (
@@ -561,17 +798,37 @@ export default function Streams() {
         <CreateStreamModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          onStreamCreated={handleStreamCreated}
+          onSubmit={(payload) => void runCreateStreamTransaction(payload)}
         />
-        <StreamCreatedModal
-          isOpen={isSuccessModalOpen}
-          onClose={() => setIsSuccessModalOpen(false)}
-          streamId={createdStream.id}
-          streamUrl={createdStream.url}
-          onCreateAnother={() => {
-            setIsSuccessModalOpen(false);
-            setIsCreateModalOpen(true);
-          }}
+        <TransactionFeedbackModal
+          isOpen={!!createFeedback}
+          state={createFeedback?.status ?? "pending"}
+          title={
+            createFeedback?.status === "success"
+              ? "Stream created and funded"
+              : createFeedback?.status === "failure"
+                ? "We couldn't create the stream"
+                : "Creating stream on Stellar"
+          }
+          description={
+            createFeedback?.status === "success"
+              ? "The treasury transaction finalized successfully and the recipient can begin accruing funds on schedule."
+              : createFeedback?.status === "failure"
+                ? createFeedback?.errorMessage ??
+                  "The wallet or network rejected the request before final submission."
+                : "Confirm the action in your wallet. We'll keep this screen updated while the transaction settles."
+          }
+          details={createFeedbackDetails}
+          note={
+            createFeedback?.status === "success"
+              ? "Share the stream route with the recipient, then confirm the first unlock appears on the expected schedule."
+              : createFeedback?.status === "failure"
+                ? "Nothing was finalized on-chain. You can retry immediately or return to the form to adjust the setup."
+                : "Pending transactions can take a few seconds on testnet. Keep this window open until the wallet confirms the outcome."
+          }
+          actions={createFeedbackActions}
+          dismissible={createFeedback?.status !== "pending"}
+          onClose={() => setCreateFeedback(null)}
         />
       </>
     );
@@ -609,7 +866,7 @@ export default function Streams() {
               <button
                 type="button"
                 className="streams-secondary-button"
-                onClick={() => navigate(`/app/streams/${streamRecords[0].id}`)}
+                onClick={() => navigate(`/app/streams/${allStreams[0].id}`)}
               >
                 Open featured deep dive
               </button>
@@ -687,17 +944,37 @@ export default function Streams() {
       <CreateStreamModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onStreamCreated={handleStreamCreated}
+        onSubmit={(payload) => void runCreateStreamTransaction(payload)}
       />
-      <StreamCreatedModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        streamId={createdStream.id}
-        streamUrl={createdStream.url}
-        onCreateAnother={() => {
-          setIsSuccessModalOpen(false);
-          setIsCreateModalOpen(true);
-        }}
+      <TransactionFeedbackModal
+        isOpen={!!createFeedback}
+        state={createFeedback?.status ?? "pending"}
+        title={
+          createFeedback?.status === "success"
+            ? "Stream created and funded"
+            : createFeedback?.status === "failure"
+              ? "We couldn't create the stream"
+              : "Creating stream on Stellar"
+        }
+        description={
+          createFeedback?.status === "success"
+            ? "The treasury transaction finalized successfully and the recipient can begin accruing funds on schedule."
+            : createFeedback?.status === "failure"
+              ? createFeedback?.errorMessage ??
+                "The wallet or network rejected the request before final submission."
+              : "Confirm the action in your wallet. We'll keep this screen updated while the transaction settles."
+        }
+        details={createFeedbackDetails}
+        note={
+          createFeedback?.status === "success"
+            ? "Share the stream route with the recipient, then confirm the first unlock appears on the expected schedule."
+            : createFeedback?.status === "failure"
+              ? "Nothing was finalized on-chain. You can retry immediately or return to the form to adjust the setup."
+              : "Pending transactions can take a few seconds on testnet. Keep this window open until the wallet confirms the outcome."
+        }
+        actions={createFeedbackActions}
+        dismissible={createFeedback?.status !== "pending"}
+        onClose={() => setCreateFeedback(null)}
       />
 
       {toastMessage ? (
