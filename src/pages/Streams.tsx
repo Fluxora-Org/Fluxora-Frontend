@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import CreateStreamModal, {
   type CreateStreamFormData,
 } from "../components/CreateStreamModal";
+import EmptyState from "../components/EmptyState";
+import StreamsLoading from "../components/StreamsLoading";
 import TransactionFeedbackModal, {
   type TransactionFeedbackState,
 } from "../components/TransactionFeedbackModal";
@@ -573,6 +575,7 @@ export default function Streams() {
   const navigate = useNavigate();
   const { streamId } = useParams();
 
+  const [loading, setLoading] = useState(true);
   const [createdStreams, setCreatedStreams] = useState<StreamRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [expandedStreamId, setExpandedStreamId] = useState<string>(
@@ -582,6 +585,12 @@ export default function Streams() {
   const [createFeedback, setCreateFeedback] =
     useState<CreateTransactionFeedback | null>(null);
   const [toastMessage, setToastMessage] = useState("");
+  const walletConnected = true;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLoading(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!toastMessage) return undefined;
@@ -589,6 +598,8 @@ export default function Streams() {
     const timer = window.setTimeout(() => setToastMessage(""), 2200);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
+
+  if (loading) return <StreamsLoading />;
 
   const allStreams = [...createdStreams, ...streamRecords];
   const activeStreams = allStreams.filter((stream) => stream.status === "Active");
@@ -611,6 +622,8 @@ export default function Streams() {
   const selectedStream = streamId
     ? allStreams.find((stream) => stream.id === streamId)
     : undefined;
+  const hasStreams = allStreams.length > 0;
+  const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
   const effectiveExpandedId = visibleStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
@@ -843,6 +856,23 @@ export default function Streams() {
           onCreateSimilar={handleCreateStream}
           onCopyAddress={() => void handleCopyRecipient(selectedStream)}
         />
+      ) : showEmptyState ? (
+        <section>
+          <h1 style={{ marginTop: 0 }}>Streams</h1>
+          <p style={{ color: "var(--muted)" }}>
+            Create and manage USDC streams. Set rate, duration, and cliff from
+            the treasury.
+          </p>
+          <EmptyState
+            variant="streams"
+            walletConnected={walletConnected}
+            onPrimaryAction={
+              walletConnected
+                ? handleCreateStream
+                : () => navigate("/connect-wallet")
+            }
+          />
+        </section>
       ) : (
         <>
           <section className="streams-hero">

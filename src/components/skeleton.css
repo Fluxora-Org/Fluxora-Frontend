@@ -1,57 +1,109 @@
+/* ── Skeleton tokens ─────────────────────────────────────────────────────── */
+:root {
+  --skeleton-base: #1a2438;
+  --skeleton-shine: #243048;
+}
+
 .skeleton {
-  background: linear-gradient(90deg, #e9e9ee 25%, #f4f4f7 50%, #e9e9ee 75%);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
   border-radius: 6px;
 }
 
 .skeleton-static {
-  background-color: #e9e9ee;
+  background-color: var(--skeleton-base);
   border-radius: 6px;
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
+/* ── Treasury overview layout ────────────────────────────────────────────── */
 .treasury-loading-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .treasury-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .metric-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 1.25rem;
   display: flex;
   gap: 0.75rem;
   align-items: center;
 }
 
-.metric-icon {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+.metric-icon  { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 8px; }
+.metric-text  { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.metric-label { height: 10px; width: 45%; }
+.metric-value { height: 18px; width: 65%; }
+
+/* ── Recent streams table ────────────────────────────────────────────────── */
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
 }
 
-.metric-text { flex: 1; }
-.metric-label { height: 10px; width: 45%; margin-bottom: 8px; }
-.metric-value { height: 16px; width: 65%; }
+.recent-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
 
-.recent-header { display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem; }
-.recent-table { width:100%; border-collapse: collapse; margin-top:0.75rem; }
-.recent-table th { text-align:left; color: var(--muted); font-size:0.8rem; padding: 0.5rem 0; }
-.recent-table td { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
-.stream-two-lines { display:flex; flex-direction:column; gap:6px; }
-.action-placeholder { width:28px; height:28px; border-radius:6px; }
+.recent-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.stream-two-lines { display: flex; flex-direction: column; gap: 6px; }
+.action-placeholder { width: 28px; height: 28px; border-radius: 6px; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .treasury-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .recent-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  .treasury-metrics {
+    grid-template-columns: 1fr;
+  }
+}

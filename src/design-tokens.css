@@ -1,0 +1,291 @@
+/**
+ * Design Tokens: Base + Theme Overrides
+ * ──────────────────────────────────────
+ * 
+ * This file establishes the single source of truth for all
+ * visual attributes: colors, typography, spacing, animations.
+ * 
+ * Usage:
+ *   .my-element {
+ *     background: var(--color-bg-primary);
+ *     padding: var(--space-lg);
+ *   }
+ * 
+ * Theme Switching:
+ *   document.documentElement.setAttribute("data-theme", "dark");
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   1. COLOR TOKENS – LIGHT THEME (default)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Background Layers ─── */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f7fa;
+  --color-bg-tertiary: #eef2f7;
+
+  /* ─── Surface Layers ─── */
+  --color-surface-default: #ffffff;
+  --color-surface-elevated: #f9fafb;
+  --color-surface-raised: #f3f4f6;
+  --color-surface-highest: #eeeff2;
+
+  /* ─── Borders ─── */
+  --color-border-default: #e0e6ed;
+  --color-border-secondary: #d5dce5;
+
+  /* ─── Text ─── */
+  --color-text-primary: #1a1f36;
+  --color-text-secondary: #4a5565;
+  --color-text-tertiary: #6b7a94;
+  --color-text-muted: #8b92a9;
+  --color-text-inverse: #ffffff;
+
+  /* ─── Semantic Colors (Light theme context) ─── */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --color-focus: #0ea5e9;
+
+  /* ─── Interactive / Brand ─── */
+  --color-accent-primary: #00b8d4;
+  --color-accent-secondary: #00d4aa;
+  --color-accent-primary-dark: #0097a7;
+  --color-accent-secondary-dark: #00a884;
+
+  /* ─── Backgrounds for Status Colors ─── */
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. COLOR TOKENS – DARK THEME (override via data-theme)
+   ═══════════════════════════════════════════════════════════ */
+
+:root[data-theme="dark"] {
+  /* ─── Background Layers ─── */
+  --color-bg-primary: #0a0e17;
+  --color-bg-secondary: #121a2a;
+  --color-bg-tertiary: #1a232f;
+
+  /* ─── Surface Layers ─── */
+  --color-surface-default: #141927;
+  --color-surface-elevated: #1e2a3c;
+  --color-surface-raised: #25364a;
+  --color-surface-highest: #2c3e52;
+
+  /* ─── Borders ─── */
+  --color-border-default: #1e2d42;
+  --color-border-secondary: #2a3d54;
+
+  /* ─── Text ─── */
+  --color-text-primary: #e8ecf4;
+  --color-text-secondary: #b8c2d6;
+  --color-text-tertiary: #8b96a8;
+  --color-text-muted: #6b738a;
+  --color-text-inverse: #0a0e17;
+
+  /* ─── Semantic Colors (Dark theme context) ─── */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --color-focus: #0ea5e9;
+
+  /* ─── Interactive / Brand ─── */
+  --color-accent-primary: #00b8d4;
+  --color-accent-secondary: #00d4aa;
+  --color-accent-primary-dark: #0097a7;
+  --color-accent-secondary-dark: #00a884;
+
+  /* ─── Backgrounds for Status Colors ─── */
+  --color-success-bg: rgba(16, 185, 129, 0.15);
+  --color-warning-bg: rgba(245, 158, 11, 0.15);
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-info-bg: rgba(59, 130, 246, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. TYPOGRAPHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --font-family-base: "Plus Jakarta Sans", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+
+  /* ─── Heading Scale ─── */
+  /* font: weight size/line-height family; */
+  --font-heading-1: 500 36px / 44px var(--font-family-base);
+  --font-heading-2: 600 24px / 32px var(--font-family-base);
+  --font-heading-3: 600 18px / 28px var(--font-family-base);
+  --font-heading-4: 600 16px / 24px var(--font-family-base);
+
+  /* ─── Body Scale ─── */
+  --font-body-lg: 400 16px / 24px var(--font-family-base);
+  --font-body-md: 400 14px / 20px var(--font-family-base);
+  --font-body-sm: 400 12px / 16px var(--font-family-base);
+
+  /* ─── Labels & Controls ─── */
+  --font-label-lg: 500 14px / 20px var(--font-family-base);
+  --font-label-md: 500 12px / 16px var(--font-family-base);
+  --font-label-sm: 500 11px / 14px var(--font-family-base);
+
+  /* ─── Code / Monospace ─── */
+  --font-mono-sm: 400 12px / 16px var(--font-family-mono);
+
+  /* ─── Letter Spacing ─── */
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. SPACING TOKENS (8px base scale)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. BORDER RADIUS TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. SHADOWS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+  /* ─── Accent-specific shadows ─── */
+  --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.2);
+  --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.2);
+}
+
+/* Dark theme shadow adjustments */
+:root[data-theme="dark"] {
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+
+  --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.25);
+  --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. TRANSITIONS & ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 200ms ease-in-out;
+  --transition-slow: 300ms ease-in-out;
+
+  /* ─── Easing functions (explicit) ─── */
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+  --ease-cubic: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ─── Pulse animation (for skeletons, loaders) ─── */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ─── Spin animation (for loading spinners) ─── */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Modal entrance animation ─── */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Modal exit animation ─── */
+@keyframes modalExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. BREAKPOINTS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --breakpoint-xs: 320px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. FOCUS / ACCESSIBILITY
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Focus ring: 2px solid focus color with 2px offset */
+  --focus-outline: 2px solid var(--color-focus);
+  --focus-outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. RESPONSIVE MOTION (prefers-reduced-motion)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import AppNavbar from "./AppNavbar";
 import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
-import "./layout.css";
+import "./Layout.css";
 
-type NavItem = {
-  to: string;
-  label: string;
-  shortLabel: string;
-};
+type NavItem = { to: string; label: string; shortLabel: string };
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/app", label: "Dashboard", shortLabel: "D" },
@@ -22,50 +17,19 @@ interface LayoutProps {
   theme?: "light" | "dark";
 }
 
-export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) {
+export default function Layout({
+  onThemeToggle: _onThemeToggle,
+  theme: _theme = "light",
+}: LayoutProps) {
   const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-
-  const handleConnectFreighter = () => {
-    setWalletAddress("GABC1234567890XYZ1");
-    setIsModalOpen(false);
-  };
-
-  const handleConnectAlbedo = () => {
-    setWalletAddress("GABC1234567890XYZ1");
-    setIsModalOpen(false);
-  };
-
-  const handleConnectWalletConnect = () => {
-    setWalletAddress("GABC1234567890XYZ1");
-    setIsModalOpen(false);
-  };
-
-  const handleDisconnect = () => {
-    setWalletAddress(null);
-  };
-
-  const closeMobileSidebar = () => {
-    setIsMobileSidebarOpen(false);
-  };
-
   const showFooter = !location.pathname.includes("/treasurypage");
+  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
 
   return (
-    <div
-      className={`app-layout${isSidebarCollapsed ? " is-collapsed" : ""}${isMobileSidebarOpen ? " is-mobile-open" : ""}`}
-    >
-      <AppNavbar
-        onThemeToggle={onThemeToggle}
-        theme={theme}
-        network="TESTNET"
-        walletAddress={walletAddress}
-        onDisconnect={handleDisconnect}
-      />
-
+    <div className={`app-layout${isSidebarCollapsed ? " is-collapsed" : ""}${isMobileSidebarOpen ? " is-mobile-open" : ""}`}>
       <div className="app-layout__body">
         <aside id="app-sidebar" className="app-sidebar" aria-label="Primary navigation">
           <div className="app-sidebar-header">
@@ -120,9 +84,7 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
                 <rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
               </svg>
             </span>
-            <span className="app-connect-label">
-              {walletAddress ? "Switch wallet" : "Connect wallet"}
-            </span>
+            <span className="app-connect-label">Connect wallet</span>
           </button>
         </aside>
 
@@ -159,9 +121,9 @@ export default function Layout({ onThemeToggle, theme = "light" }: LayoutProps) 
       <ConnectWalletModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onConnectFreighter={handleConnectFreighter}
-        onConnectAlbedo={handleConnectAlbedo}
-        onConnectWalletConnect={handleConnectWalletConnect}
+        onConnectFreighter={() => setIsModalOpen(false)}
+        onConnectAlbedo={() => setIsModalOpen(false)}
+        onConnectWalletConnect={() => setIsModalOpen(false)}
       />
     </div>
   );

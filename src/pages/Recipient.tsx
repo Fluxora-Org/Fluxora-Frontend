@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import EmptyState from "../components/EmptyState";
+import RecipientLoading from "../components/RecipientLoading";
 import TransactionFeedbackModal, {
   type TransactionFeedbackState,
 } from "../components/TransactionFeedbackModal";
@@ -15,6 +17,7 @@ type WithdrawFeedback = {
 };
 
 export default function Recipient() {
+  const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(22600.0);
   const [activeStreams] = useState(2);
   const [totalAccrued] = useState(43250.0);
@@ -23,8 +26,14 @@ export default function Recipient() {
     useState<WithdrawFeedback | null>(null);
   const walletConnected = true;
   const walletAddress = "GBRP...9XZ2";
+  const hasStreams = activeStreams > 0;
 
   const disabled = !walletConnected || balance === 0;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLoading(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const handleWithdraw = async () => {
     if (disabled) return;
@@ -127,6 +136,28 @@ export default function Recipient() {
           },
         ]
     : [];
+
+  if (loading) return <RecipientLoading />;
+
+  if (!walletConnected || !hasStreams) {
+    return (
+      <div>
+        <h1 style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}>
+          Your streams
+        </h1>
+        <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
+          View your incoming streams and withdraw accrued USDC at any time.
+        </p>
+        <EmptyState
+          variant="recipient"
+          walletConnected={walletConnected}
+          onPrimaryAction={() =>
+            window.location.assign(walletConnected ? "/#docs" : "/connect-wallet")
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -257,7 +288,7 @@ export default function Recipient() {
   );
 }
 
-const card: React.CSSProperties = {
+const card: CSSProperties = {
   marginTop: "1.5rem",
   maxWidth: 900,
   width: "100%",
@@ -267,7 +298,7 @@ const card: React.CSSProperties = {
   padding: "2rem",
 };
 
-const cardLabel: React.CSSProperties = {
+const cardLabel: CSSProperties = {
   fontSize: "0.875rem",
   color: "var(--accent-soft)",
   marginBottom: "0.25rem",
@@ -276,13 +307,13 @@ const cardLabel: React.CSSProperties = {
   fontWeight: 600,
 };
 
-const cardValue: React.CSSProperties = {
+const cardValue: CSSProperties = {
   fontSize: "3rem",
   fontWeight: 700,
   marginBottom: "0.5rem",
 };
 
-const button = (disabled: boolean): React.CSSProperties => ({
+const button = (disabled: boolean): CSSProperties => ({
   padding: "0.75rem 1rem",
   background: disabled ? "var(--surface)" : "var(--accent-gradient)",
   color: disabled ? "var(--muted)" : "white",
@@ -299,13 +330,13 @@ const button = (disabled: boolean): React.CSSProperties => ({
   marginTop: 28,
 });
 
-const divider: React.CSSProperties = {
+const divider: CSSProperties = {
   margin: "2rem 0 1.5rem",
   height: 1,
   background: "rgba(255, 255, 255, 0.06)",
 };
 
-const statsRow: React.CSSProperties = {
+const statsRow: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   flexWrap: "wrap",
@@ -313,13 +344,13 @@ const statsRow: React.CSSProperties = {
   width: "80%",
 };
 
-const statLabel: React.CSSProperties = {
+const statLabel: CSSProperties = {
   color: "var(--muted)",
   fontSize: "0.85rem",
   marginBottom: "0.4rem",
 };
 
-const statValue: React.CSSProperties = {
+const statValue: CSSProperties = {
   fontWeight: 600,
   fontSize: "1.1rem",
 };

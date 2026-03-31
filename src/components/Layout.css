@@ -1,8 +1,15 @@
 .app-layout {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   position: relative;
   background: var(--bg);
+}
+
+.app-layout__body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
 .app-sidebar {
@@ -85,6 +92,12 @@
   color: #ecf4ff;
 }
 
+.app-nav-link.is-active {
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  color: #ecfeff;
+}
+
 .app-nav-badge {
   width: 1.6rem;
   height: 1.6rem;
@@ -139,6 +152,7 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .app-mobile-topbar {
