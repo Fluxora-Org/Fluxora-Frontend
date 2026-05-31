@@ -29,6 +29,18 @@
   --surface-raised: #e8ecf1;
   --surface-highest: #dfe5ed;
 
+/* Icon sizes */
+--icon-size-xs: 16px;   /* inline */
+--icon-size-sm: 20px;   /* button/label */
+--icon-size-md: 24px;   /* standalone */
+--icon-size-lg: 32px;   /* hero/empty-state */
+
+/* Utility classes for icon sizing */
+.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
+.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
+.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); }
+.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+
   /* ===== TEXT ===== */
   --text-vivid: #1a1f36;
   --text-secondary: #4a5565;

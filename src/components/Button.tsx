@@ -24,6 +24,8 @@ import React, { ReactNode, ButtonHTMLAttributes } from 'react';
 import styles from './Button.module.css';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Icon size */
+  iconSize?: 'xs' | 'sm' | 'md' | 'lg';
   /** Button content (text, icon, or both) */
   children?: ReactNode;
   
@@ -76,6 +78,7 @@ export default function Button({
   variant = 'primary',
   size = 'md',
   fullWidth = false,
+  iconSize = 'sm',
   icon,
   iconOnly = false,
   loading = false,
@@ -128,11 +131,11 @@ export default function Button({
       {...props}
     >
       {/* Icon */}
-      {icon && (
-        <span className={styles.buttonIcon} aria-hidden="true">
-          {icon}
-        </span>
-      )}
+        {icon && (
+          <span className={`icon-${iconSize} ${styles.buttonIcon}`} aria-hidden={iconOnly ? undefined : "true"}>
+            {icon}
+          </span>
+        )}
 
       {/* Loading state */}
       {loading ? (
