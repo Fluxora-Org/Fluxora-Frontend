@@ -554,6 +554,44 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   10. STREAM TIMELINE TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Timeline bar segments */
+  --timeline-segment-cliff-color: var(--color-warning, #f59e0b);
+  --timeline-segment-cliff-opacity: 0.85;
+  --timeline-segment-accrual-start: #2dd4bf;
+  --timeline-segment-accrual-end: #0ea5e9;
+  --timeline-segment-accrual-opacity: 0.95;
+  --timeline-segment-remaining-bg: var(--color-surface-raised, #e8ecf1);
+  --timeline-segment-remaining-opacity: 0.6;
+
+  /* Marker and animations */
+  --timeline-marker-color: var(--color-text-primary, #1a1f36);
+  --timeline-marker-pulse: 2s ease-in-out infinite;
+
+  /* Status-specific overrides */
+  --timeline-status-active: inherit;
+  --timeline-status-completed: var(--color-success, #10b981);
+  --timeline-status-paused: grayscale(50%);
+
+  /* Responsive dimensions */
+  --timeline-bar-height-mobile: 36px;
+  --timeline-bar-height-tablet: 56px;
+  --timeline-bar-height-desktop: 64px;
+  --timeline-label-gap: 0.5rem;
+  --timeline-legend-gap: 1rem;
+}
+
+[data-theme="dark"] {
+  --timeline-segment-cliff-opacity: 0.9;
+  --timeline-segment-accrual-opacity: 1;
+  --timeline-segment-remaining-bg: var(--color-surface-raised, #3a4556);
+  --timeline-segment-remaining-opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════════════════
    10. FOCUS / ACCESSIBILITY
    ═══════════════════════════════════════════════════════════ */
 

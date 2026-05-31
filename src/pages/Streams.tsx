@@ -10,6 +10,7 @@ import StreamsLoading from "../components/StreamsLoading";
 import Input from "../components/Input";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { Pagination } from "../components/Pagination";
+import StreamTimeline from "../components/StreamTimeline";
 import {
   getStreamRecord,
   streamRecords,
@@ -380,6 +381,21 @@ function StreamDetail({
           label="Remaining"
           value={formatUsdc(stream.remainingAmount)}
           description="Still reserved for future unlocks."
+        />
+      </section>
+
+      {/* Stream Timeline Visualization */}
+      <section className="stream-detail__timeline-section">
+        <h2 className="stream-detail__section-header">Stream Timeline</h2>
+        <StreamTimeline
+          startDate={stream.startDate}
+          cliffDate={stream.cliffDate}
+          currentDate={new Date().toISOString()}
+          endDate={stream.endDate}
+          withdrawableAmount={stream.withdrawableAmount}
+          totalAmount={stream.depositAmount}
+          status={stream.status.toLowerCase() as "active" | "paused" | "completed" | "upcoming"}
+          isLoading={false}
         />
       </section>
 
