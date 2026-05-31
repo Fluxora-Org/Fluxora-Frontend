@@ -141,6 +141,26 @@
   --skeleton-base: #e6edf5;
   --skeleton-shine: #ffffff;
 
+  /* ─── Tooltip ─── */
+  --tooltip-bg: var(--surface-elevated);
+  --tooltip-border: var(--border-neutral);
+  --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --tooltip-title-color: var(--text-vivid);
+  --tooltip-text-color: var(--text-secondary);
+  --tooltip-z-index: 1100;
+
+  /* ─── Inline Unit Badge (for input suffixes) ─── */
+  --input-badge-bg: var(--surface-neutral);
+  --input-badge-color: var(--text-muted);
+  --input-badge-padding: 4px 8px;
+  --input-badge-border-radius: 4px;
+
+  /* ─── Info Icon ─── */
+  --icon-info-default: var(--text-muted);
+  --icon-info-hover: var(--accent);
+  --icon-info-active: var(--accent-dim);
+  --icon-info-size: 16px;
+
   /* Navbar */
   --navbar-bg: #ffffff;
   --navbar-border: #e0e6ed;
@@ -257,6 +277,15 @@
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
   --skeleton-shine: #38516f;
+
+  /* ─── Tooltip (dark theme) ─── */
+  --tooltip-bg: #2a2f3a;
+  --tooltip-border: #404854;
+  --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* ─── Inline Unit Badge (dark theme) ─── */
+  --input-badge-bg: #1f242c;
+  --input-badge-color: #9ca5b4;
 
   /* Navbar */
   --navbar-bg: #0f1419;

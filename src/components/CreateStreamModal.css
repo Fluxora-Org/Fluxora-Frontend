@@ -277,11 +277,17 @@
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.875rem;
   font-weight: 500;
   margin-bottom: 0.375rem;
   color: var(--text);
+}
+
+.form-label .info-tooltip-wrapper {
+  margin-left: auto;
 }
 
 .required {
