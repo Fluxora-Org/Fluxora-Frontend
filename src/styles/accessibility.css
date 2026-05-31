@@ -6,10 +6,11 @@
  * elements (buttons, links, form inputs, etc.)
  * 
  * Standards:
- * - WCAG 2.1 AA - Focus visibility and keyboard navigation
+ * - WCAG 2.1 AA - 2.4.7 Focus Visible (keyboard navigation)
+ * - WCAG 2.1 AA - 2.4.11 Focus Appearance (2px width, 3:1 contrast)
  * - :focus-visible for keyboard-only focus (better UX)
  * - Respects prefers-reduced-motion for animations
- * - Contrast: 4.5:1 focus ring vs background
+ * - Dual-layer approach: outline + box-shadow for guaranteed visibility
  * 
  * Import this file early in your app:
  *   import './styles/accessibility.css'
@@ -17,10 +18,11 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    UNIVERSAL FOCUS-VISIBLE STYLING
-   (Keyboard-only focus indicators)
+   ─────────────────────────────────────────────────────────────────────────
+   Keyboard-only focus indicators (no focus ring on mouse click)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Interactive elements that can receive focus */
+/* ─── All Interactive Elements ─── */
 button:focus-visible,
 a[href]:focus-visible,
 input:focus-visible,
@@ -29,18 +31,17 @@ select:focus-visible,
 [role="button"]:focus-visible,
 [role="link"]:focus-visible,
 [role="menuitem"]:focus-visible,
-[role="tab"]:focus-visible {
-  /* Cyan focus ring with 2px offset (per design spec) */
-  outline: 2px solid var(--color-focus, #0ea5e9);
-  outline-offset: 2px;
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible {
+  /* Layer 1: Outline (accessible in high-contrast mode) */
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  
+  /* Layer 2: Box-shadow (not clipped by overflow:hidden) */
+  box-shadow: var(--focus-ring-shadow);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   REMOVE FOCUS RING FOR MOUSE CLICKS
-   (Improve UX: focus ring only shows for keyboard navigation)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* :focus handles both mouse AND keyboard in older browsers */
+/* ─── Fallback for Older Browsers (no :focus-visible support) ─── */
 button:focus,
 a[href]:focus,
 input:focus,
@@ -48,12 +49,12 @@ textarea:focus,
 select:focus,
 [role="button"]:focus,
 [role="link"]:focus {
-  /* :focus-visible will override this in modern browsers */
-  outline: 2px solid var(--color-focus, #0ea5e9);
-  outline-offset: 2px;
+  /* Will be overridden by :not(:focus-visible) in modern browsers */
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
-/* Hide focus ring for mouse clicks in modern browsers */
+/* ─── Remove Focus Ring for Mouse Clicks (Modern Browsers) ─── */
 button:not(:focus-visible):focus,
 a[href]:not(:focus-visible):focus,
 input:not(:focus-visible):focus,
@@ -62,6 +63,7 @@ select:not(:focus-visible):focus,
 [role="button"]:not(:focus-visible):focus,
 [role="link"]:not(:focus-visible):focus {
   outline: none;
+  box-shadow: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -83,12 +85,15 @@ select:not(:focus-visible):focus,
 .skipToMain:focus-visible {
   top: var(--space-lg, 16px);
   left: var(--space-lg, 16px);
-  outline: 2px solid var(--color-focus, #0ea5e9);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FOCUS MANAGEMENT FOR COMMON FORM INPUTS
+   FOCUS MANAGEMENT FOR FORM INPUTS
+   ─────────────────────────────────────────────────────────────────────────
+   Form inputs use border + subtle glow instead of outline for tight integration
    ═══════════════════════════════════════════════════════════════════════════ */
 
 input[type="text"]:focus-visible,
@@ -99,10 +104,14 @@ input[type="url"]:focus-visible,
 input[type="tel"]:focus-visible,
 input[type="number"]:focus-visible,
 input[type="date"]:focus-visible,
+input[type="datetime-local"]:focus-visible,
+input[type="time"]:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  /* Add subtle glow for form inputs */
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  /* Override default outline, use border + glow instead */
+  outline: none;
+  border: var(--focus-ring-input-border);
+  box-shadow: var(--focus-ring-input-shadow);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -111,8 +120,8 @@ select:focus-visible {
 
 input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible {
-  outline: 2px solid var(--color-focus, #0ea5e9);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -130,13 +139,24 @@ a[href] {
 a[href]:visited {
   color: var(--color-accent-secondary, #00d4aa);
 }
+NAVIGATION LINKS
+   ─────────────────────────────────────────────────────────────────────────
+   Links in navigation get larger offset for better visual separation
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-a[href]:active {
-  opacity: 0.8;
+nav a[href]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 4px; /* Larger offset for nav links */
+  box-shadow: var(--focus-ring-shadow);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FOCUS TRAP (Modal/Dialog)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[role="dialog"]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset)Dialog)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* When a modal is active, remove focus-visible from background elements */

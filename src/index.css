@@ -101,12 +101,13 @@ a:hover {
 /* ═══════════════════════════════════════════════════════════
    FOCUS MANAGEMENT
    ─────────────────────────────────────────────────────────
-   Baseline focus styles. Outlines follow the element's
-   border-radius in modern browsers, but can be clipped by
-   ancestors with `overflow: hidden`. We also paint the ring
-   as an outset box-shadow so it remains visible even when
-   outlines are clipped — while keeping an `outline` so
-   high-contrast and forced-colors modes still show an indicator.
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance Compliant
+   
+   Baseline focus styles use a dual-layer approach:
+   - Outline: Follows border-radius, visible in high-contrast mode
+   - Box-shadow: Not clipped by overflow:hidden ancestors
+   
+   This ensures focus ring visibility in all scenarios.
    ═══════════════════════════════════════════════════════════ */
 
 button:focus,
@@ -195,9 +196,9 @@ nav a:focus-visible {
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--focus-ring-color);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: 4px;
-  box-shadow: 0 0 0 4px var(--focus-ring-halo);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 .button:active:not(:disabled) {

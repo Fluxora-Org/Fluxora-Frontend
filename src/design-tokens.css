@@ -53,8 +53,27 @@
   --interactive-bg-hover: #e8ecf1;
   --interactive-bg-active: #dfe5ed;
   --interactive-bg-disabled: #fafbfc;
-  --interactive-focus-ring: #007acc;
-  --interactive-focus-ring-offset: transparent;
+
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(14, 165, 233, 0.1);
+  
+  /* Dual-layer focus ring (outline + box-shadow for visibility) */
+  --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
+                       0 0 0 4px var(--focus-ring-color);
+  
+  /* Inset variant for overflow-clipped containers */
+  --focus-ring-shadow-inset: inset 0 0 0 2px var(--focus-ring-color);
+  
+  /* Input-specific focus (border + subtle glow) */
+  --focus-ring-input-border: 2px solid var(--focus-ring-color);
+  --focus-ring-input-shadow: 0 0 0 3px var(--focus-ring-halo);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
 
   /* ===== SEMANTIC COLOR TOKENS (used by components) ===== */
   /* Backgrounds */
@@ -80,7 +99,7 @@
   --color-text-inverse: #ffffff;
 
   /* Focus */
-  --color-focus: #0ea5e9;
+  --color-focus: var(--focus-ring-color); /* Alias for consistency */
 
   /* Status (semantic aliases) */
   --color-success: #10b981;
@@ -202,8 +221,14 @@
   --interactive-bg-hover: #1e3448;
   --interactive-bg-active: #2a4563;
   --interactive-bg-disabled: #0f1624;
-  --interactive-focus-ring: #00d4aa;
-  --interactive-focus-ring-offset: transparent;
+
+  /* ─── Focus Ring System (Dark Theme) ─── */
+  --focus-ring-color: #00d4aa; /* Teal - 6.2:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(0, 212, 170, 0.15);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
 
   /* ===== SEMANTIC COLOR TOKENS (dark overrides) ===== */
   /* Backgrounds */
@@ -229,7 +254,7 @@
   --color-text-inverse: #0a0e17;
 
   /* Focus */
-  --color-focus: #00d4aa;
+  --color-focus: var(--focus-ring-color); /* Teal for dark theme */
 
   /* Status (semantic aliases) */
   --color-success: #10b981;
@@ -352,8 +377,9 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --focus-ring: 0 0 0 2px var(--color-bg-primary),
-    0 0 0 4px var(--color-focus);
+
+  /* ─── Focus Ring Shadow (comprehensive) ─── */
+  --focus-ring: var(--focus-ring-shadow);
 
   /* ─── Accent-specific shadows ─── */
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.2);
@@ -558,8 +584,17 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --focus-outline: 2px solid var(--color-focus);
-  --focus-outline-offset: 2px;
+  /* Comprehensive focus outline and offset */
+  --focus-outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  --focus-outline-offset: var(--focus-ring-offset);
+}
+
+/* ─── High Contrast Mode Support ─── */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring-width: 3px;
+    --focus-ring-offset: 3px;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

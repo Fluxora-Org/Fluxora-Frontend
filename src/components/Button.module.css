@@ -46,11 +46,21 @@
 
 /* ═══════════════════════════════════════════════════════════
    FOCUS STATE (Keyboard Navigation)
+   ─────────────────────────────────────────────────────────
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance
    ═══════════════════════════════════════════════════════════ */
 
 .button:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  /* Dual-layer approach for guaranteed visibility */
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-shadow);
+}
+
+/* Remove focus ring for mouse clicks */
+.button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
 }
 
 /* ═══════════════════════════════════════════════════════════
