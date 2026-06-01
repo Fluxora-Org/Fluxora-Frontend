@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
@@ -19,8 +19,17 @@ export default function StreamCreatedModal({
   onCreateAnother,
 }: StreamCreatedModalProps) {
   const [copied, setCopied] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAnnouncement("Success! Your USDC stream is now live on Stellar.");
+      const timer = setTimeout(() => setAnnouncement(""), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   useModalAccessibility({
     isOpen,
@@ -49,6 +58,9 @@ export default function StreamCreatedModal({
         aria-describedby="stream-created-description"
         tabIndex={-1}
       >
+        <div className="sr-only" aria-live="assertive">
+          {announcement}
+        </div>
         <button
           ref={closeButtonRef}
           className={styles.closeButton}

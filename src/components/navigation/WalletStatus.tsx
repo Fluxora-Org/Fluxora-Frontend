@@ -20,6 +20,7 @@ export default function WalletStatus({
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const focusRingClassName =
     "outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--navbar-bg)]";
@@ -48,6 +49,13 @@ export default function WalletStatus({
     };
   }, []);
 
+  useEffect(() => {
+    // Announce connection on mount
+    setAnnouncement(`Wallet connected: ${truncate(address)}`);
+    const timer = setTimeout(() => setAnnouncement(""), 1000);
+    return () => clearTimeout(timer);
+  }, [address]);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(address);
@@ -58,6 +66,9 @@ export default function WalletStatus({
 
   return (
     <div ref={ref} className="flex items-center gap-2">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
       {/* Network Badge */}
       {isWrongNetwork ? (
         <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
