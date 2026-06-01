@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import StatusPill from "./StatusPill";
-import { Stream } from "./Stream";
+import type { Stream } from "./Stream";
 
 interface Props {
   stream: Stream;
@@ -10,23 +10,28 @@ export default function StreamRow({ stream }: Props) {
   const navigate = useNavigate();
 
   return (
-    <tr 
-      className="transition-colors duration-150"
-      style={{ 
+    <tr
+      style={{
         borderBottom: "1px solid var(--color-border-default)",
         backgroundColor: "var(--color-surface-default)",
+        transition:
+          "background-color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)")}
-      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--color-surface-default)")}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--color-surface-default)";
+      }}
     >
       <td className="py-4 px-3">
-        <div 
+        <div
           className="font-medium"
           style={{ color: "var(--color-text-primary)" }}
         >
           {stream.name}
         </div>
-        <div 
+        <div
           className="text-xs"
           style={{ color: "var(--color-text-muted)" }}
         >
@@ -34,11 +39,17 @@ export default function StreamRow({ stream }: Props) {
         </div>
       </td>
 
-      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
+      <td
+        className="py-4 px-3"
+        style={{ color: "var(--color-text-primary)" }}
+      >
         {stream.recipient}
       </td>
 
-      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
+      <td
+        className="py-4 px-3"
+        style={{ color: "var(--color-text-primary)" }}
+      >
         {stream.rate}
       </td>
 
@@ -48,13 +59,23 @@ export default function StreamRow({ stream }: Props) {
 
       <td className="py-4 px-3">
         <button
+          type="button"
           onClick={() => navigate(`/app/streams/${stream.id}`)}
-          className="font-medium flex items-center gap-1 transition-colors duration-200"
-          style={{ color: "var(--color-accent-primary)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-accent-primary-dark)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-accent-primary)")}
+          aria-label={`View details for ${stream.name}`}
+          className="font-medium flex items-center gap-1"
+          style={{
+            color: "var(--color-accent-primary)",
+            transition:
+              "color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--color-accent-primary-dark)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--color-accent-primary)";
+          }}
         >
-          View ↗
+          View -&gt;
         </button>
       </td>
     </tr>

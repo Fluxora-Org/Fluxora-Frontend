@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import CreateStreamModal from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
@@ -24,6 +31,8 @@ import {
   formatDetailTime,
   getUrgencyLevel,
 } from "../lib/timePresentation";
+import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
@@ -31,6 +40,7 @@ import TruncatedAddress from "../components/common/TruncatedAddress";
 type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
+const DISCLOSURE_DURATION_MS = 200;
 
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
@@ -89,20 +99,108 @@ function StreamMetricCard({
   );
 }
 
+function StreamDisclosure({
+  expanded,
+  disclosureId,
+  labelledBy,
+  children,
+}: {
+  expanded: boolean;
+  disclosureId: string;
+  labelledBy: string;
+  children: ReactNode;
+}) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [isRendered, setIsRendered] = useState(expanded);
+  const [isVisible, setIsVisible] = useState(expanded);
+  const [maxHeight, setMaxHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!isRendered) return undefined;
+
+    const node = contentRef.current;
+    if (!node) return undefined;
+
+    const updateHeight = () => {
+      setMaxHeight(node.scrollHeight);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(node);
+
+    return () => resizeObserver.disconnect();
+  }, [children, isRendered]);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setIsRendered(expanded);
+      setIsVisible(expanded);
+      return undefined;
+    }
+
+    if (expanded) {
+      setIsRendered(true);
+      const animationFrame = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+      return () => window.cancelAnimationFrame(animationFrame);
+    }
+
+    setIsVisible(false);
+    const timer = window.setTimeout(() => {
+      setIsRendered(false);
+    }, DISCLOSURE_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [expanded, prefersReducedMotion]);
+
+  if (!isRendered) return null;
+
+  return (
+    <div
+      className={`stream-card__disclosure${isVisible ? " is-open" : ""}`}
+      id={disclosureId}
+      role="region"
+      aria-hidden={!expanded}
+      aria-labelledby={labelledBy}
+      style={
+        {
+          "--stream-disclosure-max-height": `${Math.max(maxHeight, 1)}px`,
+        } as CSSProperties
+      }
+    >
+      <div className="stream-card__disclosure-inner" ref={contentRef}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function StreamCard({
   stream,
   expanded,
   onToggle,
   onOpenDetail,
+  onAnnounceToggle,
 }: {
   stream: StreamRecord;
   expanded: boolean;
   onToggle: () => void;
   onOpenDetail: () => void;
+  onAnnounceToggle: (expanded: boolean) => void;
 }) {
   const urgency = getUrgencyLevel(stream.cliffDate, stream.endDate);
   const cliffStatus = getCliffStatusText(stream.cliffDate);
   const endRelative = getRelativeTime(stream.endDate);
+  const disclosureId = `stream-expanded-${stream.id}`;
+  const toggleId = `stream-toggle-${stream.id}`;
 
   return (
     <article className={`stream-card is-${getStatusClassName(stream.status)}`}>
@@ -124,9 +222,13 @@ function StreamCard({
           <button
             type="button"
             className="streams-secondary-button"
-            onClick={onToggle}
+            id={toggleId}
+            onClick={() => {
+              onToggle();
+              onAnnounceToggle(!expanded);
+            }}
             aria-expanded={expanded}
-            aria-controls={`stream-expanded-${stream.id}`}
+            aria-controls={disclosureId}
           >
             {expanded ? "Collapse deep dive" : "Expand deep dive"}
           </button>
@@ -205,11 +307,12 @@ function StreamCard({
         </div>
       </div>
 
-      {expanded ? (
-        <div
-          className="stream-card__expanded"
-          id={`stream-expanded-${stream.id}`}
-        >
+      <StreamDisclosure
+        expanded={expanded}
+        disclosureId={disclosureId}
+        labelledBy={toggleId}
+      >
+        <div className="stream-card__expanded">
           <div className="stream-card__metrics">
             <StreamMetricCard
               label="Deposited"
@@ -291,7 +394,7 @@ function StreamCard({
             </aside>
           </div>
         </div>
-      ) : null}
+      </StreamDisclosure>
     </article>
   );
 }
@@ -543,6 +646,7 @@ function StreamNotFound({
 export default function Streams() {
   const navigate = useNavigate();
   const { streamId } = useParams();
+  const { announcement, announce } = useLiveAnnouncer();
 
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -687,6 +791,10 @@ export default function Streams() {
 
   return (
     <div className="streams-page">
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+
       {selectedStream ? (
         <StreamDetail
           stream={selectedStream}
@@ -842,6 +950,13 @@ export default function Streams() {
                     onToggle={() =>
                       setExpandedStreamId((current) =>
                         current === stream.id ? "" : stream.id,
+                      )
+                    }
+                    onAnnounceToggle={(nextExpanded) =>
+                      announce(
+                        `${stream.name} deep dive ${
+                          nextExpanded ? "expanded" : "collapsed"
+                        }.`,
                       )
                     }
                     onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}

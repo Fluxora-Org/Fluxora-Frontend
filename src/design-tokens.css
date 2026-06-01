@@ -388,6 +388,10 @@
   --ease-out: ease-out;
   --ease-in-out: ease-in-out;
   --ease-cubic: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /* Component motion tokens */
+  --motion-duration-stream-disclosure: 200ms;
+  --motion-ease-stream-disclosure: var(--ease-out);
 }
 
 /* ─── Pulse animation (skeletons, loaders) ─── */
@@ -567,6 +571,10 @@
    ═══════════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-stream-disclosure: 0ms;
+  }
+
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
