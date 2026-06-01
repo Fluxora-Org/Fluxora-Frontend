@@ -48,6 +48,16 @@
   --status-warning: #ffa726;
   --status-info: #00b8d4;
 
+    /* ─── Component-friendly semantic status tokens (dark) ─── */
+    --status-success: var(--color-success);
+    --status-warning: var(--color-warning);
+    --status-error: var(--color-danger);
+    --status-info: var(--color-info);
+
+    --status-success-bg: var(--color-success-bg);
+    --status-warning-bg: var(--color-warning-bg);
+    --status-error-bg: var(--color-danger-bg);
+    --status-info-bg: var(--color-info-bg);
   /* ===== INTERACTIVE ===== */
   --interactive-bg-default: #f0f3f7;
   --interactive-bg-hover: #e8ecf1;
@@ -87,6 +97,17 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-info: #3b82f6;
+
+  /* ─── Component-friendly semantic status tokens ─── */
+  --status-success: var(--color-success);
+  --status-warning: var(--color-warning);
+  --status-error: var(--color-danger);
+  --status-info: var(--color-info);
+
+  --status-success-bg: var(--color-success-bg);
+  --status-warning-bg: var(--color-warning-bg);
+  --status-error-bg: var(--color-danger-bg);
+  --status-info-bg: var(--color-info-bg);
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   /* These keep existing components working without changes */
