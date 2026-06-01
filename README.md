@@ -31,6 +31,13 @@ npm install
 npm run dev
 ```
 
+Or with pnpm:
+
+```bash
+pnpm install
+pnpm run dev
+```
+
 App runs at [http://localhost:5173](http://localhost:5173).
 
 ### Build for production
@@ -38,6 +45,13 @@ App runs at [http://localhost:5173](http://localhost:5173).
 ```bash
 npm run build
 npm run preview
+```
+
+Or with pnpm:
+
+```bash
+pnpm run build
+pnpm run preview
 ```
 
 ## Project structure
