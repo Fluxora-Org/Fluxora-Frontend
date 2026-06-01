@@ -6,14 +6,14 @@
  * colors, typography, spacing, shadows, animations.
  *
  * Usage:
- *   .my-element {
- *     background: var(--color-bg-primary);
- *     padding: var(--space-lg);
- *   }
+ * .my-element {
+ * background: var(--color-bg-primary);
+ * padding: var(--space-lg);
+ * }
  *
  * Theme switching:
- *   document.documentElement.setAttribute("data-theme", "dark");
- *   document.documentElement.setAttribute("data-theme", "light");
+ * document.documentElement.setAttribute("data-theme", "dark");
+ * document.documentElement.setAttribute("data-theme", "light");
  */
 
 /* ═══════════════════════════════════════════════════════════
@@ -87,6 +87,10 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-info: #3b82f6;
+
+  --color-error-border: #DC2626;
+  --color-error-text: #B91C1C;
+  --color-error-bg: #FEF2F2;
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   /* These keep existing components working without changes */
@@ -237,6 +241,10 @@
   --color-danger: #ef4444;
   --color-info: #3b82f6;
 
+  --color-error-border: #EF4444;
+  --color-error-text: #FCA5A5;
+  --color-error-bg: rgba(220, 38, 38, 0.1);
+
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   --bg: var(--surface-base);
   --surface: var(--surface-neutral);
@@ -354,6 +362,8 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   --focus-ring: 0 0 0 2px var(--color-bg-primary),
     0 0 0 4px var(--color-focus);
+    
+  --shadow-error-focus: 0 0 0 3px rgba(220, 38, 38, 0.2);
 
   /* ─── Accent-specific shadows ─── */
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.2);
@@ -368,6 +378,8 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  
+  --shadow-error-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);
 
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.25);
   --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.25);
