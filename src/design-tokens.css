@@ -541,6 +541,39 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   NAVIGATION HIERARCHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Primary nav items (Dashboard, Streams, Recipient) ─── */
+  --nav-primary-color: var(--navbar-link-color);
+  --nav-primary-color-hover: var(--color-text-primary);
+  --nav-primary-color-active: var(--color-accent-secondary);
+  --nav-primary-bg-hover: var(--color-surface-raised);
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+  --nav-primary-font: var(--font-label-lg);
+  --nav-primary-border-active: 2px solid var(--color-accent-secondary);
+
+  /* ─── Secondary/utility nav items (Settings, Help) ─── */
+  --nav-secondary-color: var(--color-text-muted);
+  --nav-secondary-color-hover: var(--color-text-secondary);
+  --nav-secondary-font: var(--font-label-md);
+
+  /* ─── Breadcrumb ─── */
+  --breadcrumb-color: var(--color-text-tertiary);
+  --breadcrumb-color-hover: var(--color-text-primary);
+  --breadcrumb-color-current: var(--color-text-primary);
+  --breadcrumb-separator-color: var(--color-text-muted);
+  --breadcrumb-font: var(--font-body-sm);
+  --breadcrumb-gap: var(--space-sm);
+  --breadcrumb-focus-ring: var(--focus-ring);
+}
+
+:root[data-theme="dark"] {
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 15%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════
    9. BREAKPOINTS
    ═══════════════════════════════════════════════════════════ */
 
