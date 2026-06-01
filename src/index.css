@@ -273,6 +273,39 @@ button[aria-label*="Switch"]:hover {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   EMPTY STATE — RESPONSIVE BREAKPOINTS
+   Covers search-no-results and error variants (Issue #220).
+   The base component uses clamp() for padding/font; these rules
+   handle layout adjustments at the four QA breakpoints.
+   ═══════════════════════════════════════════════════════════ */
+
+/* 320px — narrowest supported viewport */
+@media (max-width: 320px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 32px 12px;
+  }
+}
+
+/* 375px — standard mobile */
+@media (max-width: 375px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 36px 14px;
+  }
+}
+
+/* 768px — tablet: ensure description text doesn't overflow */
+@media (max-width: 768px) {
+  [role="region"][aria-label="Search no results state"] p,
+  [role="region"][aria-label="Error state"] p {
+    max-width: 100%;
+  }
+}
+
+/* 1024px — desktop: no overrides needed; clamp() handles it */
+
+/* ═══════════════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════════════ */
 

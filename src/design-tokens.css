@@ -141,6 +141,25 @@
   --skeleton-base: #e6edf5;
   --skeleton-shine: #ffffff;
 
+  /* ─── Empty State Variants ─── */
+  /* search-no-results */
+  --es-search-icon-stroke: #0e7490;
+  --es-search-icon-fill: rgba(14, 116, 144, 0.08);
+  --es-search-icon-bg: rgba(14, 116, 144, 0.06);
+  --es-search-icon-border: rgba(14, 116, 144, 0.20);
+  --es-search-cta-bg: rgba(14, 116, 144, 0.10);
+  --es-search-cta-border: rgba(14, 116, 144, 0.25);
+  --es-search-cta-text: #0e7490; /* 4.5:1+ on light surface */
+
+  /* error */
+  --es-error-icon-stroke: #dc2626;
+  --es-error-icon-fill: rgba(220, 38, 38, 0.08);
+  --es-error-icon-bg: rgba(220, 38, 38, 0.06);
+  --es-error-icon-border: rgba(220, 38, 38, 0.22);
+  --es-error-cta-bg: rgba(220, 38, 38, 0.10);
+  --es-error-cta-border: rgba(220, 38, 38, 0.28);
+  --es-error-cta-text: #b91c1c; /* 4.5:1+ on light surface */
+
   /* Navbar */
   --navbar-bg: #ffffff;
   --navbar-border: #e0e6ed;
@@ -257,6 +276,25 @@
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
   --skeleton-shine: #38516f;
+
+  /* ─── Empty State Variants (dark overrides) ─── */
+  /* search-no-results */
+  --es-search-icon-stroke: #5ED3F3;
+  --es-search-icon-fill: rgba(94, 211, 243, 0.08);
+  --es-search-icon-bg: rgba(94, 211, 243, 0.08);
+  --es-search-icon-border: rgba(94, 211, 243, 0.20);
+  --es-search-cta-bg: rgba(94, 211, 243, 0.12);
+  --es-search-cta-border: rgba(94, 211, 243, 0.25);
+  --es-search-cta-text: #5ED3F3; /* 4.5:1+ on dark surface */
+
+  /* error */
+  --es-error-icon-stroke: #EF4444;
+  --es-error-icon-fill: rgba(239, 68, 68, 0.10);
+  --es-error-icon-bg: rgba(239, 68, 68, 0.08);
+  --es-error-icon-border: rgba(239, 68, 68, 0.25);
+  --es-error-cta-bg: rgba(239, 68, 68, 0.12);
+  --es-error-cta-border: rgba(239, 68, 68, 0.30);
+  --es-error-cta-text: #EF4444; /* 4.5:1+ on dark surface */
 
   /* Navbar */
   --navbar-bg: #0f1419;
