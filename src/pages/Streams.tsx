@@ -92,20 +92,53 @@ function StreamMetricCard({
 function StreamCard({
   stream,
   expanded,
+  selected,
   onToggle,
+  onSelect,
   onOpenDetail,
 }: {
   stream: StreamRecord;
   expanded: boolean;
+  selected: boolean;
   onToggle: () => void;
+  onSelect: () => void;
   onOpenDetail: () => void;
 }) {
   const urgency = getUrgencyLevel(stream.cliffDate, stream.endDate);
   const cliffStatus = getCliffStatusText(stream.cliffDate);
   const endRelative = getRelativeTime(stream.endDate);
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    // Enter/Space selects the card; do not intercept if a button inside is focused
+    if (
+      e.target === e.currentTarget &&
+      (e.key === "Enter" || e.key === " ")
+    ) {
+      e.preventDefault();
+      onSelect();
+    }
+  }
+
+  const classNames = [
+    "stream-card",
+    `is-${getStatusClassName(stream.status)}`,
+    selected ? "is-selected" : "",
+    expanded ? "is-expanded" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <article className={`stream-card is-${getStatusClassName(stream.status)}`}>
+    <article
+      className={classNames}
+      tabIndex={0}
+      role="article"
+      aria-selected={selected}
+      aria-expanded={expanded}
+      aria-label={`${stream.name} — ${stream.status}`}
+      onClick={onSelect}
+      onKeyDown={handleKeyDown}
+    >
       <div className="stream-card__header">
         <div>
           <div className="stream-card__title-row">
@@ -124,7 +157,7 @@ function StreamCard({
           <button
             type="button"
             className="streams-secondary-button"
-            onClick={onToggle}
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
             aria-expanded={expanded}
             aria-controls={`stream-expanded-${stream.id}`}
           >
@@ -133,7 +166,7 @@ function StreamCard({
           <button
             type="button"
             className="streams-ghost-button"
-            onClick={onOpenDetail}
+            onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
           >
             Open detail
           </button>
@@ -207,8 +240,14 @@ function StreamCard({
 
       {expanded ? (
         <div
-          className="stream-card__expanded"
+          className="stream-card__expanded-wrapper"
+          data-state="open"
           id={`stream-expanded-${stream.id}`}
+          role="region"
+          aria-label={`${stream.name} deep dive`}
+        >
+        <div
+          className="stream-card__expanded"
         >
           <div className="stream-card__metrics">
             <StreamMetricCard
@@ -290,6 +329,7 @@ function StreamCard({
               </div>
             </aside>
           </div>
+        </div>
         </div>
       ) : null}
     </article>
@@ -551,6 +591,7 @@ export default function Streams() {
   const [expandedStreamId, setExpandedStreamId] = useState<string>(
     streamRecords[0]?.id ?? "",
   );
+  const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdStream, setCreatedStream] = useState({
@@ -832,15 +873,21 @@ export default function Streams() {
               </div>
             </div>
 
-            <div className="streams-list">
+            <div className="streams-list" role="list" aria-label="Stream cards">
               {visibleStreams.length > 0 ? (
                 visibleStreams.map((stream) => (
                   <StreamCard
                     key={stream.id}
                     stream={stream}
                     expanded={effectiveExpandedId === stream.id}
+                    selected={selectedStreamId === stream.id}
                     onToggle={() =>
                       setExpandedStreamId((current) =>
+                        current === stream.id ? "" : stream.id,
+                      )
+                    }
+                    onSelect={() =>
+                      setSelectedStreamId((current) =>
                         current === stream.id ? "" : stream.id,
                       )
                     }
