@@ -720,3 +720,115 @@
     font-size: 0.9rem;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   STREAM CARD INTERACTION STATES
+   hover · selected · expanded · focus-ring
+   WCAG 2.1 AA compliant
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Base: make cards interactive ─── */
+.stream-card {
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+  /* Ensure focus ring is visible outside the card bounds */
+  outline: none;
+}
+
+/* ─── Hover state ─── */
+/* Background lifts, border brightens (≥3:1 UI contrast vs default border) */
+.stream-card:hover {
+  background-color: var(--stream-card-hover-bg);
+  border-color: var(--stream-card-hover-border);
+  box-shadow: var(--stream-card-hover-shadow);
+  transform: var(--stream-card-hover-transform);
+}
+
+/* ─── Focus-visible ring ─── */
+/* 2px solid + 2px offset — visible on all backgrounds, keyboard-only */
+.stream-card:focus-visible {
+  outline: none;
+  box-shadow: var(--stream-card-focus-ring);
+  border-color: var(--interactive-focus-ring);
+}
+
+/* ─── Selected state ─── */
+/* Accent border at full opacity (≥3:1 UI contrast) + subtle tint */
+.stream-card.is-selected {
+  background-color: var(--stream-card-selected-bg);
+  border-color: var(--stream-card-selected-border);
+  box-shadow: var(--stream-card-selected-shadow);
+}
+
+/* Selected + hover: keep selected border, deepen shadow */
+.stream-card.is-selected:hover {
+  box-shadow: var(--stream-card-selected-shadow),
+    var(--stream-card-hover-shadow);
+  transform: var(--stream-card-hover-transform);
+}
+
+/* Selected + focus: ring on top of selected border */
+.stream-card.is-selected:focus-visible {
+  box-shadow: var(--stream-card-focus-ring),
+    var(--stream-card-selected-shadow);
+}
+
+/* ─── Expanded state ─── */
+/* Slightly different tint to signal "open" without losing status color */
+.stream-card.is-expanded {
+  background-color: var(--stream-card-expanded-bg);
+  border-color: var(--stream-card-expanded-border);
+}
+
+.stream-card.is-expanded .stream-card__header {
+  background-color: var(--stream-card-expanded-header-bg);
+  border-radius: 18px 18px 0 0;
+  margin: -1.2rem -1.2rem 1rem;
+  padding: 1.2rem;
+}
+
+/* ─── Expanded panel animation ─── */
+/* overflow:hidden on wrapper + max-height transition = smooth expand/collapse */
+.stream-card__expanded-wrapper {
+  overflow: hidden;
+  transition: var(--stream-expand-transition);
+}
+
+.stream-card__expanded-wrapper[data-state="open"] {
+  max-height: 2000px; /* large enough for any content */
+  opacity: 1;
+}
+
+.stream-card__expanded-wrapper[data-state="closed"] {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ─── Expand/collapse button affordance ─── */
+.streams-secondary-button:focus-visible,
+.streams-ghost-button:focus-visible,
+.streams-primary-button:focus-visible,
+.streams-filter-button:focus-visible,
+.streams-link-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ─── Reduced motion: disable transforms and long transitions ─── */
+@media (prefers-reduced-motion: reduce) {
+  .stream-card,
+  .stream-card__expanded-wrapper {
+    transition: none;
+    transform: none !important;
+  }
+
+  .stream-card__expanded-wrapper[data-state="open"],
+  .stream-card__expanded-wrapper[data-state="closed"] {
+    max-height: none;
+    opacity: 1;
+  }
+}
