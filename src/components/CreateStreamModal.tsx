@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
+import { InputWithUnit } from './InputWithUnit';
+import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 
 function maskAddress(addr: string): string {
@@ -380,61 +382,118 @@ export default function CreateStreamModal({
             </div>
 
             {/* Stream Rate */}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <InputField
+            <div className="form-group">
+              <label htmlFor="create-stream-accrual-rate" className="form-label">
+                Stream rate
+                {<span className="required" aria-hidden="true"> *</span>}
+                <InfoTooltip
+                  id="stream-rate-tooltip"
+                  title="How is stream rate calculated?"
+                  ariaLabel="Learn more about stream rate calculation"
+                  content={
+                    <>
+                      <p>
+                        The stream rate is the amount of USDC that accrues to the 
+                        recipient per day. For example, a rate of 38.62 USDC/day 
+                        means the recipient can withdraw approximately 270 USDC 
+                        after 7 days.
+                      </p>
+                      <p style={{ marginTop: '8px', fontWeight: 500 }}>
+                        Formula: Total Deposit ÷ Duration = Stream Rate
+                      </p>
+                    </>
+                  }
+                />
+              </label>
+              <div className={`input-container ${accrualRateError ? 'input-container--error' : accrualRateSuccess ? 'input-container--success' : ''}`.trim()}>
+                <InputWithUnit
                   id="create-stream-accrual-rate"
-                  label="Stream rate"
-                  required
-                  error={accrualRateError}
-                  helperText="How much USDC accrues per time unit"
-                  success={accrualRateSuccess}
-                >
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={accrualRate}
-                    onChange={(e) => setAccrualRate(e.target.value)}
-                    onBlur={() => handleBlur('accrualRate')}
-                    placeholder="0.00"
-                  />
-                </InputField>
+                  unit="USDC / day"
+                  type="text"
+                  inputMode="decimal"
+                  value={accrualRate}
+                  onChange={(e) => setAccrualRate(e.target.value)}
+                  onBlur={() => handleBlur('accrualRate')}
+                  placeholder="0.00"
+                  hasError={Boolean(accrualRateError)}
+                  aria-required="true"
+                  aria-invalid={Boolean(accrualRateError)}
+                  aria-describedby={accrualRateError ? 'create-stream-accrual-rate-error' : 'create-stream-accrual-rate-hint'}
+                />
               </div>
-              <div className="input-container narrow" style={{ marginTop: '1.625rem', flexShrink: 0 }}>
-                <span style={{ color: 'transparent' }}>_</span>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: 'var(--muted)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              {accrualRateError && (
+                <span id="create-stream-accrual-rate-error" className="validation-message validation-message--error" role="alert">
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                    <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                    <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+                  </svg>
+                  {accrualRateError}
+                </span>
+              )}
+              {!accrualRateError && (
+                <span id="create-stream-accrual-rate-hint" className="validation-message validation-message--hint" role="status">
+                  How much USDC the recipient earns per day
+                </span>
+              )}
             </div>
 
             {/* Stream Duration */}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <InputField
+            <div className="form-group">
+              <label htmlFor="create-stream-duration" className="form-label">
+                Stream duration
+                {<span className="required" aria-hidden="true"> *</span>}
+                <InfoTooltip
+                  id="stream-duration-tooltip"
+                  title="Understanding stream duration"
+                  ariaLabel="Learn more about stream duration"
+                  content={
+                    <>
+                      <p>
+                        The duration defines the total length of the stream in days.
+                        After this period ends, the full deposit amount will have 
+                        been streamed to the recipient.
+                      </p>
+                      <p style={{ marginTop: '8px' }}>
+                        Example: A 7-day stream transfers funds continuously over 
+                        one week. The recipient can withdraw at any time during 
+                        this period.
+                      </p>
+                    </>
+                  }
+                />
+              </label>
+              <div className={`input-container ${durationError ? 'input-container--error' : durationSuccess ? 'input-container--success' : ''}`.trim()}>
+                <InputWithUnit
                   id="create-stream-duration"
-                  label="Stream duration"
-                  required
-                  error={durationError}
-                  helperText="How long the stream will run before ending"
-                  success={durationSuccess}
-                >
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    onBlur={() => handleBlur('duration')}
-                    placeholder="1"
-                  />
-                </InputField>
+                  unit="days"
+                  type="text"
+                  inputMode="decimal"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  onBlur={() => handleBlur('duration')}
+                  placeholder="1"
+                  hasError={Boolean(durationError)}
+                  aria-required="true"
+                  aria-invalid={Boolean(durationError)}
+                  aria-describedby={durationError ? 'create-stream-duration-error' : 'create-stream-duration-hint'}
+                />
               </div>
-              <div className="input-container narrow" style={{ marginTop: '1.625rem', flexShrink: 0 }}>
-                <span style={{ color: 'transparent' }}>_</span>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: 'var(--muted)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              {durationError && (
+                <span id="create-stream-duration-error" className="validation-message validation-message--error" role="alert">
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                    <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                    <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+                  </svg>
+                  {durationError}
+                </span>
+              )}
+              {!durationError && (
+                <span id="create-stream-duration-hint" className="validation-message validation-message--hint" role="status">
+                  How many days the stream will run before ending
+                </span>
+              )}
             </div>
 
             {/* Start Time */}
@@ -478,12 +537,41 @@ export default function CreateStreamModal({
 
             {/* Cliff Period */}
             <div className="form-group">
-              <label className="form-label">Cliff period <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <label className="form-label">
+                Cliff period{' '}
+                <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(optional)</span>
+                <InfoTooltip
+                  id="cliff-tooltip"
+                  title="What is a cliff?"
+                  ariaLabel="Learn more about cliff periods"
+                  content={
+                    <>
+                      <p>
+                        A cliff is a vesting lockup period. During the cliff:
+                      </p>
+                      <ul style={{ marginTop: '4px', marginLeft: '16px', listStyle: 'disc' }}>
+                        <li>USDC continues to accrue normally</li>
+                        <li>The recipient CANNOT withdraw any funds</li>
+                        <li>After the cliff date, all accrued funds become withdrawable</li>
+                      </ul>
+                      <p style={{ marginTop: '8px' }}>
+                        <strong>Common use case:</strong> Employee compensation where vesting 
+                        "cliff" prevents withdrawal for the first 3-6 months, 
+                        ensuring commitment before funds are accessible.
+                      </p>
+                      <p style={{ marginTop: '8px' }}>
+                        Example: 1-year stream with 3-month cliff = No withdrawals 
+                        for 3 months, then all accrued USDC becomes available.
+                      </p>
+                    </>
+                  }
+                />
+              </label>
               <div className="toggle-container" onClick={() => setCliffEnabled(!cliffEnabled)}>
                 <div className={`toggle-switch ${cliffEnabled ? 'on' : ''}`}>
                   <div className="toggle-knob" />
                 </div>
-                <span>Enable cliff (no withdrawals until specific date)</span>
+                <span>Enable cliff (vesting lockup until specific date)</span>
               </div>
               {cliffEnabled && (
                 <div style={{ marginTop: '0.75rem' }}>
@@ -492,7 +580,7 @@ export default function CreateStreamModal({
                     label="Cliff date"
                     required
                     error={cliffDateError}
-                    helperText="No accrual until cliff time. Useful for vesting schedules"
+                    helperText="The recipient cannot withdraw until this date, even though USDC accrues"
                     success={cliffDateSuccess}
                   >
                     <input

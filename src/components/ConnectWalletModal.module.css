@@ -280,3 +280,250 @@
     transition: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR STATES
+   ═══════════════════════════════════════════════════════════ */
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-md) 0 var(--space-lg);
+  animation: fadeIn var(--transition-base);
+}
+
+.errorIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-lg);
+  font-size: 1.75rem;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.errorIcon::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: var(--radius-full);
+  border: 2px dashed currentColor;
+  opacity: 0.15;
+  animation: spin 20s linear infinite;
+}
+
+.iconNotInstalled {
+  background: var(--color-info-bg);
+  color: var(--status-info);
+}
+
+.iconRejected {
+  background: var(--color-danger-bg);
+  color: var(--status-error);
+}
+
+.iconMismatch {
+  background: var(--color-warning-bg);
+  color: var(--status-warning);
+}
+
+.errorTitle {
+  font: var(--font-heading-3);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-sm);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.errorDescription {
+  font: var(--font-body-md);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 var(--space-xl);
+  max-width: 440px;
+}
+
+/* Specific Instructions for Network Mismatch */
+.errorInstructions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto var(--space-xl);
+  padding: 0;
+  list-style: none;
+}
+
+.instructionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  text-align: left;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.instructionNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--interactive-bg-default);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.instructionText {
+  font: var(--font-body-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.instructionText strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* Action buttons */
+.actionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 320px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-cta-primary-bg);
+  color: var(--color-cta-primary-text);
+  font: var(--font-label-lg);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-cta-primary);
+  transition:
+    background-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.primaryButton:hover {
+  background: var(--color-cta-primary-bg-hover);
+  box-shadow: var(--shadow-cta-primary-hover);
+  transform: translateY(-1px);
+}
+
+.primaryButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+.primaryButton:active {
+  transform: translateY(0);
+  background: var(--color-cta-primary-bg-active);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-cta-secondary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-cta-secondary-bg);
+  color: var(--color-cta-secondary-text);
+  font: var(--font-label-lg);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.secondaryButton:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+}
+
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DESIGN QA PREVIEW TOOLBAR
+   ═══════════════════════════════════════════════════════════ */
+
+.previewToolbar {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px dashed var(--color-border-default);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.previewTitle {
+  font: var(--font-label-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.previewBtnGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  justify-content: center;
+}
+
+.previewButton {
+  background: var(--interactive-bg-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px var(--space-sm);
+  font: var(--font-label-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.previewButton:hover {
+  background: var(--interactive-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-secondary);
+}
+
+.previewButtonActive {
+  background: var(--color-accent-primary);
+  color: var(--color-cta-primary-text);
+  border-color: var(--color-accent-primary);
+  font-weight: 600;
+}

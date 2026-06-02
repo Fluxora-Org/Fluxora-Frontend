@@ -1,0 +1,519 @@
+/**
+ * StreamTimeline.module.css
+ * 
+ * Styles for stream timeline visualization component
+ * Supports multiple states: active, paused, completed, upcoming
+ * Responsive design: mobile (320px), tablet (768px), desktop (1024px+)
+ * WCAG 2.1 AA compliant with sufficient color contrast
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   Container and Layout
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 1rem);
+  padding: var(--space-md, 1rem);
+  background: var(--color-surface-default, #fafbfc);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-default, #e0e6ed);
+}
+
+.stream-timeline-container:focus-within {
+  outline: 2px solid var(--interactive-focus-ring, #007acc);
+  outline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Screen Reader Only Content
+   ───────────────────────────────────────────────────────────── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Timeline Bar
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 48px;
+  background: var(--color-surface-elevated, #f0f3f7);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  overflow: hidden;
+  margin: var(--space-md, 1rem) 0;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive: smaller bar on mobile */
+@media (max-width: 375px) {
+  .stream-timeline-bar {
+    height: 36px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Timeline Segments
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-bar__segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 100%;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+  overflow: hidden;
+}
+
+/* Cliff segment (hatched pattern) */
+.stream-timeline-bar__segment--cliff {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning, #f59e0b),
+    var(--color-warning, #f59e0b) 8px,
+    var(--color-warning-bg, rgba(245, 158, 11, 0.3)) 8px,
+    var(--color-warning-bg, rgba(245, 158, 11, 0.3)) 16px
+  );
+  opacity: 0.85;
+  min-width: 12px;
+}
+
+.stream-timeline-bar__segment--cliff.is-active {
+  opacity: 1;
+}
+
+.stream-timeline-bar__segment--cliff.is-completed {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-success, #10b981),
+    var(--color-success, #10b981) 8px,
+    var(--color-success-bg, rgba(16, 185, 129, 0.3)) 8px,
+    var(--color-success-bg, rgba(16, 185, 129, 0.3)) 16px
+  );
+  opacity: 0.7;
+}
+
+.stream-timeline-bar__segment--cliff.is-paused {
+  opacity: 0.6;
+  filter: grayscale(50%);
+}
+
+/* Accrual segment (solid progress fill) */
+.stream-timeline-bar__segment--accrual {
+  background: linear-gradient(90deg, #2dd4bf, #0ea5e9);
+  opacity: 0.95;
+  min-width: 12px;
+}
+
+.stream-timeline-bar__segment--accrual.is-active {
+  background: linear-gradient(90deg, #1db8a2, #0989d4);
+  opacity: 1;
+  animation: accrual-shimmer 3s ease-in-out infinite;
+}
+
+.stream-timeline-bar__segment--accrual.is-completed {
+  background: linear-gradient(90deg, #10b981, #059669);
+  opacity: 0.8;
+  animation: none;
+}
+
+.stream-timeline-bar__segment--accrual.is-paused {
+  opacity: 0.5;
+  filter: grayscale(50%);
+}
+
+/* Accrual shimmer animation for active streams */
+@keyframes accrual-shimmer {
+  0%, 100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Remaining segment (empty state) */
+.stream-timeline-bar__segment--remaining {
+  background: var(--color-surface-raised, #e8ecf1);
+  opacity: 0.6;
+  border-right: 1px solid var(--color-border-neutral, #e0e6ed);
+}
+
+.stream-timeline-bar__segment--remaining.is-completed {
+  opacity: 0.4;
+}
+
+/* Segment labels */
+.stream-timeline-bar__segment-label {
+  position: absolute;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.5px;
+}
+
+.stream-timeline-bar__segment--remaining .stream-timeline-bar__segment-label {
+  color: var(--color-text-secondary, #4a5565);
+  text-shadow: none;
+}
+
+@media (max-width: 375px) {
+  .stream-timeline-bar__segment-label {
+    font-size: 0.65rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Current Date Marker
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-bar__marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: calc(100% + 6px);
+  background: var(--color-text-primary, #1a1f36);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  animation: marker-pulse 2s ease-in-out infinite;
+}
+
+@keyframes marker-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Date Labels
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  margin-top: var(--space-sm, 0.5rem);
+  height: 3rem;
+}
+
+.stream-timeline-labels__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  gap: 0.25rem;
+}
+
+.stream-timeline-labels__date {
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+  white-space: nowrap;
+}
+
+.stream-timeline-labels__label {
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary, #6b7a94);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Cliff date positioning */
+.stream-timeline-labels__cliff {
+  position: absolute;
+  transform: translateX(-50%);
+  left: 0;
+}
+
+/* Handle date overflow on mobile - truncate if necessary */
+@media (max-width: 375px) {
+  .stream-timeline-labels__item {
+    font-size: 0.65rem;
+  }
+
+  .stream-timeline-labels__date {
+    max-width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 320px) {
+  .stream-timeline-labels__date {
+    font-size: 0.6rem;
+    max-width: 40px;
+  }
+
+  .stream-timeline-labels__label {
+    display: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Legend
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: var(--space-md, 1rem);
+  padding-top: var(--space-md, 1rem);
+  border-top: 1px solid var(--color-border-default, #e0e6ed);
+  font-size: 0.85rem;
+}
+
+.stream-timeline-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-secondary, #4a5565);
+}
+
+.stream-timeline-legend__swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-default, #e0e6ed);
+}
+
+.stream-timeline-legend__swatch--cliff {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning, #f59e0b),
+    var(--color-warning, #f59e0b) 4px,
+    var(--color-warning-bg, rgba(245, 158, 11, 0.3)) 4px,
+    var(--color-warning-bg, rgba(245, 158, 11, 0.3)) 8px
+  );
+}
+
+.stream-timeline-legend__swatch--accrual {
+  background: linear-gradient(90deg, #2dd4bf, #0ea5e9);
+}
+
+.stream-timeline-legend__swatch--remaining {
+  background: var(--color-surface-raised, #e8ecf1);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Loading State
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.5rem);
+  padding: var(--space-md, 1rem);
+  background: var(--color-info-bg, rgba(3, 184, 212, 0.1));
+  border-radius: 8px;
+  color: var(--color-info, #00b8d4);
+  font-size: 0.9rem;
+}
+
+.stream-timeline__loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-info, #00b8d4);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Error State
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline__error {
+  padding: var(--space-md, 1rem);
+  background: var(--color-danger-bg, rgba(239, 68, 68, 0.1));
+  color: var(--color-danger, #ef4444);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Responsive Design: Tablet (768px)
+   ───────────────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .stream-timeline-bar {
+    height: 56px;
+  }
+
+  .stream-timeline-labels {
+    height: 3.5rem;
+  }
+
+  .stream-timeline-bar__segment-label {
+    font-size: 0.75rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Responsive Design: Desktop (1024px+)
+   ───────────────────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .stream-timeline-bar {
+    height: 64px;
+  }
+
+  .stream-timeline-labels {
+    height: 4rem;
+  }
+
+  .stream-timeline-bar__segment-label {
+    font-size: 0.8rem;
+  }
+
+  .stream-timeline-labels__date {
+    font-size: 0.8rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Dark Theme Support
+   ───────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] .stream-timeline-container {
+  background: var(--color-surface-default, #1a1f36);
+  border-color: var(--color-border-secondary, #d0d7e0);
+}
+
+[data-theme="dark"] .stream-timeline-bar {
+  background: var(--color-surface-elevated, #2d3748);
+  border-color: var(--color-border-secondary, #4a5565);
+}
+
+[data-theme="dark"] .stream-timeline-bar__segment--remaining {
+  background: var(--color-surface-raised, #3a4556);
+  border-color: var(--color-border-default, #6b7a94);
+}
+
+[data-theme="dark"] .stream-timeline-labels__date {
+  color: var(--color-text-inverse, #ffffff);
+}
+
+[data-theme="dark"] .stream-timeline-labels__label {
+  color: var(--color-text-tertiary, #9aabc9);
+}
+
+[data-theme="dark"] .stream-timeline-legend {
+  border-top-color: var(--color-border-secondary, #4a5565);
+}
+
+[data-theme="dark"] .stream-timeline-legend__item {
+  color: var(--color-text-secondary, #9aabc9);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Accessibility: Keyboard Navigation and Focus States
+   ───────────────────────────────────────────────────────────── */
+
+.stream-timeline-bar:focus-visible {
+  outline: 2px solid var(--interactive-focus-ring, #007acc);
+  outline-offset: 2px;
+}
+
+.stream-timeline-legend__item:focus-visible {
+  outline: 2px solid var(--interactive-focus-ring, #007acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Accessibility: High Contrast Mode Support
+   ───────────────────────────────────────────────────────────── */
+
+@media (prefers-contrast: more) {
+  .stream-timeline-bar__segment--accrual {
+    background: linear-gradient(90deg, #00a884, #0069a8);
+    border: 1px solid var(--color-text-primary, #1a1f36);
+  }
+
+  .stream-timeline-bar__segment--cliff {
+    opacity: 1;
+    border: 1px solid var(--color-warning, #f59e0b);
+  }
+
+  .stream-timeline-bar__marker {
+    width: 4px;
+    box-shadow: 0 0 0 2px var(--color-text-primary, #1a1f36);
+  }
+
+  .stream-timeline-labels__date {
+    font-weight: 700;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Accessibility: Reduced Motion Support
+   ───────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-timeline-bar__segment--accrual.is-active {
+    animation: none;
+  }
+
+  .stream-timeline-bar__marker {
+    animation: none;
+  }
+
+  .stream-timeline__loading-spinner {
+    animation: none;
+    border-top-color: var(--color-info, #00b8d4);
+    opacity: 0.6;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Print Styles
+   ───────────────────────────────────────────────────────────── */
+
+@media print {
+  .stream-timeline-bar__marker,
+  .stream-timeline__loading,
+  .stream-timeline__loading-spinner {
+    display: none;
+  }
+
+  .stream-timeline-bar {
+    break-inside: avoid;
+  }
+}

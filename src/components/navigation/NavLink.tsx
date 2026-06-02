@@ -7,6 +7,7 @@ interface NavLinkProps {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+    variant?: "primary" | "secondary"; // added
 }
 
 /**
@@ -28,6 +29,7 @@ export default function NavLink({
   icon,
   onClick,
   disabled = false,
+  variant = "primary", //added
 }: NavLinkProps) {
   const { pathname } = useLocation();
   const isActive = pathname === to || (to !== "/" && pathname.startsWith(to));
@@ -38,10 +40,14 @@ export default function NavLink({
       onClick={onClick}
       aria-current={isActive ? "page" : undefined}
       aria-disabled={disabled ? "true" : undefined}
-      className={`${styles.navItem} ${disabled ? styles.disabled : ""}`.trim()}
-      style={{
-        pointerEvents: disabled ? "none" : "auto",
-      }}
+      className={[
+        styles.navItem,
+        disabled ? styles.disabled : "",
+        variant === "secondary" ? styles.navItemSecondary : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ pointerEvents: disabled ? "none" : "auto" }}
     >
       {icon && <span className={styles.navIcon}>{icon}</span>}
       <span className={styles.navLabel}>{label}</span>
