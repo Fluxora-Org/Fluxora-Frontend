@@ -110,6 +110,12 @@
   border-color: rgba(45, 212, 191, 0.5);
 }
 
+.streams-secondary-button[aria-expanded="true"] {
+  background: rgba(45, 212, 191, 0.2);
+  border-color: rgba(45, 212, 191, 0.58);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08);
+}
+
 .streams-ghost-button {
   padding: 0.75rem 1rem;
   background: transparent;
@@ -335,6 +341,30 @@
   margin-top: 1rem;
 }
 
+.stream-card__disclosure {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  transition:
+    max-height var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure),
+    opacity var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure),
+    margin-top var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure);
+}
+
+.stream-card__disclosure.is-open {
+  max-height: var(--stream-disclosure-max-height);
+  opacity: 1;
+  margin-top: 1rem;
+}
+
+.stream-card__disclosure-inner {
+  overflow: hidden;
+}
+
 .stream-card__facts,
 .stream-panel__rows,
 .stream-action-note,
@@ -399,7 +429,6 @@
 }
 
 .stream-card__expanded {
-  margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
@@ -440,6 +469,8 @@
 .stream-panel__row-value {
   font-size: 0.98rem;
   line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .stream-tag-list {
@@ -718,5 +749,48 @@
 
   .stream-time-bar__date {
     font-size: 0.9rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STREAM TIMELINE SECTION
+   Visual timeline visualization for stream lifecycle
+   ═══════════════════════════════════════════════════════════ */
+
+.stream-detail__timeline-section {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(5, 11, 24, 0.2);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.stream-detail__section-header {
+  margin: 0 0 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-vivid);
+}
+
+/* Responsive adjustments for timeline section */
+@media (max-width: 768px) {
+  .stream-detail__timeline-section {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  .stream-detail__section-header {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stream-detail__timeline-section {
+    padding: 0.875rem;
+  }
+
+  .stream-detail__section-header {
+    font-size: 0.95rem;
   }
 }

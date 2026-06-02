@@ -24,11 +24,13 @@ import React, { ReactNode, ButtonHTMLAttributes } from 'react';
 import styles from './Button.module.css';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Icon size */
+  iconSize?: 'xs' | 'sm' | 'md' | 'lg';
   /** Button content (text, icon, or both) */
   children?: ReactNode;
   
   /** Visual variant */
-  variant?: 'primary' | 'secondary' | 'danger' | 'success';
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
   
   /** Button size */
   size?: 'sm' | 'md' | 'lg';
@@ -76,6 +78,7 @@ export default function Button({
   variant = 'primary',
   size = 'md',
   fullWidth = false,
+  iconSize = 'sm',
   icon,
   iconOnly = false,
   loading = false,
@@ -89,8 +92,10 @@ export default function Button({
   // Build class list
   const classNames = [
     styles.button,
+    // Variant class (primary, secondary, ghost, danger, success)
     styles[`button${variant.charAt(0).toUpperCase() + variant.slice(1)}`],
-    size !== 'md' && styles[`button${size.toUpperCase()}`],
+    // Size class (sm, lg) – md is default and has no extra class
+    size !== 'md' && styles[`button${size.charAt(0).toUpperCase() + size.slice(1)}`],
     fullWidth && styles.buttonFullWidth,
     iconOnly && styles.buttonIconOnly,
   ]
@@ -128,11 +133,11 @@ export default function Button({
       {...props}
     >
       {/* Icon */}
-      {icon && (
-        <span className={styles.buttonIcon} aria-hidden="true">
-          {icon}
-        </span>
-      )}
+        {icon && (
+          <span className={`icon-${iconSize} ${styles.buttonIcon}`} aria-hidden={iconOnly ? undefined : "true"}>
+            {icon}
+          </span>
+        )}
 
       {/* Loading state */}
       {loading ? (

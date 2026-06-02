@@ -46,15 +46,24 @@
 
 /* ═══════════════════════════════════════════════════════════
    FOCUS STATE (Keyboard Navigation)
+   ─────────────────────────────────────────────────────────
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance
+   Form inputs use border + glow instead of outline
    ═══════════════════════════════════════════════════════════ */
 
 .input:focus-visible,
 .input:focus {
-  border-color: var(--color-accent-primary);
-  border-width: 2px;
-  padding: 9px calc(var(--space-md) - 1px); /* Adjust for border width */
-  box-shadow: 0 0 0 3px rgba(0, 184, 212, 0.1);
   outline: none;
+  border: var(--focus-ring-input-border);
+  padding: 9px calc(var(--space-md) - 1px); /* Adjust for 2px border */
+  box-shadow: var(--focus-ring-input-shadow);
+}
+
+/* Remove focus styles for mouse clicks */
+.input:focus:not(:focus-visible) {
+  border: 1px solid var(--color-border-default);
+  padding: 10px var(--space-md);
+  box-shadow: none;
 }
 
 /* ═══════════════════════════════════════════════════════════
