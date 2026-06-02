@@ -186,13 +186,17 @@ function StreamDisclosure({
 function StreamCard({
   stream,
   expanded,
+  selected,
   onToggle,
+  onSelect,
   onOpenDetail,
   onAnnounceToggle,
 }: {
   stream: StreamRecord;
   expanded: boolean;
+  selected: boolean;
   onToggle: () => void;
+  onSelect: () => void;
   onOpenDetail: () => void;
   onAnnounceToggle: (expanded: boolean) => void;
 }) {
@@ -202,8 +206,37 @@ function StreamCard({
   const disclosureId = `stream-expanded-${stream.id}`;
   const toggleId = `stream-toggle-${stream.id}`;
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+    // Enter/Space selects the card; do not intercept if a button inside is focused
+    if (
+      e.target === e.currentTarget &&
+      (e.key === "Enter" || e.key === " ")
+    ) {
+      e.preventDefault();
+      onSelect();
+    }
+  }
+
+  const classNames = [
+    "stream-card",
+    `is-${getStatusClassName(stream.status)}`,
+    selected ? "is-selected" : "",
+    expanded ? "is-expanded" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <article className={`stream-card is-${getStatusClassName(stream.status)}`}>
+    <article
+      className={classNames}
+      tabIndex={0}
+      role="article"
+      aria-selected={selected}
+      aria-expanded={expanded}
+      aria-label={`${stream.name} — ${stream.status}`}
+      onClick={onSelect}
+      onKeyDown={handleKeyDown}
+    >
       <div className="stream-card__header">
         <div>
           <div className="stream-card__title-row">
@@ -235,7 +268,7 @@ function StreamCard({
           <button
             type="button"
             className="streams-ghost-button"
-            onClick={onOpenDetail}
+            onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
           >
             Open detail
           </button>
@@ -655,6 +688,7 @@ export default function Streams() {
   const [expandedStreamId, setExpandedStreamId] = useState<string>(
     streamRecords[0]?.id ?? "",
   );
+  const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdStream, setCreatedStream] = useState({
@@ -940,13 +974,14 @@ export default function Streams() {
               </div>
             </div>
 
-            <div className="streams-list">
+            <div className="streams-list" role="list" aria-label="Stream cards">
               {visibleStreams.length > 0 ? (
                 visibleStreams.map((stream) => (
                   <StreamCard
                     key={stream.id}
                     stream={stream}
                     expanded={effectiveExpandedId === stream.id}
+                    selected={selectedStreamId === stream.id}
                     onToggle={() =>
                       setExpandedStreamId((current) =>
                         current === stream.id ? "" : stream.id,

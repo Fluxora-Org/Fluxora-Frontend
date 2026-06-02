@@ -4,10 +4,29 @@ import type { Stream } from "./Stream";
 
 interface Props {
   stream: Stream;
+  /** Whether this row is currently selected */
+  isSelected?: boolean;
+  /** Called when the row is activated (click or Enter/Space) */
+  onSelect?: (id: string) => void;
 }
 
-export default function StreamRow({ stream }: Props) {
+export default function StreamRow({ stream, isSelected = false, onSelect }: Props) {
   const navigate = useNavigate();
+
+  function handleActivate() {
+    if (onSelect) {
+      onSelect(stream.id);
+    } else {
+      navigate(`/app/streams/${stream.id}`);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTableRowElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleActivate();
+    }
+  }
 
   return (
     <tr
@@ -53,11 +72,11 @@ export default function StreamRow({ stream }: Props) {
         {stream.rate}
       </td>
 
-      <td className="py-4 px-3">
+      <td className="stream-row__cell py-4 px-3">
         <StatusPill status={stream.status} />
       </td>
 
-      <td className="py-4 px-3">
+      <td className="stream-row__cell py-4 px-3">
         <button
           type="button"
           onClick={() => navigate(`/app/streams/${stream.id}`)}

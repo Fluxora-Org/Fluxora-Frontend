@@ -4,6 +4,7 @@ import { Menu, X, Moon, Sun } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
+import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
 
 interface AppNavbarProps {
   onThemeToggle?: () => void;
@@ -18,10 +19,15 @@ const ANON_LINKS = [
   { to: "/#pricing", label: "Pricing" },
 ];
 
-const APP_LINKS = [
+const APP_PRIMARY_LINKS = [
   { to: "/app", label: "Dashboard" },
   { to: "/app/streams", label: "Streams" },
   { to: "/app/recipient", label: "Recipient" },
+];
+
+const APP_SECONDARY_LINKS: { to: string; label: string }[] = [
+  // Settings and Help go here when added
+  // { to: "/app/settings", label: "Settings" },
 ];
 
 function FluxoraLogo({ connected }: { connected: boolean }) {
@@ -83,6 +89,37 @@ function ConnectingSkeleton() {
   );
 }
 
+/**
+ * Build breadcrumb items from the current pathname.
+ * e.g. /app/streams/STR-001 → [Streams, STR-001]
+ */
+function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
+  if (!pathname.startsWith("/app")) return [];
+
+  const segments = pathname.replace("/app", "").split("/").filter(Boolean);
+  if (segments.length === 0) return [];
+
+  const labelMap: Record<string, string> = {
+    streams: "Streams",
+    recipient: "Recipient",
+    treasury: "Treasury",
+  };
+
+  const items: BreadcrumbItem[] = [];
+  let accumulatedPath = "/app";
+
+  segments.forEach((segment, index) => {
+    accumulatedPath += `/${segment}`;
+    const isLast = index === segments.length - 1;
+    items.push({
+      label: labelMap[segment] ?? segment,
+      to: isLast ? undefined : accumulatedPath,
+    });
+  });
+
+  return items;
+}
+
 export default function AppNavbar({
   onThemeToggle,
   theme = "dark",
@@ -100,9 +137,11 @@ export default function AppNavbar({
     return () => clearTimeout(t);
   }, []);
 
-  const location = useLocation();
-  const links = connected ? APP_LINKS : ANON_LINKS;
+const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
+  const breadcrumbs = useBreadcrumbs(location.pathname);
+  const showBreadcrumb = isAppView && breadcrumbs.length > 1;
+  const links = connected ? APP_PRIMARY_LINKS : ANON_LINKS;
 
   const handleMobileToggle = () => {
     if (isAppView && onSidebarToggle) {
@@ -140,13 +179,37 @@ export default function AppNavbar({
 
         {/* Center: Nav links (desktop) */}
         <nav
-          aria-label={connected ? "App navigation" : "Marketing navigation"}
-          className="hidden md:flex items-center gap-1"
-        >
-          {links.map((link) => (
-            <NavLink key={link.to} to={link.to} label={link.label} />
-          ))}
-        </nav>
+  aria-label={connected ? "App navigation" : "Marketing navigation"}
+  className="hidden md:flex items-center gap-1"
+>
+  {/* Primary destinations — full visual weight */}
+  {(connected ? APP_PRIMARY_LINKS : ANON_LINKS).map((link) => (
+    <NavLink key={link.to} to={link.to} label={link.label} />
+  ))}
+
+  {/* Secondary/utility — reduced visual weight, separated */}
+  {connected && APP_SECONDARY_LINKS.length > 0 && (
+    <>
+      <span
+        aria-hidden="true"
+        style={{
+          width: "1px",
+          height: "20px",
+          background: "var(--navbar-border)",
+          margin: "0 var(--space-sm)",
+        }}
+      />
+      {APP_SECONDARY_LINKS.map((link) => (
+        <NavLink
+          key={link.to}
+          to={link.to}
+          label={link.label}
+          variant="secondary"
+        />
+      ))}
+    </>
+  )}
+</nav>
 
         {/* Right: Actions (desktop) */}
         <div className="hidden md:flex items-center gap-3">
@@ -202,6 +265,17 @@ export default function AppNavbar({
           </button>
         )}
       </div>
+      {/* Breadcrumb — shown on deep pages (e.g. Streams / STR-001) */}
+{showBreadcrumb && (
+  <div
+    className="w-full border-t border-[var(--navbar-border)] bg-[var(--navbar-bg)] px-4 sm:px-6"
+    style={{ paddingTop: "var(--space-sm)", paddingBottom: "var(--space-sm)" }}
+  >
+    <div className="mx-auto max-w-7xl">
+      <Breadcrumb items={breadcrumbs} />
+    </div>
+  </div>
+)}
 
       {/* Mobile menu (Dropdown for marketing site) */}
       {mobileMenuOpen && !isAppView && (

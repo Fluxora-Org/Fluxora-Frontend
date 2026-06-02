@@ -3,60 +3,81 @@ import React from 'react';
 export interface ValidationMessageProps {
   id: string;
   message: string;
-  type: 'error' | 'hint' | 'success';
+  type?: 'error' | 'hint' | 'success';
 }
 
 const ErrorIcon = () => (
   <svg
     aria-hidden="true"
-    width="12"
-    height="12"
-    viewBox="0 0 12 12"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    style={{ flexShrink: 0 }}
+    style={{ flexShrink: 0, marginTop: '2px' }}
   >
-    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
-    <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
-    <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M8 4.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <circle cx="8" cy="11.75" r="1" fill="currentColor" />
   </svg>
 );
 
 const SuccessIcon = () => (
   <svg
     aria-hidden="true"
-    width="12"
-    height="12"
-    viewBox="0 0 12 12"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    style={{ flexShrink: 0 }}
+    style={{ flexShrink: 0, marginTop: '2px' }}
   >
-    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
-    <path d="M3.5 6L5.5 8L8.5 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M5 8L7.5 10.5L11 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-const roleMap: Record<ValidationMessageProps['type'], string | undefined> = {
+const roleMap: Record<NonNullable<ValidationMessageProps['type']>, string | undefined> = {
   error: 'alert',
   hint: 'status',
-  success: undefined,
+  success: 'status',
 };
 
-export const ValidationMessage: React.FC<ValidationMessageProps> = ({ id, message, type }) => {
+const colorMap: Record<NonNullable<ValidationMessageProps['type']>, string> = {
+  error: 'var(--color-error-text)',
+  hint: 'var(--color-text-muted)',
+  success: 'var(--color-success)',
+};
+
+export const ValidationMessage: React.FC<ValidationMessageProps> = ({ 
+  id, 
+  message, 
+  type = 'error' 
+}) => {
+  if (!message) return null;
+
   const role = roleMap[type];
+  const textColor = colorMap[type];
 
   return (
-    <span
+    <div
       id={id}
       className={`validation-message validation-message--${type}`}
       {...(role ? { role } : {})}
-      style={{ font: 'var(--font-body-sm)' }}
+      style={{ 
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '6px',
+        marginTop: 'var(--space-xs, 4px)',
+        color: textColor,
+        font: 'var(--font-body-sm)',
+        fontWeight: type === 'error' ? 500 : 400
+      }}
     >
       {type === 'error' && <ErrorIcon />}
       {type === 'success' && <SuccessIcon />}
-      {message}
-    </span>
+      <span>{message}</span>
+    </div>
   );
 };
 
