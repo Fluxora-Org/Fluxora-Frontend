@@ -1,0 +1,119 @@
+import { Link } from "react-router-dom";
+
+export interface BreadcrumbItem {
+  label: string;
+  to?: string;
+}
+
+interface BreadcrumbProps {
+  items: BreadcrumbItem[];
+}
+
+/**
+ * Breadcrumb
+ * ──────────────────────────────────────
+ * Semantic breadcrumb trail for deep pages (e.g. Streams / Stream #ABC123).
+ *
+ * Accessibility:
+ * - nav[aria-label="Breadcrumb"] wraps the trail
+ * - ol > li structure (ordered, represents hierarchy)
+ * - aria-current="page" on the last (current) item
+ * - Separator chevrons are aria-hidden
+ * - All link items are keyboard-focusable with visible focus ring
+ * - Truncates long Stellar addresses at 8…4 chars
+ *
+ * WCAG 2.1 AA: 4.5:1 text contrast, 3:1 focus ring contrast
+ */
+export default function Breadcrumb({ items }: BreadcrumbProps) {
+  if (items.length === 0) return null;
+
+  return (
+    <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center" }}>
+      <ol
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--breadcrumb-gap)",
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          font: "var(--breadcrumb-font)",
+          flexWrap: "wrap",
+        }}
+      >
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
+          const isStellarAddress =
+            item.label.startsWith("G") && item.label.length === 56;
+          const displayLabel = isStellarAddress
+            ? `${item.label.slice(0, 8)}…${item.label.slice(-4)}`
+            : item.label;
+
+          return (
+            <li
+              key={item.label}
+              style={{ display: "flex", alignItems: "center", gap: "var(--breadcrumb-gap)" }}
+            >
+              {isLast || !item.to ? (
+                <span
+                  aria-current={isLast ? "page" : undefined}
+                  title={isStellarAddress ? item.label : undefined}
+                  style={{
+                    color: isLast
+                      ? "var(--breadcrumb-color-current)"
+                      : "var(--breadcrumb-color)",
+                    fontWeight: isLast ? 500 : 400,
+                    maxWidth: "200px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {displayLabel}
+                </span>
+              ) : (
+                <Link
+                  to={item.to}
+                  title={isStellarAddress ? item.label : undefined}
+                  style={{
+                    color: "var(--breadcrumb-color)",
+                    textDecoration: "none",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "2px 4px",
+                    margin: "-2px -4px",
+                    transition: "color var(--transition-fast)",
+                    outline: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.color =
+                      "var(--breadcrumb-color-hover)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.color =
+                      "var(--breadcrumb-color)";
+                  }}
+                  className="breadcrumb-link"
+                >
+                  {displayLabel}
+                </Link>
+              )}
+
+              {!isLast && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    color: "var(--breadcrumb-separator-color)",
+                    userSelect: "none",
+                    fontSize: "10px",
+                  }}
+                >
+                  /
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}

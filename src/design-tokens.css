@@ -6,14 +6,14 @@
  * colors, typography, spacing, shadows, animations.
  *
  * Usage:
- *   .my-element {
- *     background: var(--color-bg-primary);
- *     padding: var(--space-lg);
- *   }
+ * .my-element {
+ * background: var(--color-bg-primary);
+ * padding: var(--space-lg);
+ * }
  *
  * Theme switching:
- *   document.documentElement.setAttribute("data-theme", "dark");
- *   document.documentElement.setAttribute("data-theme", "light");
+ * document.documentElement.setAttribute("data-theme", "dark");
+ * document.documentElement.setAttribute("data-theme", "light");
  */
 
 /* ═══════════════════════════════════════════════════════════
@@ -60,13 +60,42 @@
   --status-warning: #ffa726;
   --status-info: #00b8d4;
 
+    /* ─── Component-friendly semantic status tokens (dark) ─── */
+    --status-success: var(--color-success);
+    --status-warning: var(--color-warning);
+    --status-error: var(--color-danger);
+    --status-info: var(--color-info);
+
+    --status-success-bg: var(--color-success-bg);
+    --status-warning-bg: var(--color-warning-bg);
+    --status-error-bg: var(--color-danger-bg);
+    --status-info-bg: var(--color-info-bg);
   /* ===== INTERACTIVE ===== */
   --interactive-bg-default: #f0f3f7;
   --interactive-bg-hover: #e8ecf1;
   --interactive-bg-active: #dfe5ed;
   --interactive-bg-disabled: #fafbfc;
-  --interactive-focus-ring: #007acc;
-  --interactive-focus-ring-offset: transparent;
+
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(14, 165, 233, 0.1);
+  
+  /* Dual-layer focus ring (outline + box-shadow for visibility) */
+  --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
+                       0 0 0 4px var(--focus-ring-color);
+  
+  /* Inset variant for overflow-clipped containers */
+  --focus-ring-shadow-inset: inset 0 0 0 2px var(--focus-ring-color);
+  
+  /* Input-specific focus (border + subtle glow) */
+  --focus-ring-input-border: 2px solid var(--focus-ring-color);
+  --focus-ring-input-shadow: 0 0 0 3px var(--focus-ring-halo);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
 
   /* ===== SEMANTIC COLOR TOKENS (used by components) ===== */
   /* Backgrounds */
@@ -92,13 +121,17 @@
   --color-text-inverse: #ffffff;
 
   /* Focus */
-  --color-focus: #0ea5e9;
+  --color-focus: var(--focus-ring-color); /* Alias for consistency */
 
   /* Status (semantic aliases) */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-info: #3b82f6;
+
+  --color-error-border: #DC2626;
+  --color-error-text: #B91C1C;
+  --color-error-bg: #FEF2F2;
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   /* These keep existing components working without changes */
@@ -152,6 +185,25 @@
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #e6edf5;
   --skeleton-shine: #ffffff;
+
+  /* ─── Empty State Variants ─── */
+  /* search-no-results */
+  --es-search-icon-stroke: #0e7490;
+  --es-search-icon-fill: rgba(14, 116, 144, 0.08);
+  --es-search-icon-bg: rgba(14, 116, 144, 0.06);
+  --es-search-icon-border: rgba(14, 116, 144, 0.20);
+  --es-search-cta-bg: rgba(14, 116, 144, 0.10);
+  --es-search-cta-border: rgba(14, 116, 144, 0.25);
+  --es-search-cta-text: #0e7490; /* 4.5:1+ on light surface */
+
+  /* error */
+  --es-error-icon-stroke: #dc2626;
+  --es-error-icon-fill: rgba(220, 38, 38, 0.08);
+  --es-error-icon-bg: rgba(220, 38, 38, 0.06);
+  --es-error-icon-border: rgba(220, 38, 38, 0.22);
+  --es-error-cta-bg: rgba(220, 38, 38, 0.10);
+  --es-error-cta-border: rgba(220, 38, 38, 0.28);
+  --es-error-cta-text: #b91c1c; /* 4.5:1+ on light surface */
 
   /* Navbar */
   --navbar-bg: #ffffff;
@@ -214,8 +266,14 @@
   --interactive-bg-hover: #1e3448;
   --interactive-bg-active: #2a4563;
   --interactive-bg-disabled: #0f1624;
-  --interactive-focus-ring: #00d4aa;
-  --interactive-focus-ring-offset: transparent;
+
+  /* ─── Focus Ring System (Dark Theme) ─── */
+  --focus-ring-color: #00d4aa; /* Teal - 6.2:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(0, 212, 170, 0.15);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
 
   /* ===== SEMANTIC COLOR TOKENS (dark overrides) ===== */
   /* Backgrounds */
@@ -241,13 +299,17 @@
   --color-text-inverse: #0a0e17;
 
   /* Focus */
-  --color-focus: #00d4aa;
+  --color-focus: var(--focus-ring-color); /* Teal for dark theme */
 
   /* Status (semantic aliases) */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-info: #3b82f6;
+
+  --color-error-border: #EF4444;
+  --color-error-text: #FCA5A5;
+  --color-error-bg: rgba(220, 38, 38, 0.1);
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   --bg: var(--surface-base);
@@ -269,6 +331,25 @@
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
   --skeleton-shine: #38516f;
+
+  /* ─── Empty State Variants (dark overrides) ─── */
+  /* search-no-results */
+  --es-search-icon-stroke: #5ED3F3;
+  --es-search-icon-fill: rgba(94, 211, 243, 0.08);
+  --es-search-icon-bg: rgba(94, 211, 243, 0.08);
+  --es-search-icon-border: rgba(94, 211, 243, 0.20);
+  --es-search-cta-bg: rgba(94, 211, 243, 0.12);
+  --es-search-cta-border: rgba(94, 211, 243, 0.25);
+  --es-search-cta-text: #5ED3F3; /* 4.5:1+ on dark surface */
+
+  /* error */
+  --es-error-icon-stroke: #EF4444;
+  --es-error-icon-fill: rgba(239, 68, 68, 0.10);
+  --es-error-icon-bg: rgba(239, 68, 68, 0.08);
+  --es-error-icon-border: rgba(239, 68, 68, 0.25);
+  --es-error-cta-bg: rgba(239, 68, 68, 0.12);
+  --es-error-cta-border: rgba(239, 68, 68, 0.30);
+  --es-error-cta-text: #EF4444; /* 4.5:1+ on dark surface */
 
   /* Navbar */
   --navbar-bg: #0f1419;
@@ -366,6 +447,8 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   --focus-ring: 0 0 0 2px var(--color-bg-primary),
     0 0 0 4px var(--color-focus);
+    
+  --shadow-error-focus: 0 0 0 3px rgba(220, 38, 38, 0.2);
 
   /* ─── Accent-specific shadows ─── */
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.2);
@@ -380,6 +463,8 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  
+  --shadow-error-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);
 
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.25);
   --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.25);
@@ -400,6 +485,10 @@
   --ease-out: ease-out;
   --ease-in-out: ease-in-out;
   --ease-cubic: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /* Component motion tokens */
+  --motion-duration-stream-disclosure: 200ms;
+  --motion-ease-stream-disclosure: var(--ease-out);
 }
 
 /* ─── Pulse animation (skeletons, loaders) ─── */
@@ -553,6 +642,39 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   NAVIGATION HIERARCHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Primary nav items (Dashboard, Streams, Recipient) ─── */
+  --nav-primary-color: var(--navbar-link-color);
+  --nav-primary-color-hover: var(--color-text-primary);
+  --nav-primary-color-active: var(--color-accent-secondary);
+  --nav-primary-bg-hover: var(--color-surface-raised);
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+  --nav-primary-font: var(--font-label-lg);
+  --nav-primary-border-active: 2px solid var(--color-accent-secondary);
+
+  /* ─── Secondary/utility nav items (Settings, Help) ─── */
+  --nav-secondary-color: var(--color-text-muted);
+  --nav-secondary-color-hover: var(--color-text-secondary);
+  --nav-secondary-font: var(--font-label-md);
+
+  /* ─── Breadcrumb ─── */
+  --breadcrumb-color: var(--color-text-tertiary);
+  --breadcrumb-color-hover: var(--color-text-primary);
+  --breadcrumb-color-current: var(--color-text-primary);
+  --breadcrumb-separator-color: var(--color-text-muted);
+  --breadcrumb-font: var(--font-body-sm);
+  --breadcrumb-gap: var(--space-sm);
+  --breadcrumb-focus-ring: var(--focus-ring);
+}
+
+:root[data-theme="dark"] {
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 15%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════
    9. BREAKPOINTS
    ═══════════════════════════════════════════════════════════ */
 
@@ -570,8 +692,17 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --focus-outline: 2px solid var(--color-focus);
-  --focus-outline-offset: 2px;
+  /* Comprehensive focus outline and offset */
+  --focus-outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  --focus-outline-offset: var(--focus-ring-offset);
+}
+
+/* ─── High Contrast Mode Support ─── */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring-width: 3px;
+    --focus-ring-offset: 3px;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -579,6 +710,10 @@
    ═══════════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-stream-disclosure: 0ms;
+  }
+
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

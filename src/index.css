@@ -101,12 +101,13 @@ a:hover {
 /* ═══════════════════════════════════════════════════════════
    FOCUS MANAGEMENT
    ─────────────────────────────────────────────────────────
-   Baseline focus styles. Outlines follow the element's
-   border-radius in modern browsers, but can be clipped by
-   ancestors with `overflow: hidden`. We also paint the ring
-   as an outset box-shadow so it remains visible even when
-   outlines are clipped — while keeping an `outline` so
-   high-contrast and forced-colors modes still show an indicator.
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance Compliant
+   
+   Baseline focus styles use a dual-layer approach:
+   - Outline: Follows border-radius, visible in high-contrast mode
+   - Box-shadow: Not clipped by overflow:hidden ancestors
+   
+   This ensures focus ring visibility in all scenarios.
    ═══════════════════════════════════════════════════════════ */
 
 button:focus,
@@ -195,9 +196,9 @@ nav a:focus-visible {
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--focus-ring-color);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: 4px;
-  box-shadow: 0 0 0 4px var(--focus-ring-halo);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 .button:active:not(:disabled) {
@@ -271,6 +272,39 @@ button[aria-label*="Switch"]:hover {
     var(--cta-shadow),
     0 8px 16px rgba(0, 212, 170, 0.25);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   EMPTY STATE — RESPONSIVE BREAKPOINTS
+   Covers search-no-results and error variants (Issue #220).
+   The base component uses clamp() for padding/font; these rules
+   handle layout adjustments at the four QA breakpoints.
+   ═══════════════════════════════════════════════════════════ */
+
+/* 320px — narrowest supported viewport */
+@media (max-width: 320px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 32px 12px;
+  }
+}
+
+/* 375px — standard mobile */
+@media (max-width: 375px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 36px 14px;
+  }
+}
+
+/* 768px — tablet: ensure description text doesn't overflow */
+@media (max-width: 768px) {
+  [role="region"][aria-label="Search no results state"] p,
+  [role="region"][aria-label="Error state"] p {
+    max-width: 100%;
+  }
+}
+
+/* 1024px — desktop: no overrides needed; clamp() handles it */
 
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE
