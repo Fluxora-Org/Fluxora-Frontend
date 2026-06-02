@@ -12,6 +12,7 @@ import Landing from "./pages/Landing";
 import ErrorPage from "./pages/ErrorPage";
 import NotFound from "./pages/NotFound";
 import TreasuryPage from "./pages/TreasuryPage";
+import EmptyStateDemo from "./pages/EmptyStateDemo";
 
 function LegacyStreamRedirect() {
   const { streamId } = useParams();
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="recipient" element={<Recipient />} />
             <Route path="treasurypage" element={<TreasuryPage />} />
             <Route path="error" element={<ErrorPage />} />
+            <Route path="empty-state-demo" element={<EmptyStateDemo />} />
           </Route>
           <Route path="/connect-wallet" element={<ConnectWallet />} />
           <Route path="*" element={<NotFound />} />

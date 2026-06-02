@@ -2,25 +2,24 @@
  * Input Component
  * ──────────────────────────────────────
  * Implements DESIGN_SPEC.md § form input specifications
- * 
- * Features:
+ * * Features:
  * - Full keyboard accessibility (Tab, focus rings)
- * - Error state with aria-invalid
+ * - Error state with aria-invalid and aria-errormessage
  * - Disabled state support
- * - Helper and error messages
+ * - Helper and error messages (using ValidationMessage)
  * - Label association via htmlFor
  * - Textarea and Select variants
  * - WCAG 2.1 AA color contrast compliance
- * 
- * Usage:
- *   <Input label="Email" type="email" placeholder="your@email.com" />
- *   <Input label="Message" type="textarea" />
- *   <Input label="Country" type="select" error="Invalid selection" />
- *   <Input label="Password" type="password" required disabled />
+ * * Usage:
+ * <Input label="Email" type="email" placeholder="your@email.com" />
+ * <Input label="Message" type="textarea" />
+ * <Input label="Country" type="select" error="Invalid selection" />
+ * <Input label="Password" type="password" required disabled />
  */
 
 import { InputHTMLAttributes } from 'react';
 import styles from './Input.module.css';
+import { ValidationMessage } from './ValidationMessage';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   /** Label text displayed above input */
@@ -50,10 +49,9 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 
 /**
  * Input component with comprehensive accessibility support
- * 
- * Implements:
+ * * Implements:
  * - Label + Input association via htmlFor/id
- * - Error state with aria-invalid
+ * - Error state with aria-invalid and aria-errormessage
  * - Helper text for guidance
  * - Focus ring via :focus-visible
  * - Required indicator
@@ -73,10 +71,15 @@ export default function Input({
   ...props
 }: InputProps) {
   // Generate ID if not provided
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
   
   // Determine if input has error
   const hasError = Boolean(error);
+
+  const describedBy = [
+    hasError ? `${inputId}-error` : null,
+    helperText ? `${inputId}-helper` : null
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className={styles.inputContainer}>
@@ -84,7 +87,11 @@ export default function Input({
       {label && (
         <label htmlFor={inputId} className={styles.label}>
           {label}
-          {required && <span className={styles.labelRequired}>*</span>}
+          {required && (
+            <span className={styles.labelRequired} aria-hidden="true">
+              *
+            </span>
+          )}
         </label>
       )}
 
@@ -96,11 +103,11 @@ export default function Input({
             hasError ? styles.error : ''
           } ${className}`.trim()}
           aria-invalid={hasError ? 'true' : 'false'}
-          aria-describedby={
-            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-          }
+          aria-errormessage={hasError ? `${inputId}-error` : undefined}
+          aria-describedby={describedBy}
           disabled={disabled}
           placeholder={placeholder}
+          required={required}
           {...(props as any)}
         />
       ) : type === 'select' && options ? (
@@ -111,10 +118,10 @@ export default function Input({
             hasError ? styles.error : ''
           } ${className}`.trim()}
           aria-invalid={hasError ? 'true' : 'false'}
-          aria-describedby={
-            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-          }
+          aria-errormessage={hasError ? `${inputId}-error` : undefined}
+          aria-describedby={describedBy}
           disabled={disabled}
+          required={required}
           {...(props as any)}
         >
           <option value="">
@@ -135,9 +142,8 @@ export default function Input({
             hasError ? styles.error : ''
           } ${className}`.trim()}
           aria-invalid={hasError ? 'true' : 'false'}
-          aria-describedby={
-            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-          }
+          aria-errormessage={hasError ? `${inputId}-error` : undefined}
+          aria-describedby={describedBy}
           disabled={disabled}
           placeholder={placeholder}
           required={required}
@@ -146,14 +152,12 @@ export default function Input({
       )}
 
       {/* Error Message */}
-      {error && (
-        <span id={`${inputId}-error`} className={styles.errorMessage}>
-          {error}
-        </span>
+      {hasError && error && (
+        <ValidationMessage id={`${inputId}-error`} message={error} />
       )}
 
       {/* Helper Text */}
-      {helperText && !error && (
+      {helperText && !hasError && (
         <span id={`${inputId}-helper`} className={styles.helperText}>
           {helperText}
         </span>

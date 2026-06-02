@@ -1,4 +1,5 @@
-import { CSSProperties, MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
+import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 
 interface ConnectWalletModalProps {
@@ -7,6 +8,14 @@ interface ConnectWalletModalProps {
   onConnectFreighter?: () => void;
   onConnectAlbedo?: () => void;
   onConnectWalletConnect?: () => void;
+  // Optional controlled error state to drive the modal view from a parent component
+  errorState?: "not_installed" | "rejected" | "network_mismatch" | null;
+  // Handler for retrying connection
+  onRetryConnection?: () => void;
+  // Handler for downloading extension
+  onDownloadFreighter?: () => void;
+  // Optional flag to explicitly show or hide the Design QA Preview switcher (default: true for reviewability)
+  showStateSwitcher?: boolean;
 }
 
 interface WalletOption {
@@ -23,13 +32,45 @@ export default function ConnectWalletModal({
   onConnectFreighter,
   onConnectAlbedo,
   onConnectWalletConnect,
+  errorState,
+  onRetryConnection,
+  onDownloadFreighter,
+  showStateSwitcher = true,
 }: ConnectWalletModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
   const [focusedOptionId, setFocusedOptionId] = useState<string | null>(null);
-  const [isCloseFocused, setIsCloseFocused] = useState(false);
+  
+  // Internal error state for uncontrolled usage/simulation
+  const [internalErrorState, setInternalErrorState] = useState<
+    "not_installed" | "rejected" | "network_mismatch" | null
+  >(null);
 
+  // Determine active state (controlled prop takes priority over internal state)
+  const currentErrorState = errorState !== undefined ? errorState : internalErrorState;
+
+  // Handle Freighter selection: simulate connection/errors in demo mode
+  const handleFreighterClick = () => {
+    if (onConnectFreighter) {
+      onConnectFreighter();
+    } else {
+      // In uncontrolled demo/mock environment, clicking Freighter switches to rejected state to show interactive error behavior
+      setInternalErrorState("rejected");
+    }
+  };
+
+  // Reset internal error state back to default wallet list
+  const handleBackToWalletSelection = () => {
+    setInternalErrorState(null);
+    if (onRetryConnection) {
+      onRetryConnection();
+    }
+  };
+
+  // Keyboard navigation & Focus Trapping
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -69,6 +110,8 @@ export default function ConnectWalletModal({
     };
 
     document.addEventListener("keydown", handleKeyDown);
+    
+    // Auto-focus the close button or primary action when the modal opens
     closeButtonRef.current?.focus();
 
     return () => {
@@ -76,6 +119,28 @@ export default function ConnectWalletModal({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
+
+  // Focus Management: Automatically shift focus to the primary recovery action when the screen changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      if (currentErrorState) {
+        const autofocusElement = modalRef.current?.querySelector<HTMLElement>(
+          '[data-autofocus="true"]'
+        );
+        if (autofocusElement) {
+          autofocusElement.focus();
+        } else {
+          closeButtonRef.current?.focus();
+        }
+      } else {
+        closeButtonRef.current?.focus();
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, currentErrorState]);
 
   if (!isOpen) {
     return null;
@@ -93,7 +158,7 @@ export default function ConnectWalletModal({
       name: "Freighter",
       description: "Recommended browser extension for Stellar wallets.",
       icon: "🚀",
-      action: onConnectFreighter ?? (() => {}),
+      action: handleFreighterClick,
     },
     {
       id: "albedo",
@@ -112,7 +177,11 @@ export default function ConnectWalletModal({
   ];
 
   return (
-    <div className={styles.backdrop} onClick={handleBackdropClick}>
+    <div
+      className={styles.backdrop}
+      onClick={handleBackdropClick}
+      data-testid="connect-wallet-backdrop"
+    >
       <div
         id="connect-wallet-modal"
         className={styles.modal}
@@ -122,18 +191,11 @@ export default function ConnectWalletModal({
         aria-labelledby="connect-wallet-modal-title"
         aria-describedby="connect-wallet-modal-description"
       >
-        {/* Close button */}
+        {/* Close button - always visible and accessible in any view */}
         <button
           type="button"
           ref={closeButtonRef}
-          style={{
-            ...(inlineStyles.closeButton as React.CSSProperties),
-            boxShadow: isCloseFocused
-              ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
-              : "none",
-          }}
-          onFocus={() => setIsCloseFocused(true)}
-          onBlur={() => setIsCloseFocused(false)}
+          className={styles.closeButton}
           onClick={onClose}
           aria-label="Close wallet connection dialog"
         >
@@ -153,218 +215,275 @@ export default function ConnectWalletModal({
           </svg>
         </button>
 
-        {/* Header */}
-        <div className={styles.header}>
-          <span className={styles.badge}>Step 1 of 1</span>
-          <h2 id="connect-wallet-modal-title" className={styles.title}>
-            Choose your wallet
-          </h2>
-          <p id="connect-wallet-modal-description" className={styles.subtitle}>
-            Select a provider below to connect. You will review and approve the
-            request in your wallet.
-          </p>
-        </div>
+        {/* DEFAULT STATE: Choose Wallet Provider */}
+        {!currentErrorState && (
+          <>
+            <div className={styles.header}>
+              <span className={styles.badge} id="badge-default">Step 1 of 1</span>
+              <h2 id="connect-wallet-modal-title" className={styles.title}>
+                Choose your wallet
+              </h2>
+              <p id="connect-wallet-modal-description" className={styles.subtitle}>
+                Select a provider below to connect. You will review and approve the
+                request in your wallet.
+              </p>
+            </div>
 
-        <div style={inlineStyles.walletList as React.CSSProperties} role="list" aria-label="Wallet providers">
-          {walletOptions.map((wallet) => {
-            const isActive =
-              hoveredOptionId === wallet.id || focusedOptionId === wallet.id;
+            <div className={styles.walletList} role="list" aria-label="Wallet providers">
+              {walletOptions.map((wallet) => {
+                const isActive =
+                  hoveredOptionId === wallet.id || focusedOptionId === wallet.id;
 
-            return (
-              <button
-                key={wallet.id}
-                type="button"
-                role="listitem"
-                style={{
-                  ...(inlineStyles.walletOption as React.CSSProperties),
-                  background: isActive ? "var(--surface-elevated)" : "var(--surface-neutral)",
-                  borderColor: isActive ? "var(--border-interactive)" : "var(--border-neutral)",
-                  boxShadow: isActive
-                    ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
-                    : "none",
-                }}
-                onClick={wallet.action}
-                onMouseEnter={() => setHoveredOptionId(wallet.id)}
-                onMouseLeave={() => setHoveredOptionId(null)}
-                onFocus={() => setFocusedOptionId(wallet.id)}
-                onBlur={() => setFocusedOptionId(null)}
-                aria-label={`Connect with ${wallet.name}`}
+                return (
+                  <button
+                    key={wallet.id}
+                    type="button"
+                    role="listitem"
+                    className={styles.walletOption}
+                    style={{
+                      background: isActive ? "var(--surface-elevated)" : "var(--surface-neutral)",
+                      borderColor: isActive ? "var(--border-interactive)" : "var(--border-neutral)",
+                      boxShadow: isActive
+                        ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
+                        : "none",
+                    }}
+                    onClick={wallet.action}
+                    onMouseEnter={() => setHoveredOptionId(wallet.id)}
+                    onMouseLeave={() => setHoveredOptionId(null)}
+                    onFocus={() => setFocusedOptionId(wallet.id)}
+                    onBlur={() => setFocusedOptionId(null)}
+                    aria-label={`Connect with ${wallet.name}`}
+                  >
+                    <div className={styles.walletIcon} aria-hidden="true">
+                      {wallet.icon}
+                    </div>
+                    <div className={styles.walletInfo}>
+                      <div className={styles.walletName}>{wallet.name}</div>
+                      <div className={styles.walletDescription}>{wallet.description}</div>
+                    </div>
+                    <svg
+                      className={styles.chevron}
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M6 3l5 5-5 5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className={styles.footer}>
+              By continuing, you agree to Fluxora&apos;s{" "}
+              <a href="/terms" className={styles.termsLink}>
+                Terms of Service
+              </a>
+              .
+            </p>
+          </>
+        )}
+
+        {/* ERROR STATE: Freighter Not Installed */}
+        {currentErrorState === "not_installed" && (
+          <div className={styles.errorContainer} data-testid="error-state-not-installed">
+            <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
+              <Download size={28} />
+            </div>
+            
+            <span className={styles.badge} id="badge-not-installed">Extension Required</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Freighter Not Installed
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Freighter is the official browser extension for Stellar and Soroban. 
+              You will need to install the extension to securely connect your wallet to Fluxora.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <a
+                href="https://www.freighter.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={onDownloadFreighter}
+                aria-label="Download Freighter browser extension"
               >
-                <div style={inlineStyles.walletIcon as React.CSSProperties} aria-hidden="true">
-                  {wallet.icon}
-                </div>
-                <div style={inlineStyles.walletInfo as React.CSSProperties}>
-                  <div style={inlineStyles.walletName as React.CSSProperties}>{wallet.name}</div>
-                  <div style={inlineStyles.walletDescription as React.CSSProperties}>{wallet.description}</div>
-                </div>
-                <svg
-                  className={styles.chevron}
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M6 3l5 5-5 5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <Download size={18} />
+                Download Freighter
+              </a>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        )}
 
-        {/* Footer */}
-        <p className={styles.footer}>
-          By continuing, you agree to Fluxora&apos;s{" "}
-          <a href="/terms" className={styles.termsLink}>
-            Terms of Service
-          </a>
-          .
-        </p>
+        {/* ERROR STATE: Connection Request Rejected */}
+        {currentErrorState === "rejected" && (
+          <div className={styles.errorContainer} data-testid="error-state-rejected">
+            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
+              <AlertCircle size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-rejected">Connection Failed</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Connection Rejected
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              The connection was declined in your wallet extension. To interact with Fluxora, 
+              please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={handleFreighterClick}
+                aria-label="Retry connecting to Freighter wallet"
+              >
+                <RefreshCw size={18} />
+                Retry Connection
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ERROR STATE: Network Mismatch */}
+        {currentErrorState === "network_mismatch" && (
+          <div className={styles.errorContainer} data-testid="error-state-network-mismatch">
+            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
+              <AlertTriangle size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-network-mismatch">Network Mismatch</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Wrong Stellar Network
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Your wallet is connected to the wrong network. Fluxora is configured for Stellar 
+              <strong> Public Network (Mainnet)</strong>, but your wallet is currently on <strong>Testnet</strong>.
+            </p>
+
+            <ol className={styles.errorInstructions} aria-label="Instructions to switch network">
+              <li className={styles.instructionItem}>
+                <span className={styles.instructionNumber}>1</span>
+                <span className={styles.instructionText}>
+                  Open your <strong>Freighter extension</strong> in your browser toolbar.
+                </span>
+              </li>
+              <li className={styles.instructionItem}>
+                <span className={styles.instructionNumber}>2</span>
+                <span className={styles.instructionText}>
+                  Click the <strong>network dropdown</strong> at the top of the extension popup.
+                </span>
+              </li>
+              <li className={styles.instructionItem}>
+                <span className={styles.instructionNumber}>3</span>
+                <span className={styles.instructionText}>
+                  Select <strong>Public Network (Mainnet)</strong> and return here.
+                </span>
+              </li>
+            </ol>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={handleFreighterClick}
+                aria-label="Check network configuration again"
+              >
+                <RefreshCw size={18} />
+                Check Network Again
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* DESIGN QA PREVIEW TOOLBAR - Rendered exclusively for Design Review & Verification */}
+        {showStateSwitcher && (
+          <div className={styles.previewToolbar} data-testid="design-qa-toolbar">
+            <span className={styles.previewTitle}>Design QA Preview:</span>
+            <div className={styles.previewBtnGroup} role="group" aria-label="Select design preview state">
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === null ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => setInternalErrorState(null)}
+                aria-pressed={currentErrorState === null}
+              >
+                Default View
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "not_installed" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => setInternalErrorState("not_installed")}
+                aria-pressed={currentErrorState === "not_installed"}
+              >
+                Not Installed
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "rejected" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => setInternalErrorState("rejected")}
+                aria-pressed={currentErrorState === "rejected"}
+              >
+                Rejected
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "network_mismatch" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => setInternalErrorState("network_mismatch")}
+                aria-pressed={currentErrorState === "network_mismatch"}
+              >
+                Wrong Network
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-const inlineStyles: Record<string, CSSProperties> = {
-  backdrop: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(2, 8, 18, 0.8)",
-    backdropFilter: "blur(5px)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-    padding: "clamp(12px, 4vw, 24px)",
-  },
-  modal: {
-    position: "relative",
-    background: "var(--surface-neutral)",
-    borderRadius: 16,
-    padding: "clamp(18px, 5vw, 30px)",
-    maxWidth: 520,
-    width: "100%",
-    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45)",
-    border: "1px solid var(--border-neutral)",
-    maxHeight: "90vh",
-    overflowY: "auto",
-    fontFamily: '"Plus Jakarta Sans", Inter, system-ui, sans-serif',
-  },
-  closeButton: {
-    position: "absolute",
-    top: "1rem",
-    right: "1rem",
-    background: "transparent",
-    border: "1px solid transparent",
-    color: "var(--text-muted)",
-    fontSize: "1.125rem",
-    cursor: "pointer",
-    borderRadius: 8,
-    padding: "0.35rem 0.45rem",
-    lineHeight: 1,
-    transition: "all 160ms ease",
-  },
-  header: {
-    marginBottom: "1rem",
-    paddingRight: "2.2rem",
-  },
-  badge: {
-    display: "inline-block",
-    borderRadius: 999,
-    border: "1px solid rgba(34, 211, 238, 0.35)",
-    color: "var(--status-info)",
-    background: "rgba(34, 211, 238, 0.12)",
-    padding: "5px 9px",
-    fontSize: "0.75rem",
-    fontWeight: 600,
-    letterSpacing: "0.03em",
-    marginBottom: "0.75rem",
-    textTransform: "uppercase",
-  },
-  title: {
-    margin: 0,
-    fontSize: "clamp(1.25rem, 4vw, 1.7rem)",
-    fontWeight: 700,
-    color: "var(--text-vivid)",
-    marginBottom: "0.5rem",
-    lineHeight: 1.25,
-    letterSpacing: "-0.01em",
-  },
-  subtitle: {
-    margin: 0,
-    fontSize: "clamp(0.86rem, 2.8vw, 0.95rem)",
-    color: "var(--text-secondary)",
-    lineHeight: 1.55,
-    maxWidth: 420,
-  },
-  walletList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    marginBottom: "1rem",
-  },
-  walletOption: {
-    display: "flex",
-    alignItems: "center",
-    gap: "clamp(0.75rem, 3vw, 1rem)",
-    border: "1px solid var(--border-neutral)",
-    borderRadius: 12,
-    padding: "clamp(0.75rem, 3vw, 1rem)",
-    cursor: "pointer",
-    textAlign: "left",
-    width: "100%",
-    transition: "all 150ms ease-in-out",
-    color: "inherit",
-  },
-  walletIcon: {
-    fontSize: "clamp(1.35rem, 4vw, 1.9rem)",
-    flexShrink: 0,
-    width: "clamp(38px, 11vw, 48px)",
-    height: "clamp(38px, 11vw, 48px)",
-    borderRadius: 10,
-    background: "var(--surface-elevated)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  walletInfo: {
-    flex: 1,
-  },
-  walletName: {
-    fontSize: "clamp(0.92rem, 2.5vw, 1rem)",
-    fontWeight: 700,
-    color: "var(--text-vivid)",
-    marginBottom: "0.25rem",
-  },
-  walletDescription: {
-    fontSize: "clamp(0.76rem, 2vw, 0.875rem)",
-    color: "var(--text-secondary)",
-    lineHeight: 1.4,
-  },
-  chevron: {
-    fontSize: "1.1rem",
-    color: "var(--text-muted)",
-    flexShrink: 0,
-  },
-  footer: {
-    fontSize: "0.8rem",
-    color: "var(--text-muted)",
-    lineHeight: 1.5,
-    textAlign: "center",
-    margin: 0,
-  },
-  termsLink: {
-    color: "var(--status-info)",
-    textDecoration: "underline",
-    textUnderlineOffset: "2px",
-  },
-};

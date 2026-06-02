@@ -127,3 +127,13 @@
     transition: none;
   }
 }
+
+/* Secondary/utility nav items — reduced visual weight */
+.navItemSecondary {
+  color: var(--nav-secondary-color);
+  font: var(--nav-secondary-font);
+}
+
+.navItemSecondary:hover {
+  color: var(--nav-secondary-color-hover);
+}

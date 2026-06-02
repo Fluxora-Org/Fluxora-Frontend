@@ -12,7 +12,7 @@ function getAllSvgs(container: HTMLElement) {
 // ── aria-hidden on decorative SVGs ────────────────────────────────────────────
 
 describe("EmptyState — decorative SVGs have aria-hidden='true'", () => {
-  const variants = ["treasury", "streams", "recipient"] as const;
+  const variants = ["treasury", "streams", "recipient", "search-no-results", "error"] as const;
 
   variants.forEach((variant) => {
     it(`all SVGs in the ${variant} variant are aria-hidden`, () => {
@@ -65,6 +65,16 @@ describe("EmptyState — accessible region labels", () => {
   it("recipient variant has correct region label", () => {
     render(<EmptyState variant="recipient" />);
     expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+  });
+
+  it("search-no-results variant has correct region label", () => {
+    render(<EmptyState variant="search-no-results" />);
+    expect(screen.getByRole("region", { name: "Search no results state" })).toBeInTheDocument();
+  });
+
+  it("error variant has correct region label", () => {
+    render(<EmptyState variant="error" />);
+    expect(screen.getByRole("region", { name: "Error state" })).toBeInTheDocument();
   });
 });
 
@@ -128,5 +138,96 @@ describe("EmptyState — CTA button", () => {
     );
     screen.getByRole("button", { name: "Create stream" }).click();
     expect(onPrimaryAction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── search-no-results variant ─────────────────────────────────────────────────
+
+describe("EmptyState — search-no-results variant", () => {
+  it("renders heading 'No results found'", () => {
+    render(<EmptyState variant="search-no-results" walletConnected={true} />);
+    expect(screen.getByRole("heading", { name: /no results found/i })).toBeInTheDocument();
+  });
+
+  it("renders 'Clear filters' CTA", () => {
+    render(<EmptyState variant="search-no-results" walletConnected={true} />);
+    expect(screen.getByRole("button", { name: /clear filters/i })).toBeInTheDocument();
+  });
+
+  it("calls onClearFilters when CTA is clicked", () => {
+    const onClearFilters = vi.fn();
+    render(
+      <EmptyState
+        variant="search-no-results"
+        walletConnected={true}
+        onClearFilters={onClearFilters}
+      />
+    );
+    screen.getByRole("button", { name: /clear filters/i }).click();
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("all SVGs are aria-hidden", () => {
+    const { container } = render(
+      <EmptyState variant="search-no-results" walletConnected={true} />
+    );
+    getAllSvgs(container).forEach((svg) => {
+      expect(svg).toHaveAttribute("aria-hidden", "true");
+    });
+  });
+
+  it("has accessible region label", () => {
+    render(<EmptyState variant="search-no-results" />);
+    expect(
+      screen.getByRole("region", { name: "Search no results state" })
+    ).toBeInTheDocument();
+  });
+});
+
+// ── error variant ─────────────────────────────────────────────────────────────
+
+describe("EmptyState — error variant", () => {
+  it("renders heading 'Something went wrong'", () => {
+    render(<EmptyState variant="error" walletConnected={true} />);
+    expect(screen.getByRole("heading", { name: /something went wrong/i })).toBeInTheDocument();
+  });
+
+  it("renders 'Try again' CTA", () => {
+    render(<EmptyState variant="error" walletConnected={true} />);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it("calls onRetry when CTA is clicked", () => {
+    const onRetry = vi.fn();
+    render(
+      <EmptyState variant="error" walletConnected={true} onRetry={onRetry} />
+    );
+    screen.getByRole("button", { name: /try again/i }).click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders custom errorMessage when provided", () => {
+    render(
+      <EmptyState
+        variant="error"
+        walletConnected={true}
+        errorMessage="Custom error: 503 Service Unavailable"
+      />
+    );
+    expect(screen.getByText(/503 Service Unavailable/i)).toBeInTheDocument();
+  });
+
+  it("all SVGs are aria-hidden", () => {
+    const { container } = render(
+      <EmptyState variant="error" walletConnected={true} />
+    );
+    getAllSvgs(container).forEach((svg) => {
+      expect(svg).toHaveAttribute("aria-hidden", "true");
+    });
+  });
+
+  it("has accessible region label", () => {
+    render(<EmptyState variant="error" />);
+    expect(screen.getByRole("region", { name: "Error state" })).toBeInTheDocument();
   });
 });

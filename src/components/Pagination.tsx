@@ -24,7 +24,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <nav className="fluxora-pagination" aria-label="Stream list pagination">
-      <div className="pagination-info">
+      <div className="pagination-info" aria-live="polite" aria-atomic="true">
         Showing <span className="highlight">{startItem}</span> –{" "}
         <span className="highlight">{endItem}</span> of{" "}
         <span className="highlight">{totalItems}</span> streams
