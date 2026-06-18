@@ -1,11 +1,32 @@
 import React from "react";
 import "./Pagination.css";
 
+/**
+ * Props for the {@link Pagination} control.
+ *
+ * The component is purely presentational: it renders the "Showing X – Y of N"
+ * summary and page-navigation buttons, but does **not** slice data itself.
+ * Callers are responsible for passing a pre-sliced list to their render loop
+ * and for keeping `currentPage` in sync (see `paginate()` in Streams.tsx).
+ */
 interface PaginationProps {
+  /** 1-based index of the currently visible page. Must be ≥ 1. */
   currentPage: number;
+  /** Total number of items across all pages (length of the unsliced array). */
   totalItems: number;
+  /** Maximum number of items shown per page. One of 10 | 25 | 50. */
   itemsPerPage: number;
+  /**
+   * Fired when the user selects a different page.
+   * Receives the raw 1-based page number from the button; the caller is
+   * responsible for clamping it before committing to state.
+   */
   onPageChange: (page: number) => void;
+  /**
+   * Fired when the user changes the "Per page" selector.
+   * Receives the raw numeric value from the `<select>`; the caller should
+   * validate it against the allowed set (10 | 25 | 50) before committing.
+   */
   onItemsPerPageChange: (limit: number) => void;
 }
 

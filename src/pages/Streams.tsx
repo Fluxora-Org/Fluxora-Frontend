@@ -43,6 +43,29 @@ type StatusFilter = "All" | StreamStatus;
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
 
+/**
+ * Slices `items` to the active-page window, clamping `page` so it is always
+ * within [1, totalPages].  Both arguments are coerced to safe integers before
+ * use so that NaN or floating-point values from UI events cannot produce an
+ * out-of-bounds array access.
+ *
+ * @param items - The full sorted, filtered array to paginate.
+ * @param page  - 1-based current page number; clamped to [1, totalPages].
+ * @param limit - Maximum items per page; must be ≥ 1 (coerced to at least 1).
+ * @returns `items` for the resolved page, the clamped `safePage`, and `totalPages`.
+ */
+function paginate<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): { items: T[]; safePage: number; totalPages: number } {
+  const safeLimit = Math.max(1, Math.trunc(limit));
+  const totalPages = Math.max(1, Math.ceil(items.length / safeLimit));
+  const safePage = Math.min(Math.max(1, Math.trunc(page)), totalPages);
+  const start = (safePage - 1) * safeLimit;
+  return { items: items.slice(start, start + safeLimit), safePage, totalPages };
+}
+
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0,
@@ -734,6 +757,10 @@ export default function Streams() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, sortBy]);
+
   if (loading) return <StreamsLoading />;
 
   const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
@@ -765,6 +792,12 @@ export default function Streams() {
       // Default to recent (higher ID first for demo)
       return b.id.localeCompare(a.id);
     });
+  const {
+    items: paginatedStreams,
+    safePage,
+    totalPages,
+  } = paginate(visibleStreams, currentPage, itemsPerPage);
+
   const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
   const hasStreams = streamRecords.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
@@ -775,11 +808,11 @@ export default function Streams() {
     hasStreams &&
     withdrawableNow === 0 &&
     activeStreams.length > 0;
-  const effectiveExpandedId = visibleStreams.some(
+  const effectiveExpandedId = paginatedStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
     ? expandedStreamId
-    : visibleStreams[0]?.id;
+    : paginatedStreams[0]?.id;
 
   const handleCreateStream = () => {
     setIsCreateModalOpen(true);
@@ -992,7 +1025,7 @@ export default function Streams() {
 
             <div className="streams-list" role="list" aria-label="Stream cards">
               {visibleStreams.length > 0 ? (
-                visibleStreams.map((stream) => (
+                paginatedStreams.map((stream) => (
                   <StreamCard
                     key={stream.id}
                     stream={stream}
@@ -1021,15 +1054,20 @@ export default function Streams() {
             </div>
 
             <Pagination
-              currentPage={currentPage}
+              currentPage={safePage}
               totalItems={visibleStreams.length}
               itemsPerPage={itemsPerPage}
               onPageChange={(page) => {
-                setCurrentPage(page);
+                const clamped = Math.min(Math.max(1, Math.trunc(page)), totalPages);
+                setCurrentPage(clamped);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               onItemsPerPageChange={(limit) => {
-                setItemsPerPage(limit);
+                const safeLimitOptions = [10, 25, 50];
+                const safeLimit = safeLimitOptions.includes(Math.trunc(limit))
+                  ? Math.trunc(limit)
+                  : 10;
+                setItemsPerPage(safeLimit);
                 setCurrentPage(1);
               }}
             />
