@@ -92,6 +92,14 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                     (e.currentTarget as HTMLAnchorElement).style.color =
                       "var(--breadcrumb-color)";
                   }}
+                  onFocus={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.color =
+                      "var(--breadcrumb-color-hover)";
+                  }}
+                  onBlur={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.color =
+                      "var(--breadcrumb-color)";
+                  }}
                   className="breadcrumb-link"
                 >
                   {displayLabel}
