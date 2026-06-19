@@ -30,17 +30,40 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
 
   return (
     <tr
+      tabIndex={0}
+      role="row"
+      aria-selected={isSelected}
+      onClick={handleActivate}
+      onKeyDown={handleKeyDown}
       style={{
         borderBottom: "1px solid var(--color-border-default)",
-        backgroundColor: "var(--color-surface-default)",
+        backgroundColor: isSelected
+          ? "var(--color-surface-elevated)"
+          : "var(--color-surface-default)",
         transition:
           "background-color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
+        cursor: "pointer",
+        outline: "none",
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
+        e.currentTarget.style.outline = "2px solid var(--color-accent-primary)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.backgroundColor = isSelected
+          ? "var(--color-surface-elevated)"
+          : "var(--color-surface-default)";
+        e.currentTarget.style.outline = "none";
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-surface-default)";
+        if (document.activeElement !== e.currentTarget) {
+          e.currentTarget.style.backgroundColor = isSelected
+            ? "var(--color-surface-elevated)"
+            : "var(--color-surface-default)";
+        }
       }}
     >
       <td className="py-4 px-3">
