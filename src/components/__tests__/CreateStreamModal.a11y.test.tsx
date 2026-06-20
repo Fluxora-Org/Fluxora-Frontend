@@ -4,8 +4,10 @@ import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
 
+// Checksum-valid Stellar public key (required by the centralized
+// isValidStellarAddress validator introduced in #331).
 const VALID_STELLAR =
-  "GABC" + "ABCDEFGHJKLMNPQRSTUVWXYZ234567".repeat(2).slice(0, 52);
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderOpenModal(onClose = vi.fn()) {
   const result = render(
@@ -92,7 +94,11 @@ describe("CreateStreamModal accessibility and keyboard behavior", () => {
     expect(
       within(dialog).getByRole("heading", { name: /recipient & amount/i }),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText(/recipient is required/i)).toBeInTheDocument();
+    // The required-recipient message surfaces both in the form error banner and
+    // the inline field validation, so assert at least one is present.
+    expect(
+      within(dialog).getAllByText(/recipient is required/i).length,
+    ).toBeGreaterThan(0);
 
     fillValidStepOne(dialog);
     await user.click(within(dialog).getByRole("button", { name: /^next$/i }));
