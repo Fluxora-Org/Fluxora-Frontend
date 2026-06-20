@@ -6,6 +6,7 @@ import { Skeleton, SkeletonCard } from "./components/Skeleton";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import { ToastProvider } from "./components/toast/ToastProvider";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import ConnectWallet from "./pages/ConnectWallet";
 import Landing from "./pages/Landing";
@@ -100,27 +101,29 @@ export default function App() {
               isSidebarOpen={isSidebarOpen}
             />
 
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/dashboard" element={<Navigate to="/app" replace />} />
-              <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
-              <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
-              <Route path="/landing" element={<Landing />} />
-              <Route path="/app" element={<Layout />}>
-                <Route index element={lazyAppRoute(<Dashboard />)} />
-                <Route path="streams" element={lazyAppRoute(<Streams />)} />
-                <Route path="streams/:streamId" element={lazyAppRoute(<Streams />)} />
-                <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
-                <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
-                <Route path="error" element={<ErrorPage />} />
-                <Route
-                  path="empty-state-demo"
-                  element={lazyAppRoute(<EmptyStateDemo />)}
-                />
-              </Route>
-              <Route path="/connect-wallet" element={<ConnectWallet />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+                <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
+                <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
+                <Route path="/landing" element={<Landing />} />
+                <Route path="/app" element={<Layout />}>
+                  <Route index element={lazyAppRoute(<Dashboard />)} />
+                  <Route path="streams" element={lazyAppRoute(<Streams />)} />
+                  <Route path="streams/:streamId" element={lazyAppRoute(<Streams />)} />
+                  <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
+                  <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
+                  <Route path="error" element={<ErrorPage />} />
+                  <Route
+                    path="empty-state-demo"
+                    element={lazyAppRoute(<EmptyStateDemo />)}
+                  />
+                </Route>
+                <Route path="/connect-wallet" element={<ConnectWallet />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
           </ToastProvider>
         </WalletProvider>
       </BrowserRouter>

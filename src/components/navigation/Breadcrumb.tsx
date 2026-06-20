@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { isValidStellarAddress, maskAddress } from "../../lib/stellar";
 
 export interface BreadcrumbItem {
   label: string;
@@ -20,7 +21,7 @@ interface BreadcrumbProps {
  * - aria-current="page" on the last (current) item
  * - Separator chevrons are aria-hidden
  * - All link items are keyboard-focusable with visible focus ring
- * - Truncates long Stellar addresses at 8…4 chars
+ * - Truncates checksum-valid Stellar addresses at 8...4 chars
  *
  * WCAG 2.1 AA: 4.5:1 text contrast, 3:1 focus ring contrast
  */
@@ -43,10 +44,9 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
       >
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
-          const isStellarAddress =
-            item.label.startsWith("G") && item.label.length === 56;
+          const isStellarAddress = isValidStellarAddress(item.label);
           const displayLabel = isStellarAddress
-            ? `${item.label.slice(0, 8)}…${item.label.slice(-4)}`
+            ? maskAddress(item.label)
             : item.label;
 
           return (
@@ -56,6 +56,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
             >
               {isLast || !item.to ? (
                 <span
+                  aria-label={isStellarAddress ? item.label : undefined}
                   aria-current={isLast ? "page" : undefined}
                   title={isStellarAddress ? item.label : undefined}
                   style={{
@@ -74,24 +75,8 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
               ) : (
                 <Link
                   to={item.to}
+                  aria-label={isStellarAddress ? item.label : undefined}
                   title={isStellarAddress ? item.label : undefined}
-                  style={{
-                    color: "var(--breadcrumb-color)",
-                    textDecoration: "none",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "2px 4px",
-                    margin: "-2px -4px",
-                    transition: "color var(--transition-fast)",
-                    outline: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.color =
-                      "var(--breadcrumb-color-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.color =
-                      "var(--breadcrumb-color)";
-                  }}
                   className="breadcrumb-link"
                 >
                   {displayLabel}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:report": "vite build && node scripts/bundle-size-report.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^16.0.1",
     "@tailwindcss/vite": "^4.2.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
