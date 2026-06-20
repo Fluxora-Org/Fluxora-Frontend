@@ -82,9 +82,6 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
     }).format(date);
   };
 
-  const isCompleted = status === "completed";
-  const isCurrent = current >= cliff ? (currentTime >= cliffEnd ? true : false) : false;
-
   return (
     <div className="stream-timeline-container" role="region" aria-label="Stream timeline visualization">
       {/* Accessible text summary for screen readers */}
