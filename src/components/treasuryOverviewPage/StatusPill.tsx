@@ -9,18 +9,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type ExtendedStatus = StreamStatus | "Healthy" | "At-Risk" | "Critical";
+type StatusPillStatus = StreamStatus | "Healthy" | "At-Risk" | "Critical";
 
 interface Props {
-  status: ExtendedStatus;
+  status: StatusPillStatus;
   /** Icon size */
-  iconSize?: 'xs' | 'sm' | 'md' | 'lg';
+  iconSize?: "xs" | "sm" | "md" | "lg";
 }
 
-const statusStyles: Record<
-  ExtendedStatus,
-  { background: string; color: string; Icon: LucideIcon; label: string }
-> = {
+const statusStyles: Record<StatusPillStatus, { background: string; color: string; Icon: LucideIcon; label: string }> = {
   Active: {
     background: "var(--status-success-bg)",
     color: "var(--status-success)",
@@ -59,7 +56,7 @@ const statusStyles: Record<
   },
 };
 
-export default function StatusPill({ status, iconSize = 'xs' }: Props) {
+export default function StatusPill({ status, iconSize = "xs" }: Props) {
   const { background, color, Icon, label } = statusStyles[status];
 
   return (

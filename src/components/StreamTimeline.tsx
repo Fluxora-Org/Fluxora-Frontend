@@ -14,17 +14,17 @@ export interface StreamTimelineProps {
 
 /**
  * StreamTimeline Component
- * 
+ *
  * Displays a horizontal timeline visualization of a stream's lifecycle:
  * - Cliff period (hatched pattern)
  * - Accrual phase (progress fill)
  * - Remaining period (empty)
- * 
+ *
  * Accessible to screen readers via:
  * - ARIA labels and descriptions
  * - Text-based summary (hidden but announced)
  * - Semantic HTML structure
- * 
+ *
  * WCAG 2.1 AA compliant
  */
 export const StreamTimeline: React.FC<StreamTimelineProps> = ({
@@ -44,9 +44,17 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   const end = new Date(endDate);
 
   // Validate dates
-  if (isNaN(start.getTime()) || isNaN(current.getTime()) || isNaN(end.getTime())) {
+  if (
+    isNaN(start.getTime()) ||
+    isNaN(current.getTime()) ||
+    isNaN(end.getTime())
+  ) {
     return (
-      <div className="stream-timeline-container" role="region" aria-label="Stream timeline">
+      <div
+        className="stream-timeline-container"
+        role="region"
+        aria-label="Stream timeline"
+      >
         <div className="stream-timeline__error">Invalid date configuration</div>
       </div>
     );
@@ -59,11 +67,17 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
 
   // Cliff segment percentage (0-100)
   const cliffPercent = cliff
-    ? Math.max(0, Math.min(100, ((cliffEnd - start.getTime()) / totalDuration) * 100))
+    ? Math.max(
+        0,
+        Math.min(100, ((cliffEnd - start.getTime()) / totalDuration) * 100),
+      )
     : 0;
 
   // Accrual segment percentage (from start to current)
-  const accrualPercent = Math.max(0, Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100));
+  const accrualPercent = Math.max(
+    0,
+    Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100),
+  );
 
   // Format date for display (handle long Stellar addresses)
   const formatDate = (date: Date): string => {
@@ -83,7 +97,11 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   };
 
   return (
-    <div className="stream-timeline-container" role="region" aria-label="Stream timeline visualization">
+    <div
+      className="stream-timeline-container"
+      role="region"
+      aria-label="Stream timeline visualization"
+    >
       {/* Accessible text summary for screen readers */}
       <div className="stream-timeline__sr-summary" role="doc-subtitle">
         <h3 className="sr-only">Timeline Summary</h3>
@@ -100,7 +118,14 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       </div>
 
       {/* Visual timeline bar */}
-      <div className="stream-timeline-bar" role="progressbar" aria-valuenow={Math.round(accrualPercent)} aria-valuemin={0} aria-valuemax={100} aria-label="Stream accrual progress">
+      <div
+        className="stream-timeline-bar"
+        role="progressbar"
+        aria-valuenow={Math.round(accrualPercent)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Stream accrual progress"
+      >
         {/* Cliff segment (hatched) */}
         {cliff && cliffPercent > 0 && (
           <div
@@ -109,7 +134,11 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
             role="img"
             aria-label={`Cliff period: ${formatDate(start)} to ${formatDate(cliff)}`}
           >
-            {cliffPercent > 5 && <span className="stream-timeline-bar__segment-label">{formatShortDate(start)}</span>}
+            {cliffPercent > 5 && (
+              <span className="stream-timeline-bar__segment-label">
+                {formatShortDate(start)}
+              </span>
+            )}
           </div>
         )}
 
@@ -122,7 +151,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
             aria-label={`Accrual period: ${cliff ? formatDate(cliff) : formatDate(start)} to ${formatDate(current)}`}
           >
             {accrualPercent - cliffPercent > 8 && (
-              <span className="stream-timeline-bar__segment-label">{((accrualPercent - cliffPercent) / 100 * 100).toFixed(0)}%</span>
+              <span className="stream-timeline-bar__segment-label">
+                {(((accrualPercent - cliffPercent) / 100) * 100).toFixed(0)}%
+              </span>
             )}
           </div>
         )}
@@ -151,7 +182,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       {/* Date labels */}
       <div className="stream-timeline-labels">
         <div className="stream-timeline-labels__item stream-timeline-labels__start">
-          <span className="stream-timeline-labels__date">{formatDate(start)}</span>
+          <span className="stream-timeline-labels__date">
+            {formatDate(start)}
+          </span>
           <span className="stream-timeline-labels__label">Start</span>
         </div>
 
@@ -160,13 +193,17 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
             className="stream-timeline-labels__item stream-timeline-labels__cliff"
             style={{ marginLeft: `${cliffPercent}%` }}
           >
-            <span className="stream-timeline-labels__date">{formatDate(cliff)}</span>
+            <span className="stream-timeline-labels__date">
+              {formatDate(cliff)}
+            </span>
             <span className="stream-timeline-labels__label">Cliff end</span>
           </div>
         )}
 
         <div className="stream-timeline-labels__item stream-timeline-labels__end">
-          <span className="stream-timeline-labels__date">{formatDate(end)}</span>
+          <span className="stream-timeline-labels__date">
+            {formatDate(end)}
+          </span>
           <span className="stream-timeline-labels__label">End</span>
         </div>
       </div>
@@ -189,7 +226,11 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="stream-timeline__loading" aria-live="polite" aria-label="Loading timeline">
+        <div
+          className="stream-timeline__loading"
+          aria-live="polite"
+          aria-label="Loading timeline"
+        >
           <span className="stream-timeline__loading-spinner" />
           <span>Loading timeline...</span>
         </div>
