@@ -1,27 +1,59 @@
 import { FormEvent, useState } from "react";
 
+const EMAIL_PATTERN =
+  /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i;
+
+export function normalizeNewsletterEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function isValidNewsletterEmail(value: string) {
+  const normalized = normalizeNewsletterEmail(value);
+
+  if (normalized.length > 254 || normalized.includes("..")) {
+    return false;
+  }
+
+  const [localPart, domain] = normalized.split("@");
+  if (
+    !localPart ||
+    !domain ||
+    localPart.length > 64 ||
+    localPart.startsWith(".") ||
+    localPart.endsWith(".")
+  ) {
+    return false;
+  }
+
+  return EMAIL_PATTERN.test(normalized);
+}
+
 export default function NewsletterSection() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const validateEmail = (value: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!validateEmail(email)) {
+    if (submitting) {
+      return;
+    }
+
+    const normalizedEmail = normalizeNewsletterEmail(email);
+
+    if (!isValidNewsletterEmail(normalizedEmail)) {
       setError("Please enter a valid email address.");
+      setSuccess(false);
       return;
     }
 
     setError("");
+    setSuccess(false);
     setSubmitting(true);
 
-    // 🔹 Replace with real newsletter endpoint later
+    // Replace with a real newsletter endpoint when the backend is available.
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     setSubmitting(false);
@@ -51,9 +83,21 @@ export default function NewsletterSection() {
             type="email"
             placeholder="Enter your email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError("");
+              setSuccess(false);
+            }}
             style={styles.input}
             aria-invalid={!!error}
+            aria-describedby={
+              error
+                ? "newsletter-error"
+                : success
+                  ? "newsletter-success"
+                  : undefined
+            }
+            disabled={submitting}
           />
 
           <button
@@ -69,9 +113,20 @@ export default function NewsletterSection() {
           </button>
         </form>
 
-        {error && <p style={styles.error}>{error}</p>}
+        {error && (
+          <p id="newsletter-error" role="alert" style={styles.error}>
+            {error}
+          </p>
+        )}
         {success && (
-          <p style={styles.success}>Thanks for subscribing!</p>
+          <p
+            id="newsletter-success"
+            role="status"
+            aria-live="polite"
+            style={styles.success}
+          >
+            Thanks for subscribing!
+          </p>
         )}
       </div>
     </section>
