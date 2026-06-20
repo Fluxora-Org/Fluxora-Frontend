@@ -111,7 +111,17 @@ function ThemeToggle() {
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:
 
 - `VITE_API_URL` — Backend API base URL
-- `VITE_NETWORK` — Stellar network (testnet / mainnet)
+- `VITE_NETWORK` — Stellar network (TESTNET / PUBLIC)
+- `VITE_RPC_URL` — Soroban RPC server endpoint
+- `VITE_STREAM_CONTRACT_ID` — The deployed stream contract ID (C...)
+
+## Transaction Signing Layer (Stellar / Soroban)
+
+Fluxora integrates with the Stellar ecosystem for on-chain stream management:
+- **Freighter Wallet Integration**: Leverages `@stellar/freighter-api` to securely retrieve accounts, request network passphrases, and sign transactions.
+- **Soroban Smart Contract Invocations**: Invokes contract entrypoints (`create_stream`, `withdraw`, `pause_stream`, `cancel_stream`) by building operations, simulating resource costs, and submitting signed envelopes.
+- **Network Validation**: Verifies that the connected Freighter extension matches `VITE_NETWORK` before building or signing transactions, protecting users from cross-network mistakes.
+- **Robust Error Mapping**: Automatically maps user rejections, simulation failures, and timeouts into descriptive toasts and inline alert messages.
 
 ## Related repos
 
