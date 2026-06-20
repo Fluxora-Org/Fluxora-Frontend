@@ -106,6 +106,17 @@ function ThemeToggle() {
 `useTheme()` throws if used outside a `ThemeProvider`. The provider wraps the app in
 `src/App.tsx`.
 
+## App route guard
+
+The `/app` route subtree is wrapped in `RequireWallet`, which reads the shared
+`useWallet()` context. While Freighter session restore is still loading, the
+guard shows a restoring state instead of redirecting. Disconnected users are
+sent to `/connect-wallet` with their intended `/app` destination preserved in
+router state for return after connection.
+
+This is a client-side UX guard only. Backend services must still enforce
+authorization before returning privileged treasury or stream data.
+
 ## Environment
 
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:

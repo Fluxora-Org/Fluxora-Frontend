@@ -1,14 +1,14 @@
 import {
   createContext,
   useContext,
-  useState,
   useEffect,
+  useState,
   ReactNode,
 } from "react";
 import {
-  isConnected,
   getAddress,
   getNetwork,
+  isConnected,
   WatchWalletChanges,
 } from "@stellar/freighter-api";
 
@@ -16,6 +16,7 @@ interface WalletState {
   address: string | null;
   network: string | null;
   connected: boolean;
+  loading: boolean;
 }
 
 interface WalletContextType extends WalletState {
@@ -25,41 +26,69 @@ interface WalletContextType extends WalletState {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-const INITIAL: WalletState = { address: null, network: null, connected: false };
+const INITIAL: WalletState = {
+  address: null,
+  network: null,
+  connected: false,
+  loading: true,
+};
 
+const DISCONNECTED: WalletState = {
+  address: null,
+  network: null,
+  connected: false,
+  loading: false,
+};
+
+/**
+ * Restores and watches the user's Freighter wallet session.
+ *
+ * The provider is the single passive Freighter integration point for app
+ * routing and navigation. Consumers should use `useWallet()` instead of
+ * probing Freighter directly so route guards can wait for silent restore before
+ * deciding whether a user is connected.
+ */
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(INITIAL);
 
   const connect = (address: string, network: string) =>
-    setState({ address, network, connected: true });
+    setState({ address, network, connected: true, loading: false });
 
-  const disconnect = () => setState(INITIAL);
+  const disconnect = () => setState(DISCONNECTED);
 
-  // Silently restore session if the user already approved this app
   useEffect(() => {
     (async () => {
       try {
         const conn = await isConnected();
-        if (!conn.isConnected) return;
+        if (!conn.isConnected) {
+          setState(DISCONNECTED);
+          return;
+        }
 
-        const addr = await getAddress(); // no popup — returns "" if not approved
-        if (addr.error || !addr.address) return;
+        const addr = await getAddress();
+        if (addr.error || !addr.address) {
+          setState(DISCONNECTED);
+          return;
+        }
 
         const net = await getNetwork();
-        if (net.error) return;
+        if (net.error) {
+          setState(DISCONNECTED);
+          return;
+        }
 
         setState({
           address: addr.address,
           network: net.network,
           connected: true,
+          loading: false,
         });
       } catch {
-        // Extension not installed or no prior approval — ignore silently
+        setState(DISCONNECTED);
       }
     })();
   }, []);
 
-  // Watch for account / network switches inside Freighter
   useEffect(() => {
     if (!state.connected) return;
 
@@ -68,7 +97,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev
-          : { address, network, connected: true },
+          : { address, network, connected: true, loading: false },
       );
     });
 
@@ -82,6 +111,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Reads canonical wallet connection state, including silent restore loading.
+ */
 export function useWallet() {
   const ctx = useContext(WalletContext);
   if (!ctx) throw new Error("useWallet must be inside <WalletProvider>");

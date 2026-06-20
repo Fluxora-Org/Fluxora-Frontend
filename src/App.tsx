@@ -5,6 +5,7 @@ import AppNavbar from "./components/navigation/AppNavbar";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import { ToastProvider } from "./components/toast/ToastProvider";
+import RequireWallet from "./components/RequireWallet";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Streams from "./pages/Streams";
@@ -52,7 +53,14 @@ export default function App() {
               <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
               <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
               <Route path="/landing" element={<Landing />} />
-              <Route path="/app" element={<Layout />}>
+              <Route
+                path="/app"
+                element={
+                  <RequireWallet>
+                    <Layout />
+                  </RequireWallet>
+                }
+              >
                 <Route index element={<Dashboard />} />
                 <Route path="streams" element={<Streams />} />
                 <Route path="streams/:streamId" element={<Streams />} />
