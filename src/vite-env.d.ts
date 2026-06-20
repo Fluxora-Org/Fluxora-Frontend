@@ -1,11 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_STREAM_CONTRACT_ID: string;
-  readonly VITE_RPC_URL: string;
-  readonly VITE_NETWORK: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+  readonly VITE_TX_POLL_INTERVAL_MS?: string;
+  readonly VITE_TX_POLL_MAX_ATTEMPTS?: string;
+  readonly VITE_TX_POLL_BACKOFF_FACTOR?: string;
+  readonly VITE_TX_DEMO_CONFIRMATION_ATTEMPTS?: string;
 }
