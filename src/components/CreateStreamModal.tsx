@@ -4,16 +4,68 @@ import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
-import {
-  calculateRequiredDeposit,
-  parseAmount,
-  sanitizeAmount,
-} from '../lib/createStreamAmounts';
+import { useWallet } from './wallet-connect/Walletcontext';
+import { useToast } from './toast/ToastProvider';
+import { createStream } from '../lib/stellar/tx';
+
+const USDC_DECIMAL_PLACES = 7;
+
+export function sanitizeDepositAmountInput(value: string): string {
+  const digitsAndDots = value.replace(/[^0-9.]/g, "");
+  const [rawInteger = "", ...fractionParts] = digitsAndDots.split(".");
+  const hasDecimal = digitsAndDots.includes(".");
+  const integerPart = rawInteger.replace(/^0+(?=\d)/, "");
+  const normalizedInteger = integerPart || (hasDecimal ? "0" : "");
+  const fractionPart = fractionParts
+    .join("")
+    .slice(0, USDC_DECIMAL_PLACES);
+
+  return hasDecimal ? `${normalizedInteger}.${fractionPart}` : normalizedInteger;
+}
+
+// Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
+export const MAX_ACCRUAL_RATE = 100_000;
+export const MAX_DURATION_DAYS = 3_650;
+export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
 function maskAddress(addr: string): string {
   const t = addr.trim();
   if (t.length <= 12) return t || "—";
   return `${t.slice(0, 6)} . . . ${t.slice(-6)}`;
+}
+
+/**
+ * Converts a user-entered decimal string into the numeric value used by stream
+ * rate, duration, and deposit calculations.
+ */
+function parseStreamNumber(value: string): number {
+  return parseFloat(value.replace(/,/g, ""));
+}
+
+/**
+ * Calculates the total USDC deposit required for a daily stream rate across the
+ * entered duration in days.
+ */
+function calculateRequiredDeposit(
+  dailyRate: string,
+  durationDays: string,
+): string {
+  return (
+    parseStreamNumber(dailyRate || "0") * parseStreamNumber(durationDays || "0")
+  ).toFixed(2);
+}
+
+/**
+ * Formats a validated deposit amount for the review step without substituting
+ * fabricated placeholder values.
+ */
+function formatReviewDeposit(value: string): string {
+  return parseStreamNumber(value).toFixed(2);
+}
+
+/** Formats the daily duration unit with singular/plural copy. */
+function formatDurationUnit(value: string): string {
+  return parseStreamNumber(value) === 1 ? "day" : "days";
 }
 
 /** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
@@ -22,6 +74,34 @@ function isValidStellarAddress(value: string): boolean {
   if (trimmed.length !== 56) return false;
   if (trimmed[0] !== "G") return false;
   return /^G[ABCDEFGHJKLMNPQRSTUVWXYZ234567]{55}$/.test(trimmed);
+}
+
+function validateAccrualRate(value: string): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return 'Stream rate must be a positive number.';
+  }
+
+  if (numericValue > MAX_ACCRUAL_RATE) {
+    return `Stream rate must be ${MAX_ACCRUAL_RATE.toLocaleString()} USDC/day or less.`;
+  }
+
+  return undefined;
+}
+
+function validateDuration(value: string): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return 'Duration must be a positive number.';
+  }
+
+  if (numericValue > MAX_DURATION_DAYS) {
+    return `Duration must be ${MAX_DURATION_DAYS.toLocaleString()} days or less.`;
+  }
+
+  return undefined;
 }
 
 interface CreateStreamModalProps {
@@ -36,6 +116,9 @@ export default function CreateStreamModal({
   onClose,
   onStreamCreated,
 }: CreateStreamModalProps) {
+  const wallet = useWallet();
+  const { addToast } = useToast();
+
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [accrualRate, setAccrualRate] = useState("38.62");
@@ -57,6 +140,9 @@ export default function CreateStreamModal({
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const userDeposit = 200.0;
+  const accrualRateValue = parseFloat(accrualRate || "0");
+  const durationValue = parseFloat(duration || "0");
+  const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
 
   useModalAccessibility({
@@ -77,7 +163,7 @@ export default function CreateStreamModal({
       );
       return false;
     }
-    const amount = parseAmount(depositAmount);
+    const amount = parseFloat(depositAmount.replace(/,/g, ""));
     if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
       setError("Deposit amount must be a positive number.");
       return false;
@@ -100,16 +186,20 @@ export default function CreateStreamModal({
     }
     setTouched(prev => ({ ...prev, ...touchedFields }));
 
-    // Validate accrual rate
-    if (!accrualRate || parseAmount(accrualRate) <= 0) {
+    if (validateAccrualRate(accrualRate)) {
       return false;
     }
-    // Validate duration
-    if (!duration || parseAmount(duration) <= 0) {
+    if (validateDuration(duration)) {
+      return false;
+    }
+    if (
+      !Number.isFinite(requiredDepositValue) ||
+      requiredDepositValue > MAX_REQUIRED_DEPOSIT
+    ) {
       return false;
     }
     // Validate deposit balance
-    if (parseAmount(requiredDeposit) > userDeposit) {
+    if (parseFloat(requiredDeposit) > userDeposit) {
       return false;
     }
     // Validate custom start date
@@ -151,12 +241,44 @@ export default function CreateStreamModal({
       if (!validateStep2()) return;
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (!wallet.connected) {
+        setError("Please connect your wallet first.");
+        return;
+      }
+      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
+      if (wallet.network?.toUpperCase() !== expectedNet.toUpperCase()) {
+        setError(`Wrong Stellar network. Expected ${expectedNet.toUpperCase()}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
+        return;
+      }
+
+      setError(null);
       setIsSubmitting(true);
-      onStreamCreated?.();
-      setTimeout(() => {
-        onClose();
-        setIsSubmitting(false);
-      }, 400);
+
+      const sender = wallet.address!;
+      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+
+      const start = startTimeOption === "now"
+        ? Math.floor(Date.now() / 1000)
+        : Math.floor(new Date(customStartDate).getTime() / 1000);
+
+      const durationDays = parseFloat(duration) || 0;
+      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+      const end = start + durationSeconds;
+
+      createStream(sender, recipient.trim(), amountStr, start, end)
+        .then(() => {
+          addToast("Stream created successfully on-chain!", "success");
+          onStreamCreated?.();
+          onClose();
+        })
+        .catch((err: any) => {
+          setError(err.message || "Failed to create stream.");
+          addToast(`Failed to create stream: ${err.message || err}`, "error");
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
     }
   };
 
@@ -253,7 +375,17 @@ export default function CreateStreamModal({
         </div>
 
         <div className="modal-body-scroll">
-        {currentStep === 1 && (
+          {error && (
+            <div className="validation-message validation-message--error" style={{ margin: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 107, 107, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)' }} role="alert">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+          {currentStep === 1 && (
           <>
             <hr className="divider" />
             <div className="section-header">
@@ -271,7 +403,7 @@ export default function CreateStreamModal({
                 : undefined;
               const recipientSuccess = touched.recipient && !recipientError && recipient.trim().length > 0;
 
-              const depositAmountNum = parseAmount(depositAmount);
+              const depositAmountNum = parseFloat(depositAmount.replace(/,/g, ''));
               const depositError = touched.depositAmount
                 ? (!depositAmount.trim() || isNaN(depositAmountNum) || depositAmountNum <= 0
                     ? 'Deposit amount must be a positive number.'
@@ -318,7 +450,7 @@ export default function CreateStreamModal({
                       className="input-field"
                       value={depositAmount}
                       onChange={(e) => {
-                        const v = sanitizeAmount(e.target.value);
+                        const v = sanitizeDepositAmountInput(e.target.value);
                         setDepositAmount(v);
                         if (error) setError(null);
                       }}
@@ -339,19 +471,13 @@ export default function CreateStreamModal({
         )}
         {currentStep === 2 && (() => {
           // Derived per-field validation state for step 2
-          const accrualRateNum = parseAmount(accrualRate);
           const accrualRateError = touched.accrualRate
-            ? (!accrualRate.trim() || isNaN(accrualRateNum) || accrualRateNum <= 0
-                ? 'Stream rate must be a positive number.'
-                : undefined)
+            ? validateAccrualRate(accrualRate)
             : undefined;
           const accrualRateSuccess = touched.accrualRate && !accrualRateError && accrualRate.trim().length > 0;
 
-          const durationNum = parseAmount(duration);
           const durationError = touched.duration
-            ? (!duration.trim() || isNaN(durationNum) || durationNum <= 0
-                ? 'Duration must be a positive number.'
-                : undefined)
+            ? validateDuration(duration)
             : undefined;
           const durationSuccess = touched.duration && !durationError && duration.trim().length > 0;
 
@@ -415,9 +541,7 @@ export default function CreateStreamModal({
                   type="text"
                   inputMode="decimal"
                   value={accrualRate}
-                  onChange={(e) =>
-                    setAccrualRate(sanitizeAmount(e.target.value))
-                  }
+                  onChange={(e) => setAccrualRate(e.target.value)}
                   onBlur={() => handleBlur('accrualRate')}
                   placeholder="0.00"
                   hasError={Boolean(accrualRateError)}
@@ -475,7 +599,7 @@ export default function CreateStreamModal({
                   type="text"
                   inputMode="decimal"
                   value={duration}
-                  onChange={(e) => setDuration(sanitizeAmount(e.target.value))}
+                  onChange={(e) => setDuration(e.target.value)}
                   onBlur={() => handleBlur('duration')}
                   placeholder="1"
                   hasError={Boolean(durationError)}
@@ -604,7 +728,7 @@ export default function CreateStreamModal({
             <div className="deposit-summary">
               <div className="deposit-box">
                 <div className="deposit-label">Required deposit</div>
-                <div className={`deposit-value ${parseAmount(requiredDeposit) > userDeposit ? 'required' : ''}`}>
+                <div className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? 'required' : ''}`}>
                   {requiredDeposit} USDC
                 </div>
               </div>
@@ -619,11 +743,9 @@ export default function CreateStreamModal({
 
           {currentStep === 3 &&
             (() => {
-              const mockRecipient =
-                recipient.trim() || "GDU4D7EXAMPLEADDRESS0L50DR";
-              const mockDeposit = depositAmount.trim()
-                ? parseAmount(depositAmount).toFixed(2)
-                : "200.00";
+              const reviewRecipient = recipient.trim();
+              const reviewDeposit = formatReviewDeposit(depositAmount);
+              const durationUnit = formatDurationUnit(duration);
               return (
                 <>
                   <hr className="divider" />
@@ -675,7 +797,7 @@ export default function CreateStreamModal({
                       <div className="review-card-content">
                         <div className="review-card-sublabel">Address</div>
                         <div className="review-card-value">
-                          {maskAddress(mockRecipient)}
+                          {maskAddress(reviewRecipient)}
                         </div>
                       </div>
                     </div>
@@ -726,7 +848,7 @@ export default function CreateStreamModal({
                       </div>
                       <div className="review-card-content">
                         <div className="review-card-amount">
-                          {mockDeposit}{" "}
+                          {reviewDeposit}{" "}
                           <span className="review-card-unit">USDC</span>
                         </div>
                       </div>
@@ -799,7 +921,7 @@ export default function CreateStreamModal({
                           </span>
                           <span className="review-card-row-label">Rate</span>
                           <span className="review-card-row-value">
-                            {accrualRate} USDC per month
+                            {accrualRate} USDC per day
                           </span>
                         </div>
                         <div className="review-card-row">
@@ -826,8 +948,7 @@ export default function CreateStreamModal({
                             Duration
                           </span>
                           <span className="review-card-row-value">
-                            {duration}{" "}
-                            {parseInt(duration, 10) === 1 ? "month" : "months"}
+                            {duration} {durationUnit}
                           </span>
                         </div>
                         <div className="review-card-row">
@@ -892,7 +1013,7 @@ export default function CreateStreamModal({
                     role="region"
                     aria-live="polite"
                   >
-                    <strong>By creating this stream:</strong> {mockDeposit} USDC
+                    <strong>By creating this stream:</strong> {reviewDeposit} USDC
                     will be locked in a Soroban smart contract. The recipient
                     can withdraw their accrued amount at any time during the
                     stream.
