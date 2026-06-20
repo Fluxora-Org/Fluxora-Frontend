@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:report": "vite build && node scripts/bundle-size-report.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

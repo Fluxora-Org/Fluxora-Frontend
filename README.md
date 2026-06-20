@@ -44,6 +44,7 @@ App runs at [http://localhost:5173](http://localhost:5173).
 
 ```bash
 npm run build
+npm run build:report
 npm run preview
 ```
 
@@ -51,8 +52,14 @@ Or with pnpm:
 
 ```bash
 pnpm run build
+pnpm run build:report
 pnpm run preview
 ```
+
+`npm run build:report` emits a raw/gzip bundle table from `dist/assets` after
+the production build. Vite warns when any chunk exceeds 650 kB, and
+`vite.config.ts` splits vendor code into `vendor-react`, `vendor-stellar`, and
+`vendor-icons` chunks so PR reviewers can spot bundle regressions.
 
 ## Project structure
 
