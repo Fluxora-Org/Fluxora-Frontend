@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import StreamsTable from "./StreamsTable";
+import type { Stream } from "./Stream";
 
-export default function RecentStreams() {
+export default function RecentStreams({ streams }: { streams: Stream[] }) {
   const navigate = useNavigate();
 
   return (
@@ -16,7 +17,7 @@ export default function RecentStreams() {
         </button>
       </div>
 
-      <StreamsTable />
+      <StreamsTable streams={streams} />
     </div>
   );
 }
