@@ -1,3 +1,4 @@
+vi.unmock("../ToastProvider");
 import {
   act,
   fireEvent,

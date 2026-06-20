@@ -43,6 +43,7 @@ type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
+const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
@@ -715,6 +716,7 @@ export default function Streams() {
   const { streamId } = useParams();
   const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
+  const hasMountedFilterAnnouncer = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -775,6 +777,23 @@ export default function Streams() {
         return b.id.localeCompare(a.id);
       });
   }, [searchQuery, sortBy, statusFilter]);
+
+  useEffect(() => {
+    if (!hasMountedFilterAnnouncer.current) {
+      hasMountedFilterAnnouncer.current = true;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      announce(
+        `Showing ${visibleStreams.length} ${
+          visibleStreams.length === 1 ? "stream" : "streams"
+        }.`,
+      );
+    }, FILTER_ANNOUNCEMENT_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
   const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
   const hasStreams = streamRecords.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
