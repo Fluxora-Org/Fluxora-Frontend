@@ -523,7 +523,7 @@ function StreamDetail({
         <h2 className="stream-detail__section-header">Stream Timeline</h2>
         <StreamTimeline
           startDate={stream.startDate}
-          cliffDate={stream.cliffDate}
+          cliffDate={stream.cliffDate ?? null}
           currentDate={new Date().toISOString()}
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
@@ -997,6 +997,7 @@ export default function Streams() {
                         }.`,
                       )
                     }
+                    onSelect={() => setSelectedStreamId(stream.id)}
                     onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}
                   />
                 ))
