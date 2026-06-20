@@ -5,6 +5,11 @@ import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 
+// Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
+export const MAX_ACCRUAL_RATE = 100_000;
+export const MAX_DURATION_DAYS = 3_650;
+export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
+
 function maskAddress(addr: string): string {
   const t = addr.trim();
   if (t.length <= 12) return t || "—";
@@ -17,6 +22,34 @@ function isValidStellarAddress(value: string): boolean {
   if (trimmed.length !== 56) return false;
   if (trimmed[0] !== "G") return false;
   return /^G[ABCDEFGHJKLMNPQRSTUVWXYZ234567]{55}$/.test(trimmed);
+}
+
+function validateAccrualRate(value: string): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return 'Stream rate must be a positive number.';
+  }
+
+  if (numericValue > MAX_ACCRUAL_RATE) {
+    return `Stream rate must be ${MAX_ACCRUAL_RATE.toLocaleString()} USDC/day or less.`;
+  }
+
+  return undefined;
+}
+
+function validateDuration(value: string): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return 'Duration must be a positive number.';
+  }
+
+  if (numericValue > MAX_DURATION_DAYS) {
+    return `Duration must be ${MAX_DURATION_DAYS.toLocaleString()} days or less.`;
+  }
+
+  return undefined;
 }
 
 interface CreateStreamModalProps {
@@ -52,8 +85,11 @@ export default function CreateStreamModal({
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const userDeposit = 200.0;
+  const accrualRateValue = parseFloat(accrualRate || "0");
+  const durationValue = parseFloat(duration || "0");
+  const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = (
-    parseFloat(accrualRate || "0") * parseFloat(duration || "0")
+    Number.isFinite(requiredDepositValue) ? requiredDepositValue : 0
   ).toFixed(2);
 
   useModalAccessibility({
@@ -97,12 +133,16 @@ export default function CreateStreamModal({
     }
     setTouched(prev => ({ ...prev, ...touchedFields }));
 
-    // Validate accrual rate
-    if (!accrualRate || parseFloat(accrualRate) <= 0) {
+    if (validateAccrualRate(accrualRate)) {
       return false;
     }
-    // Validate duration
-    if (!duration || parseFloat(duration) <= 0) {
+    if (validateDuration(duration)) {
+      return false;
+    }
+    if (
+      !Number.isFinite(requiredDepositValue) ||
+      requiredDepositValue > MAX_REQUIRED_DEPOSIT
+    ) {
       return false;
     }
     // Validate deposit balance
@@ -336,19 +376,13 @@ export default function CreateStreamModal({
         )}
         {currentStep === 2 && (() => {
           // Derived per-field validation state for step 2
-          const accrualRateNum = parseFloat(accrualRate);
           const accrualRateError = touched.accrualRate
-            ? (!accrualRate.trim() || isNaN(accrualRateNum) || accrualRateNum <= 0
-                ? 'Stream rate must be a positive number.'
-                : undefined)
+            ? validateAccrualRate(accrualRate)
             : undefined;
           const accrualRateSuccess = touched.accrualRate && !accrualRateError && accrualRate.trim().length > 0;
 
-          const durationNum = parseFloat(duration);
           const durationError = touched.duration
-            ? (!duration.trim() || isNaN(durationNum) || durationNum <= 0
-                ? 'Duration must be a positive number.'
-                : undefined)
+            ? validateDuration(duration)
             : undefined;
           const durationSuccess = touched.duration && !durationError && duration.trim().length > 0;
 
