@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import { stellarExplorerUrl } from "../../lib/stellar";
 
 interface WalletStatusProps {
   address: string;
@@ -180,10 +181,8 @@ export default function WalletStatus({
                 <button
                   role="menuitem"
                   onClick={() => {
-                    const netPath =
-                      network?.toLowerCase() === "public" ? "public" : "testnet";
                     window.open(
-                      `https://stellar.expert/explorer/${netPath}/account/${address}`,
+                      stellarExplorerUrl(address, network),
                       "_blank",
                       "noopener",
                     );
