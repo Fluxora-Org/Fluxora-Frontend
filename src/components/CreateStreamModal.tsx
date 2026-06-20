@@ -5,6 +5,21 @@ import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 
+const USDC_DECIMAL_PLACES = 7;
+
+export function sanitizeDepositAmountInput(value: string): string {
+  const digitsAndDots = value.replace(/[^0-9.]/g, "");
+  const [rawInteger = "", ...fractionParts] = digitsAndDots.split(".");
+  const hasDecimal = digitsAndDots.includes(".");
+  const integerPart = rawInteger.replace(/^0+(?=\d)/, "");
+  const normalizedInteger = integerPart || (hasDecimal ? "0" : "");
+  const fractionPart = fractionParts
+    .join("")
+    .slice(0, USDC_DECIMAL_PLACES);
+
+  return hasDecimal ? `${normalizedInteger}.${fractionPart}` : normalizedInteger;
+}
+
 function maskAddress(addr: string): string {
   const t = addr.trim();
   if (t.length <= 12) return t || "—";
@@ -315,7 +330,7 @@ export default function CreateStreamModal({
                       className="input-field"
                       value={depositAmount}
                       onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9.]/g, '');
+                        const v = sanitizeDepositAmountInput(e.target.value);
                         setDepositAmount(v);
                         if (error) setError(null);
                       }}
