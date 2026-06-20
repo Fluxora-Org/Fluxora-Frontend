@@ -10,12 +10,19 @@ interface Props {
   onSelect?: (id: string) => void;
 }
 
-export default function StreamRow({
-  stream,
-  isSelected = false,
-  onSelect,
-}: Props) {
+function truncateAddress(address: string) {
+  return address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
+}
+
+function formatAccruedAmount(amount: number) {
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2,
+  }).format(amount)} USDC accrued`;
+}
+
+export default function StreamRow({ stream, isSelected = false, onSelect }: Props) {
   const navigate = useNavigate();
+  const recipientLabel = truncateAddress(stream.recipient);
 
   function handleActivate() {
     if (onSelect) {
@@ -35,15 +42,27 @@ export default function StreamRow({
   return (
     <tr
       tabIndex={0}
+      role="row"
       aria-selected={isSelected}
       style={{
         borderBottom: "1px solid var(--color-border-default)",
         backgroundColor: isSelected
           ? "var(--color-surface-elevated)"
           : "var(--color-surface-default)",
-        cursor: "pointer",
         transition:
           "background-color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
+        cursor: "pointer",
+        outline: "none",
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
+        e.currentTarget.style.outline = "2px solid var(--color-accent-primary)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.backgroundColor = isSelected
+          ? "var(--color-surface-elevated)"
+          : "var(--color-surface-default)";
+        e.currentTarget.style.outline = "none";
       }}
       onClick={handleActivate}
       onKeyDown={handleKeyDown}
@@ -51,9 +70,11 @@ export default function StreamRow({
         e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = isSelected
-          ? "var(--color-surface-elevated)"
-          : "var(--color-surface-default)";
+        if (document.activeElement !== e.currentTarget) {
+          e.currentTarget.style.backgroundColor = isSelected
+            ? "var(--color-surface-elevated)"
+            : "var(--color-surface-default)";
+        }
       }}
     >
       <td className="py-4 px-3">
@@ -63,17 +84,33 @@ export default function StreamRow({
         >
           {stream.name}
         </div>
-        <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        <div
+          className="text-xs"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           {stream.id}
         </div>
       </td>
 
-      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
-        {stream.recipient}
+      <td
+        className="py-4 px-3"
+        style={{ color: "var(--color-text-primary)" }}
+        title={stream.recipient}
+        aria-label={`Recipient ${stream.recipient}`}
+      >
+        {recipientLabel}
       </td>
 
-      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
-        {stream.rate}
+      <td
+        className="py-4 px-3"
+        style={{ color: "var(--color-text-primary)" }}
+      >
+        <div>{stream.rate}</div>
+        {typeof stream.accruedAmount === "number" && (
+          <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {formatAccruedAmount(stream.accruedAmount)}
+          </div>
+        )}
       </td>
 
       <td className="stream-row__cell py-4 px-3">
