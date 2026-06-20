@@ -4,6 +4,11 @@ import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
+import {
+  calculateRequiredDeposit,
+  parseAmount,
+  sanitizeAmount,
+} from '../lib/createStreamAmounts';
 
 function maskAddress(addr: string): string {
   const t = addr.trim();
@@ -52,9 +57,7 @@ export default function CreateStreamModal({
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const userDeposit = 200.0;
-  const requiredDeposit = (
-    parseFloat(accrualRate || "0") * parseFloat(duration || "0")
-  ).toFixed(2);
+  const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
 
   useModalAccessibility({
     isOpen,
@@ -74,7 +77,7 @@ export default function CreateStreamModal({
       );
       return false;
     }
-    const amount = parseFloat(depositAmount.replace(/,/g, ""));
+    const amount = parseAmount(depositAmount);
     if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
       setError("Deposit amount must be a positive number.");
       return false;
@@ -98,15 +101,15 @@ export default function CreateStreamModal({
     setTouched(prev => ({ ...prev, ...touchedFields }));
 
     // Validate accrual rate
-    if (!accrualRate || parseFloat(accrualRate) <= 0) {
+    if (!accrualRate || parseAmount(accrualRate) <= 0) {
       return false;
     }
     // Validate duration
-    if (!duration || parseFloat(duration) <= 0) {
+    if (!duration || parseAmount(duration) <= 0) {
       return false;
     }
     // Validate deposit balance
-    if (parseFloat(requiredDeposit) > userDeposit) {
+    if (parseAmount(requiredDeposit) > userDeposit) {
       return false;
     }
     // Validate custom start date
@@ -268,7 +271,7 @@ export default function CreateStreamModal({
                 : undefined;
               const recipientSuccess = touched.recipient && !recipientError && recipient.trim().length > 0;
 
-              const depositAmountNum = parseFloat(depositAmount.replace(/,/g, ''));
+              const depositAmountNum = parseAmount(depositAmount);
               const depositError = touched.depositAmount
                 ? (!depositAmount.trim() || isNaN(depositAmountNum) || depositAmountNum <= 0
                     ? 'Deposit amount must be a positive number.'
@@ -315,7 +318,7 @@ export default function CreateStreamModal({
                       className="input-field"
                       value={depositAmount}
                       onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9.]/g, '');
+                        const v = sanitizeAmount(e.target.value);
                         setDepositAmount(v);
                         if (error) setError(null);
                       }}
@@ -336,7 +339,7 @@ export default function CreateStreamModal({
         )}
         {currentStep === 2 && (() => {
           // Derived per-field validation state for step 2
-          const accrualRateNum = parseFloat(accrualRate);
+          const accrualRateNum = parseAmount(accrualRate);
           const accrualRateError = touched.accrualRate
             ? (!accrualRate.trim() || isNaN(accrualRateNum) || accrualRateNum <= 0
                 ? 'Stream rate must be a positive number.'
@@ -344,7 +347,7 @@ export default function CreateStreamModal({
             : undefined;
           const accrualRateSuccess = touched.accrualRate && !accrualRateError && accrualRate.trim().length > 0;
 
-          const durationNum = parseFloat(duration);
+          const durationNum = parseAmount(duration);
           const durationError = touched.duration
             ? (!duration.trim() || isNaN(durationNum) || durationNum <= 0
                 ? 'Duration must be a positive number.'
@@ -412,7 +415,9 @@ export default function CreateStreamModal({
                   type="text"
                   inputMode="decimal"
                   value={accrualRate}
-                  onChange={(e) => setAccrualRate(e.target.value)}
+                  onChange={(e) =>
+                    setAccrualRate(sanitizeAmount(e.target.value))
+                  }
                   onBlur={() => handleBlur('accrualRate')}
                   placeholder="0.00"
                   hasError={Boolean(accrualRateError)}
@@ -470,7 +475,7 @@ export default function CreateStreamModal({
                   type="text"
                   inputMode="decimal"
                   value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  onChange={(e) => setDuration(sanitizeAmount(e.target.value))}
                   onBlur={() => handleBlur('duration')}
                   placeholder="1"
                   hasError={Boolean(durationError)}
@@ -599,7 +604,7 @@ export default function CreateStreamModal({
             <div className="deposit-summary">
               <div className="deposit-box">
                 <div className="deposit-label">Required deposit</div>
-                <div className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? 'required' : ''}`}>
+                <div className={`deposit-value ${parseAmount(requiredDeposit) > userDeposit ? 'required' : ''}`}>
                   {requiredDeposit} USDC
                 </div>
               </div>
@@ -617,7 +622,7 @@ export default function CreateStreamModal({
               const mockRecipient =
                 recipient.trim() || "GDU4D7EXAMPLEADDRESS0L50DR";
               const mockDeposit = depositAmount.trim()
-                ? parseFloat(depositAmount.replace(/,/g, "")).toFixed(2)
+                ? parseAmount(depositAmount).toFixed(2)
                 : "200.00";
               return (
                 <>
