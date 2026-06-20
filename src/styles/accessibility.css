@@ -321,9 +321,23 @@ textarea:disabled:focus-visible {
   background-color: var(--color-surface-raised);
 }
 
+.breadcrumb-link {
+  color: var(--breadcrumb-color);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: color var(--transition-fast);
+  outline: none;
+}
+
+.breadcrumb-link:hover,
+.breadcrumb-link:focus-visible {
+  color: var(--breadcrumb-color-hover);
+}
+
 /* Breadcrumb link focus ring */
 .breadcrumb-link:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-outline-offset);
-  color: var(--breadcrumb-color-hover);
 }
