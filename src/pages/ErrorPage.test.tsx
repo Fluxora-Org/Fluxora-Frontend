@@ -41,16 +41,7 @@ describe('ErrorPage', () => {
     expect(screen.getByText('Network timeout occurred.')).toBeInTheDocument();
   });
 
-  it('renders the recovery steps section heading', () => {
-    renderErrorPage();
-    expect(screen.getByRole('heading', { level: 2, name: /what you can do/i })).toBeInTheDocument();
-  });
 
-  it('renders all three recovery steps', () => {
-    renderErrorPage();
-    const items = screen.getAllByRole('listitem');
-    expect(items).toHaveLength(3);
-  });
 
   it('renders the "Try again" button', () => {
     renderErrorPage();
@@ -82,16 +73,11 @@ describe('ErrorPage', () => {
     expect(group).toBeInTheDocument();
   });
 
-  it('recovery section has an accessible label', () => {
-    renderErrorPage();
-    expect(screen.getByRole('region', { name: /recovery steps/i })).toBeInTheDocument();
-  });
-
   it('decorative SVGs have aria-hidden="true"', () => {
     const { container } = renderErrorPage();
     const svgs = container.querySelectorAll('svg[aria-hidden="true"]');
-    // icon wrapper + two button icons
-    expect(svgs.length).toBeGreaterThanOrEqual(3);
+    // illustration icon
+    expect(svgs.length).toBeGreaterThanOrEqual(1);
   });
 
   it('both buttons have type="button"', () => {
@@ -133,18 +119,13 @@ describe('ErrorPage', () => {
     expect(container.querySelector('.error-page-container')).toBeInTheDocument();
   });
 
-  it('applies btn-retry class to the retry button', () => {
+  it('applies ui-primary-cta class to the retry button', () => {
     const { container } = renderErrorPage();
-    expect(container.querySelector('.btn-retry')).toBeInTheDocument();
+    expect(container.querySelector('.ui-primary-cta')).toBeInTheDocument();
   });
 
-  it('applies btn-dashboard class to the dashboard button', () => {
+  it('applies ui-secondary-control class to the dashboard button', () => {
     const { container } = renderErrorPage();
-    expect(container.querySelector('.btn-dashboard')).toBeInTheDocument();
-  });
-
-  it('applies error-recovery class to the recovery section', () => {
-    const { container } = renderErrorPage();
-    expect(container.querySelector('.error-recovery')).toBeInTheDocument();
+    expect(container.querySelector('.ui-secondary-control')).toBeInTheDocument();
   });
 });

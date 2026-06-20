@@ -6,7 +6,9 @@
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent, within } from '@testing-library/react';
 import * as fc from 'fast-check';
-import CreateStreamModal from '../CreateStreamModal';
+import CreateStreamModal, {
+  sanitizeDepositAmountInput,
+} from '../CreateStreamModal';
 
 // Valid Stellar address: starts with G, 56 chars, base32 (no 0,1,8,9)
 const VALID_STELLAR = 'GABC' + 'ABCDEFGHJKLMNPQRSTUVWXYZ234567'.repeat(2).slice(0, 52);
@@ -28,6 +30,29 @@ function advanceToStep2(container: HTMLElement) {
   const nextBtn = within(container).getByRole('button', { name: /^next$/i });
   fireEvent.click(nextBtn);
 }
+
+describe('Step 1 deposit amount sanitization', () => {
+  it.each([
+    ['1.2.3', '1.23'],
+    ['0000123', '123'],
+    ['0000.500000000', '0.5000000'],
+    ['abc$0012.345678901xyz', '12.3456789'],
+    ['.75', '0.75'],
+    ['0', '0'],
+    ['0.', '0.'],
+  ])('sanitizes %s to %s', (input, expected) => {
+    expect(sanitizeDepositAmountInput(input)).toBe(expected);
+  });
+
+  it('sanitizes the step-1 deposit field as the user types', () => {
+    const { container } = renderModal();
+    const depositInput = container.querySelector('#create-stream-deposit') as HTMLInputElement;
+
+    fireEvent.change(depositInput, { target: { value: '0001.2.345678901' } });
+
+    expect(depositInput.value).toBe('1.2345678');
+  });
+});
 
 /**
  * 6.1 — All invalid step-2 fields show errors simultaneously on Next click

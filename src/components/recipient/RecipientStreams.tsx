@@ -1,84 +1,32 @@
 import { useState } from "react";
+import {
+  mockRecipientStreams,
+  type RecipientStream,
+} from "../../fixtures/recipientStreams";
 
-interface Stream {
-  id: string;
-  sender: string;
-  senderName: string;
-  amount: number;
-  rate: number; // USDC per hour
-  progress: number;
-  status: "active" | "paused" | "completed";
-  isPinned: boolean;
-  startTime: string;
-}
+export type RecipientStreamsSortKey = "pinned" | "newest" | "rate";
 
-const mockStreams: Stream[] = [
-  {
-    id: "1",
-    sender: "GD...3X4",
-    senderName: "Stellar Dev Foundation",
-    amount: 15000,
-    rate: 20.5,
-    progress: 75,
-    status: "active",
-    isPinned: true,
-    startTime: "2024-03-01",
-  },
-  {
-    id: "2",
-    sender: "GC...9Y2",
-    senderName: "Fluxora DAO",
-    amount: 5000,
-    rate: 5.25,
-    progress: 45,
-    status: "active",
-    isPinned: false,
-    startTime: "2024-03-15",
-  },
-  {
-    id: "3",
-    sender: "GB...1Z8",
-    senderName: "Ecosystem Grant #42",
-    amount: 2500,
-    rate: 1.5,
-    progress: 10,
-    status: "active",
-    isPinned: false,
-    startTime: "2024-03-28",
-  },
-];
-
-const STATUS_LABELS: Record<Stream["status"], string> = {
+const STATUS_LABELS: Record<RecipientStream["status"], string> = {
   active: "Active",
   paused: "Paused",
   completed: "Completed",
 };
 
-const STATUS_CLASSES: Record<Stream["status"], string> = {
-  active:
-    "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
-  paused:
-    "bg-amber-500/10 border-amber-500/30 text-amber-400",
-  completed:
-    "bg-blue-500/10 border-blue-500/30 text-blue-400",
+const STATUS_CLASSES: Record<RecipientStream["status"], string> = {
+  active: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+  paused: "bg-amber-500/10 border-amber-500/30 text-amber-400",
+  completed: "bg-blue-500/10 border-blue-500/30 text-blue-400",
 };
 
-export default function RecipientStreams() {
-  const [streams, setStreams] = useState<Stream[]>(mockStreams);
-  const [sortKey, setSortKey] = useState<"pinned" | "newest" | "rate">("pinned");
-
-  const togglePin = (id: string) => {
-    setStreams((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s))
-    );
-  };
-
-  const sortedStreams = [...streams].sort((a, b) => {
-    if (sortKey === "pinned") {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return 0;
+export function sortRecipientStreams(
+  streams: RecipientStream[],
+  sortKey: RecipientStreamsSortKey
+) {
+  return [...streams].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) {
+      return a.isPinned ? -1 : 1;
     }
+
     if (sortKey === "newest") {
       return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
     }
@@ -87,12 +35,28 @@ export default function RecipientStreams() {
     }
     return 0;
   });
+}
+
+export default function RecipientStreams() {
+  const [streams, setStreams] = useState<RecipientStream[]>(mockRecipientStreams);
+  const [sortKey, setSortKey] = useState<RecipientStreamsSortKey>("pinned");
+
+  const togglePin = (id: string) => {
+    setStreams((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s))
+    );
+  };
+
+  const sortedStreams = sortRecipientStreams(streams, sortKey);
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* ── Section Header ── */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold" style={{ color: "var(--text)" }} id="streams-list-heading">
+        <h2
+          className="text-xl font-bold"
+          style={{ color: "var(--text)" }}
+          id="streams-list-heading"
+        >
           Your Incoming Streams
         </h2>
 
@@ -106,9 +70,7 @@ export default function RecipientStreams() {
           <select
             id="streams-sort"
             value={sortKey}
-            onChange={(e) =>
-              setSortKey(e.target.value as "pinned" | "newest" | "rate")
-            }
+            onChange={(e) => setSortKey(e.target.value as RecipientStreamsSortKey)}
             className="bg-transparent border border-[var(--border)] text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             style={{ background: "var(--surface)", color: "var(--text)" }}
           >
@@ -119,7 +81,13 @@ export default function RecipientStreams() {
         </div>
       </div>
 
-      {/* ── Stream Cards ── */}
+      <div className="hidden md:grid grid-cols-[minmax(240px,1fr)_1fr_96px_96px] gap-6 px-5 text-xs font-bold text-slate-500 uppercase tracking-widest">
+        <span>From</span>
+        <span>Accrued</span>
+        <span>Rate</span>
+        <span>Status</span>
+      </div>
+
       <ul
         className="grid gap-4"
         aria-labelledby="streams-list-heading"
@@ -131,12 +99,11 @@ export default function RecipientStreams() {
             className={`stream-card group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.01] ${
               stream.isPinned ? "is-active" : ""
             }`}
-            style={{ 
+            style={{
               background: "var(--card-gradient)",
-              borderColor: "var(--border)"
+              borderColor: "var(--border)",
             }}
           >
-            {/* Pinned accent bar – decorative */}
             {stream.isPinned && (
               <div
                 aria-hidden="true"
@@ -148,7 +115,6 @@ export default function RecipientStreams() {
               aria-label={`Stream from ${stream.senderName}`}
               className="p-5 flex flex-col md:flex-row md:items-center gap-6"
             >
-              {/* ── Sender Info ── */}
               <div className="flex items-center gap-4 min-w-[240px]">
                 <div
                   aria-hidden="true"
@@ -161,23 +127,34 @@ export default function RecipientStreams() {
                   {stream.senderName.charAt(0)}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold" style={{ color: "var(--text)" }}>
+                  <span
+                    className="text-sm font-bold"
+                    style={{ color: "var(--text)" }}
+                  >
                     {stream.senderName}
                   </span>
-                  <span className="text-xs tabular-nums font-mono" style={{ color: "var(--muted)" }}>
+                  <span
+                    className="text-xs tabular-nums font-mono"
+                    style={{ color: "var(--muted)" }}
+                  >
                     {stream.sender}
                   </span>
                 </div>
               </div>
 
-              {/* ── Progress & Amount ── */}
               <div className="flex-1 flex flex-col gap-2">
                 <div className="flex justify-between items-end">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-bold" style={{ color: "var(--text)" }}>
+                    <span
+                      className="text-lg font-bold"
+                      style={{ color: "var(--text)" }}
+                    >
                       {stream.amount.toLocaleString()}
                     </span>
-                    <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: "var(--muted)" }}
+                    >
                       USDC Total
                     </span>
                   </div>
@@ -191,7 +168,6 @@ export default function RecipientStreams() {
                   </span>
                 </div>
 
-                {/* Progress bar */}
                 <div
                   role="progressbar"
                   aria-valuenow={stream.progress}
@@ -212,14 +188,16 @@ export default function RecipientStreams() {
                 </div>
               </div>
 
-              {/* ── Rate, Status & Actions ── */}
               <div className="flex items-center gap-8 min-w-[200px] justify-between">
                 <dl className="flex flex-col gap-2">
                   <div className="flex flex-col">
                     <dt className="text-xs font-bold text-slate-500 uppercase tracking-widest">
                       Rate
                     </dt>
-                    <dd className="text-sm font-bold" style={{ color: "var(--text)" }}>
+                    <dd
+                      className="text-sm font-bold"
+                      style={{ color: "var(--text)" }}
+                    >
                       {stream.rate} USDC/hr
                     </dd>
                   </div>
@@ -237,8 +215,8 @@ export default function RecipientStreams() {
                             stream.status === "active"
                               ? "bg-emerald-400 animate-pulse"
                               : stream.status === "paused"
-                              ? "bg-amber-400"
-                              : "bg-blue-400"
+                                ? "bg-amber-400"
+                                : "bg-blue-400"
                           }`}
                         />
                         {STATUS_LABELS[stream.status]}
@@ -247,7 +225,6 @@ export default function RecipientStreams() {
                   </div>
                 </dl>
 
-                {/* Action buttons */}
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => togglePin(stream.id)}
