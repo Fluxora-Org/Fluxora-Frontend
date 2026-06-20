@@ -11,6 +11,31 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const normalizedId = id.replace(/\\/g, "/");
+
+            if (normalizedId.includes("/src/pages/Dashboard")) {
+              return "app-dashboard";
+            }
+            if (normalizedId.includes("/src/pages/Streams")) {
+              return "app-streams";
+            }
+            if (normalizedId.includes("/src/pages/Recipient")) {
+              return "app-recipient";
+            }
+            if (normalizedId.includes("/src/pages/TreasuryPage")) {
+              return "app-treasury";
+            }
+            if (normalizedId.includes("/src/pages/EmptyStateDemo")) {
+              return "app-empty-state-demo";
+            }
+          },
+        },
+      },
+    },
     server: { port: 5173 },
     test: {
       globals: true,

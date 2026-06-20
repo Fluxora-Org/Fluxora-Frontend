@@ -54,6 +54,23 @@ pnpm run build
 pnpm run preview
 ```
 
+### Bundle and code-splitting
+
+The public marketing routes (`/`, `/landing`) and the core app shell stay in the
+initial bundle so first paint remains fast. Heavier authenticated app pages are
+loaded behind a shared Suspense skeleton only when a user enters `/app`.
+
+The Vite build uses these manual chunks for app pages:
+
+- `app-dashboard` - `/app`
+- `app-streams` - `/app/streams` and `/app/streams/:streamId`
+- `app-recipient` - `/app/recipient`
+- `app-treasury` - `/app/treasurypage`
+- `app-empty-state-demo` - `/app/empty-state-demo`
+
+Run `npm run build` and check `dist/assets` to verify those chunks before
+shipping a performance-sensitive release.
+
 ## Project structure
 
 ```
