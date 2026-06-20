@@ -1,14 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ConnectWalletModal from "../ConnectWalletModal";
 
 describe("ConnectWalletModal", () => {
   const onClose = vi.fn();
   const onConnectFreighter = vi.fn();
-  const onConnectAlbedo = vi.fn();
-  const onConnectWalletConnect = vi.fn();
-  const onRetryConnection = vi.fn();
   const onDownloadFreighter = vi.fn();
 
   beforeEach(() => {
@@ -37,6 +35,38 @@ describe("ConnectWalletModal", () => {
     const closeBtn = screen.getByLabelText("Close wallet connection dialog");
     await userEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores focus to the trigger after the modal closes", async () => {
+    function Harness() {
+      const [open, setOpen] = React.useState(false);
+
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open wallet modal
+          </button>
+          <ConnectWalletModal
+            isOpen={open}
+            onClose={() => setOpen(false)}
+            showStateSwitcher={false}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: "Open wallet modal" });
+
+    trigger.focus();
+    await userEvent.click(trigger);
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Close wallet connection dialog",
+      }),
+    );
+
+    expect(trigger).toHaveFocus();
   });
 
   it("calls onClose when backdrop is clicked", async () => {

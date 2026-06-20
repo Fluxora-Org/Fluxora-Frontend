@@ -1,9 +1,12 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
-import WalletConnectModal from "./Walletconnectmodal";
+import ConnectWalletModal from "../ConnectWalletModal";
+import { getNetwork, requestAccess } from "@stellar/freighter-api";
 
 import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
+
+type WalletModalError = "not_installed" | "rejected" | "network_mismatch" | null;
 
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -15,11 +18,45 @@ function explorerUrl(address: string, network: string | null) {
 }
 
 export default function WalletButton() {
-  const { address, network, connected, disconnect } = useWallet();
+  const { address, network, connected, connect, disconnect } = useWallet();
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState<WalletModalError>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  async function handleConnectFreighter() {
+    try {
+      setModalError(null);
+      const access = await requestAccess();
+
+      if (access.error) {
+        setModalError("rejected");
+        return;
+      }
+
+      if (!access.address) {
+        setModalError("not_installed");
+        return;
+      }
+
+      const net = await getNetwork();
+      if (net.error) {
+        setModalError("network_mismatch");
+        return;
+      }
+
+      connect(access.address, net.network);
+      setModalOpen(false);
+    } catch {
+      setModalError("not_installed");
+    }
+  }
+
+  function handleOpenModal() {
+    setModalError(null);
+    setModalOpen(true);
+  }
 
   function handleCopy() {
     if (!address) return;
@@ -48,7 +85,7 @@ export default function WalletButton() {
     return (
       <>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={handleOpenModal}
           className="px-4 py-3 text-base font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
           style={{
             backgroundColor: "var(--color-accent-primary)",
@@ -57,9 +94,13 @@ export default function WalletButton() {
         >
           Connect wallet
         </button>
-        <WalletConnectModal
+        <ConnectWalletModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
+          onConnectFreighter={() => void handleConnectFreighter()}
+          errorState={modalError}
+          onRetryConnection={() => setModalError(null)}
+          showStateSwitcher={false}
         />
       </>
     );

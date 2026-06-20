@@ -106,6 +106,16 @@ function ThemeToggle() {
 `useTheme()` throws if used outside a `ThemeProvider`. The provider wraps the app in
 `src/App.tsx`.
 
+## Wallet modal
+
+`src/components/ConnectWalletModal.tsx` is the canonical wallet connection
+modal. Wallet entry points, including `WalletButton`, should route Freighter,
+Albedo, and WalletConnect actions through this component so error states and
+focus management stay consistent.
+
+`src/components/ConnectWalletModal.example.tsx` is a sample-only review surface
+and is not imported by the application routes.
+
 ## Environment
 
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:
