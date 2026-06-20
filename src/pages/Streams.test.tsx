@@ -115,4 +115,49 @@ describe("Streams disclosure motion", () => {
     expect(collapseButton).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(disclosureId)).not.toBeInTheDocument();
   });
+
+  it("announces filtered stream counts after search changes without announcing on mount", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "Marketing" },
+    });
+
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("Showing 1 stream.")).toBeInTheDocument();
+  });
+
+  it("debounces rapid filter and sort announcements", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "STR-" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Active" }));
+    fireEvent.change(screen.getByLabelText(/Sort streams/i), {
+      target: { value: "name" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(299);
+    });
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(screen.getByText("Showing 2 streams.")).toBeInTheDocument();
+  });
 });

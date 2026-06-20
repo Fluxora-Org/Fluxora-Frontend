@@ -40,6 +40,7 @@ type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
+const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
@@ -523,7 +524,7 @@ function StreamDetail({
         <h2 className="stream-detail__section-header">Stream Timeline</h2>
         <StreamTimeline
           startDate={stream.startDate}
-          cliffDate={stream.cliffDate}
+          cliffDate={stream.cliffDate ?? null}
           currentDate={new Date().toISOString()}
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
@@ -695,6 +696,7 @@ export default function Streams() {
   const { streamId } = useParams();
   const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
+  const hasMountedFilterAnnouncer = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -722,21 +724,6 @@ export default function Streams() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  if (loading) return <StreamsLoading />;
-
-  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
-  const monthlyOutflow = activeStreams.reduce(
-    (total, stream) => total + stream.monthlyRate,
-    0,
-  );
-  const withdrawableNow = streamRecords.reduce(
-    (total, stream) => total + stream.withdrawableAmount,
-    0,
-  );
-  const nextUnlock = activeStreams
-    .map((stream) => stream.nextUnlockDate)
-    .filter(Boolean)
-    .sort()[0];
   const visibleStreams = streamRecords
     .filter((stream) => {
       const matchesStatus =
@@ -753,6 +740,39 @@ export default function Streams() {
       // Default to recent (higher ID first for demo)
       return b.id.localeCompare(a.id);
     });
+
+  useEffect(() => {
+    if (!hasMountedFilterAnnouncer.current) {
+      hasMountedFilterAnnouncer.current = true;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      announce(
+        `Showing ${visibleStreams.length} ${
+          visibleStreams.length === 1 ? "stream" : "streams"
+        }.`,
+      );
+    }, FILTER_ANNOUNCEMENT_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
+
+  if (loading) return <StreamsLoading />;
+
+  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
+  const monthlyOutflow = activeStreams.reduce(
+    (total, stream) => total + stream.monthlyRate,
+    0,
+  );
+  const withdrawableNow = streamRecords.reduce(
+    (total, stream) => total + stream.withdrawableAmount,
+    0,
+  );
+  const nextUnlock = activeStreams
+    .map((stream) => stream.nextUnlockDate)
+    .filter(Boolean)
+    .sort()[0];
   const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
   const hasStreams = streamRecords.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
@@ -985,6 +1005,7 @@ export default function Streams() {
                     stream={stream}
                     expanded={effectiveExpandedId === stream.id}
                     selected={selectedStreamId === stream.id}
+                    onSelect={() => setSelectedStreamId(stream.id)}
                     onToggle={() =>
                       setExpandedStreamId((current) =>
                         current === stream.id ? "" : stream.id,
