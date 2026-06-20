@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+vi.unmock("../components/toast/ToastProvider");
+
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
@@ -6,6 +8,9 @@ import { streamRecords } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
 
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
+type ClipboardMock = {
+  writeText: ReturnType<typeof vi.fn>;
+};
 
 function mockMatchMedia(matches: boolean) {
   const listeners: MatchMediaChangeHandler[] = [];
@@ -48,6 +53,13 @@ function renderStreams() {
       </MemoryRouter>
     </ToastProvider>,
   );
+}
+
+function mockClipboard(writeText: ClipboardMock["writeText"]) {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
 }
 
 async function finishLoading() {
@@ -195,5 +207,73 @@ describe("Streams disclosure motion", () => {
     });
 
     expect(screen.getByText("Showing 2 streams.")).toBeInTheDocument();
+  });
+});
+
+describe("Streams card recipient copy", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("copies the card recipient address and shows success feedback without selecting the card", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(writeText);
+    renderStreams();
+    await finishLoading();
+    vi.useRealTimers();
+
+    const stream = streamRecords[0]!;
+    const streamCard = screen.getByRole("article", {
+      name: new RegExp(stream.name, "i"),
+    });
+    const copyAddress = within(streamCard).getByRole("button", {
+      name: `Copy address: ${stream.recipientAddress}`,
+    });
+
+    expect(streamCard).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.click(copyAddress);
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(stream.recipientAddress);
+    });
+    expect(
+      await screen.findByText(`Recipient for ${stream.name} copied to your clipboard.`),
+    ).toBeInTheDocument();
+    expect(streamCard).toHaveAttribute("aria-selected", "false");
+    expect(streamCard).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("shows accessible failure feedback when card recipient copy is unavailable", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("clipboard blocked"));
+    mockClipboard(writeText);
+    renderStreams();
+    await finishLoading();
+    vi.useRealTimers();
+
+    const stream = streamRecords[0]!;
+    const streamCard = screen.getByRole("article", {
+      name: new RegExp(stream.name, "i"),
+    });
+
+    fireEvent.click(
+      within(streamCard).getByRole("button", {
+        name: `Copy address: ${stream.recipientAddress}`,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(stream.recipientAddress);
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+    );
   });
 });
