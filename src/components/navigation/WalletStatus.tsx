@@ -61,7 +61,9 @@ export default function WalletStatus({
       await navigator.clipboard.writeText(address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    } catch {
+      // Clipboard writes can fail in insecure contexts or when denied.
+    }
   };
 
   return (
@@ -126,10 +128,15 @@ export default function WalletStatus({
 
             <button
               role="menuitem"
-              onClick={() => { 
-                const netPath = network?.toLowerCase() === "public" ? "public" : "testnet";
-                window.open(`https://stellar.expert/explorer/${netPath}/account/${address}`, "_blank", "noopener"); 
-                setOpen(false); 
+              onClick={() => {
+                const netPath =
+                  network?.toLowerCase() === "public" ? "public" : "testnet";
+                window.open(
+                  `https://stellar.expert/explorer/${netPath}/account/${address}`,
+                  "_blank",
+                  "noopener",
+                );
+                setOpen(false);
               }}
               className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
@@ -141,7 +148,10 @@ export default function WalletStatus({
 
             <button
               role="menuitem"
-              onClick={() => { setOpen(false); onDisconnect?.(); }}
+              onClick={() => {
+                setOpen(false);
+                onDisconnect?.();
+              }}
               className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
             >
               <LogOut size={16} />

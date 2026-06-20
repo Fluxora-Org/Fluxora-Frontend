@@ -54,6 +54,28 @@ pnpm run build
 pnpm run preview
 ```
 
+### Linting and formatting
+
+The repo uses ESLint flat config with TypeScript, React Hooks, and React
+Refresh rules. It also enables unsafe dynamic-code checks such as `no-eval` and
+`no-new-func`:
+
+```bash
+npm run lint
+npm run lint:fix
+```
+
+Prettier is configured for the React/Vite source tree:
+
+```bash
+npm run format
+npm run format:check
+```
+
+`format` can normalize the full source tree. `format:check` currently guards the
+tooling/config baseline so style checks can run without mixing a repository-wide
+format-only diff into feature PRs.
+
 ## Project structure
 
 ```

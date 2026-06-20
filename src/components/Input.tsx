@@ -17,35 +17,47 @@
  * <Input label="Password" type="password" required disabled />
  */
 
-import { InputHTMLAttributes } from 'react';
-import styles from './Input.module.css';
-import { ValidationMessage } from './ValidationMessage';
+import type {
+  InputHTMLAttributes,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
+import styles from "./Input.module.css";
+import { ValidationMessage } from "./ValidationMessage";
 
-export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface InputProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type"
+> {
   /** Label text displayed above input */
   label?: string;
-  
+
   /** Type of input (text, email, password, number, textarea, select) */
   type?: string;
-  
+
   /** Help text displayed below input */
   helperText?: string;
-  
+
   /** Error message (shows in red) */
   error?: string;
-  
+
   /** Required field indicator */
   required?: boolean;
-  
+
   /** Options for select inputs */
   options?: Array<{ value: string; label: string }>;
-  
+
   /** Additional className */
   className?: string;
-  
+
   /** ID for label association */
   id?: string;
 }
+
+type SharedInputProps = Omit<
+  InputProps,
+  "type" | "options" | "label" | "helperText" | "error"
+>;
 
 /**
  * Input component with comprehensive accessibility support
@@ -59,12 +71,12 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
  */
 export default function Input({
   label,
-  type = 'text',
+  type = "text",
   helperText,
   error,
   required = false,
   options,
-  className = '',
+  className = "",
   id,
   disabled = false,
   placeholder,
@@ -72,14 +84,19 @@ export default function Input({
 }: InputProps) {
   // Generate ID if not provided
   const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
-  
+
   // Determine if input has error
   const hasError = Boolean(error);
 
-  const describedBy = [
-    hasError ? `${inputId}-error` : null,
-    helperText ? `${inputId}-helper` : null
-  ].filter(Boolean).join(' ') || undefined;
+  const describedBy =
+    [
+      hasError ? `${inputId}-error` : null,
+      helperText ? `${inputId}-helper` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
+  const sharedProps: SharedInputProps = props;
 
   return (
     <div className={styles.inputContainer}>
@@ -96,37 +113,35 @@ export default function Input({
       )}
 
       {/* Textarea */}
-      {type === 'textarea' ? (
+      {type === "textarea" ? (
         <textarea
           id={inputId}
           className={`${styles.input} ${styles.textarea} ${
-            hasError ? styles.error : ''
+            hasError ? styles.error : ""
           } ${className}`.trim()}
-          aria-invalid={hasError ? 'true' : 'false'}
+          aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
           disabled={disabled}
           placeholder={placeholder}
           required={required}
-          {...(props as any)}
+          {...(sharedProps as TextareaHTMLAttributes<HTMLTextAreaElement>)}
         />
-      ) : type === 'select' && options ? (
+      ) : type === "select" && options ? (
         /* Select */
         <select
           id={inputId}
           className={`${styles.input} ${styles.select} ${
-            hasError ? styles.error : ''
+            hasError ? styles.error : ""
           } ${className}`.trim()}
-          aria-invalid={hasError ? 'true' : 'false'}
+          aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
           disabled={disabled}
           required={required}
-          {...(props as any)}
+          {...(sharedProps as SelectHTMLAttributes<HTMLSelectElement>)}
         >
-          <option value="">
-            {placeholder || 'Select an option'}
-          </option>
+          <option value="">{placeholder || "Select an option"}</option>
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -139,9 +154,9 @@ export default function Input({
           id={inputId}
           type={type}
           className={`${styles.input} ${
-            hasError ? styles.error : ''
+            hasError ? styles.error : ""
           } ${className}`.trim()}
-          aria-invalid={hasError ? 'true' : 'false'}
+          aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
           disabled={disabled}

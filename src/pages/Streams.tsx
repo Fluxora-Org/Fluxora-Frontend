@@ -35,7 +35,6 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
-
 type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
@@ -207,10 +206,7 @@ function StreamCard({
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
     // Enter/Space selects the card; do not intercept if a button inside is focused
-    if (
-      e.target === e.currentTarget &&
-      (e.key === "Enter" || e.key === " ")
-    ) {
+    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       onSelect();
     }
@@ -267,7 +263,10 @@ function StreamCard({
           <button
             type="button"
             className="streams-ghost-button"
-            onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetail();
+            }}
           >
             Open detail
           </button>
@@ -280,9 +279,9 @@ function StreamCard({
         <div className="stream-meta-block">
           <span>Recipient</span>
           <strong>{stream.recipientName}</strong>
-          <TruncatedAddress 
-            address={stream.recipientAddress} 
-            onCopy={() => {}} 
+          <TruncatedAddress
+            address={stream.recipientAddress}
+            onCopy={() => {}}
           />
         </div>
         <div className="stream-meta-block">
@@ -310,10 +309,16 @@ function StreamCard({
             className={`stream-time-bar__item stream-time-bar__cliff is-${cliffStatus}`}
             aria-label={`Cliff date: ${formatDateWithTimezone(stream.cliffDate)} (${cliffStatus})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">⏱</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              ⏱
+            </span>
             <span className="stream-time-bar__label">Cliff</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.cliffDate)}</span>
-            <span className="stream-time-bar__relative">({getRelativeTime(stream.cliffDate)})</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.cliffDate)}
+            </span>
+            <span className="stream-time-bar__relative">
+              ({getRelativeTime(stream.cliffDate)})
+            </span>
           </div>
         )}
         {stream.endDate && (
@@ -321,9 +326,13 @@ function StreamCard({
             className={`stream-time-bar__item stream-time-bar__end is-${urgency.end}`}
             aria-label={`End date: ${formatDateWithTimezone(stream.endDate)} (${endRelative})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">→</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              →
+            </span>
             <span className="stream-time-bar__label">End</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.endDate)}</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.endDate)}
+            </span>
             <span className="stream-time-bar__relative">({endRelative})</span>
           </div>
         )}
@@ -389,7 +398,9 @@ function StreamCard({
                 <div className="stream-panel__row">
                   <span className="stream-panel__row-label">End date</span>
                   <div className="stream-panel__row-value">
-                    {formatDetailTime(stream.endDate, { includeTimezone: true })}
+                    {formatDetailTime(stream.endDate, {
+                      includeTimezone: true,
+                    })}
                   </div>
                 </div>
                 <div className="stream-panel__row">
@@ -464,8 +475,12 @@ function StreamDetail({
           <div className="stream-detail__meta">
             <span className="stream-chip">{stream.id}</span>
             <span className="stream-chip">{stream.recipientName}</span>
-            <span className="stream-chip">{formatMonthlyRate(stream.monthlyRate)}</span>
-            <span className="stream-chip">Ends {formatDate(stream.endDate)}</span>
+            <span className="stream-chip">
+              {formatMonthlyRate(stream.monthlyRate)}
+            </span>
+            <span className="stream-chip">
+              Ends {formatDate(stream.endDate)}
+            </span>
           </div>
         </div>
 
@@ -528,7 +543,13 @@ function StreamDetail({
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
           totalAmount={stream.depositAmount}
-          status={stream.status.toLowerCase() as "active" | "paused" | "completed" | "upcoming"}
+          status={
+            stream.status.toLowerCase() as
+              | "active"
+              | "paused"
+              | "completed"
+              | "upcoming"
+          }
           isLoading={false}
         />
       </section>
@@ -543,8 +564,8 @@ function StreamDetail({
                 <div className="stream-panel__row-value">
                   {stream.recipientName}
                   <div className="mt-1">
-                    <TruncatedAddress 
-                      address={stream.recipientAddress} 
+                    <TruncatedAddress
+                      address={stream.recipientAddress}
                       onCopy={onCopyAddress}
                     />
                   </div>
@@ -600,7 +621,10 @@ function StreamDetail({
             <h2 className="stream-panel__header">Timeline</h2>
             <div className="stream-timeline">
               {stream.timeline.map((event) => (
-                <div className="stream-timeline__item" key={event.date + event.title}>
+                <div
+                  className="stream-timeline__item"
+                  key={event.date + event.title}
+                >
                   <div className="stream-timeline__date">
                     {formatDate(event.date)}
                   </div>
@@ -724,7 +748,9 @@ export default function Streams() {
 
   if (loading) return <StreamsLoading />;
 
-  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
+  const activeStreams = streamRecords.filter(
+    (stream) => stream.status === "Active",
+  );
   const monthlyOutflow = activeStreams.reduce(
     (total, stream) => total + stream.monthlyRate,
     0,
@@ -935,7 +961,10 @@ export default function Streams() {
                   stream detail route for the complete layout.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label="Filter and search streams">
+              <div
+                className="flex flex-wrap items-center gap-3 w-full mt-4"
+                aria-label="Filter and search streams"
+              >
                 <div className="flex-1 min-w-[200px]">
                   <Input
                     id="streams-search"
@@ -990,6 +1019,7 @@ export default function Streams() {
                         current === stream.id ? "" : stream.id,
                       )
                     }
+                    onSelect={() => setSelectedStreamId(stream.id)}
                     onAnnounceToggle={(nextExpanded) =>
                       announce(
                         `${stream.name} deep dive ${
