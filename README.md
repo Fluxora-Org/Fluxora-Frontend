@@ -113,6 +113,8 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - `VITE_API_URL` — Backend API base URL
 - `VITE_NETWORK` — Stellar network (testnet / mainnet)
 
+- `VITE_DEMO_MODE` - Set to `true` or `1` to render treasury overview fixture data for screenshots and tests. Leave unset for the default live-data path.
+
 ## Related repos
 
 - **fluxora-backend** — API and streaming engine
