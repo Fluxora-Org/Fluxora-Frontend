@@ -8,8 +8,7 @@ import { render, fireEvent, within } from '@testing-library/react';
 import * as fc from 'fast-check';
 import CreateStreamModal from '../CreateStreamModal';
 
-// Valid Stellar address: starts with G, 56 chars, base32 (no 0,1,8,9)
-const VALID_STELLAR = 'GABC' + 'ABCDEFGHJKLMNPQRSTUVWXYZ234567'.repeat(2).slice(0, 52);
+const VALID_STELLAR = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
 function renderModal() {
   return render(

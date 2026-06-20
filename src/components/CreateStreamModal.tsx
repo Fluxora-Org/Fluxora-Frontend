@@ -4,20 +4,7 @@ import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
-
-function maskAddress(addr: string): string {
-  const t = addr.trim();
-  if (t.length <= 12) return t || "—";
-  return `${t.slice(0, 6)} . . . ${t.slice(-6)}`;
-}
-
-/** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
-function isValidStellarAddress(value: string): boolean {
-  const trimmed = value.trim();
-  if (trimmed.length !== 56) return false;
-  if (trimmed[0] !== "G") return false;
-  return /^G[ABCDEFGHJKLMNPQRSTUVWXYZ234567]{55}$/.test(trimmed);
-}
+import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 
 interface CreateStreamModalProps {
   isOpen: boolean;
@@ -670,7 +657,7 @@ export default function CreateStreamModal({
                       <div className="review-card-content">
                         <div className="review-card-sublabel">Address</div>
                         <div className="review-card-value">
-                          {maskAddress(mockRecipient)}
+                          {maskAddress(mockRecipient, 6, 6)}
                         </div>
                       </div>
                     </div>

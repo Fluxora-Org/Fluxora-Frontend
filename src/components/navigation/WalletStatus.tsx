@@ -1,14 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import { maskAddress } from "../../lib/stellar";
 
 interface WalletStatusProps {
   address: string;
   network: string;
   onDisconnect?: () => void;
-}
-
-function truncate(addr: string) {
-  return addr.length <= 12 ? addr : `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 const SUPPORTED_NETWORKS = ["PUBLIC", "TESTNET"];
@@ -51,7 +48,7 @@ export default function WalletStatus({
 
   useEffect(() => {
     // Announce connection on mount
-    setAnnouncement(`Wallet connected: ${truncate(address)}`);
+    setAnnouncement(`Wallet connected: ${maskAddress(address, 6, 4)}`);
     const timer = setTimeout(() => setAnnouncement(""), 1000);
     return () => clearTimeout(timer);
   }, [address]);
@@ -98,11 +95,13 @@ export default function WalletStatus({
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Wallet ${truncate(address)}. Open wallet options.`}
+          aria-label={`Wallet ${maskAddress(address, 6, 4)}. Open wallet options.`}
           className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="font-mono text-xs">{truncate(address)}</span>
+          <span className="font-mono text-xs">
+            {maskAddress(address, 6, 4)}
+          </span>
           <ChevronDown
             size={16}
             className={`transition-transform ${open ? "rotate-180" : ""}`}
