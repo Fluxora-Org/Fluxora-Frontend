@@ -119,3 +119,8 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - **fluxora-contracts** — Soroban smart contracts
 
 Each is a separate Git repository.
+
+Contract source and Soroban tests live in `fluxora-contracts`, not this frontend
+repository. Protocol security notes in `docs/security.md` are retained here as
+context for the UI, but executable contract coverage belongs with the contracts
+repo so it runs in the correct toolchain and CI.
