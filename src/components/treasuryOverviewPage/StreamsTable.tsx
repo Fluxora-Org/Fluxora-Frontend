@@ -1,9 +1,12 @@
 import { useRef, useState } from "react";
-import { streams } from "./sample-streams.tsx";
 import StreamRow from "./StreamRow";
-import { Stream } from "./Stream";
+import type { Stream } from "./Stream";
 
-export default function StreamsTable() {
+interface StreamsTableProps {
+  streams: Stream[];
+}
+
+export default function StreamsTable({ streams }: StreamsTableProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
 
@@ -64,16 +67,24 @@ export default function StreamsTable() {
         </thead>
 
         <tbody ref={tbodyRef} onKeyDown={handleKeyDown}>
-          {streams.map((s: Stream) => (
-            <StreamRow
-              key={s.id}
-              stream={s}
-              isSelected={selectedId === s.id}
-              onSelect={(id) =>
-                setSelectedId((prev) => (prev === id ? null : id))
-              }
-            />
-          ))}
+          {streams.length > 0 ? (
+            streams.map((s: Stream) => (
+              <StreamRow
+                key={s.id}
+                stream={s}
+                isSelected={selectedId === s.id}
+                onSelect={(id) =>
+                  setSelectedId((prev) => (prev === id ? null : id))
+                }
+              />
+            ))
+          ) : (
+            <tr>
+              <td colSpan={5} className="py-4 px-3 text-gray-500">
+                No recent streams available.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

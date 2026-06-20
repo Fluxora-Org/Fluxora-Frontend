@@ -113,6 +113,17 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - `VITE_API_URL` — Backend API base URL
 - `VITE_NETWORK` — Stellar network (testnet / mainnet)
 
+## Treasury overview data
+
+`src/components/treasuryOverviewPage/useTreasury.ts` is the single client-side
+entry point for treasury overview metrics and streams. The exported hook returns
+typed `metrics`, `streams`, `loading`, `error`, and `refetch` state so overview
+components do not import demo fixtures directly.
+
+Until a backend treasury API is available, the default data source returns empty
+arrays. Demo data is intentionally gated behind `VITE_TREASURY_DEMO_DATA` so
+mocked balances are not rendered accidentally in production builds.
+
 ## Related repos
 
 - **fluxora-backend** — API and streaming engine

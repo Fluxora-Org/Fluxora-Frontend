@@ -1,7 +1,21 @@
 import { useNavigate } from "react-router-dom";
 import StreamsTable from "./StreamsTable";
+import type { Stream } from "./Stream";
+import { useTreasury } from "./useTreasury";
 
-export default function RecentStreams() {
+interface RecentStreamsProps {
+  streams: Stream[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}
+
+export function RecentStreamsContent({
+  streams,
+  loading,
+  error,
+  onRetry,
+}: RecentStreamsProps) {
   const navigate = useNavigate();
 
   return (
@@ -16,7 +30,33 @@ export default function RecentStreams() {
         </button>
       </div>
 
-      <StreamsTable />
+      {loading ? (
+        <p aria-busy="true" className="text-sm text-gray-500">
+          Loading recent streams...
+        </p>
+      ) : error ? (
+        <div role="alert" className="text-sm text-red-600">
+          <p>{error}</p>
+          <button type="button" onClick={onRetry} className="mt-2 text-teal-600">
+            Retry
+          </button>
+        </div>
+      ) : (
+        <StreamsTable streams={streams} />
+      )}
     </div>
+  );
+}
+
+export default function RecentStreams() {
+  const treasury = useTreasury();
+
+  return (
+    <RecentStreamsContent
+      streams={treasury.streams}
+      loading={treasury.loading}
+      error={treasury.error}
+      onRetry={treasury.refetch}
+    />
   );
 }
