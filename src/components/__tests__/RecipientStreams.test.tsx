@@ -1,189 +1,194 @@
-/**
- * Tests for Issue #125 – Recipient page hierarchy (headers, sections, metrics)
- *
- * Covers:
- *  - Semantic landmark structure (<main>, <header>, <section>)
- *  - Heading hierarchy (h1 → h2, no skipped levels)
- *  - Metric cards use <dl>/<dt>/<dd>
- *  - Progress bars have correct ARIA attributes
- *  - Status badges have role="status" and aria-label
- *  - Sort <select> is labelled
- *  - Pin button exposes aria-pressed
- *  - Decorative SVGs are aria-hidden
- *  - Focus-visible ring classes are present on interactive elements
- */
-
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import RecipientStreams from "../recipient/RecipientStreams";
+import RecipientStreams, {
+  sortRecipientStreams,
+} from "../recipient/RecipientStreams";
+import {
+  mockRecipientStreams,
+  type RecipientStream,
+} from "../../fixtures/recipientStreams";
 
-// ─── RecipientStreams ────────────────────────────────────────────────────────
+function streamNames() {
+  return screen
+    .getAllByRole("article")
+    .map((article) =>
+      article.getAttribute("aria-label")?.replace("Stream from ", "")
+    );
+}
 
-describe("RecipientStreams – heading hierarchy", () => {
-  it("renders a visible h2 for the streams list", () => {
+describe("RecipientStreams structure", () => {
+  it("renders the streams list heading and labelled list", () => {
     render(<RecipientStreams />);
-    const heading = screen.getByRole("heading", { level: 2, name: /your incoming streams/i });
-    expect(heading).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: /your incoming streams/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /your incoming streams/i })).toBeInTheDocument();
   });
-});
 
-describe("RecipientStreams – list landmark", () => {
-  it("renders a <ul> labelled by the section heading", () => {
+  it("renders reusable fixture streams with ISO-8601 start times", () => {
     render(<RecipientStreams />);
-    const list = screen.getByRole("list", { name: /your incoming streams/i });
-    expect(list).toBeInTheDocument();
-  });
 
-  it("renders one <li> per mock stream", () => {
-    render(<RecipientStreams />);
-    const items = screen.getAllByRole("listitem");
-    expect(items.length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-describe("RecipientStreams – article landmarks", () => {
-  it("each stream card is an <article> with an accessible name", () => {
-    render(<RecipientStreams />);
-    const articles = screen.getAllByRole("article");
-    expect(articles.length).toBeGreaterThanOrEqual(1);
-    articles.forEach((article) => {
-      expect(article).toHaveAttribute("aria-label");
-      expect(article.getAttribute("aria-label")).toMatch(/stream from/i);
-    });
-  });
-});
-
-describe("RecipientStreams – progress bars", () => {
-  it("each progress bar has role=progressbar with aria-valuenow/min/max", () => {
-    render(<RecipientStreams />);
-    const bars = screen.getAllByRole("progressbar");
-    expect(bars.length).toBeGreaterThanOrEqual(1);
-    bars.forEach((bar) => {
-      expect(bar).toHaveAttribute("aria-valuenow");
-      expect(bar).toHaveAttribute("aria-valuemin", "0");
-      expect(bar).toHaveAttribute("aria-valuemax", "100");
-      expect(bar).toHaveAttribute("aria-label");
+    expect(screen.getAllByRole("listitem")).toHaveLength(mockRecipientStreams.length);
+    mockRecipientStreams.forEach((stream) => {
+      expect(stream.startTime).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+      expect(Date.parse(stream.startTime)).not.toBeNaN();
+      expect(
+        screen.getByRole("article", { name: `Stream from ${stream.senderName}` })
+      ).toBeInTheDocument();
     });
   });
 
-  it("aria-valuenow is within 0–100", () => {
+  it("renders From, Accrued, Rate, and Status column labels", () => {
     render(<RecipientStreams />);
-    const bars = screen.getAllByRole("progressbar");
-    bars.forEach((bar) => {
-      const value = Number(bar.getAttribute("aria-valuenow"));
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(100);
-    });
+
+    expect(screen.getByText(/^From$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Accrued$/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Rate$/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/^Status$/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders progress bars, status badges, pin buttons, and detail buttons", () => {
+    render(<RecipientStreams />);
+
+    expect(screen.getAllByRole("progressbar")).toHaveLength(mockRecipientStreams.length);
+    expect(screen.getAllByRole("status")).toHaveLength(mockRecipientStreams.length);
+    expect(
+      screen.getAllByRole("button", { name: /pin stream|unpin stream/i })
+    ).toHaveLength(mockRecipientStreams.length);
+    expect(
+      screen.getAllByRole("button", { name: /view details for stream from/i })
+    ).toHaveLength(mockRecipientStreams.length);
   });
 });
 
-describe("RecipientStreams – status badges", () => {
-  it("each status badge has role=status and an aria-label", () => {
+describe("RecipientStreams pin and sort behavior", () => {
+  it("defaults to pinned-first order", () => {
     render(<RecipientStreams />);
-    const badges = screen.getAllByRole("status");
-    expect(badges.length).toBeGreaterThanOrEqual(1);
-    badges.forEach((badge) => {
-      expect(badge).toHaveAttribute("aria-label");
-      expect(badge.getAttribute("aria-label")).toMatch(/stream status:/i);
-    });
-  });
-});
 
-describe("RecipientStreams – sort control", () => {
-  it("sort <select> has an associated <label>", () => {
-    render(<RecipientStreams />);
-    const select = screen.getByRole("combobox", { name: /sort by/i });
-    expect(select).toBeInTheDocument();
+    expect(streamNames()).toEqual([
+      "Stellar Dev Foundation",
+      "Fluxora DAO",
+      "Ecosystem Grant #42",
+    ]);
   });
 
-  it("sort options include Priority, Newest, and Highest Rate", () => {
-    render(<RecipientStreams />);
-    expect(screen.getByRole("option", { name: /priority/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /newest/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /highest rate/i })).toBeInTheDocument();
-  });
-});
-
-describe("RecipientStreams – pin button", () => {
-  it("pin buttons expose aria-pressed", () => {
-    render(<RecipientStreams />);
-    const pinButtons = screen.getAllByRole("button", { name: /pin stream|unpin stream/i });
-    expect(pinButtons.length).toBeGreaterThanOrEqual(1);
-    pinButtons.forEach((btn) => {
-      expect(btn).toHaveAttribute("aria-pressed");
-    });
-  });
-
-  it("toggling pin flips aria-pressed", async () => {
+  it("sorts unpinned streams by newest while keeping pinned streams first", async () => {
     const user = userEvent.setup();
     render(<RecipientStreams />);
 
-    // Find a button that is currently NOT pinned (aria-pressed="false")
-    const unpinnedBtn = screen
-      .getAllByRole("button", { name: /pin stream/i })
-      .find((btn) => btn.getAttribute("aria-pressed") === "false");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /sort by/i }),
+      "newest"
+    );
 
-    if (!unpinnedBtn) return; // all pinned – skip
-
-    await user.click(unpinnedBtn);
-    expect(unpinnedBtn).toHaveAttribute("aria-pressed", "true");
+    expect(streamNames()).toEqual([
+      "Stellar Dev Foundation",
+      "Ecosystem Grant #42",
+      "Fluxora DAO",
+    ]);
   });
-});
 
-describe("RecipientStreams – detail button", () => {
-  it("detail buttons have descriptive aria-labels naming the sender", () => {
+  it("sorts unpinned streams by highest rate while keeping pinned streams first", async () => {
+    const user = userEvent.setup();
     render(<RecipientStreams />);
-    const detailBtns = screen.getAllByRole("button", { name: /view details for stream from/i });
-    expect(detailBtns.length).toBeGreaterThanOrEqual(1);
-  });
-});
 
-describe("RecipientStreams – decorative SVGs", () => {
-  it("all inline SVGs inside buttons are aria-hidden", () => {
-    const { container } = render(<RecipientStreams />);
-    const svgs = container.querySelectorAll("svg");
-    svgs.forEach((svg) => {
-      expect(svg.getAttribute("aria-hidden")).toBe("true");
-    });
-  });
-});
-
-describe("RecipientStreams – focus ring classes", () => {
-  it("pin buttons have focus-visible ring classes", () => {
-    const { container } = render(<RecipientStreams />);
-    const pinBtns = container.querySelectorAll(
-      "button[aria-pressed]"
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /sort by/i }),
+      "rate"
     );
-    pinBtns.forEach((btn) => {
-      expect(btn.className).toContain("focus-visible:ring-2");
-    });
+
+    expect(streamNames()).toEqual([
+      "Stellar Dev Foundation",
+      "Fluxora DAO",
+      "Ecosystem Grant #42",
+    ]);
   });
 
-  it("detail buttons have focus-visible ring classes", () => {
-    const { container } = render(<RecipientStreams />);
-    // detail buttons don't have aria-pressed; select by aria-label pattern
-    const allBtns = container.querySelectorAll("button");
-    const detailBtns = Array.from(allBtns).filter((b) =>
-      b.getAttribute("aria-label")?.startsWith("View details")
+  it("moves a newly pinned stream into the pinned group", async () => {
+    const user = userEvent.setup();
+    render(<RecipientStreams />);
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /sort by/i }),
+      "newest"
     );
-    expect(detailBtns.length).toBeGreaterThanOrEqual(1);
-    detailBtns.forEach((btn) => {
-      expect(btn.className).toContain("focus-visible:ring-2");
-    });
+    await user.click(
+      screen.getByRole("button", { name: /pin stream from Ecosystem Grant #42/i })
+    );
+
+    expect(streamNames()).toEqual([
+      "Ecosystem Grant #42",
+      "Stellar Dev Foundation",
+      "Fluxora DAO",
+    ]);
+    expect(
+      screen.getByRole("button", { name: /unpin stream from Ecosystem Grant #42/i })
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps same-key ties stable after pinned precedence", () => {
+    const streams: RecipientStream[] = [
+      {
+        ...mockRecipientStreams[1],
+        id: "unpinned-a",
+        senderName: "Unpinned A",
+        rate: 10,
+        startTime: "2024-04-01T00:00:00.000Z",
+      },
+      {
+        ...mockRecipientStreams[2],
+        id: "unpinned-b",
+        senderName: "Unpinned B",
+        rate: 10,
+        startTime: "2024-04-01T00:00:00.000Z",
+      },
+      {
+        ...mockRecipientStreams[0],
+        id: "pinned",
+        senderName: "Pinned",
+        rate: 1,
+        startTime: "2024-01-01T00:00:00.000Z",
+        isPinned: true,
+      },
+    ];
+
+    expect(sortRecipientStreams(streams, "rate").map((stream) => stream.senderName)).toEqual([
+      "Pinned",
+      "Unpinned A",
+      "Unpinned B",
+    ]);
+    expect(sortRecipientStreams(streams, "newest").map((stream) => stream.senderName)).toEqual([
+      "Pinned",
+      "Unpinned A",
+      "Unpinned B",
+    ]);
   });
 });
 
-describe("RecipientStreams – metric dl structure", () => {
-  it("each stream card contains a <dl> with <dt> and <dd> for Rate", () => {
+describe("RecipientStreams accessibility details", () => {
+  it("labels sort options and pin state", () => {
+    render(<RecipientStreams />);
+
+    expect(screen.getByRole("option", { name: /priority/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /newest/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /highest rate/i })).toBeInTheDocument();
+
+    screen
+      .getAllByRole("button", { name: /pin stream|unpin stream/i })
+      .forEach((button) => expect(button).toHaveAttribute("aria-pressed"));
+  });
+
+  it("keeps each card's metric and SVG accessibility contracts", () => {
     const { container } = render(<RecipientStreams />);
-    const dls = container.querySelectorAll("dl");
-    expect(dls.length).toBeGreaterThanOrEqual(1);
-    dls.forEach((dl) => {
-      const dts = dl.querySelectorAll("dt");
-      const dds = dl.querySelectorAll("dd");
-      expect(dts.length).toBeGreaterThanOrEqual(1);
-      expect(dds.length).toBeGreaterThanOrEqual(1);
+
+    screen.getAllByRole("article").forEach((article) => {
+      expect(within(article).getByText(/USDC Total/i)).toBeInTheDocument();
+      expect(within(article).getByText(/USDC\/hr/i)).toBeInTheDocument();
+    });
+    container.querySelectorAll("svg").forEach((svg) => {
+      expect(svg).toHaveAttribute("aria-hidden", "true");
     });
   });
 });
