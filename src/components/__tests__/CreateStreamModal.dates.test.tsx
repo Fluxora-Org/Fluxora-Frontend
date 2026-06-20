@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import CreateStreamModal from "../CreateStreamModal";
 
+// Checksum-valid Stellar public key (required by the centralized
+// isValidStellarAddress validator introduced in #331).
 const VALID_STELLAR =
-  "GABC" + "ABCDEFGHJKLMNPQRSTUVWXYZ234567".repeat(2).slice(0, 52);
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderStep2() {
   const view = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
