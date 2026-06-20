@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createStream, withdraw, pauseStream, cancelStream, TransactionError } from "../tx";
+import {
+  createStream,
+  withdraw,
+  pauseStream,
+  cancelStream,
+  getTransactionStatus,
+  TransactionError,
+} from "../tx";
 import * as freighter from "@stellar/freighter-api";
 import { rpc as SorobanRpc, Account } from "@stellar/stellar-sdk";
 
@@ -85,6 +92,7 @@ describe("Soroban transaction layer (tx.ts)", () => {
     });
     serverInstance.getTransaction.mockResolvedValue({
       status: "SUCCESS",
+      txHash: "mock_tx_hash",
       resultXdr: {
         toXDR: () => "mocked_result_xdr",
       },
@@ -103,10 +111,22 @@ describe("Soroban transaction layer (tx.ts)", () => {
     );
 
     expect(res.status).toBe("SUCCESS");
+    expect(res.txHash).toBe("mock_tx_hash");
     expect(serverInstance.getAccount).toHaveBeenCalledWith(mockAddress);
     expect(serverInstance.simulateTransaction).toHaveBeenCalled();
     expect(freighter.signTransaction).toHaveBeenCalled();
     expect(serverInstance.sendTransaction).toHaveBeenCalled();
+  });
+
+  it("maps getTransaction responses into polling statuses", async () => {
+    serverInstance.getTransaction
+      .mockResolvedValueOnce({ status: "NOT_FOUND", txHash: "mock_tx_hash" })
+      .mockResolvedValueOnce({ status: "SUCCESS", txHash: "mock_tx_hash" })
+      .mockResolvedValueOnce({ status: "FAILED", txHash: "mock_tx_hash" });
+
+    await expect(getTransactionStatus("mock_tx_hash")).resolves.toBe("pending");
+    await expect(getTransactionStatus("mock_tx_hash")).resolves.toBe("confirmed");
+    await expect(getTransactionStatus("mock_tx_hash")).resolves.toBe("failed");
   });
 
   it("should withdraw successfully", async () => {

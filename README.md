@@ -1,5 +1,7 @@
 # Fluxora Frontend
 
+[![CI](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml)
+
 React dashboard and recipient portal for the Fluxora treasury streaming protocol.
 
 ## What's in this repo
@@ -44,6 +46,7 @@ App runs at [http://localhost:5173](http://localhost:5173).
 
 ```bash
 npm run build
+npm run build:report
 npm run preview
 ```
 
@@ -51,8 +54,53 @@ Or with pnpm:
 
 ```bash
 pnpm run build
+pnpm run build:report
 pnpm run preview
 ```
+
+### Linting and formatting
+
+The repo uses ESLint flat config with TypeScript, React Hooks, and React
+Refresh rules. It also enables unsafe dynamic-code checks such as `no-eval` and
+`no-new-func`:
+
+```bash
+npm run lint
+npm run lint:fix
+```
+
+Prettier is configured for the React/Vite source tree:
+
+```bash
+npm run format
+npm run format:check
+```
+
+`format` can normalize the full source tree. `format:check` currently guards the
+tooling/config baseline so style checks can run without mixing a repository-wide
+format-only diff into feature PRs.
+
+### Bundle and code-splitting
+
+The public marketing routes (`/`, `/landing`) and the core app shell stay in the
+initial bundle so first paint remains fast. Heavier authenticated app pages are
+loaded behind a shared Suspense skeleton only when a user enters `/app`.
+
+The Vite build uses these manual chunks for app pages:
+
+- `app-dashboard` - `/app`
+- `app-streams` - `/app/streams` and `/app/streams/:streamId`
+- `app-recipient` - `/app/recipient`
+- `app-treasury` - `/app/treasurypage`
+- `app-empty-state-demo` - `/app/empty-state-demo`
+
+Run `npm run build` and check `dist/assets` to verify those chunks before
+shipping a performance-sensitive release.
+
+`npm run build:report` emits a raw/gzip bundle table from `dist/assets` after
+the production build. Vite warns when any chunk exceeds 650 kB, and
+`vite.config.ts` splits vendor code into `vendor-react`, `vendor-stellar`, and
+`vendor-icons` chunks so PR reviewers can spot bundle regressions.
 
 ## Project structure
 
@@ -64,6 +112,12 @@ src/
   main.tsx
   index.css
 ```
+
+## Route Error Recovery
+
+The route tree is wrapped in `src/components/ErrorBoundary.tsx`. Render-time
+route failures show the sanitized `ErrorPage` fallback with Try Again and Back to
+Dashboard recovery actions, while full error details are logged only in dev/test.
 
 ## Theming
 
@@ -106,31 +160,83 @@ function ThemeToggle() {
 `useTheme()` throws if used outside a `ThemeProvider`. The provider wraps the app in
 `src/App.tsx`.
 
+## Contributing / CI
+
+Pull requests and pushes to `main` run the GitHub Actions CI workflow on Node 18
+and Node 20. The workflow installs with `npm ci`, runs `npm run build` for
+TypeScript and production build coverage, then runs `npm run test:coverage`.
+
+The coverage gate currently enforces the configured 95% thresholds on the
+tested core component/theme baseline listed in `vitest.config.ts`. Expand that
+include list when adding reliable coverage for more production modules.
+
+## Streams performance
+
+`src/components/VirtualList.tsx` keeps small stream collections simple, then
+switches to windowed rendering once a list passes the configured threshold. The
+Streams page uses this for card lists so off-screen `StreamCard` subtrees,
+disclosures, SVGs, and `ResizeObserver` work stay unmounted while placeholders
+preserve scroll height.
+
+Virtualized placeholders only reserve space and do not echo stream data or use
+raw HTML.
+
+## Wallet state
+
+`WalletProvider` in `src/components/wallet-connect/Walletcontext.tsx` is the
+single supported wallet state source for app UI. Pages, navigation, and wallet
+status components should consume `useWallet()` instead of importing
+`@stellar/freighter-api` directly.
+
+The provider only marks a session connected after Freighter confirms an
+approved address, watches account and network changes, and clears address and
+network on disconnect so stale wallet state cannot keep signing actions enabled.
+
+## Wallet modal
+
+`src/components/ConnectWalletModal.tsx` is the canonical wallet connection
+modal. Wallet entry points, including `WalletButton`, should route Freighter,
+Albedo, and WalletConnect actions through this component so error states and
+focus management stay consistent.
+
+`src/components/ConnectWalletModal.example.tsx` is a sample-only review surface
+and is not imported by the application routes.
+
+## App route guard
+
+The `/app` route subtree is wrapped in `RequireWallet`, which reads the shared
+`useWallet()` context. While Freighter session restore is still loading, the
+guard shows a restoring state instead of redirecting. Disconnected users are
+sent to `/connect-wallet` with their intended `/app` destination preserved in
+router state for return after connection.
+
+This is a client-side UX guard only. Backend services must still enforce
+authorization before returning privileged treasury or stream data.
+
 ## Environment
 
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:
 
 - `VITE_API_URL` — Backend API base URL
-- `VITE_NETWORK` — Stellar network (testnet / mainnet)
+- `VITE_NETWORK` — Stellar network (TESTNET / PUBLIC)
+- `VITE_RPC_URL` — Soroban RPC server endpoint
+- `VITE_STREAM_CONTRACT_ID` — The deployed stream contract ID (C...)
 
-### Transaction lifecycle
+## Transaction Signing Layer (Stellar / Soroban)
 
-Create-stream submission uses a transaction-status lifecycle:
+Fluxora integrates with the Stellar ecosystem for on-chain stream management:
+- **Freighter Wallet Integration**: Leverages `@stellar/freighter-api` to securely retrieve accounts, request network passphrases, and sign transactions.
+- **Soroban Smart Contract Invocations**: Invokes contract entrypoints (`create_stream`, `withdraw`, `pause_stream`, `cancel_stream`) by building operations, simulating resource costs, and submitting signed envelopes.
+- **Network Validation**: Verifies that the connected Freighter extension matches `VITE_NETWORK` before building or signing transactions, protecting users from cross-network mistakes.
+- **Robust Error Mapping**: Automatically maps user rejections, simulation failures, and timeouts into descriptive toasts and inline alert messages.
 
-- `submitting` while the UI hands off the transaction reference
-- `pending` while the status source is polled
-- `confirmed` before the success receipt opens
-- `failed` when the status source fails or polling reaches the attempt cap
+## SEO and Social Previews
 
-The polling hook is configured by these optional client-side timing knobs:
+Search and link-preview metadata lives in `index.html`. Update the description,
+canonical URL, Open Graph tags, Twitter Card tags, and absolute HTTPS preview
+image there when launching a new campaign or changing the public marketing URL.
 
-- `VITE_TX_POLL_INTERVAL_MS` — first polling delay in milliseconds
-- `VITE_TX_POLL_MAX_ATTEMPTS` — maximum status checks before timeout
-- `VITE_TX_POLL_BACKOFF_FACTOR` — multiplier applied after each pending check
-- `VITE_TX_DEMO_CONFIRMATION_ATTEMPTS` — demo status source confirmation point
-
-These values only control polling cadence. Confirmation must still come from the
-status source, not optimistic client time.
+- `VITE_DEMO_MODE` - Set to `true` or `1` to render treasury overview fixture data for screenshots and tests. Leave unset for the default live-data path.
 
 ## Related repos
 
@@ -138,3 +244,8 @@ status source, not optimistic client time.
 - **fluxora-contracts** — Soroban smart contracts
 
 Each is a separate Git repository.
+
+Contract source and Soroban tests live in `fluxora-contracts`, not this frontend
+repository. Protocol security notes in `docs/security.md` are retained here as
+context for the UI, but executable contract coverage belongs with the contracts
+repo so it runs in the correct toolchain and CI.

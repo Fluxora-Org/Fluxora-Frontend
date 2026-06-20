@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
@@ -54,38 +54,6 @@ async function finishLoading() {
   await act(async () => {
     vi.advanceTimersByTime(2000);
   });
-}
-
-const VALID_STELLAR_ADDRESS =
-  "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-
-async function advanceCreateStreamModalToReview() {
-  fireEvent.click(screen.getByRole("button", { name: "Create stream" }));
-  const dialog = screen.getByRole("dialog", { name: "Create stream" });
-
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Recipient" }), {
-    target: { value: VALID_STELLAR_ADDRESS },
-  });
-  fireEvent.change(
-    within(dialog).getByRole("textbox", { name: "Deposit amount" }),
-    {
-      target: { value: "120" },
-    },
-  );
-  fireEvent.click(within(dialog).getByRole("button", { name: /^next$/i }));
-
-  fireEvent.change(document.querySelector("#create-stream-accrual-rate")!, {
-    target: { value: "30" },
-  });
-  fireEvent.change(document.querySelector("#create-stream-duration")!, {
-    target: { value: "4" },
-  });
-  fireEvent.click(within(dialog).getByRole("button", { name: /^next$/i }));
-
-  expect(
-    dialog.querySelector(".review-card-amount")?.textContent?.replace(/\s+/g, " ").trim(),
-  ).toBe("120.00 USDC");
-  return dialog;
 }
 
 describe("Streams disclosure motion", () => {
@@ -147,50 +115,85 @@ describe("Streams disclosure motion", () => {
     expect(collapseButton).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(disclosureId)).not.toBeInTheDocument();
   });
-});
 
-describe("Streams create transaction lifecycle", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
-  it("opens the success modal only after transaction confirmation", async () => {
+  it("keeps the current small stream list non-virtualized and accessible", async () => {
     mockMatchMedia(false);
     renderStreams();
     await finishLoading();
-    const dialog = await advanceCreateStreamModalToReview();
 
-    fireEvent.click(
-      within(dialog).getByRole("button", {
-        name: /^Create stream$/,
-      }),
-    );
+    const list = screen.getByRole("list", { name: "Stream cards" });
 
-    await act(async () => {
-      await Promise.resolve();
+    expect(list).toHaveAttribute("data-virtualized", "false");
+    expect(screen.getByText(streamRecords[0]!.name)).toBeInTheDocument();
+    expect(screen.getByText(streamRecords[streamRecords.length - 1]!.name)).toBeInTheDocument();
+  });
+
+  it("keeps the stream list in sync after filtering and sorting", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.click(screen.getByRole("button", { name: "Active" }));
+    fireEvent.change(screen.getByLabelText("Sort streams"), {
+      target: { value: "rate" },
     });
 
-    expect(
-      screen.getByText(/waiting for stellar confirmation/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("dialog", { name: /stream created/i }),
-    ).not.toBeInTheDocument();
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveTextContent("Dev Grant - Alice");
+    expect(cards[1]).toHaveTextContent("Marketing Budget");
 
-    await act(async () => {
-      vi.advanceTimersByTime(750);
-      await Promise.resolve();
-      await Promise.resolve();
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "Nebula" },
     });
 
-    expect(
-      screen.getByRole("dialog", { name: /stream created/i }),
-    ).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByText("Marketing Budget")).toBeInTheDocument();
+    expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
+  });
+
+  it("announces filtered stream counts after search changes without announcing on mount", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "Marketing" },
+    });
+
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("Showing 1 stream.")).toBeInTheDocument();
+  });
+
+  it("debounces rapid filter and sort announcements", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "STR-" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Active" }));
+    fireEvent.change(screen.getByLabelText(/Sort streams/i), {
+      target: { value: "name" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(299);
+    });
+    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(screen.getByText("Showing 2 streams.")).toBeInTheDocument();
   });
 });

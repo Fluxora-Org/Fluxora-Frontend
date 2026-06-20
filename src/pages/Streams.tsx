@@ -1,6 +1,9 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -16,6 +19,7 @@ import Input from "../components/Input";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
+import VirtualList from "../components/VirtualList";
 import {
   getStreamRecord,
   streamRecords,
@@ -32,10 +36,6 @@ import {
 } from "../lib/timePresentation";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import {
-  useTransactionStatus,
-  type TxStatus,
-} from "../hooks/useTransactionStatus";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
@@ -44,10 +44,9 @@ type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
-
-function createLocalTransactionReference(streamId: string) {
-  return `local-create-stream-${streamId}-${Date.now().toString(36)}`;
-}
+const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
+const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
+const STREAM_CARD_ESTIMATED_HEIGHT = 420;
 
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
@@ -88,7 +87,7 @@ function HealthPill({ health }: { health: StreamHealth }) {
   );
 }
 
-function StreamMetricCard({
+const StreamMetricCard = memo(function StreamMetricCard({
   label,
   value,
   description,
@@ -104,9 +103,9 @@ function StreamMetricCard({
       <p>{description}</p>
     </div>
   );
-}
+});
 
-function StreamDisclosure({
+const StreamDisclosure = memo(function StreamDisclosure({
   expanded,
   disclosureId,
   labelledBy,
@@ -188,9 +187,20 @@ function StreamDisclosure({
       </div>
     </div>
   );
-}
+});
 
-function StreamCard({
+type StreamCardProps = {
+  stream: StreamRecord;
+  expanded: boolean;
+  selected: boolean;
+  onToggle: (streamId: string) => void;
+  onSelect: (streamId: string) => void;
+  onOpenDetail: (streamId: string) => void;
+  onAnnounceToggle: (streamName: string, expanded: boolean) => void;
+};
+
+// Memoized so unrelated page state updates do not repaint every stream card.
+const StreamCard = memo(function StreamCard({
   stream,
   expanded,
   selected,
@@ -198,31 +208,40 @@ function StreamCard({
   onSelect,
   onOpenDetail,
   onAnnounceToggle,
-}: {
-  stream: StreamRecord;
-  expanded: boolean;
-  selected: boolean;
-  onToggle: () => void;
-  onSelect: () => void;
-  onOpenDetail: () => void;
-  onAnnounceToggle: (expanded: boolean) => void;
-}) {
+}: StreamCardProps) {
   const urgency = getUrgencyLevel(stream.cliffDate, stream.endDate);
   const cliffStatus = getCliffStatusText(stream.cliffDate);
   const endRelative = getRelativeTime(stream.endDate);
   const disclosureId = `stream-expanded-${stream.id}`;
   const toggleId = `stream-toggle-${stream.id}`;
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
+  const handleSelect = useCallback(() => {
+    onSelect(stream.id);
+  }, [onSelect, stream.id]);
+
+  const handleToggle = useCallback(() => {
+    onToggle(stream.id);
+    onAnnounceToggle(stream.name, !expanded);
+  }, [expanded, onAnnounceToggle, onToggle, stream.id, stream.name]);
+
+  const handleOpenDetail = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      onOpenDetail(stream.id);
+    },
+    [onOpenDetail, stream.id],
+  );
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     // Enter/Space selects the card; do not intercept if a button inside is focused
     if (
       e.target === e.currentTarget &&
       (e.key === "Enter" || e.key === " ")
     ) {
       e.preventDefault();
-      onSelect();
+      handleSelect();
     }
-  }
+  }, [handleSelect]);
 
   const classNames = [
     "stream-card",
@@ -241,7 +260,7 @@ function StreamCard({
       aria-selected={selected}
       aria-expanded={expanded}
       aria-label={`${stream.name} — ${stream.status}`}
-      onClick={onSelect}
+      onClick={handleSelect}
       onKeyDown={handleKeyDown}
     >
       <div className="stream-card__header">
@@ -263,10 +282,7 @@ function StreamCard({
             type="button"
             className="streams-secondary-button"
             id={toggleId}
-            onClick={() => {
-              onToggle();
-              onAnnounceToggle(!expanded);
-            }}
+            onClick={handleToggle}
             aria-expanded={expanded}
             aria-controls={disclosureId}
           >
@@ -275,7 +291,7 @@ function StreamCard({
           <button
             type="button"
             className="streams-ghost-button"
-            onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+            onClick={handleOpenDetail}
           >
             Open detail
           </button>
@@ -437,7 +453,7 @@ function StreamCard({
       </StreamDisclosure>
     </article>
   );
-}
+});
 
 function StreamDetail({
   stream,
@@ -536,7 +552,13 @@ function StreamDetail({
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
           totalAmount={stream.depositAmount}
-          status={stream.status.toLowerCase() as "active" | "paused" | "completed" | "upcoming"}
+          status={
+            stream.status.toLowerCase() as
+              | "active"
+              | "paused"
+              | "completed"
+              | "upcoming"
+          }
           isLoading={false}
         />
       </section>
@@ -703,6 +725,7 @@ export default function Streams() {
   const { streamId } = useParams();
   const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
+  const hasMountedFilterAnnouncer = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -718,11 +741,6 @@ export default function Streams() {
     id: "STR-NEW",
     url: "https://fluxora.io/stream/STR-NEW",
   });
-  const [pendingCreateTxHash, setPendingCreateTxHash] = useState<string | null>(
-    null,
-  );
-  const [createTxStatus, setCreateTxStatus] = useState<TxStatus>("idle");
-  const [createTxError, setCreateTxError] = useState<string | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -734,56 +752,6 @@ export default function Streams() {
     const timer = window.setTimeout(() => setLoading(false), 2000);
     return () => window.clearTimeout(timer);
   }, []);
-
-  const createTransaction = useTransactionStatus(pendingCreateTxHash, {
-    enabled: Boolean(pendingCreateTxHash),
-  });
-
-  const resetCreateTransaction = () => {
-    createTransaction.reset();
-    setPendingCreateTxHash(null);
-    setCreateTxStatus("idle");
-    setCreateTxError(null);
-  };
-
-  const closeCreateModal = () => {
-    setIsCreateModalOpen(false);
-    resetCreateTransaction();
-  };
-
-  useEffect(() => {
-    if (!pendingCreateTxHash) return;
-
-    if (createTransaction.status === "pending") {
-      setCreateTxStatus("pending");
-      return;
-    }
-
-    if (createTransaction.status === "confirmed") {
-      setCreateTxStatus("confirmed");
-      setPendingCreateTxHash(null);
-      setIsCreateModalOpen(false);
-      setIsSuccessModalOpen(true);
-      return;
-    }
-
-    if (createTransaction.status === "failed") {
-      const message =
-        createTransaction.error ??
-        "Transaction confirmation failed. Please retry.";
-      setCreateTxStatus("failed");
-      setCreateTxError(message);
-      setPendingCreateTxHash(null);
-      addToast(message, "error");
-    }
-  }, [
-    addToast,
-    createTransaction.error,
-    createTransaction.status,
-    pendingCreateTxHash,
-  ]);
-
-  if (loading) return <StreamsLoading />;
 
   const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
   const monthlyOutflow = activeStreams.reduce(
@@ -798,22 +766,43 @@ export default function Streams() {
     .map((stream) => stream.nextUnlockDate)
     .filter(Boolean)
     .sort()[0];
-  const visibleStreams = streamRecords
-    .filter((stream) => {
-      const matchesStatus =
-        statusFilter === "All" || stream.status === statusFilter;
-      const matchesSearch =
-        stream.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stream.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stream.recipientName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
-    })
-    .sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "rate") return b.monthlyRate - a.monthlyRate;
-      // Default to recent (higher ID first for demo)
-      return b.id.localeCompare(a.id);
-    });
+  const visibleStreams = useMemo(() => {
+    const normalizedSearch = searchQuery.toLowerCase();
+
+    return streamRecords
+      .filter((stream) => {
+        const matchesStatus =
+          statusFilter === "All" || stream.status === statusFilter;
+        const matchesSearch =
+          stream.name.toLowerCase().includes(normalizedSearch) ||
+          stream.id.toLowerCase().includes(normalizedSearch) ||
+          stream.recipientName.toLowerCase().includes(normalizedSearch);
+        return matchesStatus && matchesSearch;
+      })
+      .sort((a, b) => {
+        if (sortBy === "name") return a.name.localeCompare(b.name);
+        if (sortBy === "rate") return b.monthlyRate - a.monthlyRate;
+        // Default to recent (higher ID first for demo)
+        return b.id.localeCompare(a.id);
+      });
+  }, [searchQuery, sortBy, statusFilter]);
+
+  useEffect(() => {
+    if (!hasMountedFilterAnnouncer.current) {
+      hasMountedFilterAnnouncer.current = true;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      announce(
+        `Showing ${visibleStreams.length} ${
+          visibleStreams.length === 1 ? "stream" : "streams"
+        }.`,
+      );
+    }, FILTER_ANNOUNCEMENT_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
   const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
   const hasStreams = streamRecords.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
@@ -830,23 +819,21 @@ export default function Streams() {
     ? expandedStreamId
     : visibleStreams[0]?.id;
 
-  const handleCreateStream = () => {
-    resetCreateTransaction();
+  const handleCreateStream = useCallback(() => {
     setIsCreateModalOpen(true);
-  };
+  }, []);
 
-  const handleStreamCreated = () => {
+  const handleStreamCreated = useCallback(() => {
     const generatedId = `STR-${String(streamRecords.length + 1).padStart(3, "0")}`;
     setCreatedStream({
       id: generatedId,
       url: `https://fluxora.io/stream/${generatedId}`,
     });
-    setCreateTxStatus("submitting");
-    setCreateTxError(null);
-    setPendingCreateTxHash(createLocalTransactionReference(generatedId));
-  };
+    setIsCreateModalOpen(false);
+    setIsSuccessModalOpen(true);
+  }, []);
 
-  const handleCopyRecipient = async (stream: StreamRecord) => {
+  const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
     try {
       await navigator.clipboard.writeText(stream.recipientAddress);
       addToast(
@@ -859,7 +846,30 @@ export default function Streams() {
         "error",
       );
     }
-  };
+  }, [addToast]);
+
+  const handleToggleStreamCard = useCallback((streamId: string) => {
+    setExpandedStreamId((current) => (current === streamId ? "" : streamId));
+  }, []);
+
+  const handleSelectStreamCard = useCallback((streamId: string) => {
+    setSelectedStreamId(streamId);
+  }, []);
+
+  const handleOpenStreamDetail = useCallback((streamId: string) => {
+    navigate(`/app/streams/${streamId}`);
+  }, [navigate]);
+
+  const handleAnnounceStreamToggle = useCallback(
+    (streamName: string, nextExpanded: boolean) => {
+      announce(
+        `${streamName} deep dive ${nextExpanded ? "expanded" : "collapsed"}.`,
+      );
+    },
+    [announce],
+  );
+
+  if (loading) return <StreamsLoading />;
 
   if (streamId && !selectedStream) {
     return (
@@ -872,10 +882,8 @@ export default function Streams() {
 
         <CreateStreamModal
           isOpen={isCreateModalOpen}
-          onClose={closeCreateModal}
+          onClose={() => setIsCreateModalOpen(false)}
           onStreamCreated={handleStreamCreated}
-          transactionStatus={createTxStatus}
-          transactionError={createTxError}
         />
         <StreamCreatedModal
           isOpen={isSuccessModalOpen}
@@ -1042,36 +1050,30 @@ export default function Streams() {
               </div>
             </div>
 
-            <div className="streams-list" role="list" aria-label="Stream cards">
-              {visibleStreams.length > 0 ? (
-                visibleStreams.map((stream) => (
-                  <StreamCard
-                    key={stream.id}
-                    stream={stream}
-                    expanded={effectiveExpandedId === stream.id}
-                    selected={selectedStreamId === stream.id}
-                    onToggle={() =>
-                      setExpandedStreamId((current) =>
-                        current === stream.id ? "" : stream.id,
-                      )
-                    }
-                    onAnnounceToggle={(nextExpanded) =>
-                      announce(
-                        `${stream.name} deep dive ${
-                          nextExpanded ? "expanded" : "collapsed"
-                        }.`,
-                      )
-                    }
-                    onSelect={() => setSelectedStreamId(stream.id)}
-                    onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}
-                  />
-                ))
-              ) : (
+            <VirtualList
+              ariaLabel="Stream cards"
+              className="streams-list"
+              emptyState={
                 <div className="streams-empty-search">
                   <p>No streams match your search or filter.</p>
                 </div>
+              }
+              estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
+              getKey={(stream) => stream.id}
+              items={visibleStreams}
+              renderItem={(stream) => (
+                <StreamCard
+                  stream={stream}
+                  expanded={effectiveExpandedId === stream.id}
+                  selected={selectedStreamId === stream.id}
+                  onToggle={handleToggleStreamCard}
+                  onSelect={handleSelectStreamCard}
+                  onAnnounceToggle={handleAnnounceStreamToggle}
+                  onOpenDetail={handleOpenStreamDetail}
+                />
               )}
-            </div>
+              threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
+            />
 
             <Pagination
               currentPage={currentPage}
@@ -1092,10 +1094,8 @@ export default function Streams() {
 
       <CreateStreamModal
         isOpen={isCreateModalOpen}
-        onClose={closeCreateModal}
+        onClose={() => setIsCreateModalOpen(false)}
         onStreamCreated={handleStreamCreated}
-        transactionStatus={createTxStatus}
-        transactionError={createTxError}
       />
       <StreamCreatedModal
         isOpen={isSuccessModalOpen}

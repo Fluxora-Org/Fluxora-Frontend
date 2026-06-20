@@ -45,7 +45,7 @@ function isAbortError(error: unknown) {
 }
 
 /**
- * Demo status source used until the Soroban/RPC status endpoint is wired.
+ * Demo status source used until a flow passes a concrete Soroban/RPC source.
  * It keeps the same polling contract as a real source and confirms only after
  * the configured attempt count.
  */
