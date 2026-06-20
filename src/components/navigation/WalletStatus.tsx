@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import { stellarExplorerUrl } from "../../lib/stellar";
 
 interface WalletStatusProps {
   address: string;
@@ -127,8 +128,7 @@ export default function WalletStatus({
             <button
               role="menuitem"
               onClick={() => { 
-                const netPath = network?.toLowerCase() === "public" ? "public" : "testnet";
-                window.open(`https://stellar.expert/explorer/${netPath}/account/${address}`, "_blank", "noopener"); 
+                window.open(stellarExplorerUrl(address, network), "_blank", "noopener");
                 setOpen(false); 
               }}
               className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
