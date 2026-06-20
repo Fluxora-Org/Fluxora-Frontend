@@ -106,6 +106,17 @@ function ThemeToggle() {
 `useTheme()` throws if used outside a `ThemeProvider`. The provider wraps the app in
 `src/App.tsx`.
 
+## Wallet state
+
+`WalletProvider` in `src/components/wallet-connect/Walletcontext.tsx` is the
+single supported wallet state source for app UI. Pages, navigation, and wallet
+status components should consume `useWallet()` instead of importing
+`@stellar/freighter-api` directly.
+
+The provider only marks a session connected after Freighter confirms an
+approved address, watches account and network changes, and clears address and
+network on disconnect so stale wallet state cannot keep signing actions enabled.
+
 ## Environment
 
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:

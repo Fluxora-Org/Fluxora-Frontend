@@ -3,11 +3,13 @@ import EmptyState from "../components/EmptyState";
 import RecipientStreams from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 import "./Streams.css";
 import "./Recipient.css";
 
 export default function Recipient() {
   const [loading, setLoading] = useState(true);
+  const wallet = useWallet();
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 2000);
@@ -18,7 +20,7 @@ export default function Recipient() {
   const activeStreams = 2;
   const totalAccrued = 43250.0;
   const totalWithdrawn = 20650.0;
-  const walletConnected = true;
+  const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
 
   // Zero-accrual: connected + streams exist + no withdrawable balance yet

@@ -27,6 +27,15 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 const INITIAL: WalletState = { address: null, network: null, connected: false };
 
+/**
+ * Single supported wallet state source for app surfaces.
+ *
+ * `WalletProvider` is the only component that talks to Freighter for passive
+ * session restore and account/network change watching. Pages should consume
+ * `useWallet()` instead of importing `@stellar/freighter-api` directly so a
+ * verified address is required before `connected` becomes true and disconnect
+ * clears all stale wallet data.
+ */
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(INITIAL);
 
@@ -82,6 +91,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Read the canonical wallet state.
+ *
+ * Use this hook for wallet-dependent UI in pages and navigation. It reflects
+ * session restore, manual connect/disconnect, and Freighter account/network
+ * changes observed by `WalletProvider`.
+ */
 export function useWallet() {
   const ctx = useContext(WalletContext);
   if (!ctx) throw new Error("useWallet must be inside <WalletProvider>");
