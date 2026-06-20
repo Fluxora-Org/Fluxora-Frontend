@@ -1,42 +1,48 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getAddress,
+  getNetwork,
+  isConnected,
+  WatchWalletChanges,
+} from "@stellar/freighter-api";
+
+// The global test setup mocks Walletcontext with a no-op stub; this suite
+// exercises the real provider/restore lifecycle, so opt back into the actual
+// implementation here.
+vi.unmock("../Walletcontext");
+
 import { WalletProvider, useWallet } from "../Walletcontext";
 
-const freighter = vi.hoisted(() => ({
+vi.mock("@stellar/freighter-api", () => ({
   isConnected: vi.fn(),
   getAddress: vi.fn(),
   getNetwork: vi.fn(),
-  WatchWalletChanges: vi.fn(function WatchWalletChanges() {
-    return {
-      watch: vi.fn(),
-      stop: vi.fn(),
-    };
-  }),
+  WatchWalletChanges: vi.fn(),
 }));
 
-vi.mock("@stellar/freighter-api", () => ({
-  isConnected: freighter.isConnected,
-  getAddress: freighter.getAddress,
-  getNetwork: freighter.getNetwork,
-  WatchWalletChanges: freighter.WatchWalletChanges,
-}));
+const mockedIsConnected = vi.mocked(isConnected);
+const mockedGetAddress = vi.mocked(getAddress);
+const mockedGetNetwork = vi.mocked(getNetwork);
+const mockedWatchWalletChanges = vi.mocked(WatchWalletChanges);
 
 function WalletProbe() {
-  const wallet = useWallet();
+  const { address, connected, error, network, loading } = useWallet();
 
   return (
-    <dl>
-      <dt>Loading</dt>
-      <dd>{String(wallet.loading)}</dd>
-      <dt>Connected</dt>
-      <dd>{String(wallet.connected)}</dd>
-      <dt>Address</dt>
-      <dd>{wallet.address ?? "none"}</dd>
-    </dl>
+    <output aria-label="wallet state">
+      {JSON.stringify({
+        address,
+        connected,
+        error: error?.type ?? null,
+        network,
+        loading,
+      })}
+    </output>
   );
 }
 
-function renderWalletProbe() {
+function renderWalletProvider() {
   render(
     <WalletProvider>
       <WalletProbe />
@@ -44,36 +50,157 @@ function renderWalletProbe() {
   );
 }
 
-describe("WalletProvider restore state", () => {
+function walletState() {
+  return JSON.parse(screen.getByLabelText("wallet state").textContent ?? "{}");
+}
+
+describe("WalletProvider restore errors", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    freighter.isConnected.mockResolvedValue({ isConnected: false });
-    freighter.getAddress.mockResolvedValue({ address: "", error: null });
-    freighter.getNetwork.mockResolvedValue({ network: "TESTNET", error: null });
+
+    mockedIsConnected.mockResolvedValue({ isConnected: false });
+    mockedGetAddress.mockResolvedValue({ address: "" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "",
+      networkPassphrase: "",
+    });
+    mockedWatchWalletChanges.mockImplementation(
+      function MockWatchWalletChanges() {
+        return {
+          watch: vi.fn(),
+          stop: vi.fn(),
+        };
+      } as unknown as typeof WatchWalletChanges,
+    );
   });
 
-  it("keeps loading true until silent restore completes disconnected", async () => {
-    renderWalletProbe();
+  it("restores an approved wallet and clears previous errors", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
 
-    expect(screen.getByText("true")).toBeInTheDocument();
+    renderWalletProvider();
 
     await waitFor(() =>
-      expect(screen.getByText("false")).toBeInTheDocument(),
+      expect(walletState()).toEqual({
+        address: "GAPPROVEDADDRESS",
+        connected: true,
+        error: null,
+        network: "TESTNET",
+        loading: false,
+      }),
     );
-    expect(screen.getByText("none")).toBeInTheDocument();
   });
 
-  it("restores a verified address and clears loading", async () => {
-    freighter.isConnected.mockResolvedValue({ isConnected: true });
-    freighter.getAddress.mockResolvedValue({ address: "GRESTORED", error: null });
-    freighter.getNetwork.mockResolvedValue({ network: "PUBLIC", error: null });
+  it("records not_installed when Freighter is unavailable", async () => {
+    mockedIsConnected.mockResolvedValue({
+      isConnected: false,
+      error: { code: -1, message: "Node environment is not supported" },
+    });
 
-    renderWalletProbe();
+    renderWalletProvider();
 
     await waitFor(() =>
-      expect(screen.getByText("GRESTORED")).toBeInTheDocument(),
+      expect(walletState()).toMatchObject({
+        address: null,
+        connected: false,
+        error: "not_installed",
+        network: null,
+      }),
     );
-    expect(screen.getAllByText("false")).toHaveLength(1);
-    expect(screen.getByText("true")).toBeInTheDocument();
+  });
+
+  it("records rejected when address restore is declined", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({
+      address: "",
+      error: { code: -4, message: "User declined access" },
+    });
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "rejected",
+      }),
+    );
+    expect(mockedGetNetwork).not.toHaveBeenCalled();
+  });
+
+  it("records network_error when network lookup fails", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "",
+      networkPassphrase: "",
+      error: { code: 500, message: "Network RPC timeout" },
+    });
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "network_error",
+      }),
+    );
+  });
+
+  it("records unknown for unclassified thrown restore errors", async () => {
+    mockedIsConnected.mockRejectedValue(new Error("Unexpected wallet failure"));
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "unknown",
+      }),
+    );
+  });
+});
+
+describe("WalletProvider restore loading", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedIsConnected.mockResolvedValue({ isConnected: false });
+    mockedGetAddress.mockResolvedValue({ address: "" });
+    mockedGetNetwork.mockResolvedValue({ network: "", networkPassphrase: "" });
+    mockedWatchWalletChanges.mockImplementation(
+      function MockWatchWalletChanges() {
+        return { watch: vi.fn(), stop: vi.fn() };
+      } as unknown as typeof WatchWalletChanges,
+    );
+  });
+
+  it("clears loading once silent restore resolves disconnected", async () => {
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({ connected: false, loading: false }),
+    );
+  });
+
+  it("clears loading after restoring a verified address", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        address: "GAPPROVEDADDRESS",
+        connected: true,
+        loading: false,
+      }),
+    );
   });
 });
