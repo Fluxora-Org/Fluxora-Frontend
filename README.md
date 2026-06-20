@@ -215,12 +215,17 @@ authorization before returning privileged treasury or stream data.
 
 ## Environment
 
-Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:
+Copy `.env.example` to `.env` or `.env.local` when configuring public API or
+Stellar metadata:
 
-- `VITE_API_URL` — Backend API base URL
-- `VITE_NETWORK` — Stellar network (TESTNET / PUBLIC)
-- `VITE_RPC_URL` — Soroban RPC server endpoint
-- `VITE_STREAM_CONTRACT_ID` — The deployed stream contract ID (C...)
+- `VITE_API_URL` - backend API base URL
+- `VITE_NETWORK` - Stellar network (`TESTNET` or `PUBLIC`); unsupported values fail closed to `TESTNET`
+- `VITE_RPC_URL` - Soroban RPC server endpoint
+- `VITE_STREAM_CONTRACT_ID` - deployed stream contract ID (`C...`)
+- `VITE_USE_MOCKS` - `true` or `1` enables mock-data paths
+
+Only expose public client metadata through `VITE_` variables. Do not put API
+secrets, signing keys, or wallet credentials in frontend env files.
 
 ## Transaction Signing Layer (Stellar / Soroban)
 

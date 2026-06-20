@@ -13,6 +13,11 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
     connected: false,
     address: undefined,
     network: undefined,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
     disconnect: () => {},
   }),
 }));

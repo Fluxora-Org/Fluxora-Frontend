@@ -30,8 +30,7 @@ export default function Recipient() {
   const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
 
-  const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
-  const networkMismatch = wallet.connected && wallet.network?.toUpperCase() !== expectedNet.toUpperCase();
+  const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
 
   // Zero-accrual: connected + streams exist + no withdrawable balance yet
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
@@ -110,7 +109,7 @@ export default function Recipient() {
           {(errorMsg || networkMismatch) && (
             <p className="validation-message validation-message--error" style={{ color: "var(--color-danger)", marginTop: "1rem" }} role="alert">
               {networkMismatch 
-                ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${expectedNet.toUpperCase()}.`
+                ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${wallet.expectedNetworkLabel}.`
                 : errorMsg}
             </p>
           )}

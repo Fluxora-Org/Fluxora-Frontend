@@ -11,6 +11,11 @@ const walletState = vi.hoisted(() => ({
 vi.mock("../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
   }),

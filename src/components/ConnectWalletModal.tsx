@@ -3,6 +3,8 @@ import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw } from "luci
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
+import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
+import { getNetworkLabel } from "../lib/config";
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ interface ConnectWalletModalProps {
   onDownloadFreighter?: () => void;
   // Optional flag to explicitly show or hide the Design QA Preview switcher (default: true for reviewability)
   showStateSwitcher?: boolean;
+  expectedNetworkLabel?: string;
+  actualNetworkLabel?: string | null;
 }
 
 interface WalletOption {
@@ -38,6 +42,8 @@ export default function ConnectWalletModal({
   onRetryConnection,
   onDownloadFreighter,
   showStateSwitcher = true,
+  expectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork()),
+  actualNetworkLabel = null,
 }: ConnectWalletModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -82,7 +88,7 @@ export default function ConnectWalletModal({
         return;
       }
 
-      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
+      const expectedNet = getExpectedStellarNetwork();
       if (net.network.toUpperCase() !== expectedNet.toUpperCase()) {
         setInternalErrorState("network_mismatch");
         return;
@@ -426,8 +432,9 @@ export default function ConnectWalletModal({
               Wrong Stellar Network
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Your wallet is connected to the wrong network. Fluxora is configured for Stellar 
-              <strong> Public Network (Mainnet)</strong>, but your wallet is currently on <strong>Testnet</strong>.
+              Your wallet is connected to the wrong network. Fluxora is configured for Stellar{" "}
+              <strong>{expectedNetworkLabel}</strong>, but your wallet is currently on{" "}
+              <strong>{actualNetworkLabel ?? "an unsupported network"}</strong>.
             </p>
 
             <ol className={styles.errorInstructions} aria-label="Instructions to switch network">
@@ -446,7 +453,7 @@ export default function ConnectWalletModal({
               <li className={styles.instructionItem}>
                 <span className={styles.instructionNumber}>3</span>
                 <span className={styles.instructionText}>
-                  Select <strong>Public Network (Mainnet)</strong> and return here.
+                  Select <strong>{expectedNetworkLabel}</strong> and return here.
                 </span>
               </li>
             </ol>

@@ -235,9 +235,8 @@ export default function CreateStreamModal({
         setError("Please connect your wallet first.");
         return;
       }
-      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
-      if (wallet.network?.toUpperCase() !== expectedNet.toUpperCase()) {
-        setError(`Wrong Stellar network. Expected ${expectedNet.toUpperCase()}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
+      if (wallet.isNetworkMismatch) {
+        setError(`Wrong Stellar network. Expected ${wallet.expectedNetwork}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
         return;
       }
 

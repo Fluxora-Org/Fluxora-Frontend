@@ -7,6 +7,11 @@ const wallet = vi.hoisted(() => ({
   address: null as string | null,
   network: null as string | null,
   connected: false,
+  loading: false,
+  error: null,
+  expectedNetwork: "TESTNET",
+  expectedNetworkLabel: "Testnet",
+  isNetworkMismatch: false,
   connect: vi.fn(),
   disconnect: vi.fn(),
 }));
