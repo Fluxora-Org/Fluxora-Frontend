@@ -15,6 +15,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
 
   return (
     <section
+      aria-labelledby="landing-hero-title"
       className="relative min-h-[90vh] w-full overflow-hidden font-['Plus_Jakarta_Sans',system-ui,sans-serif] flex items-center"
       style={{
         background: isDark
@@ -61,6 +62,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             {/* Headline Hierarchy */}
             <div className="flex flex-col gap-3">
               <h1
+                id="landing-hero-title"
                 className={`
                   text-5xl font-extrabold leading-[1.1] tracking-tight lg:text-7xl
                   ${isDark ? "text-white" : "text-slate-900"}
@@ -71,10 +73,10 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                   Treasury Streaming
                 </span>
               </h1>
-              <h2 className={`text-heading-3 max-w-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+              <p className={`text-heading-3 max-w-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                 Real-time USDC infrastructure for DAOs, grants, and ecosystem funds. 
                 Automate your payouts with second-by-second precision.
-              </h2>
+              </p>
             </div>
 
             {/* Subtext Detail (Accessibility & Trust) */}
@@ -97,6 +99,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                 <span className="relative z-10 flex items-center gap-2">
                   Launch App
                   <svg
+                    aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
                     width="20"
                     height="20"
@@ -132,6 +135,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
               >
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-500">
                   <svg
+                    aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
                     width="14"
                     height="14"
@@ -199,6 +203,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                 <div className="flex items-center gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 shadow-lg shadow-cyan-500/20 shrink-0">
                     <svg
+                      aria-hidden="true"
                       width="28"
                       height="28"
                       viewBox="0 0 24 24"
@@ -212,9 +217,9 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                     </svg>
                   </div>
                   <div className="flex flex-col">
-                    <h3 className={`text-heading-4 leading-none mb-1.5 ${isDark ? "text-white" : "text-slate-800"}`}>
+                    <p className={`text-heading-4 leading-none mb-1.5 ${isDark ? "text-white" : "text-slate-800"}`}>
                       Stellar Growth Grant
-                    </h3>
+                    </p>
                     <div className="flex items-center gap-2">
                        <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>from SCF Treasury</span>
                        <span className="h-1 w-1 rounded-full bg-slate-500" />
