@@ -4,6 +4,14 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ConnectWalletModal from "../ConnectWalletModal";
 
+vi.mock("@stellar/freighter-api", () => {
+  return {
+    isConnected: vi.fn().mockResolvedValue({ isConnected: true }),
+    requestAccess: vi.fn().mockResolvedValue({ address: "GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222" }),
+    getNetwork: vi.fn().mockResolvedValue({ network: "TESTNET" }),
+  };
+});
+
 describe("ConnectWalletModal", () => {
   const onClose = vi.fn();
   const onConnectFreighter = vi.fn();

@@ -1,60 +1,29 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
-import { getNetwork, requestAccess } from "@stellar/freighter-api";
 
 import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
-
-type WalletModalError = "not_installed" | "rejected" | "network_mismatch" | null;
+import { stellarExplorerUrl } from "../../lib/stellar";
 
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-function explorerUrl(address: string, network: string | null) {
-  const net = network === "PUBLIC" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${net}/account/${address}`;
-}
-
 export default function WalletButton() {
-  const { address, network, connected, connect, disconnect } = useWallet();
+  const { address, network, connected, disconnect } = useWallet();
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalError, setModalError] = useState<WalletModalError>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  async function handleConnectFreighter() {
-    try {
-      setModalError(null);
-      const access = await requestAccess();
-
-      if (access.error) {
-        setModalError("rejected");
-        return;
-      }
-
-      if (!access.address) {
-        setModalError("not_installed");
-        return;
-      }
-
-      const net = await getNetwork();
-      if (net.error) {
-        setModalError("network_mismatch");
-        return;
-      }
-
-      connect(access.address, net.network);
-      setModalOpen(false);
-    } catch {
-      setModalError("not_installed");
-    }
+  // The canonical ConnectWalletModal performs the Freighter connection and
+  // error handling internally; WalletButton just closes once it succeeds.
+  function handleConnectFreighter() {
+    setModalOpen(false);
   }
 
   function handleOpenModal() {
-    setModalError(null);
     setModalOpen(true);
   }
 
@@ -67,7 +36,7 @@ export default function WalletButton() {
 
   function handleExplorer() {
     if (!address) return;
-    window.open(explorerUrl(address, network), "_blank", "noopener,noreferrer");
+    window.open(stellarExplorerUrl(address, network), "_blank", "noopener,noreferrer");
     setDropdownOpen(false);
   }
 
@@ -97,9 +66,7 @@ export default function WalletButton() {
         <ConnectWalletModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          onConnectFreighter={() => void handleConnectFreighter()}
-          errorState={modalError}
-          onRetryConnection={() => setModalError(null)}
+          onConnectFreighter={handleConnectFreighter}
           showStateSwitcher={false}
         />
       </>

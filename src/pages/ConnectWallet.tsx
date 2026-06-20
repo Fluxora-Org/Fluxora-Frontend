@@ -1,11 +1,31 @@
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import GlowingDot from "../components/GlowingDot";
 import WalletIcon from "../components/WalletIcon";
 import ConnectWalletModal from "../components/ConnectWalletModal";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+
+interface ConnectWalletLocationState {
+  returnTo?: string;
+}
 
 export default function ConnectWallet() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCtaFocused, setIsCtaFocused] = useState(false);
+  const wallet = useWallet();
+  const location = useLocation();
+  const state = location.state as ConnectWalletLocationState | null;
+  const returnTo =
+    state?.returnTo?.startsWith("/app") ? state.returnTo : "/app";
+
+  useEffect(() => {
+    if (!wallet.connected) return;
+    setIsModalOpen(false);
+  }, [wallet.connected]);
+
+  if (wallet.connected) {
+    return <Navigate to={returnTo} replace />;
+  }
 
   return (
     <main id="main-content" style={styles.page} aria-labelledby="connect-wallet-heading">

@@ -12,6 +12,7 @@ const wallet = vi.hoisted(() => ({
 }));
 
 const freighter = vi.hoisted(() => ({
+  isConnected: vi.fn(),
   requestAccess: vi.fn(),
   getNetwork: vi.fn(),
 }));
@@ -21,6 +22,7 @@ vi.mock("../Walletcontext", () => ({
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
+  isConnected: freighter.isConnected,
   requestAccess: freighter.requestAccess,
   getNetwork: freighter.getNetwork,
 }));
@@ -31,6 +33,7 @@ describe("WalletButton canonical modal", () => {
     wallet.address = null;
     wallet.network = null;
     wallet.connected = false;
+    freighter.isConnected.mockResolvedValue({ isConnected: true });
     freighter.requestAccess.mockResolvedValue({
       address: "GCONNECTED",
       error: null,
