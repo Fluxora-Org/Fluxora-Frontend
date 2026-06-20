@@ -118,4 +118,5 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - **fluxora-backend** — API and streaming engine
 - **fluxora-contracts** — Soroban smart contracts
 
-Each is a separate Git repository.
+Each is a separate Git repository. Soroban contract code and contract tests should
+live in `fluxora-contracts`; this frontend repo only keeps the React/Vite client.
