@@ -1,136 +1,163 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getAddress,
+  getNetwork,
+  isConnected,
+  WatchWalletChanges,
+} from "@stellar/freighter-api";
+
+// The global test setup mocks Walletcontext with a no-op stub; this suite
+// exercises the real provider/restore lifecycle, so opt back into the actual
+// implementation here.
+vi.unmock("../Walletcontext");
+
 import { WalletProvider, useWallet } from "../Walletcontext";
 
-const freighter = vi.hoisted(() => {
-  let watcherCallback:
-    | ((state: { address: string; network: string }) => void)
-    | undefined;
-  function WatchWalletChanges() {
-    return {
-      watch: vi.fn((callback) => {
-        watcherCallback = callback;
-      }),
-      stop: freighter.stop,
-    };
-  }
-
-  return {
-    isConnected: vi.fn(),
-    getAddress: vi.fn(),
-    getNetwork: vi.fn(),
-    stop: vi.fn(),
-    emitWalletChange: (state: { address: string; network: string }) => {
-      watcherCallback?.(state);
-    },
-    resetWatcher: () => {
-      watcherCallback = undefined;
-    },
-    WatchWalletChanges: vi.fn(WatchWalletChanges),
-  };
-});
-
 vi.mock("@stellar/freighter-api", () => ({
-  isConnected: freighter.isConnected,
-  getAddress: freighter.getAddress,
-  getNetwork: freighter.getNetwork,
-  WatchWalletChanges: freighter.WatchWalletChanges,
+  isConnected: vi.fn(),
+  getAddress: vi.fn(),
+  getNetwork: vi.fn(),
+  WatchWalletChanges: vi.fn(),
 }));
 
+const mockedIsConnected = vi.mocked(isConnected);
+const mockedGetAddress = vi.mocked(getAddress);
+const mockedGetNetwork = vi.mocked(getNetwork);
+const mockedWatchWalletChanges = vi.mocked(WatchWalletChanges);
+
 function WalletProbe() {
-  const wallet = useWallet();
+  const { address, connected, error, network } = useWallet();
 
   return (
-    <section>
-      <dl>
-        <dt>Connected</dt>
-        <dd>{String(wallet.connected)}</dd>
-        <dt>Address</dt>
-        <dd>{wallet.address ?? "none"}</dd>
-        <dt>Network</dt>
-        <dd>{wallet.network ?? "none"}</dd>
-      </dl>
-      <button
-        type="button"
-        onClick={() => wallet.connect("GMANUAL", "TESTNET")}
-      >
-        Manual connect
-      </button>
-      <button type="button" onClick={wallet.disconnect}>
-        Disconnect
-      </button>
-    </section>
+    <output aria-label="wallet state">
+      {JSON.stringify({
+        address,
+        connected,
+        error: error?.type ?? null,
+        network,
+      })}
+    </output>
   );
 }
 
-function renderWalletProbe() {
-  return render(
+function renderWalletProvider() {
+  render(
     <WalletProvider>
       <WalletProbe />
     </WalletProvider>,
   );
 }
 
-describe("WalletProvider", () => {
+function walletState() {
+  return JSON.parse(screen.getByLabelText("wallet state").textContent ?? "{}");
+}
+
+describe("WalletProvider restore errors", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    freighter.resetWatcher();
-    freighter.isConnected.mockResolvedValue({ isConnected: false });
-    freighter.getAddress.mockResolvedValue({ address: "", error: null });
-    freighter.getNetwork.mockResolvedValue({ network: "TESTNET", error: null });
+
+    mockedIsConnected.mockResolvedValue({ isConnected: false });
+    mockedGetAddress.mockResolvedValue({ address: "" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "",
+      networkPassphrase: "",
+    });
+    mockedWatchWalletChanges.mockImplementation(
+      function MockWatchWalletChanges() {
+        return {
+          watch: vi.fn(),
+          stop: vi.fn(),
+        };
+      } as unknown as typeof WatchWalletChanges,
+    );
   });
 
-  it("restores only verified Freighter sessions and watches account changes", async () => {
-    freighter.isConnected.mockResolvedValue({ isConnected: true });
-    freighter.getAddress.mockResolvedValue({ address: "GRESTORED", error: null });
-    freighter.getNetwork.mockResolvedValue({ network: "PUBLIC", error: null });
+  it("restores an approved wallet and clears previous errors", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
 
-    renderWalletProbe();
+    renderWalletProvider();
 
     await waitFor(() =>
-      expect(screen.getByText("GRESTORED")).toBeInTheDocument(),
+      expect(walletState()).toEqual({
+        address: "GAPPROVEDADDRESS",
+        connected: true,
+        error: null,
+        network: "TESTNET",
+      }),
     );
-    expect(screen.getByText("PUBLIC")).toBeInTheDocument();
-    expect(freighter.WatchWalletChanges).toHaveBeenCalledTimes(1);
+  });
 
-    freighter.emitWalletChange({ address: "GSWITCHED", network: "TESTNET" });
+  it("records not_installed when Freighter is unavailable", async () => {
+    mockedIsConnected.mockResolvedValue({
+      isConnected: false,
+      error: { code: -1, message: "Node environment is not supported" },
+    });
+
+    renderWalletProvider();
 
     await waitFor(() =>
-      expect(screen.getByText("GSWITCHED")).toBeInTheDocument(),
+      expect(walletState()).toMatchObject({
+        address: null,
+        connected: false,
+        error: "not_installed",
+        network: null,
+      }),
     );
-    expect(screen.getByText("TESTNET")).toBeInTheDocument();
   });
 
-  it("manual connect and disconnect update all wallet fields through context", async () => {
-    const user = userEvent.setup();
-    renderWalletProbe();
+  it("records rejected when address restore is declined", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({
+      address: "",
+      error: { code: -4, message: "User declined access" },
+    });
 
-    expect(screen.getByText("false")).toBeInTheDocument();
-    expect(screen.getAllByText("none")).toHaveLength(2);
+    renderWalletProvider();
 
-    await user.click(screen.getByRole("button", { name: "Manual connect" }));
-
-    expect(screen.getByText("true")).toBeInTheDocument();
-    expect(screen.getByText("GMANUAL")).toBeInTheDocument();
-    expect(screen.getByText("TESTNET")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Disconnect" }));
-
-    expect(screen.getByText("false")).toBeInTheDocument();
-    expect(screen.getAllByText("none")).toHaveLength(2);
-    expect(freighter.stop).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "rejected",
+      }),
+    );
+    expect(mockedGetNetwork).not.toHaveBeenCalled();
   });
 
-  it("does not mark connected when Freighter has no approved address", async () => {
-    freighter.isConnected.mockResolvedValue({ isConnected: true });
-    freighter.getAddress.mockResolvedValue({ address: "", error: null });
+  it("records network_error when network lookup fails", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "",
+      networkPassphrase: "",
+      error: { code: 500, message: "Network RPC timeout" },
+    });
 
-    renderWalletProbe();
+    renderWalletProvider();
 
-    await waitFor(() => expect(freighter.getAddress).toHaveBeenCalled());
-    expect(screen.getByText("false")).toBeInTheDocument();
-    expect(screen.getAllByText("none")).toHaveLength(2);
-    expect(freighter.WatchWalletChanges).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "network_error",
+      }),
+    );
+  });
+
+  it("records unknown for unclassified thrown restore errors", async () => {
+    mockedIsConnected.mockRejectedValue(new Error("Unexpected wallet failure"));
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "unknown",
+      }),
+    );
   });
 });

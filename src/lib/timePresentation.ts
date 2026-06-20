@@ -57,16 +57,21 @@ export function formatDateWithTimezone(
     showTime?: boolean;
     showTimezone?: boolean;
     format?: "short" | "medium" | "long";
-  }
+  },
 ): string {
   if (!dateString) return "Not set";
 
   const date = new Date(dateString);
-  const { showTime = false, showTimezone = false, format = "short" } = options || {};
+  const {
+    showTime = false,
+    showTimezone = false,
+    format = "short",
+  } = options || {};
 
   const formatOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
-    month: format === "long" ? "long" : format === "medium" ? "short" : "numeric",
+    month:
+      format === "long" ? "long" : format === "medium" ? "short" : "numeric",
     day: "numeric",
   };
 
@@ -144,10 +149,11 @@ export function getCliffStatusText(cliffDate: string | undefined): string {
   switch (status) {
     case "passed":
       return "passed";
-    case "upcoming":
+    case "upcoming": {
       const days = getDaysBetween(cliffDate);
       if (days !== null && days <= 7) return "soon";
       return "upcoming";
+    }
     default:
       return "no cliff";
   }
@@ -159,7 +165,7 @@ export function getCliffStatusText(cliffDate: string | undefined): string {
 export function formatStreamTimeRange(
   _startDate: string,
   cliffDate?: string,
-  endDate?: string
+  endDate?: string,
 ): TimeDisplay {
   const hasCliff = !!cliffDate;
   const hasEnd = !!endDate;
@@ -185,7 +191,7 @@ export function formatDetailTime(
   options?: {
     includeRelative?: boolean;
     includeTimezone?: boolean;
-  }
+  },
 ): string {
   if (!dateString) return "Not scheduled";
 
@@ -206,7 +212,10 @@ export function formatDetailTime(
 /**
  * Check if a date is within a certain number of days
  */
-export function isWithinDays(dateString: string | undefined, days: number): boolean {
+export function isWithinDays(
+  dateString: string | undefined,
+  days: number,
+): boolean {
   const diff = getDaysBetween(dateString);
   if (diff === null) return false;
   return diff >= 0 && diff <= days;
@@ -219,14 +228,15 @@ export type UrgencyLevel = "none" | "low" | "medium" | "high";
 
 export function getUrgencyLevel(
   cliffDate?: string,
-  endDate?: string
+  endDate?: string,
 ): { cliff: UrgencyLevel; end: UrgencyLevel } {
   // Cliff urgency
   let cliffUrgency: UrgencyLevel = "none";
   if (cliffDate) {
     const cliffDays = getDaysBetween(cliffDate);
     if (cliffDays !== null) {
-      if (cliffDays < 0) cliffUrgency = "none"; // Passed
+      if (cliffDays < 0)
+        cliffUrgency = "none"; // Passed
       else if (cliffDays <= 7) cliffUrgency = "high";
       else if (cliffDays <= 14) cliffUrgency = "medium";
       else cliffUrgency = "low";
@@ -238,7 +248,8 @@ export function getUrgencyLevel(
   if (endDate) {
     const endDays = getDaysBetween(endDate);
     if (endDays !== null) {
-      if (endDays < 0) endUrgency = "none"; // Completed
+      if (endDays < 0)
+        endUrgency = "none"; // Completed
       else if (endDays <= 14) endUrgency = "high";
       else if (endDays <= 30) endUrgency = "medium";
       else endUrgency = "low";

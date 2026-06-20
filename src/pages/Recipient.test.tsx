@@ -46,6 +46,9 @@ describe("Recipient wallet source", () => {
 
   it("enables the withdraw surface when useWallet reports a connected wallet", () => {
     walletState.connected = true;
+    // Match the expected network so the on-chain mismatch guard does not
+    // disable the withdraw action.
+    walletState.network = "TESTNET";
 
     renderRecipient();
 
