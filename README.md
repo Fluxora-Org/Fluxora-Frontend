@@ -113,6 +113,12 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - `VITE_API_URL` — Backend API base URL
 - `VITE_NETWORK` — Stellar network (testnet / mainnet)
 
+## SEO and Social Previews
+
+Search and link-preview metadata lives in `index.html`. Update the description,
+canonical URL, Open Graph tags, Twitter Card tags, and absolute HTTPS preview
+image there when launching a new campaign or changing the public marketing URL.
+
 ## Related repos
 
 - **fluxora-backend** — API and streaming engine
