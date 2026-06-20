@@ -10,7 +10,6 @@ import Dashboard from "./pages/Dashboard";
 import Streams from "./pages/Streams";
 import Recipient from "./pages/Recipient";
 import ConnectWallet from "./pages/ConnectWallet";
-import Landing from "./pages/Landing";
 import ErrorPage from "./pages/ErrorPage";
 import NotFound from "./pages/NotFound";
 import TreasuryPage from "./pages/TreasuryPage";
@@ -51,7 +50,7 @@ export default function App() {
               <Route path="/dashboard" element={<Navigate to="/app" replace />} />
               <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
               <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
-              <Route path="/landing" element={<Landing />} />
+              <Route path="/landing" element={<Navigate to="/" replace />} />
               <Route path="/app" element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="streams" element={<Streams />} />
