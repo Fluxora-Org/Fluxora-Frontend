@@ -30,17 +30,25 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
 
   return (
     <tr
+      aria-selected={isSelected}
+      tabIndex={0}
       style={{
         borderBottom: "1px solid var(--color-border-default)",
-        backgroundColor: "var(--color-surface-default)",
+        backgroundColor: isSelected
+          ? "var(--color-surface-elevated)"
+          : "var(--color-surface-default)",
         transition:
           "background-color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
       }}
+      onClick={handleActivate}
+      onKeyDown={handleKeyDown}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-surface-default)";
+        e.currentTarget.style.backgroundColor = isSelected
+          ? "var(--color-surface-elevated)"
+          : "var(--color-surface-default)";
       }}
     >
       <td className="py-4 px-3">
@@ -79,7 +87,10 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
       <td className="stream-row__cell py-4 px-3">
         <button
           type="button"
-          onClick={() => navigate(`/app/streams/${stream.id}`)}
+          onClick={(event) => {
+            event.stopPropagation();
+            navigate(`/app/streams/${stream.id}`);
+          }}
           aria-label={`View details for ${stream.name}`}
           className="font-medium flex items-center gap-1"
           style={{

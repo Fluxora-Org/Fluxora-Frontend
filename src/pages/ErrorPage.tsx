@@ -98,7 +98,14 @@ export default function ErrorPage({
       <div className="error-content flex flex-col items-center justify-center text-center">
         <div className="error-illustration-wrapper" aria-hidden="true">
           <div className="error-illustration flex items-center justify-center w-48 h-48 mb-8 bg-gray-100 rounded-full text-gray-400">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
               <path d="M12 8V12M12 16H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
@@ -116,19 +123,40 @@ export default function ErrorPage({
           {content.message}
         </p>
 
+        <section
+          className="error-recovery"
+          role="region"
+          aria-label="Recovery steps"
+        >
+          <h2>What you can do</h2>
+          <ol>
+            <li>Retry the action in case the problem was temporary.</li>
+            <li>Return to the dashboard to continue from a stable page.</li>
+            <li>Contact support if the issue keeps happening.</li>
+          </ol>
+        </section>
+
         <div className="error-actions flex flex-col sm:flex-row gap-4 w-full sm:w-auto" role="group" aria-label="Error recovery actions">
           <Button 
             onClick={handlePrimaryAction} 
-            className="w-full sm:w-auto ui-primary-cta"
+            className="btn-retry w-full sm:w-auto ui-primary-cta"
           >
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M13 8a5 5 0 1 1-1.46-3.54" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M13 3.5V7h-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             {content.primaryCtaText}
           </Button>
           
           {content.secondaryCtaText && (
             <Button 
               onClick={handleSecondaryAction} 
-              className="w-full sm:w-auto ui-secondary-control"
+              className="btn-dashboard w-full sm:w-auto ui-secondary-control"
             >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2.5 7.5 8 3l5.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 7.5V13h8V7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               {content.secondaryCtaText}
             </Button>
           )}

@@ -523,7 +523,7 @@ function StreamDetail({
         <h2 className="stream-detail__section-header">Stream Timeline</h2>
         <StreamTimeline
           startDate={stream.startDate}
-          cliffDate={stream.cliffDate}
+          cliffDate={stream.cliffDate ?? null}
           currentDate={new Date().toISOString()}
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
@@ -985,6 +985,7 @@ export default function Streams() {
                     stream={stream}
                     expanded={effectiveExpandedId === stream.id}
                     selected={selectedStreamId === stream.id}
+                    onSelect={() => setSelectedStreamId(stream.id)}
                     onToggle={() =>
                       setExpandedStreamId((current) =>
                         current === stream.id ? "" : stream.id,

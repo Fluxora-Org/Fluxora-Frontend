@@ -1,5 +1,7 @@
 # Fluxora Frontend
 
+[![CI](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml)
+
 React dashboard and recipient portal for the Fluxora treasury streaming protocol.
 
 ## What's in this repo
@@ -105,6 +107,16 @@ function ThemeToggle() {
 
 `useTheme()` throws if used outside a `ThemeProvider`. The provider wraps the app in
 `src/App.tsx`.
+
+## Contributing / CI
+
+Pull requests and pushes to `main` run the GitHub Actions CI workflow on Node 18
+and Node 20. The workflow installs with `npm ci`, runs `npm run build` for
+TypeScript and production build coverage, then runs `npm run test:coverage`.
+
+The coverage gate currently enforces the configured 95% thresholds on the
+tested core component/theme baseline listed in `vitest.config.ts`. Expand that
+include list when adding reliable coverage for more production modules.
 
 ## Environment
 

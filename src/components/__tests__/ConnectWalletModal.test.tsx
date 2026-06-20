@@ -6,9 +6,6 @@ import ConnectWalletModal from "../ConnectWalletModal";
 describe("ConnectWalletModal", () => {
   const onClose = vi.fn();
   const onConnectFreighter = vi.fn();
-  const onConnectAlbedo = vi.fn();
-  const onConnectWalletConnect = vi.fn();
-  const onRetryConnection = vi.fn();
   const onDownloadFreighter = vi.fn();
 
   beforeEach(() => {
