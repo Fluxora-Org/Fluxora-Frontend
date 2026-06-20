@@ -1,0 +1,12 @@
+.virtual-list-item {
+  min-width: 0;
+}
+
+.virtual-list-spacer {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.virtual-list--reduced-motion {
+  scroll-behavior: auto;
+}

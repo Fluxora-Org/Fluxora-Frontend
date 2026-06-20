@@ -115,4 +115,16 @@ describe("Streams disclosure motion", () => {
     expect(collapseButton).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(disclosureId)).not.toBeInTheDocument();
   });
+
+  it("keeps the current small stream list non-virtualized and accessible", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    const list = screen.getByRole("list", { name: "Stream cards" });
+
+    expect(list).toHaveAttribute("data-virtualized", "false");
+    expect(screen.getByText(streamRecords[0]!.name)).toBeInTheDocument();
+    expect(screen.getByText(streamRecords[streamRecords.length - 1]!.name)).toBeInTheDocument();
+  });
 });

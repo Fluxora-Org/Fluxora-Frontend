@@ -16,6 +16,7 @@ import Input from "../components/Input";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
+import VirtualList from "../components/VirtualList";
 import {
   getStreamRecord,
   streamRecords,
@@ -40,6 +41,8 @@ type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
+const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
+const STREAM_CARD_ESTIMATED_HEIGHT = 420;
 
 function formatUsdc(value: number) {
   return `${new Intl.NumberFormat("en-US", {
@@ -523,12 +526,18 @@ function StreamDetail({
         <h2 className="stream-detail__section-header">Stream Timeline</h2>
         <StreamTimeline
           startDate={stream.startDate}
-          cliffDate={stream.cliffDate}
+          cliffDate={stream.cliffDate ?? null}
           currentDate={new Date().toISOString()}
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
           totalAmount={stream.depositAmount}
-          status={stream.status.toLowerCase() as "active" | "paused" | "completed" | "upcoming"}
+          status={
+            stream.status.toLowerCase() as
+              | "active"
+              | "paused"
+              | "completed"
+              | "upcoming"
+          }
           isLoading={false}
         />
       </section>
@@ -977,35 +986,40 @@ export default function Streams() {
               </div>
             </div>
 
-            <div className="streams-list" role="list" aria-label="Stream cards">
-              {visibleStreams.length > 0 ? (
-                visibleStreams.map((stream) => (
-                  <StreamCard
-                    key={stream.id}
-                    stream={stream}
-                    expanded={effectiveExpandedId === stream.id}
-                    selected={selectedStreamId === stream.id}
-                    onToggle={() =>
-                      setExpandedStreamId((current) =>
-                        current === stream.id ? "" : stream.id,
-                      )
-                    }
-                    onAnnounceToggle={(nextExpanded) =>
-                      announce(
-                        `${stream.name} deep dive ${
-                          nextExpanded ? "expanded" : "collapsed"
-                        }.`,
-                      )
-                    }
-                    onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}
-                  />
-                ))
-              ) : (
+            <VirtualList
+              ariaLabel="Stream cards"
+              className="streams-list"
+              emptyState={
                 <div className="streams-empty-search">
                   <p>No streams match your search or filter.</p>
                 </div>
+              }
+              estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
+              getKey={(stream) => stream.id}
+              items={visibleStreams}
+              renderItem={(stream) => (
+                <StreamCard
+                  stream={stream}
+                  expanded={effectiveExpandedId === stream.id}
+                  selected={selectedStreamId === stream.id}
+                  onSelect={() => setSelectedStreamId(stream.id)}
+                  onToggle={() =>
+                    setExpandedStreamId((current) =>
+                      current === stream.id ? "" : stream.id,
+                    )
+                  }
+                  onAnnounceToggle={(nextExpanded) =>
+                    announce(
+                      `${stream.name} deep dive ${
+                        nextExpanded ? "expanded" : "collapsed"
+                      }.`,
+                    )
+                  }
+                  onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}
+                />
               )}
-            </div>
+              threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
+            />
 
             <Pagination
               currentPage={currentPage}
