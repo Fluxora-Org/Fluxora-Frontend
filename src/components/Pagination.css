@@ -62,6 +62,16 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
 .page-num-btn:hover:not(.is-active) {
   background: var(--surface-hover, rgba(255, 255, 255, 0.05));
   color: var(--text-primary);
