@@ -1,6 +1,8 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
 import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
+import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
+import { useWallet } from "./wallet-connect/Walletcontext";
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
@@ -39,11 +41,14 @@ export default function ConnectWalletModal({
 }: ConnectWalletModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   
   // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
   const [focusedOptionId, setFocusedOptionId] = useState<string | null>(null);
   
+  const { connect } = useWallet();
+
   // Internal error state for uncontrolled usage/simulation
   const [internalErrorState, setInternalErrorState] = useState<
     "not_installed" | "rejected" | "network_mismatch" | null
@@ -52,12 +57,44 @@ export default function ConnectWalletModal({
   // Determine active state (controlled prop takes priority over internal state)
   const currentErrorState = errorState !== undefined ? errorState : internalErrorState;
 
-  // Handle Freighter selection: simulate connection/errors in demo mode
-  const handleFreighterClick = () => {
-    if (onConnectFreighter) {
-      onConnectFreighter();
-    } else {
-      // In uncontrolled demo/mock environment, clicking Freighter switches to rejected state to show interactive error behavior
+  // Handle Freighter selection: perform actual connection and network verification
+  const handleFreighterClick = async () => {
+    setInternalErrorState(null);
+    try {
+      const ready = await isConnected();
+      if (!ready.isConnected) {
+        setInternalErrorState("not_installed");
+        if (onDownloadFreighter) {
+          onDownloadFreighter();
+        }
+        return;
+      }
+
+      const access = await requestAccess();
+      if (access.error || !access.address) {
+        setInternalErrorState("rejected");
+        return;
+      }
+
+      const net = await getNetwork();
+      if (net.error || !net.network) {
+        setInternalErrorState("rejected");
+        return;
+      }
+
+      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
+      if (net.network.toUpperCase() !== expectedNet.toUpperCase()) {
+        setInternalErrorState("network_mismatch");
+        return;
+      }
+
+      // Successful connection!
+      connect(access.address, net.network);
+      if (onConnectFreighter) {
+        onConnectFreighter();
+      }
+      onClose();
+    } catch {
       setInternalErrorState("rejected");
     }
   };
@@ -76,6 +113,7 @@ export default function ConnectWalletModal({
       return;
     }
 
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -117,6 +155,8 @@ export default function ConnectWalletModal({
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus();
+      previouslyFocusedRef.current = null;
     };
   }, [isOpen, onClose]);
 
