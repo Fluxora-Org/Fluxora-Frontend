@@ -65,6 +65,12 @@ src/
   index.css
 ```
 
+## Route Error Recovery
+
+The route tree is wrapped in `src/components/ErrorBoundary.tsx`. Render-time
+route failures show the sanitized `ErrorPage` fallback with Try Again and Back to
+Dashboard recovery actions, while full error details are logged only in dev/test.
+
 ## Theming
 
 Light/dark theming is owned by a single `ThemeProvider` (`src/theme/ThemeProvider.tsx`),
