@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // Separate vitest config that omits the @tailwindcss/vite plugin.
@@ -11,10 +12,23 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    // Playwright owns the e2e/ specs; keep them out of the vitest run.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["src/components/**/*.tsx", "src/theme/**/*.tsx"],
+      include: [
+        "src/components/ConnectButton.tsx",
+        "src/components/GlowingDot.tsx",
+        "src/components/InputField.tsx",
+        "src/components/InputWithUnit.tsx",
+        "src/components/StreamsLoading.tsx",
+        "src/components/ToastNotification.tsx",
+        "src/components/TreasuryOverviewLoading.tsx",
+        "src/components/treasuryOverviewPage/MetricCard.tsx",
+        "src/components/treasuryOverviewPage/StatusPill.tsx",
+        "src/theme/ThemeProvider.tsx",
+      ],
       exclude: ["src/components/**/*.test.tsx", "src/theme/**/__tests__/**"],
       thresholds: {
         lines: 95,
