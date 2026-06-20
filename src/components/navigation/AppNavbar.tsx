@@ -124,7 +124,14 @@ export default function AppNavbar({
   isSidebarOpen = false,
 }: AppNavbarProps) {
   const { theme, toggleTheme } = useTheme();
-  const { connected, address, network, disconnect } = useWallet();
+  const {
+    connected,
+    address,
+    network,
+    expectedNetwork,
+    isNetworkMismatch,
+    disconnect,
+  } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
@@ -231,6 +238,8 @@ const location = useLocation();
             <WalletStatus
               address={address}
               network={network ?? "TESTNET"}
+              expectedNetwork={expectedNetwork}
+              isNetworkMismatch={isNetworkMismatch}
               onDisconnect={disconnect}
             />
           ) : (
@@ -311,6 +320,8 @@ const location = useLocation();
               <WalletStatus
                 address={address}
                 network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
                 onDisconnect={() => {
                   disconnect();
                   closeMobile();

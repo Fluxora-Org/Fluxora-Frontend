@@ -44,6 +44,7 @@ App runs at [http://localhost:5173](http://localhost:5173).
 
 ```bash
 npm run build
+npm run build:report
 npm run preview
 ```
 
@@ -51,8 +52,31 @@ Or with pnpm:
 
 ```bash
 pnpm run build
+pnpm run build:report
 pnpm run preview
 ```
+
+### Bundle and code-splitting
+
+The public marketing routes (`/`, `/landing`) and the core app shell stay in the
+initial bundle so first paint remains fast. Heavier authenticated app pages are
+loaded behind a shared Suspense skeleton only when a user enters `/app`.
+
+The Vite build uses these manual chunks for app pages:
+
+- `app-dashboard` - `/app`
+- `app-streams` - `/app/streams` and `/app/streams/:streamId`
+- `app-recipient` - `/app/recipient`
+- `app-treasury` - `/app/treasurypage`
+- `app-empty-state-demo` - `/app/empty-state-demo`
+
+Run `npm run build` and check `dist/assets` to verify those chunks before
+shipping a performance-sensitive release.
+
+`npm run build:report` emits a raw/gzip bundle table from `dist/assets` after
+the production build. Vite warns when any chunk exceeds 650 kB, and
+`vite.config.ts` splits vendor code into `vendor-react`, `vendor-stellar`, and
+`vendor-icons` chunks so PR reviewers can spot bundle regressions.
 
 ## Project structure
 
@@ -64,6 +88,12 @@ src/
   main.tsx
   index.css
 ```
+
+## Route Error Recovery
+
+The route tree is wrapped in `src/components/ErrorBoundary.tsx`. Render-time
+route failures show the sanitized `ErrorPage` fallback with Try Again and Back to
+Dashboard recovery actions, while full error details are logged only in dev/test.
 
 ## Theming
 
@@ -111,7 +141,25 @@ function ThemeToggle() {
 Create a `.env` (or `.env.local`) when you add API or Stellar config, for example:
 
 - `VITE_API_URL` — Backend API base URL
-- `VITE_NETWORK` — Stellar network (testnet / mainnet)
+- `VITE_NETWORK` — Stellar network (TESTNET / PUBLIC)
+- `VITE_RPC_URL` — Soroban RPC server endpoint
+- `VITE_STREAM_CONTRACT_ID` — The deployed stream contract ID (C...)
+
+## Transaction Signing Layer (Stellar / Soroban)
+
+Fluxora integrates with the Stellar ecosystem for on-chain stream management:
+- **Freighter Wallet Integration**: Leverages `@stellar/freighter-api` to securely retrieve accounts, request network passphrases, and sign transactions.
+- **Soroban Smart Contract Invocations**: Invokes contract entrypoints (`create_stream`, `withdraw`, `pause_stream`, `cancel_stream`) by building operations, simulating resource costs, and submitting signed envelopes.
+- **Network Validation**: Verifies that the connected Freighter extension matches `VITE_NETWORK` before building or signing transactions, protecting users from cross-network mistakes.
+- **Robust Error Mapping**: Automatically maps user rejections, simulation failures, and timeouts into descriptive toasts and inline alert messages.
+
+## SEO and Social Previews
+
+Search and link-preview metadata lives in `index.html`. Update the description,
+canonical URL, Open Graph tags, Twitter Card tags, and absolute HTTPS preview
+image there when launching a new campaign or changing the public marketing URL.
+
+- `VITE_DEMO_MODE` - Set to `true` or `1` to render treasury overview fixture data for screenshots and tests. Leave unset for the default live-data path.
 
 ## Related repos
 
@@ -119,3 +167,8 @@ Create a `.env` (or `.env.local`) when you add API or Stellar config, for exampl
 - **fluxora-contracts** — Soroban smart contracts
 
 Each is a separate Git repository.
+
+Contract source and Soroban tests live in `fluxora-contracts`, not this frontend
+repository. Protocol security notes in `docs/security.md` are retained here as
+context for the UI, but executable contract coverage belongs with the contracts
+repo so it runs in the correct toolchain and CI.

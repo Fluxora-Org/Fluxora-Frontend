@@ -6,6 +6,12 @@ import {
   isConnected,
   WatchWalletChanges,
 } from "@stellar/freighter-api";
+
+// The global test setup mocks Walletcontext with a no-op stub; this suite
+// exercises the real provider/restore lifecycle, so opt back into the actual
+// implementation here.
+vi.unmock("../Walletcontext");
+
 import { WalletProvider, useWallet } from "../Walletcontext";
 
 vi.mock("@stellar/freighter-api", () => ({
