@@ -66,7 +66,7 @@ const statusStyles: Record<ExtendedStatus, { background: string; color: string; 
 };
 
 export default function StatusPill({ status, iconSize = 'xs' }: Props) {
-  const { background, color } = statusStyles[status];
+  const { background, color, Icon, label } = statusStyles[status];
 
   return (
     <span
