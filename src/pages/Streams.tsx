@@ -1018,6 +1018,7 @@ export default function Streams() {
                         }.`,
                       )
                     }
+                    onSelect={() => setSelectedStreamId(stream.id)}
                     onOpenDetail={() => navigate(`/app/streams/${stream.id}`)}
                   />
                 ))

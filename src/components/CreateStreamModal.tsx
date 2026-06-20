@@ -4,6 +4,9 @@ import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
+import { useWallet } from './wallet-connect/Walletcontext';
+import { useToast } from './toast/ToastProvider';
+import { createStream } from '../lib/stellar/tx';
 
 function maskAddress(addr: string): string {
   const t = addr.trim();
@@ -31,6 +34,9 @@ export default function CreateStreamModal({
   onClose,
   onStreamCreated,
 }: CreateStreamModalProps) {
+  const wallet = useWallet();
+  const { addToast } = useToast();
+
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [accrualRate, setAccrualRate] = useState("38.62");
@@ -148,12 +154,44 @@ export default function CreateStreamModal({
       if (!validateStep2()) return;
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (!wallet.connected) {
+        setError("Please connect your wallet first.");
+        return;
+      }
+      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
+      if (wallet.network?.toUpperCase() !== expectedNet.toUpperCase()) {
+        setError(`Wrong Stellar network. Expected ${expectedNet.toUpperCase()}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
+        return;
+      }
+
+      setError(null);
       setIsSubmitting(true);
-      onStreamCreated?.();
-      setTimeout(() => {
-        onClose();
-        setIsSubmitting(false);
-      }, 400);
+
+      const sender = wallet.address!;
+      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+
+      const start = startTimeOption === "now"
+        ? Math.floor(Date.now() / 1000)
+        : Math.floor(new Date(customStartDate).getTime() / 1000);
+
+      const durationDays = parseFloat(duration) || 0;
+      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+      const end = start + durationSeconds;
+
+      createStream(sender, recipient.trim(), amountStr, start, end)
+        .then(() => {
+          addToast("Stream created successfully on-chain!", "success");
+          onStreamCreated?.();
+          onClose();
+        })
+        .catch((err: any) => {
+          setError(err.message || "Failed to create stream.");
+          addToast(`Failed to create stream: ${err.message || err}`, "error");
+        })
+        .finally(() => {
+          setIsSubmitting(false);
+        });
     }
   };
 
@@ -250,7 +288,17 @@ export default function CreateStreamModal({
         </div>
 
         <div className="modal-body-scroll">
-        {currentStep === 1 && (
+          {error && (
+            <div className="validation-message validation-message--error" style={{ margin: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 107, 107, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)' }} role="alert">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+          {currentStep === 1 && (
           <>
             <hr className="divider" />
             <div className="section-header">
