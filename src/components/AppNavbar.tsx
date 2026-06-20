@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { stellarExplorerUrl } from "../lib/stellar";
 
 interface AppNavbarProps {
   onThemeToggle?: () => void;
@@ -148,10 +149,11 @@ function FluxoraLogo() {
 
 interface WalletDropdownProps {
   address: string;
+  network: "TESTNET" | "MAINNET";
   onDisconnect?: () => void;
 }
 
-function WalletDropdown({ address, onDisconnect }: WalletDropdownProps) {
+function WalletDropdown({ address, network, onDisconnect }: WalletDropdownProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -177,7 +179,7 @@ function WalletDropdown({ address, onDisconnect }: WalletDropdownProps) {
   };
 
   const handleViewExplorer = () => {
-    window.open(`https://stellar.expert/explorer/testnet/account/${address}`, "_blank", "noopener");
+    window.open(stellarExplorerUrl(address, network), "_blank", "noopener");
     setOpen(false);
   };
 
@@ -267,7 +269,11 @@ export default function AppNavbar({
           {network}
         </button>
         {walletAddress ? (
-          <WalletDropdown address={walletAddress} onDisconnect={onDisconnect} />
+          <WalletDropdown
+            address={walletAddress}
+            network={network}
+            onDisconnect={onDisconnect}
+          />
         ) : (
           <span style={styles.noWallet} aria-label="No wallet connected">
             <span style={{ ...styles.connectedDot, background: "var(--text-muted)" }} />

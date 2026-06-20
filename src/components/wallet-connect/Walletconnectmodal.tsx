@@ -8,41 +8,86 @@ interface Props {
   onClose: () => void;
 }
 
+type FreighterReadiness =
+  | { status: "ready" }
+  | { status: "not_installed" }
+  | { status: "unresponsive" };
+
+const FREIGHTER_INSTALL_MESSAGE =
+  "Freighter is not installed. Install the Freighter browser extension, then try again.";
+
+const FREIGHTER_UNRESPONSIVE_MESSAGE =
+  "Freighter is installed but is not responding. Unlock the extension or reload this page, then try again.";
+
+function hasFreighterExtension(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const freighterWindow = window as Window & {
+    freighter?: unknown;
+    freighterApi?: unknown;
+  };
+  return Boolean(freighterWindow.freighter || freighterWindow.freighterApi);
+}
+
 export default function WalletConnectModal({ isOpen, onClose }: Props) {
   const { connect } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Focus modal on open; close on Escape via onKeyDown on the backdrop
+  // Focus modal on open; close on Escape via onKeyDown on the backdrop.
   useEffect(() => {
-    if (isOpen) modalRef.current?.focus();
+    if (!isOpen) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    modalRef.current?.focus();
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  function handleBackdropKey(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "Escape") onClose();
+  function handleClose() {
+    onClose();
+    previouslyFocusedRef.current?.focus();
   }
 
+  function handleBackdropKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") handleClose();
+  }
+
+  /**
+   * Checks whether Freighter is present before polling for connection readiness.
+   * A missing extension needs install guidance, while an installed extension
+   * that never responds should ask the user to unlock or reload instead.
+   */
   async function waitForFreighter(
     maxRetries = 5,
     delayMs = 300,
-  ): Promise<boolean> {
-    for (let i = 0; i < maxRetries; i++) {
+  ): Promise<FreighterReadiness> {
+    const firstResult = await isConnected();
+    if (firstResult.isConnected) return { status: "ready" };
+    if (!hasFreighterExtension()) return { status: "not_installed" };
+    if (firstResult.error) return { status: "unresponsive" };
+
+    for (let i = 1; i < maxRetries; i++) {
       const result = await isConnected();
-      if (result.isConnected) return true;
+      if (result.isConnected) return { status: "ready" };
       await new Promise((res) => setTimeout(res, delayMs));
     }
-    return false;
+    return { status: "unresponsive" };
   }
 
   async function handleFreighter() {
     setError(null);
     setLoading(true);
     try {
-      const extensionReady = await waitForFreighter();
-      if (!extensionReady) throw new Error("Freighter extension not found...");
+      const readiness = await waitForFreighter();
+      if (readiness.status === "not_installed") {
+        throw new Error(FREIGHTER_INSTALL_MESSAGE);
+      }
+      if (readiness.status === "unresponsive") {
+        throw new Error(FREIGHTER_UNRESPONSIVE_MESSAGE);
+      }
 
       const access = await requestAccess();
       if (access.error) throw new Error(access.error);
@@ -53,7 +98,7 @@ export default function WalletConnectModal({ isOpen, onClose }: Props) {
       if (net.error) throw new Error(net.error);
 
       connect(access.address, net.network);
-      onClose();
+      handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -64,7 +109,7 @@ export default function WalletConnectModal({ isOpen, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
       onKeyDown={handleBackdropKey}
       role="dialog"
       aria-modal="true"
@@ -97,7 +142,7 @@ export default function WalletConnectModal({ isOpen, onClose }: Props) {
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
             className="p-1.5 rounded-lg transition-colors duration-200"
             style={{ 
@@ -227,15 +272,30 @@ export default function WalletConnectModal({ isOpen, onClose }: Props) {
 
         {/* Error */}
         {error && (
-          <p 
+          <p
+            role="alert"
             className="mx-4 mb-4 px-4 py-3 rounded-xl text-sm border"
-            style={{ 
+            style={{
               color: "var(--color-danger)",
               backgroundColor: "rgba(239, 68, 68, 0.1)",
               borderColor: "rgba(239, 68, 68, 0.2)",
             }}
           >
             {error}
+            {error === FREIGHTER_INSTALL_MESSAGE && (
+              <>
+                {" "}
+                <a
+                  href="https://www.freighter.app/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:underline"
+                  style={{ color: "var(--color-accent-primary)" }}
+                >
+                  Download Freighter
+                </a>
+              </>
+            )}
           </p>
         )}
 

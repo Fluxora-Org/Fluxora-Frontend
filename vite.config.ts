@@ -3,6 +3,31 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
+
+function vendorChunk(id: string) {
+  if (!id.includes("node_modules")) return undefined;
+
+  // Keep React and the router together so React hooks resolve against one copy.
+  if (
+    id.includes("/react/") ||
+    id.includes("/react-dom/") ||
+    id.includes("/react-router/") ||
+    id.includes("/react-router-dom/")
+  ) {
+    return "vendor-react";
+  }
+
+  if (id.includes("@stellar/freighter-api")) {
+    return "vendor-stellar";
+  }
+
+  if (id.includes("/lucide-react/") || id.includes("/react-icons/")) {
+    return "vendor-icons";
+  }
+
+  return "vendor";
+}
 
 export default defineConfig(async () => {
   const plugins = isTesting
@@ -12,6 +37,14 @@ export default defineConfig(async () => {
   return {
     plugins,
     server: { port: 5173 },
+    build: {
+      chunkSizeWarningLimit: CHUNK_SIZE_WARNING_LIMIT_KB,
+      rollupOptions: {
+        output: {
+          manualChunks: vendorChunk,
+        },
+      },
+    },
     test: {
       globals: true,
       environment: "jsdom",

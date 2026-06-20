@@ -1,5 +1,11 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// The global test setup mocks Walletcontext with a no-op stub; this suite
+// exercises the real provider and network-mismatch guard, so opt back into the
+// actual implementation here.
+vi.unmock("../Walletcontext");
+
 import { WalletProvider, useWallet } from "../Walletcontext";
 
 const walletWatchers: Array<

@@ -4,14 +4,10 @@ import WalletConnectModal from "./Walletconnectmodal";
 
 import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { stellarExplorerUrl } from "../../lib/stellar";
 
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
-function explorerUrl(address: string, network: string | null) {
-  const net = network === "PUBLIC" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${net}/account/${address}`;
 }
 
 export default function WalletButton() {
@@ -30,7 +26,7 @@ export default function WalletButton() {
 
   function handleExplorer() {
     if (!address) return;
-    window.open(explorerUrl(address, network), "_blank", "noopener,noreferrer");
+    window.open(stellarExplorerUrl(address, network), "_blank", "noopener,noreferrer");
     setDropdownOpen(false);
   }
 
