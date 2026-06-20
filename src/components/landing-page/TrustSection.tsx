@@ -76,6 +76,7 @@ export default function TrustSection({ theme = "light" }: TrustSectionProps) {
 
   return (
     <section
+      aria-labelledby="landing-trust-title"
       className="w-full font-['Plus_Jakarta_Sans',system-ui,sans-serif]"
       style={{
         background: "var(--color-bg-primary)",
@@ -100,6 +101,14 @@ export default function TrustSection({ theme = "light" }: TrustSectionProps) {
             Powered by Stellar
           </span>
         </div>
+
+        <h2
+          id="landing-trust-title"
+          className="text-center text-3xl font-extrabold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          Trusted Stellar treasury patterns
+        </h2>
 
         {/* Description */}
         <p
@@ -133,12 +142,12 @@ export default function TrustSection({ theme = "light" }: TrustSectionProps) {
                 <CheckCircleIcon />
               </div>
 
-              <p
+              <h3
                 className="text-base font-bold text-center"
                 style={{ color: "var(--color-text-primary)" }}
               >
                 {title}
-              </p>
+              </h3>
 
               <p
                 className="text-sm text-center"

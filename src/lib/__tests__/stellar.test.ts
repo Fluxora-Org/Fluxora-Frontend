@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidStellarAddress, maskAddress } from "../stellar";
+import { isValidStellarAddress, maskAddress, stellarExplorerUrl } from "../stellar";
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
@@ -89,5 +89,24 @@ describe("Stellar address helpers", () => {
     );
     expect(maskAddress("  GSHORT  ")).toBe("GSHORT");
     expect(maskAddress("")).toBe("-");
+  });
+});
+
+describe("stellarExplorerUrl", () => {
+  it.each([
+    ["PUBLIC", "public"],
+    ["MAINNET", "public"],
+    ["TESTNET", "testnet"],
+    [null, "testnet"],
+  ])("maps %s to the %s explorer path", (network, expectedPath) => {
+    expect(stellarExplorerUrl("GABC", network)).toBe(
+      `https://stellar.expert/explorer/${expectedPath}/account/GABC`,
+    );
+  });
+
+  it("encodes the account path segment", () => {
+    expect(stellarExplorerUrl("GABC/unsafe value", "PUBLIC")).toBe(
+      "https://stellar.expert/explorer/public/account/GABC%2Funsafe%20value",
+    );
   });
 });

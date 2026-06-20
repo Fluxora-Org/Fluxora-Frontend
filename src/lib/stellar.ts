@@ -74,3 +74,15 @@ export function maskAddress(value: string, prefix = 8, suffix = 4): string {
   if (trimmed.length <= prefix + suffix) return trimmed;
   return `${trimmed.slice(0, prefix)}...${trimmed.slice(-suffix)}`;
 }
+
+export function stellarExplorerUrl(address: string, network?: string | null) {
+  const normalizedNetwork = network?.toUpperCase();
+  const explorerNetwork =
+    normalizedNetwork === "PUBLIC" || normalizedNetwork === "MAINNET"
+      ? "public"
+      : "testnet";
+
+  return `https://stellar.expert/explorer/${explorerNetwork}/account/${encodeURIComponent(
+    address,
+  )}`;
+}

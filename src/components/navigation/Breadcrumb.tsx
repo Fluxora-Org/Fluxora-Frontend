@@ -56,6 +56,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
             >
               {isLast || !item.to ? (
                 <span
+                  aria-label={isStellarAddress ? item.label : undefined}
                   aria-current={isLast ? "page" : undefined}
                   title={isStellarAddress ? item.label : undefined}
                   style={{
@@ -74,24 +75,8 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
               ) : (
                 <Link
                   to={item.to}
+                  aria-label={isStellarAddress ? item.label : undefined}
                   title={isStellarAddress ? item.label : undefined}
-                  style={{
-                    color: "var(--breadcrumb-color)",
-                    textDecoration: "none",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "2px 4px",
-                    margin: "-2px -4px",
-                    transition: "color var(--transition-fast)",
-                    outline: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.color =
-                      "var(--breadcrumb-color-hover)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.color =
-                      "var(--breadcrumb-color)";
-                  }}
                   className="breadcrumb-link"
                 >
                   {displayLabel}
