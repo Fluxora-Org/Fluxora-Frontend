@@ -23,13 +23,16 @@ interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void;
+  onStreamCreated?: () => void | Promise<void>;
+  /** Called when stream creation fails after the user confirms the review step. */
+  onStreamError?: (err: unknown) => void;
 }
 
 export default function CreateStreamModal({
   isOpen,
   onClose,
   onStreamCreated,
+  onStreamError,
 }: CreateStreamModalProps) {
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -43,9 +46,11 @@ export default function CreateStreamModal({
   const [cliffDate, setCliffDate] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
+  const submitInFlightRef = useRef(false);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -137,7 +142,14 @@ export default function CreateStreamModal({
     return true;
   };
 
-  const handleNext = () => {
+  const getStreamErrorMessage = (err: unknown): string => {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Stream creation failed. Please try again.";
+  };
+
+  const handleNext = async () => {
     if (currentStep === 1) {
       setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
       if (!validateStep1()) return;
@@ -148,12 +160,23 @@ export default function CreateStreamModal({
       if (!validateStep2()) return;
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (submitInFlightRef.current) return;
+      submitInFlightRef.current = true;
       setIsSubmitting(true);
-      onStreamCreated?.();
-      setTimeout(() => {
-        onClose();
+      setStreamError(null);
+      try {
+        await onStreamCreated?.();
+        setTimeout(() => {
+          onClose();
+          submitInFlightRef.current = false;
+          setIsSubmitting(false);
+        }, 400);
+      } catch (err) {
+        setStreamError(getStreamErrorMessage(err));
+        onStreamError?.(err);
+        submitInFlightRef.current = false;
         setIsSubmitting(false);
-      }, 400);
+      }
     }
   };
 
@@ -881,6 +904,23 @@ export default function CreateStreamModal({
                       </div>
                     </div>
                   </div>
+
+                  {streamError && (
+                    <div className="review-error-box" role="alert">
+                      <div>
+                        <strong>Stream creation failed.</strong>
+                        <p>{streamError}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="review-error-retry"
+                        onClick={handleNext}
+                        disabled={isSubmitting}
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
 
                   <div
                     className="review-warning-box"
