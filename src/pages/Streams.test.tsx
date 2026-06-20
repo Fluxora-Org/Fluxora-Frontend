@@ -115,4 +115,28 @@ describe("Streams disclosure motion", () => {
     expect(collapseButton).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(disclosureId)).not.toBeInTheDocument();
   });
+
+  it("keeps the stream list in sync after filtering and sorting", async () => {
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.click(screen.getByRole("button", { name: "Active" }));
+    fireEvent.change(screen.getByLabelText("Sort streams"), {
+      target: { value: "rate" },
+    });
+
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveTextContent("Dev Grant - Alice");
+    expect(cards[1]).toHaveTextContent("Marketing Budget");
+
+    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
+      target: { value: "Nebula" },
+    });
+
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByText("Marketing Budget")).toBeInTheDocument();
+    expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
+  });
 });
