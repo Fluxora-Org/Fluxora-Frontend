@@ -1,9 +1,42 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
+import { createStream } from '../../lib/stellar/tx';
 
+// The modal performs the on-chain create-stream call itself and only surfaces
+// failures via the review-step error box + onStreamError, so we drive the
+// failure path by stubbing the tx layer and a connected wallet on the expected
+// network. (The global setup mock leaves the wallet disconnected.)
+vi.mock('../../lib/stellar/tx', () => ({
+  createStream: vi.fn(),
+}));
+
+vi.mock('../wallet-connect/Walletcontext', () => ({
+  useWallet: () => ({
+    address: 'GTEST',
+    network: 'TESTNET',
+    connected: true,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+  WalletProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+const mockedCreateStream = vi.mocked(createStream);
+
+// Checksum-valid Stellar public key (required by the centralized
+// isValidStellarAddress validator introduced in #331).
 const VALID_STELLAR =
-  'GABC' + 'ABCDEFGHJKLMNPQRSTUVWXYZ234567'.repeat(2).slice(0, 52);
+  'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
+
+beforeEach(() => {
+  vi.stubEnv('VITE_NETWORK', 'TESTNET');
+  mockedCreateStream.mockReset();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function advanceToStep3(container: HTMLElement) {
   const recipientInput = container.querySelector(
@@ -21,17 +54,16 @@ function advanceToStep3(container: HTMLElement) {
 }
 
 describe('CreateStreamModal submit failure handling', () => {
-  it('surfaces a rejected onStreamCreated promise and keeps the modal open', async () => {
+  it('surfaces a rejected createStream call and keeps the modal open', async () => {
     const submitError = new Error('RPC rejected');
     const onClose = vi.fn();
     const onStreamError = vi.fn();
-    const onStreamCreated = vi.fn().mockRejectedValue(submitError);
+    mockedCreateStream.mockRejectedValue(submitError);
 
     const { container } = render(
       <CreateStreamModal
         isOpen={true}
         onClose={onClose}
-        onStreamCreated={onStreamCreated}
         onStreamError={onStreamError}
       />,
     );
@@ -48,11 +80,11 @@ describe('CreateStreamModal submit failure handling', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('surfaces a synchronously thrown onStreamCreated error', async () => {
+  it('surfaces a synchronously thrown createStream error', async () => {
     const submitError = new Error('Wallet denied');
     const onClose = vi.fn();
     const onStreamError = vi.fn();
-    const onStreamCreated = vi.fn(() => {
+    mockedCreateStream.mockImplementation(() => {
       throw submitError;
     });
 
@@ -60,7 +92,6 @@ describe('CreateStreamModal submit failure handling', () => {
       <CreateStreamModal
         isOpen={true}
         onClose={onClose}
-        onStreamCreated={onStreamCreated}
         onStreamError={onStreamError}
       />,
     );
@@ -78,16 +109,14 @@ describe('CreateStreamModal submit failure handling', () => {
   });
 
   it('clears the failure alert and retries when Try again is clicked', async () => {
-    const onStreamCreated = vi
-      .fn()
+    mockedCreateStream
       .mockRejectedValueOnce(new Error('Network timeout'))
-      .mockImplementationOnce(() => new Promise<void>(() => {}));
+      .mockImplementationOnce(() => new Promise<never>(() => {}));
 
     const { container } = render(
       <CreateStreamModal
         isOpen={true}
         onClose={() => {}}
-        onStreamCreated={onStreamCreated}
       />,
     );
 
@@ -103,19 +132,20 @@ describe('CreateStreamModal submit failure handling', () => {
     fireEvent.click(screen.getByRole('button', { name: /^try again$/i }));
 
     await waitFor(() => {
-      expect(onStreamCreated).toHaveBeenCalledTimes(2);
+      expect(mockedCreateStream).toHaveBeenCalledTimes(2);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 
   it('guards against duplicate submissions while the request is pending', () => {
-    const onStreamCreated = vi.fn(() => new Promise<void>(() => {}));
+    mockedCreateStream.mockImplementation(
+      () => new Promise<never>(() => {}),
+    );
 
     const { container } = render(
       <CreateStreamModal
         isOpen={true}
         onClose={() => {}}
-        onStreamCreated={onStreamCreated}
       />,
     );
 
@@ -127,6 +157,6 @@ describe('CreateStreamModal submit failure handling', () => {
     fireEvent.click(createButton);
     fireEvent.click(createButton);
 
-    expect(onStreamCreated).toHaveBeenCalledTimes(1);
+    expect(mockedCreateStream).toHaveBeenCalledTimes(1);
   });
 });

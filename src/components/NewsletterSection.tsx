@@ -1,27 +1,55 @@
 import { FormEvent, useState } from "react";
 
+const EMAIL_MAX_LENGTH = 254;
+const LOCAL_PART_MAX_LENGTH = 64;
+const DOMAIN_LABEL_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+const TLD_PATTERN = /^[A-Za-z]{2,63}$/;
+
+export function validateNewsletterEmail(rawValue: string): boolean {
+  const value = rawValue.trim();
+  if (value !== rawValue || value.length === 0 || value.length > EMAIL_MAX_LENGTH) {
+    return false;
+  }
+
+  const parts = value.split("@");
+  if (parts.length !== 2) return false;
+
+  const [localPart, domain] = parts;
+  if (!localPart || localPart.length > LOCAL_PART_MAX_LENGTH || !domain) {
+    return false;
+  }
+
+  const domainLabels = domain.split(".");
+  if (domainLabels.length < 2 || !TLD_PATTERN.test(domainLabels[domainLabels.length - 1])) {
+    return false;
+  }
+
+  return domainLabels.every((label) => DOMAIN_LABEL_PATTERN.test(label));
+}
+
 export default function NewsletterSection() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const validateEmail = (value: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  };
+  const messageId = error ? "newsletter-error" : success ? "newsletter-success" : undefined;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!validateEmail(email)) {
-      setError("Please enter a valid email address.");
+    if (submitting) return;
+
+    if (!validateNewsletterEmail(email)) {
+      setSuccess(false);
+      setError("Please enter a valid email address without leading or trailing spaces.");
       return;
     }
 
     setError("");
+    setSuccess(false);
     setSubmitting(true);
 
-    // 🔹 Replace with real newsletter endpoint later
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     setSubmitting(false);
@@ -48,17 +76,26 @@ export default function NewsletterSection() {
 
           <input
             id="newsletter-email"
-            type="email"
+            type="text"
+            inputMode="email"
+            autoComplete="email"
             placeholder="Enter your email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError("");
+              setSuccess(false);
+            }}
             style={styles.input}
             aria-invalid={!!error}
+            aria-describedby={messageId}
+            maxLength={EMAIL_MAX_LENGTH}
           />
 
           <button
             type="submit"
             disabled={submitting}
+            aria-disabled={submitting}
             style={{
               ...styles.button,
               opacity: submitting ? 0.8 : 1,
@@ -69,9 +106,15 @@ export default function NewsletterSection() {
           </button>
         </form>
 
-        {error && <p style={styles.error}>{error}</p>}
+        {error && (
+          <p id="newsletter-error" role="alert" style={styles.error}>
+            {error}
+          </p>
+        )}
         {success && (
-          <p style={styles.success}>Thanks for subscribing!</p>
+          <p id="newsletter-success" aria-live="polite" style={styles.success}>
+            Thanks for subscribing!
+          </p>
         )}
       </div>
     </section>

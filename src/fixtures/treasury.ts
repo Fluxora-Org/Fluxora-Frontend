@@ -1,31 +1,40 @@
-import { Metric } from "./Metric"; 
-import { Stream } from "./Stream"; 
-import Icon from "../../assets/Icon.png";
-import Icon1 from "../../assets/Icon(1).png";
-import Icon2 from "../../assets/Icon(2).png";
+import { createElement } from "react";
+import type { Metric } from "../components/treasuryOverviewPage/Metric";
+import type { Stream } from "../components/treasuryOverviewPage/Stream";
+import Icon from "../assets/Icon.png";
+import Icon1 from "../assets/Icon(1).png";
+import Icon2 from "../assets/Icon(2).png";
 
-export const metricsData: Metric[] = [
+function metricIcon(src: string, alt: string) {
+  return createElement("img", {
+    src,
+    alt,
+    className: "w-10 h-10 bg-cyan-500/10 p-1 rounded-md",
+  });
+}
+
+export const treasuryDemoMetrics: Metric[] = [
   {
-    icon: <img src={Icon} alt="active streams" className="w-10 h-10 bg-cyan-500/10 p-1 rounded-md" />,
+    icon: metricIcon(Icon, "active streams"),
     label: "Active Streams",
     value: "12",
     desc: "streams currently accruing",
   },
   {
-    icon: <img src={Icon1} alt="total streaming" className="w-10 h-10 bg-cyan-500/10 p-1 rounded-md" />,
+    icon: metricIcon(Icon1, "total streaming"),
     label: "Total Streaming",
     value: "48,500 USDC",
     desc: "combined deposit in active streams",
   },
   {
-    icon: <img src={Icon2} alt="withdrawable" className="w-10 h-10 bg-cyan-500/10 p-1 rounded-md" />,
+    icon: metricIcon(Icon2, "withdrawable"),
     label: "Withdrawable",
     value: "12,200 USDC",
     desc: "available for recipients to withdraw",
   },
 ];
 
-export const streams: Stream[] = [
+export const treasuryDemoStreams: Stream[] = [
   {
     name: "Dev Grant - Alice",
     id: "STR-001",
