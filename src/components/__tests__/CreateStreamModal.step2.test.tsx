@@ -9,6 +9,7 @@ import * as fc from 'fast-check';
 import CreateStreamModal, {
   sanitizeDepositAmountInput,
 } from '../CreateStreamModal';
+import { createT } from '../../i18n';
 
 const VALID_STELLAR = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
@@ -79,6 +80,21 @@ describe('6.1 Step 2: all invalid fields show errors simultaneously on Next clic
 
     expect(accrualContainer?.classList.contains('input-container--error')).toBe(true);
     expect(durationContainer?.classList.contains('input-container--error')).toBe(true);
+  });
+});
+
+describe('CreateStreamModal i18n catalog copy', () => {
+  it('renders step-2 helper copy from the typed catalog', () => {
+    const t = createT();
+    const { container } = renderModal();
+    advanceToStep2(container);
+
+    expect(
+      within(container).getByText(t('createStream.step2.rateHelper')),
+    ).toBeInTheDocument();
+    expect(
+      within(container).getByText(t('createStream.step2.durationHelper')),
+    ).toBeInTheDocument();
   });
 });
 

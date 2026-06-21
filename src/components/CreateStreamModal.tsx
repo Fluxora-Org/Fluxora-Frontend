@@ -14,6 +14,7 @@ import {
   isBeforeLocalDateTime,
   isDateTimeInPast,
 } from '../lib/createStreamDates';
+import { useI18n, type PluralFunction, type TFunction } from '../i18n';
 
 const USDC_DECIMAL_PLACES = 7;
 
@@ -65,33 +66,43 @@ function formatReviewDeposit(value: string): string {
 }
 
 /** Formats the daily duration unit with singular/plural copy. */
-function formatDurationUnit(value: string): string {
-  return parseStreamNumber(value) === 1 ? "day" : "days";
+function formatDurationUnit(value: string, plural: PluralFunction): string {
+  return plural(parseStreamNumber(value), {
+    one: "createStream.units.day.one",
+    other: "createStream.units.day.other",
+  });
 }
 
-function validateAccrualRate(value: string): string | undefined {
+function validateAccrualRate(
+  value: string,
+  t: TFunction,
+): string | undefined {
   const numericValue = parseFloat(value);
 
   if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
-    return 'Stream rate must be a positive number.';
+    return t("createStream.validation.ratePositive");
   }
 
   if (numericValue > MAX_ACCRUAL_RATE) {
-    return `Stream rate must be ${MAX_ACCRUAL_RATE.toLocaleString()} USDC/day or less.`;
+    return t("createStream.validation.rateMax", {
+      maxRate: MAX_ACCRUAL_RATE.toLocaleString(),
+    });
   }
 
   return undefined;
 }
 
-function validateDuration(value: string): string | undefined {
+function validateDuration(value: string, t: TFunction): string | undefined {
   const numericValue = parseFloat(value);
 
   if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
-    return 'Duration must be a positive number.';
+    return t("createStream.validation.durationPositive");
   }
 
   if (numericValue > MAX_DURATION_DAYS) {
-    return `Duration must be ${MAX_DURATION_DAYS.toLocaleString()} days or less.`;
+    return t("createStream.validation.durationMax", {
+      maxDays: MAX_DURATION_DAYS.toLocaleString(),
+    });
   }
 
   return undefined;
@@ -114,6 +125,7 @@ export default function CreateStreamModal({
 }: CreateStreamModalProps) {
   const wallet = useWallet();
   const { addToast } = useToast();
+  const { plural, t } = useI18n();
 
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -153,14 +165,14 @@ export default function CreateStreamModal({
   const isBusyCreating = isSubmitting || isConfirmationPending;
   const submitButtonLabel =
     currentStep === 3 && isSubmitting
-      ? "Submitting..."
+      ? t("createStream.buttons.submitting")
       : currentStep === 3 && isConfirmationPending
-        ? "Confirming..."
+        ? t("createStream.buttons.confirming")
         : currentStep === 3 && transactionStatus.status === "failed"
-          ? "Retry create stream"
+          ? t("createStream.buttons.retryCreate")
           : currentStep === 2
-            ? "Next"
-            : "Create stream";
+            ? t("common.next")
+            : t("createStream.buttons.create");
 
   useModalAccessibility({
     isOpen,
@@ -178,7 +190,7 @@ export default function CreateStreamModal({
     }
 
     setHasCompletedConfirmation(true);
-    addToast("Stream created successfully on-chain!", "success");
+    addToast(t("createStream.toast.created"), "success");
     onStreamCreated?.();
     onClose();
   }, [
@@ -186,6 +198,7 @@ export default function CreateStreamModal({
     hasCompletedConfirmation,
     onClose,
     onStreamCreated,
+    t,
     transactionStatus.status,
   ]);
 
@@ -197,18 +210,16 @@ export default function CreateStreamModal({
 
   const validateStep1 = (): boolean => {
     if (!recipient.trim()) {
-      setError("Recipient is required.");
+      setError(t("createStream.validation.recipientRequired"));
       return false;
     }
     if (!isValidStellarAddress(recipient.trim())) {
-      setError(
-        "Please enter a valid Stellar address (starts with G, 56 characters).",
-      );
+      setError(t("createStream.validation.invalidRecipient"));
       return false;
     }
     const amount = parseFloat(depositAmount.replace(/,/g, ""));
     if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
-      setError("Deposit amount must be a positive number.");
+      setError(t("createStream.validation.depositPositive"));
       return false;
     }
     setError(null);
@@ -229,10 +240,10 @@ export default function CreateStreamModal({
     }
     setTouched(prev => ({ ...prev, ...touchedFields }));
 
-    if (validateAccrualRate(accrualRate)) {
+    if (validateAccrualRate(accrualRate, t)) {
       return false;
     }
-    if (validateDuration(duration)) {
+    if (validateDuration(duration, t)) {
       return false;
     }
     if (
@@ -275,7 +286,7 @@ export default function CreateStreamModal({
     if (err instanceof Error && err.message.trim()) {
       return err.message;
     }
-    return "Stream creation failed. Please try again.";
+    return t("createStream.validation.streamCreationFallback");
   };
 
   const handleNext = async () => {
@@ -295,11 +306,14 @@ export default function CreateStreamModal({
       if (submitInFlightRef.current) return;
 
       if (!wallet.connected) {
-        setError("Please connect your wallet first.");
+        setError(t("createStream.validation.walletRequired"));
         return;
       }
       if (wallet.isNetworkMismatch) {
-        setError(`Wrong Stellar network. Expected ${wallet.expectedNetwork}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
+        setError(t("createStream.validation.wrongNetwork", {
+          expectedNetwork: wallet.expectedNetwork,
+          walletNetwork: wallet.network?.toUpperCase(),
+        }));
         return;
       }
 
@@ -330,7 +344,7 @@ export default function CreateStreamModal({
           end,
         );
         if (!response.txHash) {
-          throw new Error("Missing transaction hash from Stellar RPC.");
+          throw new Error(t("createStream.validation.missingTransactionHash"));
         }
         // Hand off to the confirmation poller; the success toast,
         // onStreamCreated, and onClose fire once polling reports `confirmed`.
@@ -338,7 +352,7 @@ export default function CreateStreamModal({
       } catch (err) {
         const message = getStreamErrorMessage(err);
         setStreamError(message);
-        addToast(`Failed to create stream: ${message}`, "error");
+        addToast(t("createStream.toast.createFailed", { message }), "error");
         onStreamError?.(err);
       } finally {
         submitInFlightRef.current = false;
@@ -386,10 +400,9 @@ export default function CreateStreamModal({
       >
         <div className="modal-header">
           <div>
-            <h2 id="create-stream-title">Create stream</h2>
+            <h2 id="create-stream-title">{t("createStream.title")}</h2>
             <p id="create-stream-description" className="modal-description">
-              Set the recipient, funding, and schedule details for a new Stellar
-              stream.
+              {t("createStream.description")}
             </p>
           </div>
           <button
@@ -397,7 +410,7 @@ export default function CreateStreamModal({
             className="close-button"
             onClick={handleClose}
             disabled={isBusyCreating}
-            aria-label="Close create stream modal"
+            aria-label={t("createStream.closeAria")}
           >
             <svg
               width="24"
@@ -433,7 +446,9 @@ export default function CreateStreamModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : '1'}</div>
-            <div className="step-label">Recipient &<br />amount</div>
+            <div className="step-label">
+              {t("createStream.steps.recipientAmount")}
+            </div>
           </div>
           <div className={`step-item ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}`}>
             <div className="step-circle">{currentStep > 2 ? (
@@ -441,11 +456,15 @@ export default function CreateStreamModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             ) : '2'}</div>
-            <div className="step-label">Rate &<br />schedule</div>
+            <div className="step-label">
+              {t("createStream.steps.rateSchedule")}
+            </div>
           </div>
           <div className={`step-item ${currentStep === 3 ? 'active' : ''}`}>
             <div className="step-circle">3</div>
-            <div className="step-label">Review &<br />create</div>
+            <div className="step-label">
+              {t("createStream.steps.reviewCreate")}
+            </div>
           </div>
         </div>
 
@@ -464,16 +483,16 @@ export default function CreateStreamModal({
           <>
             <hr className="divider" />
             <div className="section-header">
-              <h3>Recipient & amount</h3>
-              <p>Set who receives the stream and how much USDC to lock.</p>
+              <h3>{t("createStream.step1.heading")}</h3>
+              <p>{t("createStream.step1.summary")}</p>
             </div>
             {(() => {
               // Derived per-field validation state (not stored, computed inline)
               const recipientError = touched.recipient
                 ? (!recipient.trim()
-                    ? 'Recipient is required.'
+                    ? t("createStream.validation.recipientRequired")
                     : !isValidStellarAddress(recipient.trim())
-                    ? 'Please enter a valid Stellar address (starts with G, 56 characters).'
+                    ? t("createStream.validation.invalidRecipient")
                     : undefined)
                 : undefined;
               const recipientSuccess = touched.recipient && !recipientError && recipient.trim().length > 0;
@@ -481,7 +500,7 @@ export default function CreateStreamModal({
               const depositAmountNum = parseFloat(depositAmount.replace(/,/g, ''));
               const depositError = touched.depositAmount
                 ? (!depositAmount.trim() || isNaN(depositAmountNum) || depositAmountNum <= 0
-                    ? 'Deposit amount must be a positive number.'
+                    ? t("createStream.validation.depositPositive")
                     : undefined)
                 : undefined;
               const depositSuccess = touched.depositAmount && !depositError && depositAmount.trim().length > 0;
@@ -490,10 +509,10 @@ export default function CreateStreamModal({
                 <>
                   <InputField
                     id="create-stream-recipient"
-                    label="Recipient"
+                    label={t("createStream.step1.recipientLabel")}
                     required
                     error={recipientError}
-                    helperText="Enter a valid Stellar address (starts with G, 56 characters)"
+                    helperText={t("createStream.step1.recipientHelper")}
                     success={recipientSuccess}
                   >
                     <input
@@ -506,17 +525,17 @@ export default function CreateStreamModal({
                         if (error) setError(null);
                       }}
                       onBlur={() => handleBlur('recipient')}
-                      placeholder="Paste Stellar address (G...)"
+                      placeholder={t("createStream.step1.recipientPlaceholder")}
                       autoComplete="off"
                     />
                   </InputField>
 
                   <InputField
                     id="create-stream-deposit"
-                    label="Deposit amount"
+                    label={t("createStream.step1.depositLabel")}
                     required
                     error={depositError}
-                    helperText="Enter the total USDC amount to deposit into the stream"
+                    helperText={t("createStream.step1.depositHelper")}
                     success={depositSuccess}
                   >
                     <input
@@ -530,16 +549,18 @@ export default function CreateStreamModal({
                         if (error) setError(null);
                       }}
                       onBlur={() => handleBlur('depositAmount')}
-                      placeholder="$ 0.00 USDC"
+                      placeholder={t("createStream.step1.depositPlaceholder")}
                     />
                   </InputField>
                 </>
               );
             })()}
             <div className="info-box" role="region" aria-labelledby="info-box-title">
-              <div id="info-box-title" className="info-box-title">Smart contract lock:</div>
+              <div id="info-box-title" className="info-box-title">
+                {t("createStream.step1.infoTitle")}
+              </div>
               <p className="info-box-text">
-                Your USDC will be locked in a Soroban smart contract. The recipient can withdraw their accrued portion at any time.
+                {t("createStream.step1.infoText")}
               </p>
             </div>
           </>
@@ -547,31 +568,31 @@ export default function CreateStreamModal({
         {currentStep === 2 && (() => {
           // Derived per-field validation state for step 2
           const accrualRateError = touched.accrualRate
-            ? validateAccrualRate(accrualRate)
+            ? validateAccrualRate(accrualRate, t)
             : undefined;
           const accrualRateSuccess = touched.accrualRate && !accrualRateError && accrualRate.trim().length > 0;
 
           const durationError = touched.duration
-            ? validateDuration(duration)
+            ? validateDuration(duration, t)
             : undefined;
           const durationSuccess = touched.duration && !durationError && duration.trim().length > 0;
 
           const customStartDateError = (startTimeOption === 'custom' && touched.customStartDate)
             ? (!customStartDate
-                ? 'Custom start date is required.'
+                ? t("createStream.validation.customStartRequired")
                 : isDateTimeInPast(customStartDate)
-                ? 'Start date must be in the future.'
+                ? t("createStream.validation.startPast")
                 : undefined)
             : undefined;
           const customStartDateSuccess = startTimeOption === 'custom' && touched.customStartDate && !customStartDateError && Boolean(customStartDate);
 
           const cliffDateError = (cliffEnabled && touched.cliffDate)
             ? (!cliffDate
-                ? 'Cliff date is required.'
+                ? t("createStream.validation.cliffDateRequired")
                 : isDateTimeInPast(cliffDate)
-                ? 'Cliff date must not be in the past.'
+                ? t("createStream.validation.cliffPast")
                 : (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate))
-                ? 'Cliff date must be on or after the start date.'
+                ? t("createStream.validation.cliffAfterStart")
                 : undefined)
             : undefined;
           const cliffDateSuccess = cliffEnabled && touched.cliffDate && !cliffDateError && Boolean(cliffDate);
@@ -581,32 +602,29 @@ export default function CreateStreamModal({
             <hr className="divider" />
 
             <div className="section-header">
-              <h3>Rate & schedule</h3>
-              <p>Configure how fast USDC streams and when it starts.</p>
+              <h3>{t("createStream.step2.heading")}</h3>
+              <p>{t("createStream.step2.summary")}</p>
               <p className="text-xs text-[var(--text-muted)]">
-                Start and cliff times use your local timezone.
+                {t("createStream.step2.localTimezone")}
               </p>
             </div>
 
             {/* Stream Rate */}
             <div className="form-group">
               <label htmlFor="create-stream-accrual-rate" className="form-label">
-                Stream rate
+                {t("createStream.step2.rateLabel")}
                 {<span className="required" aria-hidden="true"> *</span>}
                 <InfoTooltip
                   id="stream-rate-tooltip"
-                  title="How is stream rate calculated?"
-                  ariaLabel="Learn more about stream rate calculation"
+                  title={t("createStream.step2.rateTooltipTitle")}
+                  ariaLabel={t("createStream.step2.rateTooltipAria")}
                   content={
                     <>
                       <p>
-                        The stream rate is the amount of USDC that accrues to the 
-                        recipient per day. For example, a rate of 38.62 USDC/day 
-                        means the recipient can withdraw approximately 270 USDC 
-                        after 7 days.
+                        {t("createStream.step2.rateTooltipText")}
                       </p>
                       <p style={{ marginTop: '8px', fontWeight: 500 }}>
-                        Formula: Total Deposit ÷ Duration = Stream Rate
+                        {t("createStream.step2.rateFormula")}
                       </p>
                     </>
                   }
@@ -640,7 +658,7 @@ export default function CreateStreamModal({
               )}
               {!accrualRateError && (
                 <span id="create-stream-accrual-rate-hint" className="validation-message validation-message--hint" role="status">
-                  How much USDC the recipient earns per day
+                  {t("createStream.step2.rateHelper")}
                 </span>
               )}
             </div>
@@ -648,23 +666,19 @@ export default function CreateStreamModal({
             {/* Stream Duration */}
             <div className="form-group">
               <label htmlFor="create-stream-duration" className="form-label">
-                Stream duration
+                {t("createStream.step2.durationLabel")}
                 {<span className="required" aria-hidden="true"> *</span>}
                 <InfoTooltip
                   id="stream-duration-tooltip"
-                  title="Understanding stream duration"
-                  ariaLabel="Learn more about stream duration"
+                  title={t("createStream.step2.durationTooltipTitle")}
+                  ariaLabel={t("createStream.step2.durationTooltipAria")}
                   content={
                     <>
                       <p>
-                        The duration defines the total length of the stream in days.
-                        After this period ends, the full deposit amount will have 
-                        been streamed to the recipient.
+                        {t("createStream.step2.durationTooltipText")}
                       </p>
                       <p style={{ marginTop: '8px' }}>
-                        Example: A 7-day stream transfers funds continuously over 
-                        one week. The recipient can withdraw at any time during 
-                        this period.
+                        {t("createStream.step2.durationExample")}
                       </p>
                     </>
                   }
@@ -673,7 +687,7 @@ export default function CreateStreamModal({
               <div className={`input-container ${durationError ? 'input-container--error' : durationSuccess ? 'input-container--success' : ''}`.trim()}>
                 <InputWithUnit
                   id="create-stream-duration"
-                  unit="days"
+                  unit={t("createStream.units.days")}
                   type="text"
                   inputMode="decimal"
                   value={duration}
@@ -698,36 +712,36 @@ export default function CreateStreamModal({
               )}
               {!durationError && (
                 <span id="create-stream-duration-hint" className="validation-message validation-message--hint" role="status">
-                  How many days the stream will run before ending
+                  {t("createStream.step2.durationHelper")}
                 </span>
               )}
             </div>
 
             {/* Start Time */}
             <div className="form-group">
-              <label className="form-label">Start time</label>
+              <label className="form-label">{t("createStream.step2.startTime")}</label>
               <div className="segmented-control">
                 <button
                   className={`segment-btn ${startTimeOption === 'now' ? 'active' : ''}`}
                   onClick={() => setStartTimeOption('now')}
                 >
-                  Start now
+                  {t("createStream.step2.startNow")}
                 </button>
                 <button
                   className={`segment-btn ${startTimeOption === 'custom' ? 'active' : ''}`}
                   onClick={() => setStartTimeOption('custom')}
                 >
-                  Custom date
+                  {t("createStream.step2.customDate")}
                 </button>
               </div>
               {startTimeOption === 'custom' && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <InputField
                     id="create-stream-custom-start-date"
-                    label="Custom start date"
+                    label={t("createStream.step2.customStartLabel")}
                     required
                     error={customStartDateError}
-                    helperText="When the stream begins accruing USDC"
+                    helperText={t("createStream.step2.customStartHelper")}
                     success={customStartDateSuccess}
                   >
                     <input
@@ -745,30 +759,30 @@ export default function CreateStreamModal({
             {/* Cliff Period */}
             <div className="form-group">
               <label className="form-label">
-                Cliff period{' '}
-                <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(optional)</span>
+                {t("createStream.step2.cliffLabel")}{' '}
+                <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>
+                  {t("createStream.step2.cliffOptional")}
+                </span>
                 <InfoTooltip
                   id="cliff-tooltip"
-                  title="What is a cliff?"
-                  ariaLabel="Learn more about cliff periods"
+                  title={t("createStream.step2.cliffTooltipTitle")}
+                  ariaLabel={t("createStream.step2.cliffTooltipAria")}
                   content={
                     <>
                       <p>
-                        A cliff is a vesting lockup period. During the cliff:
+                        {t("createStream.step2.cliffIntro")}
                       </p>
                       <ul style={{ marginTop: '4px', marginLeft: '16px', listStyle: 'disc' }}>
-                        <li>USDC continues to accrue normally</li>
-                        <li>The recipient CANNOT withdraw any funds</li>
-                        <li>After the cliff date, all accrued funds become withdrawable</li>
+                        <li>{t("createStream.step2.cliffItemAccrues")}</li>
+                        <li>{t("createStream.step2.cliffItemLocked")}</li>
+                        <li>{t("createStream.step2.cliffItemUnlocks")}</li>
                       </ul>
                       <p style={{ marginTop: '8px' }}>
-                        <strong>Common use case:</strong> Employee compensation where vesting 
-                        "cliff" prevents withdrawal for the first 3-6 months, 
-                        ensuring commitment before funds are accessible.
+                        <strong>{t("createStream.step2.cliffCommonUseLabel")}</strong>{" "}
+                        {t("createStream.step2.cliffCommonUseText")}
                       </p>
                       <p style={{ marginTop: '8px' }}>
-                        Example: 1-year stream with 3-month cliff = No withdrawals 
-                        for 3 months, then all accrued USDC becomes available.
+                        {t("createStream.step2.cliffExample")}
                       </p>
                     </>
                   }
@@ -778,16 +792,16 @@ export default function CreateStreamModal({
                 <div className={`toggle-switch ${cliffEnabled ? 'on' : ''}`}>
                   <div className="toggle-knob" />
                 </div>
-                <span>Enable cliff (vesting lockup until specific date)</span>
+                <span>{t("createStream.step2.cliffToggle")}</span>
               </div>
               {cliffEnabled && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <InputField
                     id="create-stream-cliff-date"
-                    label="Cliff date"
+                    label={t("createStream.step2.cliffDateLabel")}
                     required
                     error={cliffDateError}
-                    helperText="The recipient cannot withdraw until this date, even though USDC accrues"
+                    helperText={t("createStream.step2.cliffDateHelper")}
                     success={cliffDateSuccess}
                   >
                     <input
@@ -805,13 +819,13 @@ export default function CreateStreamModal({
             {/* Deposit Summary */}
             <div className="deposit-summary">
               <div className="deposit-box">
-                <div className="deposit-label">Required deposit</div>
+                <div className="deposit-label">{t("createStream.step2.requiredDeposit")}</div>
                 <div className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? 'required' : ''}`}>
                   {requiredDeposit} USDC
                 </div>
               </div>
               <div className="deposit-box">
-                <div className="deposit-label">Your deposit</div>
+                <div className="deposit-label">{t("createStream.step2.yourDeposit")}</div>
                 <div className="deposit-value">{userDeposit.toFixed(2)} USDC</div>
               </div>
             </div>
@@ -823,7 +837,7 @@ export default function CreateStreamModal({
             (() => {
               const reviewRecipient = recipient.trim();
               const reviewDeposit = formatReviewDeposit(depositAmount);
-              const durationUnit = formatDurationUnit(duration);
+              const durationUnit = formatDurationUnit(duration, plural);
               return (
                 <>
                   <hr className="divider" />
@@ -847,7 +861,7 @@ export default function CreateStreamModal({
                             />
                           </svg>
                         </span>
-                        <div className="review-card-title">Recipient</div>
+                        <div className="review-card-title">{t("createStream.review.recipient")}</div>
                         <button
                           type="button"
                           className="review-card-edit"
@@ -856,9 +870,9 @@ export default function CreateStreamModal({
                             setCurrentStep(1);
                           }}
                           disabled={isBusyCreating}
-                          aria-label="Edit recipient"
+                          aria-label={t("createStream.review.editRecipientAria")}
                         >
-                          Edit
+                          {t("common.edit")}
                           <svg
                             width="14"
                             height="14"
@@ -877,7 +891,7 @@ export default function CreateStreamModal({
                         </button>
                       </div>
                       <div className="review-card-content">
-                        <div className="review-card-sublabel">Address</div>
+                        <div className="review-card-sublabel">{t("createStream.review.address")}</div>
                         <div className="review-card-value">
                           {maskAddress(reviewRecipient)}
                         </div>
@@ -903,7 +917,7 @@ export default function CreateStreamModal({
                             />
                           </svg>
                         </span>
-                        <div className="review-card-title">Deposit</div>
+                        <div className="review-card-title">{t("createStream.review.deposit")}</div>
                         <button
                           type="button"
                           className="review-card-edit"
@@ -912,9 +926,9 @@ export default function CreateStreamModal({
                             setCurrentStep(1);
                           }}
                           disabled={isBusyCreating}
-                          aria-label="Edit deposit"
+                          aria-label={t("createStream.review.editDepositAria")}
                         >
-                          Edit
+                          {t("common.edit")}
                           <svg
                             width="14"
                             height="14"
@@ -959,7 +973,7 @@ export default function CreateStreamModal({
                             />
                           </svg>
                         </span>
-                        <div className="review-card-title">Rate & schedule</div>
+                        <div className="review-card-title">{t("createStream.review.rateSchedule")}</div>
                         <button
                           type="button"
                           className="review-card-edit"
@@ -968,9 +982,9 @@ export default function CreateStreamModal({
                             setCurrentStep(2);
                           }}
                           disabled={isBusyCreating}
-                          aria-label="Edit rate and schedule"
+                          aria-label={t("createStream.review.editRateScheduleAria")}
                         >
-                          Edit
+                          {t("common.edit")}
                           <svg
                             width="14"
                             height="14"
@@ -1009,9 +1023,11 @@ export default function CreateStreamModal({
                               />
                             </svg>
                           </span>
-                          <span className="review-card-row-label">Rate</span>
+                          <span className="review-card-row-label">{t("createStream.review.rate")}</span>
                           <span className="review-card-row-value">
-                            {accrualRate} USDC per day
+                            {t("createStream.review.rateValue", {
+                              rate: accrualRate,
+                            })}
                           </span>
                         </div>
                         <div className="review-card-row">
@@ -1035,7 +1051,7 @@ export default function CreateStreamModal({
                             </svg>
                           </span>
                           <span className="review-card-row-label">
-                            Duration
+                            {t("createStream.review.duration")}
                           </span>
                           <span className="review-card-row-value">
                             {duration} {durationUnit}
@@ -1061,10 +1077,10 @@ export default function CreateStreamModal({
                               />
                             </svg>
                           </span>
-                          <span className="review-card-row-label">Start</span>
+                          <span className="review-card-row-label">{t("createStream.review.start")}</span>
                           <span className="review-card-row-value">
                             {startTimeOption === "now"
-                              ? "Immediately"
+                              ? t("createStream.review.startImmediately")
                               : customStartDate
                                 ? formatLocalDateTime(customStartDate)
                                 : "—"}
@@ -1087,11 +1103,11 @@ export default function CreateStreamModal({
                               <path strokeLinecap="round" d="M12 6v6" />
                             </svg>
                           </span>
-                          <span className="review-card-row-label">Cliff</span>
+                          <span className="review-card-row-label">{t("createStream.review.cliff")}</span>
                           <span className="review-card-row-value">
                             {cliffEnabled && cliffDate
                               ? formatLocalDateTime(cliffDate)
-                              : "Not set"}
+                              : t("common.notSet")}
                           </span>
                         </div>
                       </div>
@@ -1101,7 +1117,7 @@ export default function CreateStreamModal({
                   {streamError && (
                     <div className="review-error-box" role="alert">
                       <div>
-                        <strong>Stream creation failed.</strong>
+                        <strong>{t("createStream.review.failedTitle")}</strong>
                         <p>{streamError}</p>
                       </div>
                       <button
@@ -1110,7 +1126,7 @@ export default function CreateStreamModal({
                         onClick={handleNext}
                         disabled={isSubmitting}
                       >
-                        Try again
+                        {t("createStream.review.tryAgain")}
                       </button>
                     </div>
                   )}
@@ -1120,10 +1136,10 @@ export default function CreateStreamModal({
                     role="region"
                     aria-live="polite"
                   >
-                    <strong>By creating this stream:</strong> {reviewDeposit} USDC
-                    will be locked in a Soroban smart contract. The recipient
-                    can withdraw their accrued amount at any time during the
-                    stream.
+                    <strong>{t("createStream.review.warningPrefix")}</strong>{" "}
+                    {t("createStream.review.warningBody", {
+                      amount: reviewDeposit,
+                    })}
                   </div>
                   {isSubmitting && (
                     <div
@@ -1131,7 +1147,7 @@ export default function CreateStreamModal({
                       role="status"
                       aria-live="polite"
                     >
-                      Submitting transaction to Stellar. Keep this window open.
+                      {t("createStream.review.submitStatus")}
                     </div>
                   )}
                   {!isSubmitting && transactionStatus.status === "pending" && (
@@ -1140,12 +1156,15 @@ export default function CreateStreamModal({
                       role="status"
                       aria-live="polite"
                     >
-                      Waiting for Stellar confirmation before opening the
-                      success receipt.
+                      {t("createStream.review.waitingForConfirmation")}
                       <span className="transaction-status-detail">
-                        Confirmation check {transactionStatus.attempts}
+                        {t("createStream.review.confirmationCheck", {
+                          attempts: transactionStatus.attempts,
+                        })}
                         {submittedTxHash
-                          ? ` - tx ${submittedTxHash.slice(0, 10)}...${submittedTxHash.slice(-8)}`
+                          ? ` - ${t("createStream.review.confirmationTx", {
+                              txHash: `${submittedTxHash.slice(0, 10)}...${submittedTxHash.slice(-8)}`,
+                            })}`
                           : ""}
                       </span>
                     </div>
@@ -1156,7 +1175,7 @@ export default function CreateStreamModal({
                       role="alert"
                     >
                       {transactionStatus.error ??
-                        "Transaction confirmation failed. Please retry."}
+                        t("createStream.validation.transactionConfirmationFailed")}
                     </div>
                   )}
                 </>
@@ -1174,7 +1193,7 @@ export default function CreateStreamModal({
                 onClick={handleCancel}
                 disabled={isBusyCreating}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1182,7 +1201,7 @@ export default function CreateStreamModal({
                 onClick={handleNext}
                 disabled={isBusyCreating}
               >
-                Next
+                {t("common.next")}
               </button>
             </>
           ) : (
@@ -1193,7 +1212,7 @@ export default function CreateStreamModal({
                 onClick={handleBack}
                 disabled={isBusyCreating}
               >
-                Back
+                {t("common.back")}
               </button>
               <button
                 type="button"

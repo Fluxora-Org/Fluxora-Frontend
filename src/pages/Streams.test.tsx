@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
 import { streamRecords } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
+import { I18nProvider, createT } from "../i18n";
 
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
 type ClipboardMock = {
@@ -45,13 +46,15 @@ function mockMatchMedia(matches: boolean) {
 
 function renderStreams() {
   return render(
-    <ToastProvider>
-      <MemoryRouter initialEntries={["/app/streams"]}>
-        <Routes>
-          <Route path="/app/streams" element={<Streams />} />
-        </Routes>
-      </MemoryRouter>
-    </ToastProvider>,
+    <I18nProvider>
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/app/streams"]}>
+          <Routes>
+            <Route path="/app/streams" element={<Streams />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </I18nProvider>,
   );
 }
 
@@ -138,6 +141,26 @@ describe("Streams disclosure motion", () => {
     expect(list).toHaveAttribute("data-virtualized", "false");
     expect(screen.getByText(streamRecords[0]!.name)).toBeInTheDocument();
     expect(screen.getByText(streamRecords[streamRecords.length - 1]!.name)).toBeInTheDocument();
+  });
+
+  it("renders hero, search, and empty-search copy from the catalog", async () => {
+    const t = createT();
+    mockMatchMedia(false);
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.getByText(t("streams.hero.eyebrow"))).toBeInTheDocument();
+    expect(screen.getByText(t("streams.list.heading"))).toBeInTheDocument();
+    expect(screen.getByLabelText(t("streams.list.searchAria"))).toHaveAttribute(
+      "placeholder",
+      t("streams.list.searchPlaceholder"),
+    );
+
+    fireEvent.change(screen.getByLabelText(t("streams.list.searchAria")), {
+      target: { value: "no-stream-here" },
+    });
+
+    expect(screen.getByText(t("streams.list.emptySearch"))).toBeInTheDocument();
   });
 
   it("keeps the stream list in sync after filtering and sorting", async () => {

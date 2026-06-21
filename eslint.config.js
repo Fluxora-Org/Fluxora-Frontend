@@ -50,8 +50,11 @@ export default tseslint.config(
           allowExportNames: [
             "applyTheme",
             "initTheme",
+            "I18nProvider",
             "isTheme",
             "resolveInitialTheme",
+            "sanitizeDepositAmountInput",
+            "useI18n",
             "useTheme",
             "useToast",
             "useWallet",

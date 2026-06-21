@@ -8,6 +8,7 @@ import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import { ToastProvider } from "./components/toast/ToastProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireWallet from "./components/RequireWallet";
+import { I18nProvider } from "./i18n";
 import Home from "./pages/Home";
 import ConnectWallet from "./pages/ConnectWallet";
 import ErrorPage from "./pages/ErrorPage";
@@ -90,16 +91,17 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <WalletProvider>
-          <ToastProvider>
-            <a href="#main-content" className="skip-link">
-              Skip to content
-            </a>
-            <AppNavbar
-              onSidebarToggle={handleSidebarToggle}
-              isSidebarOpen={isSidebarOpen}
-            />
+      <I18nProvider>
+        <BrowserRouter>
+          <WalletProvider>
+            <ToastProvider>
+              <a href="#main-content" className="skip-link">
+                Skip to content
+              </a>
+              <AppNavbar
+                onSidebarToggle={handleSidebarToggle}
+                isSidebarOpen={isSidebarOpen}
+              />
 
             <ErrorBoundary>
               <Routes>
@@ -130,10 +132,11 @@ export default function App() {
                 <Route path="/connect-wallet" element={<ConnectWallet />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </ErrorBoundary>
-          </ToastProvider>
-        </WalletProvider>
-      </BrowserRouter>
+              </ErrorBoundary>
+            </ToastProvider>
+          </WalletProvider>
+        </BrowserRouter>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

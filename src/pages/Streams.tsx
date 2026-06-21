@@ -36,6 +36,7 @@ import {
 } from "../lib/timePresentation";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { useI18n, type MessageKey, type TFunction } from "../i18n";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
@@ -43,6 +44,12 @@ import TruncatedAddress from "../components/common/TruncatedAddress";
 type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
+const STATUS_FILTER_KEYS: Record<StatusFilter, MessageKey> = {
+  Active: "streams.statusFilters.active",
+  All: "streams.statusFilters.all",
+  Completed: "streams.statusFilters.completed",
+  Paused: "streams.statusFilters.paused",
+};
 const DISCLOSURE_DURATION_MS = 200;
 const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
@@ -199,6 +206,7 @@ type StreamCardProps = {
   onAnnounceToggle: (streamName: string, expanded: boolean) => void;
   onCopyRecipient: (stream: StreamRecord) => void;
   onCopyRecipientError: (stream: StreamRecord) => void;
+  t: TFunction;
 };
 
 // Memoized so unrelated page state updates do not repaint every stream card.
@@ -212,6 +220,7 @@ const StreamCard = memo(function StreamCard({
   onAnnounceToggle,
   onCopyRecipient,
   onCopyRecipientError,
+  t,
 }: StreamCardProps) {
   const urgency = getUrgencyLevel(stream.cliffDate, stream.endDate);
   const cliffStatus = getCliffStatusText(stream.cliffDate);
@@ -334,11 +343,13 @@ const StreamCard = memo(function StreamCard({
           </div>
         </div>
         <div className="stream-meta-block">
-          <span>Withdrawable now</span>
+          <span>{t("streams.streamCard.withdrawableNow")}</span>
           <strong>{formatUsdc(stream.withdrawableAmount)}</strong>
           <div className="stream-card__meta-label">
             {stream.nextUnlockDate
-              ? `Next unlock ${getRelativeTime(stream.nextUnlockDate)}`
+              ? t("streams.streamCard.nextUnlock", {
+                  relativeTime: getRelativeTime(stream.nextUnlockDate),
+                })
               : "No upcoming unlock"}
           </div>
         </div>
@@ -477,11 +488,13 @@ function StreamDetail({
   onBack,
   onCreateSimilar,
   onCopyAddress,
+  t,
 }: {
   stream: StreamRecord;
   onBack: () => void;
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
+  t: TFunction;
 }) {
   return (
     <>
@@ -635,7 +648,9 @@ function StreamDetail({
                 </div>
               </div>
               <div className="stream-panel__row">
-                <span className="stream-panel__row-label">Next unlock</span>
+                <span className="stream-panel__row-label">
+                  {t("streams.streamCard.nextUnlockLabel")}
+                </span>
                 <div className="stream-panel__row-value">
                   {formatDate(stream.nextUnlockDate)}
                 </div>
@@ -713,6 +728,8 @@ function StreamNotFound({
   onBack: () => void;
   onCreateStream: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="stream-empty-state">
       <p className="streams-eyebrow">Stream detail</p>
@@ -730,7 +747,7 @@ function StreamNotFound({
           className="streams-primary-button"
           onClick={onCreateStream}
         >
-          Create stream
+          {t("streams.actions.create")}
         </button>
       </div>
     </section>
@@ -742,6 +759,7 @@ export default function Streams() {
   const { streamId } = useParams();
   const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
+  const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
 
   const [loading, setLoading] = useState(true);
@@ -811,15 +829,21 @@ export default function Streams() {
     }
 
     const timer = window.setTimeout(() => {
+      const streamWord = t(
+        visibleStreams.length === 1
+          ? "streams.announcements.streamSingular"
+          : "streams.announcements.streamPlural",
+      );
       announce(
-        `Showing ${visibleStreams.length} ${
-          visibleStreams.length === 1 ? "stream" : "streams"
-        }.`,
+        t("streams.announcements.showing", {
+          count: visibleStreams.length,
+          streamWord,
+        }),
       );
     }, FILTER_ANNOUNCEMENT_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
+  }, [announce, searchQuery, sortBy, statusFilter, t, visibleStreams.length]);
   const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
   const hasStreams = streamRecords.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
@@ -854,30 +878,30 @@ export default function Streams() {
     try {
       await navigator.clipboard.writeText(stream.recipientAddress);
       addToast(
-        `Recipient for ${stream.name} copied to your clipboard.`,
+        t("streams.toast.recipientCopied", { streamName: stream.name }),
         "success",
       );
     } catch {
       addToast(
-        "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+        t("streams.toast.clipboardUnavailable"),
         "error",
       );
     }
-  }, [addToast]);
+  }, [addToast, t]);
 
   const handleRecipientCopied = useCallback((stream: StreamRecord) => {
     addToast(
-      `Recipient for ${stream.name} copied to your clipboard.`,
+      t("streams.toast.recipientCopied", { streamName: stream.name }),
       "success",
     );
-  }, [addToast]);
+  }, [addToast, t]);
 
-  const handleRecipientCopyError = useCallback((_stream: StreamRecord) => {
+  const handleRecipientCopyError = useCallback(() => {
     addToast(
-      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+      t("streams.toast.clipboardUnavailable"),
       "error",
     );
-  }, [addToast]);
+  }, [addToast, t]);
 
   const handleToggleStreamCard = useCallback((streamId: string) => {
     setExpandedStreamId((current) => (current === streamId ? "" : streamId));
@@ -894,10 +918,17 @@ export default function Streams() {
   const handleAnnounceStreamToggle = useCallback(
     (streamName: string, nextExpanded: boolean) => {
       announce(
-        `${streamName} deep dive ${nextExpanded ? "expanded" : "collapsed"}.`,
+        t("streams.announcements.toggle", {
+          streamName,
+          state: t(
+            nextExpanded
+              ? "streams.announcements.expanded"
+              : "streams.announcements.collapsed",
+          ),
+        }),
       );
     },
-    [announce],
+    [announce, t],
   );
 
   if (loading) return <StreamsLoading />;
@@ -942,13 +973,13 @@ export default function Streams() {
           onBack={() => navigate("/app/streams")}
           onCreateSimilar={handleCreateStream}
           onCopyAddress={() => void handleCopyRecipient(selectedStream)}
+          t={t}
         />
       ) : showEmptyState ? (
         <section>
-          <h1 style={{ marginTop: 0 }}>Streams</h1>
+          <h1 style={{ marginTop: 0 }}>{t("streams.hero.title")}</h1>
           <p style={{ color: "var(--muted)" }}>
-            Create and manage USDC streams. Set rate, duration, and cliff from
-            the treasury.
+            {t("streams.empty.description")}
           </p>
           <EmptyState
             variant="streams"
@@ -964,12 +995,10 @@ export default function Streams() {
         <>
           <section className="streams-hero">
             <div className="streams-hero__copy">
-              <p className="streams-eyebrow">Treasury streaming</p>
-              <h1>Streams</h1>
+              <p className="streams-eyebrow">{t("streams.hero.eyebrow")}</p>
+              <h1>{t("streams.hero.title")}</h1>
               <p className="streams-subtitle">
-                Review every stream from a single operational surface, then open
-                a deeper layout when treasury context, recipient balance, or
-                audit notes need closer attention.
+                {t("streams.hero.subtitle")}
               </p>
             </div>
             <div className="streams-hero__actions">
@@ -978,14 +1007,14 @@ export default function Streams() {
                 className="streams-primary-button"
                 onClick={handleCreateStream}
               >
-                Create stream
+                {t("streams.actions.create")}
               </button>
               <button
                 type="button"
                 className="streams-secondary-button"
                 onClick={() => navigate(`/app/streams/${streamRecords[0]?.id}`)}
               >
-                Open featured deep dive
+                {t("streams.actions.openFeatured")}
               </button>
             </div>
           </section>
@@ -1002,49 +1031,48 @@ export default function Streams() {
                   );
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel="Check cliff date"
+                actionLabel={t("streams.zeroAccrual.action")}
               />
             </div>
           )}
 
-          <section className="streams-summary-grid" aria-label="Stream summary">
+          <section className="streams-summary-grid" aria-label={t("streams.summary.ariaLabel")}>
             <div className="streams-summary-card">
-              <span>Active streams</span>
+              <span>{t("streams.summary.activeLabel")}</span>
               <strong>{activeStreams.length}</strong>
-              <p>Currently accruing from treasury capital.</p>
+              <p>{t("streams.summary.activeDescription")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Monthly outflow</span>
+              <span>{t("streams.summary.monthlyLabel")}</span>
               <strong>{formatUsdc(monthlyOutflow)}</strong>
-              <p>Projected accrual across active streams each month.</p>
+              <p>{t("streams.summary.monthlyDescription")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Withdrawable now</span>
+              <span>{t("streams.summary.withdrawableLabel")}</span>
               <strong>{formatUsdc(withdrawableNow)}</strong>
-              <p>Available to recipients right now without a refill.</p>
+              <p>{t("streams.summary.withdrawableDescription")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Next unlock</span>
+              <span>{t("streams.summary.nextUnlockLabel")}</span>
               <strong>{formatDate(nextUnlock)}</strong>
-              <p>Earliest upcoming release window across active streams.</p>
+              <p>{t("streams.summary.nextUnlockDescription")}</p>
             </div>
           </section>
 
           <section className="streams-list-shell">
             <div className="streams-list-head">
               <div>
-                <h2>Deep-dive ready list</h2>
+                <h2>{t("streams.list.heading")}</h2>
                 <p className="streams-subtitle">
-                  Expand a row for the operational summary or open the full
-                  stream detail route for the complete layout.
+                  {t("streams.list.subtitle")}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label="Filter and search streams">
+              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label={t("streams.list.filterAria")}>
                 <div className="flex-1 min-w-[200px]">
                   <Input
                     id="streams-search"
-                    aria-label="Search streams by name, ID or recipient"
-                    placeholder="Search streams..."
+                    aria-label={t("streams.list.searchAria")}
+                    placeholder={t("streams.list.searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -1060,21 +1088,21 @@ export default function Streams() {
                       onClick={() => setStatusFilter(filter)}
                       aria-pressed={statusFilter === filter}
                     >
-                      {filter}
+                      {t(STATUS_FILTER_KEYS[filter])}
                     </button>
                   ))}
                 </div>
                 <div className="min-w-[160px]">
                   <Input
                     id="streams-sort"
-                    aria-label="Sort streams"
+                    aria-label={t("streams.list.sortAria")}
                     type="select"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     options={[
-                      { value: "recent", label: "Most recent" },
-                      { value: "name", label: "Name (A-Z)" },
-                      { value: "rate", label: "Highest rate" },
+                      { value: "recent", label: t("streams.list.sortMostRecent") },
+                      { value: "name", label: t("streams.list.sortName") },
+                      { value: "rate", label: t("streams.list.sortHighestRate") },
                     ]}
                   />
                 </div>
@@ -1082,11 +1110,11 @@ export default function Streams() {
             </div>
 
             <VirtualList
-              ariaLabel="Stream cards"
+              ariaLabel={t("streams.list.cardsAria")}
               className="streams-list"
               emptyState={
                 <div className="streams-empty-search">
-                  <p>No streams match your search or filter.</p>
+                  <p>{t("streams.list.emptySearch")}</p>
                 </div>
               }
               estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
@@ -1103,6 +1131,7 @@ export default function Streams() {
                   onOpenDetail={handleOpenStreamDetail}
                   onCopyRecipient={handleRecipientCopied}
                   onCopyRecipientError={handleRecipientCopyError}
+                  t={t}
                 />
               )}
               threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
