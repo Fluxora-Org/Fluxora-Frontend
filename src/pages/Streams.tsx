@@ -271,7 +271,7 @@ const StreamCard = memo(function StreamCard({
       role="article"
       aria-selected={selected}
       aria-expanded={expanded}
-      aria-label={`${stream.name} - ${stream.status}`}
+      aria-label={`${stream.name} — ${stream.status}`}
       onClick={handleSelect}
       onKeyDown={handleKeyDown}
     >
@@ -351,7 +351,7 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__cliff is-${cliffStatus}`}
             aria-label={`Cliff date: ${formatDateWithTimezone(stream.cliffDate)} (${cliffStatus})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">?</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">⏱</span>
             <span className="stream-time-bar__label">Cliff</span>
             <span className="stream-time-bar__date">{formatDateWithTimezone(stream.cliffDate)}</span>
             <span className="stream-time-bar__relative">({getRelativeTime(stream.cliffDate)})</span>
@@ -362,7 +362,7 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__end is-${urgency.end}`}
             aria-label={`End date: ${formatDateWithTimezone(stream.endDate)} (${endRelative})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">?</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">→</span>
             <span className="stream-time-bar__label">End</span>
             <span className="stream-time-bar__date">{formatDateWithTimezone(stream.endDate)}</span>
             <span className="stream-time-bar__relative">({endRelative})</span>
@@ -421,8 +421,8 @@ const StreamCard = memo(function StreamCard({
                   <span className="stream-panel__row-label">Cliff date</span>
                   <div className="stream-panel__row-value stream-time-value">
                     <span className={`stream-cliff-badge is-${cliffStatus}`}>
-                      {cliffStatus === "passed" && "? "}
-                      {cliffStatus === "upcoming" && "? "}
+                      {cliffStatus === "passed" && "✓ "}
+                      {cliffStatus === "upcoming" && "⏱ "}
                       {formatDetailTime(stream.cliffDate)}
                     </span>
                   </div>
@@ -990,7 +990,7 @@ export default function Streams() {
             </div>
           </section>
 
-          {/* Zero-accrual banner - streams live but nothing withdrawable yet */}
+          {/* Zero-accrual banner — streams live but nothing withdrawable yet */}
           {showZeroAccrual && (
             <div style={{ marginBottom: "2rem" }}>
               <ZeroAccrualBanner
