@@ -100,13 +100,16 @@ interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void;
+  onStreamCreated?: () => void | Promise<void>;
+  /** Called when stream creation fails after the user confirms the review step. */
+  onStreamError?: (err: unknown) => void;
 }
 
 export default function CreateStreamModal({
   isOpen,
   onClose,
   onStreamCreated,
+  onStreamError,
 }: CreateStreamModalProps) {
   const wallet = useWallet();
   const { addToast } = useToast();
@@ -123,9 +126,11 @@ export default function CreateStreamModal({
   const [cliffDate, setCliffDate] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
+  const submitInFlightRef = useRef(false);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -220,7 +225,14 @@ export default function CreateStreamModal({
     return true;
   };
 
-  const handleNext = () => {
+  const getStreamErrorMessage = (err: unknown): string => {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Stream creation failed. Please try again.";
+  };
+
+  const handleNext = async () => {
     if (currentStep === 1) {
       setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
       if (!validateStep1()) return;
@@ -231,6 +243,8 @@ export default function CreateStreamModal({
       if (!validateStep2()) return;
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (submitInFlightRef.current) return;
+
       if (!wallet.connected) {
         setError("Please connect your wallet first.");
         return;
@@ -242,6 +256,8 @@ export default function CreateStreamModal({
       }
 
       setError(null);
+      setStreamError(null);
+      submitInFlightRef.current = true;
       setIsSubmitting(true);
 
       const sender = wallet.address!;
@@ -256,19 +272,20 @@ export default function CreateStreamModal({
       const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
       const end = start + durationSeconds;
 
-      createStream(sender, recipient.trim(), amountStr, start, end)
-        .then(() => {
-          addToast("Stream created successfully on-chain!", "success");
-          onStreamCreated?.();
-          onClose();
-        })
-        .catch((err: any) => {
-          setError(err.message || "Failed to create stream.");
-          addToast(`Failed to create stream: ${err.message || err}`, "error");
-        })
-        .finally(() => {
-          setIsSubmitting(false);
-        });
+      try {
+        await createStream(sender, recipient.trim(), amountStr, start, end);
+        addToast("Stream created successfully on-chain!", "success");
+        await onStreamCreated?.();
+        onClose();
+      } catch (err) {
+        const message = getStreamErrorMessage(err);
+        setStreamError(message);
+        addToast(`Failed to create stream: ${message}`, "error");
+        onStreamError?.(err);
+      } finally {
+        submitInFlightRef.current = false;
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1000,6 +1017,23 @@ export default function CreateStreamModal({
                       </div>
                     </div>
                   </div>
+
+                  {streamError && (
+                    <div className="review-error-box" role="alert">
+                      <div>
+                        <strong>Stream creation failed.</strong>
+                        <p>{streamError}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="review-error-retry"
+                        onClick={handleNext}
+                        disabled={isSubmitting}
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
 
                   <div
                     className="review-warning-box"
