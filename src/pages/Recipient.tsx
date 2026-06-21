@@ -6,6 +6,11 @@ import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
 import { withdraw } from "../lib/stellar/tx";
+import type { StreamRecord } from "../data/streamRecords";
+import {
+  getRecipientStreams,
+  toRecipientStreams,
+} from "../lib/api/streamsService";
 import "./Streams.css";
 import "./Recipient.css";
 
@@ -14,18 +19,62 @@ export default function Recipient() {
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
+  const [recipientStreams, setRecipientStreams] = useState<StreamRecord[]>([]);
   const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(t);
-  }, []);
+    const controller = new AbortController();
 
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
+    if (!wallet.connected || !wallet.address) {
+      setRecipientStreams([]);
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+
+    getRecipientStreams(wallet.address, { signal: controller.signal })
+      .then((streams) => {
+        if (controller.signal.aborted) return;
+        setRecipientStreams(streams);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRecipientStreams([]);
+        setErrorMsg(
+          error instanceof Error
+            ? error.message
+            : "Unable to load recipient streams.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [wallet.address, wallet.connected]);
+
+  const balance = recipientStreams.reduce(
+    (total, stream) => total + stream.withdrawableAmount,
+    0,
+  );
+  const activeStreams = recipientStreams.filter(
+    (stream) => stream.status === "Active",
+  ).length;
+  const totalAccrued = recipientStreams.reduce(
+    (total, stream) => total + stream.streamedAmount,
+    0,
+  );
+  const totalWithdrawn = recipientStreams.reduce(
+    (total, stream) =>
+      total + Math.max(stream.streamedAmount - stream.withdrawableAmount, 0),
+    0,
+  );
+  const incomingStreams = toRecipientStreams(recipientStreams);
 
   const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
@@ -36,16 +85,23 @@ export default function Recipient() {
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
   
   const isPending = txState === "signing" || txState === "submitting";
-  const disabled = !walletConnected || balance === 0 || networkMismatch || isPending;
+  const disabled =
+    !walletConnected ||
+    !wallet.address ||
+    balance === 0 ||
+    networkMismatch ||
+    isPending;
 
   const handleWithdraw = async () => {
     if (disabled) return;
     setTxState("signing");
     setErrorMsg(null);
 
-    const recipientAddr = wallet.address!;
+    const recipientAddr = wallet.address;
+    if (!recipientAddr) return;
+
     const amountStr = Math.floor(balance * 10_000_000).toString(); // Scale to 7 decimals
-    const streamId = "1"; // Default stream ID
+    const streamId = recipientStreams[0]?.id ?? "1";
 
     try {
       setTxState("submitting");
@@ -53,10 +109,11 @@ export default function Recipient() {
       setTxState("confirmed");
       addToast("Withdrawal completed successfully on-chain!", "success");
       setTimeout(() => setTxState("idle"), 5000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       setTxState("error");
-      setErrorMsg(err.message || "Withdrawal failed.");
-      addToast(`Withdrawal failed: ${err.message || err}`, "error");
+      setErrorMsg(message || "Withdrawal failed.");
+      addToast(`Withdrawal failed: ${message || "Unknown error"}`, "error");
     }
   };
 
@@ -174,7 +231,7 @@ export default function Recipient() {
           </div>
         </div>
         <div className="mt-6">
-          <RecipientStreams />
+          <RecipientStreams streams={incomingStreams} />
         </div>
       </section>
     </main>

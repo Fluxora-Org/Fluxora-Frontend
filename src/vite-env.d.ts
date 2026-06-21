@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_RPC_URL: string;
   readonly VITE_NETWORK: string;
   readonly VITE_USE_MOCKS: string;
+  readonly VITE_DEMO_MODE?: string;
   readonly VITE_TX_POLL_INTERVAL_MS?: string;
   readonly VITE_TX_POLL_MAX_ATTEMPTS?: string;
   readonly VITE_TX_POLL_BACKOFF_FACTOR?: string;

@@ -34,6 +34,207 @@ export interface StreamRecord {
   timeline: StreamTimelineEvent[];
 }
 
+const STATUS_VALUES: StreamStatus[] = ["Active", "Paused", "Completed"];
+const HEALTH_VALUES: StreamHealth[] = ["Healthy", "Attention", "Settled"];
+const MAX_TEXT_LENGTH = 240;
+const MAX_LONG_TEXT_LENGTH = 800;
+const MAX_TAGS = 8;
+const MAX_TIMELINE_EVENTS = 12;
+
+function stripControlCharacters(value: string) {
+  return Array.from(value)
+    .map((character) => {
+      const code = character.charCodeAt(0);
+      return (code >= 0 && code <= 31) || code === 127 ? " " : character;
+    })
+    .join("");
+}
+
+function sanitizeText(
+  value: unknown,
+  fallback: string,
+  maxLength = MAX_TEXT_LENGTH,
+) {
+  if (typeof value !== "string") return fallback;
+
+  const sanitized = stripControlCharacters(value)
+    .replace(/[<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+
+  return sanitized || fallback;
+}
+
+function sanitizeAddress(value: unknown, fallback: string) {
+  const text = sanitizeText(value, fallback, 96).toUpperCase();
+  const sanitized = text.replace(/[^A-Z0-9._-]/g, "");
+  return sanitized || fallback;
+}
+
+function sanitizeNumber(value: unknown, fallback = 0) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function sanitizeProgress(value: unknown, fallback = 0) {
+  return Math.min(100, Math.max(0, sanitizeNumber(value, fallback)));
+}
+
+function sanitizeDate(value: unknown, fallback = "1970-01-01") {
+  const text = sanitizeText(value, fallback, 40);
+  return Number.isNaN(Date.parse(text)) ? fallback : text;
+}
+
+function normalizeStatus(value: unknown): StreamStatus {
+  const text = sanitizeText(value, "Active", 24).toLowerCase();
+  return (
+    STATUS_VALUES.find((status) => status.toLowerCase() === text) ?? "Active"
+  );
+}
+
+function normalizeHealth(value: unknown, status: StreamStatus): StreamHealth {
+  const text = sanitizeText(value, "", 24).toLowerCase();
+  const health = HEALTH_VALUES.find(
+    (candidate) => candidate.toLowerCase() === text,
+  );
+
+  if (health) return health;
+  return status === "Completed" ? "Settled" : "Healthy";
+}
+
+function normalizeTags(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((tag) => sanitizeText(tag, "", 48))
+    .filter(Boolean)
+    .slice(0, MAX_TAGS);
+}
+
+function normalizeTimeline(value: unknown): StreamTimelineEvent[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((event) => {
+      const item = event && typeof event === "object" ? event : {};
+      const record = item as Record<string, unknown>;
+
+      return {
+        date: sanitizeDate(record.date),
+        title: sanitizeText(record.title, "Stream update", 120),
+        detail: sanitizeText(record.detail, "No detail provided.", 320),
+      };
+    })
+    .slice(0, MAX_TIMELINE_EVENTS);
+}
+
+function pickField(
+  source: Record<string, unknown>,
+  keys: string[],
+): unknown {
+  return keys.map((key) => source[key]).find((value) => value !== undefined);
+}
+
+export function normalizeStreamRecord(input: unknown): StreamRecord {
+  const source =
+    input && typeof input === "object"
+      ? (input as Record<string, unknown>)
+      : {};
+  const status = normalizeStatus(pickField(source, ["status", "state"]));
+  const health = normalizeHealth(source.health, status);
+  const depositAmount = sanitizeNumber(
+    pickField(source, ["depositAmount", "deposit_amount", "totalAmount"]),
+  );
+  const streamedAmount = sanitizeNumber(
+    pickField(source, ["streamedAmount", "streamed_amount", "accruedAmount"]),
+  );
+  const withdrawableAmount = sanitizeNumber(
+    pickField(source, [
+      "withdrawableAmount",
+      "withdrawable_amount",
+      "availableAmount",
+    ]),
+  );
+  const remainingAmount = sanitizeNumber(
+    pickField(source, ["remainingAmount", "remaining_amount"]),
+    Math.max(depositAmount - streamedAmount, 0),
+  );
+
+  return {
+    id: sanitizeText(pickField(source, ["id", "streamId", "stream_id"]), "STR-UNKNOWN", 80),
+    name: sanitizeText(source.name, "Untitled stream", 160),
+    recipientName: sanitizeText(
+      pickField(source, ["recipientName", "recipient_name", "recipient"]),
+      "Unknown recipient",
+      120,
+    ),
+    recipientAddress: sanitizeAddress(
+      pickField(source, [
+        "recipientAddress",
+        "recipient_address",
+        "recipient",
+        "recipientId",
+      ]),
+      "UNKNOWN",
+    ),
+    treasuryName: sanitizeText(
+      pickField(source, ["treasuryName", "treasury_name", "treasury"]),
+      "Treasury",
+      120,
+    ),
+    treasuryAddress: sanitizeAddress(
+      pickField(source, [
+        "treasuryAddress",
+        "treasury_address",
+        "sourceAddress",
+        "sender",
+      ]),
+      "UNKNOWN",
+    ),
+    asset: sanitizeText(source.asset, "USDC", 24).toUpperCase(),
+    status,
+    monthlyRate: sanitizeNumber(
+      pickField(source, ["monthlyRate", "monthly_rate", "rate"]),
+    ),
+    depositAmount,
+    streamedAmount,
+    withdrawableAmount,
+    remainingAmount,
+    progress: sanitizeProgress(source.progress),
+    startDate: sanitizeDate(pickField(source, ["startDate", "start_date"])),
+    endDate: sanitizeDate(pickField(source, ["endDate", "end_date"])),
+    cliffDate:
+      pickField(source, ["cliffDate", "cliff_date"]) === undefined
+        ? undefined
+        : sanitizeDate(pickField(source, ["cliffDate", "cliff_date"])),
+    nextUnlockDate:
+      pickField(source, ["nextUnlockDate", "next_unlock_date"]) === undefined
+        ? undefined
+        : sanitizeDate(
+            pickField(source, ["nextUnlockDate", "next_unlock_date"]),
+          ),
+    summary: sanitizeText(
+      source.summary,
+      "No stream summary is available yet.",
+      MAX_LONG_TEXT_LENGTH,
+    ),
+    health,
+    healthNote: sanitizeText(
+      pickField(source, ["healthNote", "health_note"]),
+      "No health note is available yet.",
+      MAX_LONG_TEXT_LENGTH,
+    ),
+    auditNote: sanitizeText(
+      pickField(source, ["auditNote", "audit_note"]),
+      "No audit note is available yet.",
+      MAX_LONG_TEXT_LENGTH,
+    ),
+    tags: normalizeTags(source.tags),
+    timeline: normalizeTimeline(source.timeline),
+  };
+}
+
 export const streamRecords: StreamRecord[] = [
   {
     id: "STR-001",

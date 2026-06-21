@@ -6,9 +6,16 @@ import { isTreasuryDemoMode } from "../useTreasuryOverviewData";
 
 const getMetrics = vi.fn();
 const getStreams = vi.fn();
+const treasuryHookState = vi.hoisted(() => ({
+  metrics: [] as unknown[],
+  streams: [] as unknown[],
+  loading: false,
+  error: null as string | null,
+}));
 
 vi.mock("../useTreasury", () => ({
   useTreasury: () => ({
+    ...treasuryHookState,
     getMetrics,
     getStreams,
   }),
@@ -37,6 +44,10 @@ describe("treasury overview demo mode", () => {
     getStreams.mockReset();
     getMetrics.mockResolvedValue([]);
     getStreams.mockResolvedValue([]);
+    treasuryHookState.metrics = [];
+    treasuryHookState.streams = [];
+    treasuryHookState.loading = false;
+    treasuryHookState.error = null;
   });
 
   it("parses the demo mode flag explicitly", () => {
@@ -62,9 +73,6 @@ describe("treasury overview demo mode", () => {
     renderTreasuryPage();
 
     expect(screen.queryByText("Demo state:")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Loading treasury overview...",
-    );
 
     await waitFor(() => {
       expect(
@@ -74,7 +82,7 @@ describe("treasury overview demo mode", () => {
 
     expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
     expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
-    expect(getMetrics).toHaveBeenCalledTimes(1);
-    expect(getStreams).toHaveBeenCalledTimes(1);
+    expect(getMetrics).not.toHaveBeenCalled();
+    expect(getStreams).not.toHaveBeenCalled();
   });
 });

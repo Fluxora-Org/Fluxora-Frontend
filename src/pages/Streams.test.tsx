@@ -65,7 +65,12 @@ function mockClipboard(writeText: ClipboardMock["writeText"]) {
 async function finishLoading() {
   await act(async () => {
     vi.advanceTimersByTime(2000);
+    await Promise.resolve();
   });
+
+  expect(screen.getByRole("article", {
+    name: new RegExp(streamRecords[0]!.name, "i"),
+  })).toBeInTheDocument();
 }
 
 describe("Streams disclosure motion", () => {

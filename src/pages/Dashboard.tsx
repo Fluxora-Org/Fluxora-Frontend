@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import RecentStreams, { Stream } from "../components/RecentStreams";
+import RecentStreams from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
 import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
@@ -10,6 +10,8 @@ import ToastNotification, {
 } from "../components/ToastNotification";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
+import { toTreasuryStreams } from "../lib/api/streamsService";
 import "../design-tokens.css";
 
 const ONBOARDING_KEY = "fluxora_onboarding_dismissed";
@@ -31,29 +33,42 @@ function markOnboardingSeen(): void {
 }
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [streams] = useState<Stream[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     variant: ToastVariant;
   } | null>(null);
-  const [withdrawable, setWithdrawable] = useState<number | null>(null);
   const { announcement, announce } = useLiveAnnouncer();
   const wallet = useWallet();
+  const treasury = useTreasury();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
+  const dashboardStreamRecords = walletConnected ? treasury.streams : [];
+  const streams = toTreasuryStreams(dashboardStreamRecords);
+  const activeStreams = dashboardStreamRecords.filter(
+    (stream) => stream.status === "Active",
+  );
+  const totalStreaming = activeStreams.reduce(
+    (total, stream) => total + stream.depositAmount,
+    0,
+  );
+  const withdrawable = walletConnected
+    ? dashboardStreamRecords.reduce(
+        (total, stream) => total + stream.withdrawableAmount,
+        0,
+      )
+    : null;
 
   useEffect(() => {
-    setWithdrawable(walletConnected ? 22600 : null);
-  }, [walletConnected]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
+    if (treasury.error) {
+      setToast({
+        message: treasury.error,
+        variant: "error",
+      });
+    }
+  }, [treasury.error]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -63,14 +78,14 @@ export default function Dashboard() {
   }, [toast]);
 
   useEffect(() => {
-    if (!loading && streams.length === 0 && !hasSeenOnboarding()) {
+    if (!treasury.loading && streams.length === 0 && !hasSeenOnboarding()) {
       setShowOnboarding(true);
     }
 
-    if (!loading && streams.length > 0) {
+    if (!treasury.loading && streams.length > 0) {
       announce(`${streams.length} active streams loaded.`);
     }
-  }, [loading, streams.length, announce]);
+  }, [treasury.loading, streams.length, announce]);
 
   useEffect(() => {
     if (walletConnected && walletAddress) {
@@ -116,7 +131,7 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) return <TreasuryOverviewLoading />;
+  if (treasury.loading) return <TreasuryOverviewLoading />;
 
   const hasStreams = streams.length > 0;
 
@@ -183,7 +198,7 @@ export default function Dashboard() {
           >
             Active Streams
           </div>
-          <div className="text-heading-2">{streams.length || "--"}</div>
+          <div className="text-heading-2">{activeStreams.length || "--"}</div>
         </div>
         <div style={card}>
           <div
@@ -192,7 +207,11 @@ export default function Dashboard() {
           >
             Total Streaming
           </div>
-          <div className="text-heading-2">-- USDC</div>
+          <div className="text-heading-2">
+            {walletConnected
+              ? `${totalStreaming.toLocaleString()} USDC`
+              : "-- USDC"}
+          </div>
         </div>
         <div style={card}>
           <div

@@ -3,13 +3,19 @@ import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { webcrypto, randomBytes } from 'node:crypto';
+import type { ReactNode } from 'react';
+
+interface TestProviderProps {
+  children: ReactNode;
+}
 
 // Polyfill Web Crypto API for Stellar SDK / @noble/ed25519 in test environment
 const customCrypto = {
   ...webcrypto,
   getRandomValues<T extends ArrayBufferView | null>(array: T): T {
     if (!array) return array;
-    const bytes = randomBytes((array as any).byteLength);
+    const view = array as ArrayBufferView;
+    const bytes = randomBytes(view.byteLength);
     const u8 = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
     u8.set(bytes);
     return array;
@@ -31,6 +37,8 @@ Object.defineProperty(globalThis, 'crypto', {
 });
 
 expect.extend(matchers);
+
+vi.stubEnv('VITE_USE_MOCKS', 'true');
 
 // jsdom does not implement matchMedia. Provide a no-op default (no preference,
 // no listeners) so components/hooks that probe it don't crash. Individual tests
@@ -70,7 +78,7 @@ vi.mock('../components/wallet-connect/Walletcontext', () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     }),
-    WalletProvider: ({ children }: any) => children,
+    WalletProvider: ({ children }: TestProviderProps) => children,
   };
 });
 
@@ -80,6 +88,6 @@ vi.mock('../components/toast/ToastProvider', () => {
       addToast: vi.fn(),
       removeToast: vi.fn(),
     }),
-    ToastProvider: ({ children }: any) => children,
+    ToastProvider: ({ children }: TestProviderProps) => children,
   };
 });

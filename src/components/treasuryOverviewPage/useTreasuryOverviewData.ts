@@ -6,6 +6,7 @@ import {
 import type { Metric } from "./Metric";
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
+import { toTreasuryStreams } from "../../lib/api/streamsService";
 
 export interface TreasuryOverviewData {
   metrics: Metric[];
@@ -20,7 +21,7 @@ export function isTreasuryDemoMode(value = import.meta.env.VITE_DEMO_MODE) {
 }
 
 export function useTreasuryOverviewData(): TreasuryOverviewData {
-  const { getMetrics, getStreams } = useTreasury();
+  const { metrics, streams, loading, error } = useTreasury();
   const isDemoMode = isTreasuryDemoMode();
   const [data, setData] = useState<TreasuryOverviewData>({
     metrics: isDemoMode ? treasuryDemoMetrics : [],
@@ -42,41 +43,14 @@ export function useTreasuryOverviewData(): TreasuryOverviewData {
       return undefined;
     }
 
-    let cancelled = false;
     setData({
-      metrics: [],
-      streams: [],
+      metrics,
+      streams: toTreasuryStreams(streams),
       isDemoMode: false,
-      loading: true,
-      error: null,
+      loading,
+      error: error ? "Unable to load treasury overview data." : null,
     });
-
-    Promise.all([getMetrics(), getStreams()])
-      .then(([metrics, streams]) => {
-        if (cancelled) return;
-        setData({
-          metrics,
-          streams,
-          isDemoMode: false,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setData({
-          metrics: [],
-          streams: [],
-          isDemoMode: false,
-          loading: false,
-          error: "Unable to load treasury overview data.",
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [getMetrics, getStreams, isDemoMode]);
+  }, [error, isDemoMode, loading, metrics, streams]);
 
   return data;
 }

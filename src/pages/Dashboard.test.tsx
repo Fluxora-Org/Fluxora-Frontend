@@ -1,4 +1,5 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Dashboard from "./Dashboard";
 
@@ -21,16 +22,21 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
   }),
 }));
 
-function renderDashboard() {
-  render(<Dashboard />);
-  act(() => {
-    vi.advanceTimersByTime(1200);
+async function renderDashboard() {
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>,
+  );
+  await waitFor(() => {
+    expect(
+      screen.queryByRole("status", { name: /loading treasury overview/i }),
+    ).not.toBeInTheDocument();
   });
 }
 
 describe("Dashboard wallet source", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     walletState.connected = false;
     walletState.address = null;
     walletState.network = null;
@@ -38,12 +44,11 @@ describe("Dashboard wallet source", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     localStorage.clear();
   });
 
-  it("uses disconnected state from useWallet for the connect banner", () => {
-    renderDashboard();
+  it("uses disconnected state from useWallet for the connect banner", async () => {
+    await renderDashboard();
 
     expect(
       screen.getByText(/Connect your Stellar wallet to see real balances/i),
@@ -51,15 +56,15 @@ describe("Dashboard wallet source", () => {
     expect(screen.getAllByText("-- USDC").length).toBeGreaterThan(0);
   });
 
-  it("uses connected address from useWallet for treasury onboarding", () => {
+  it("uses connected address from useWallet for treasury onboarding", async () => {
     walletState.connected = true;
     walletState.address = "GCONNECTED";
 
-    renderDashboard();
+    await renderDashboard();
 
     expect(
       screen.queryByText(/Connect your Stellar wallet to see real balances/i),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("22,600 USDC")).toBeInTheDocument();
+    expect(screen.getByText("6,700 USDC")).toBeInTheDocument();
   });
 });

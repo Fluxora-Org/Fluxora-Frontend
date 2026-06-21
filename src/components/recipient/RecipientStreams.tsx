@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   mockRecipientStreams,
   type RecipientStream,
@@ -37,9 +37,19 @@ export function sortRecipientStreams(
   });
 }
 
-export default function RecipientStreams() {
-  const [streams, setStreams] = useState<RecipientStream[]>(mockRecipientStreams);
+interface RecipientStreamsProps {
+  streams?: RecipientStream[];
+}
+
+export default function RecipientStreams({
+  streams: initialStreams = mockRecipientStreams,
+}: RecipientStreamsProps) {
+  const [streams, setStreams] = useState<RecipientStream[]>(initialStreams);
   const [sortKey, setSortKey] = useState<RecipientStreamsSortKey>("pinned");
+
+  useEffect(() => {
+    setStreams(initialStreams);
+  }, [initialStreams]);
 
   const togglePin = (id: string) => {
     setStreams((prev) =>

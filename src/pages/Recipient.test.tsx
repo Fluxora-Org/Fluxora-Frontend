@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Recipient from "./Recipient";
 
@@ -21,44 +21,44 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
   }),
 }));
 
-function renderRecipient() {
+async function renderRecipient() {
   render(<Recipient />);
-  act(() => {
-    vi.advanceTimersByTime(2000);
+  await waitFor(() => {
+    expect(
+      screen.queryByRole("status", { name: /loading recipient page/i }),
+    ).not.toBeInTheDocument();
   });
 }
 
 describe("Recipient wallet source", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     walletState.connected = false;
     walletState.address = null;
     walletState.network = null;
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  afterEach(() => {});
 
-  it("uses disconnected state from useWallet for the empty state", () => {
-    renderRecipient();
+  it("uses disconnected state from useWallet for the empty state", async () => {
+    await renderRecipient();
 
     expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Withdraw 22,600 USDC/i }),
+      screen.queryByRole("button", { name: /Withdraw/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("enables the withdraw surface when useWallet reports a connected wallet", () => {
+  it("enables the withdraw surface when useWallet reports a connected wallet", async () => {
     walletState.connected = true;
+    walletState.address = "GABC...XYZ1";
     // Match the expected network so the on-chain mismatch guard does not
     // disable the withdraw action.
     walletState.network = "TESTNET";
 
-    renderRecipient();
+    await renderRecipient();
 
     expect(
-      screen.getByRole("button", { name: /Withdraw 22,600 USDC/i }),
+      screen.getByRole("button", { name: /Withdraw 4,200 USDC/i }),
     ).toBeEnabled();
     expect(screen.getByText("Withdrawable now")).toBeInTheDocument();
   });

@@ -55,6 +55,7 @@ export default tseslint.config(
             "useTheme",
             "useToast",
             "useWallet",
+            "sortRecipientStreams",
           ],
         },
       ],
