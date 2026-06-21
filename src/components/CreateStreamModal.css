@@ -763,6 +763,53 @@
   font-weight: 600;
 }
 
+.review-error-box {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.review-error-box strong {
+  display: block;
+  margin-bottom: 0.125rem;
+  color: #fee2e2;
+  font-weight: 600;
+}
+
+.review-error-box p {
+  margin: 0;
+}
+
+.review-error-retry {
+  flex-shrink: 0;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid rgba(254, 202, 202, 0.45);
+  border-radius: 8px;
+  background: rgba(254, 202, 202, 0.12);
+  color: #fee2e2;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.review-error-retry:hover {
+  background: rgba(254, 202, 202, 0.18);
+}
+
+.review-error-retry:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 /* ==============================================
    RESPONSIVE STYLES
    ============================================== */
@@ -971,6 +1018,16 @@
     line-height: 1.4;
   }
 
+  .review-error-box {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  .review-error-retry {
+    align-self: flex-start;
+  }
+
   .modal-footer {
     gap: 0.5rem;
     margin-top: 0.875rem;
@@ -1057,6 +1114,10 @@
   }
 
   .review-warning-box {
+    font-size: 0.6875rem;
+  }
+
+  .review-error-box {
     font-size: 0.6875rem;
   }
 

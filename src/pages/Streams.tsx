@@ -197,6 +197,8 @@ type StreamCardProps = {
   onSelect: (streamId: string) => void;
   onOpenDetail: (streamId: string) => void;
   onAnnounceToggle: (streamName: string, expanded: boolean) => void;
+  onCopyRecipient: (stream: StreamRecord) => void;
+  onCopyRecipientError: (stream: StreamRecord) => void;
 };
 
 // Memoized so unrelated page state updates do not repaint every stream card.
@@ -208,6 +210,8 @@ const StreamCard = memo(function StreamCard({
   onSelect,
   onOpenDetail,
   onAnnounceToggle,
+  onCopyRecipient,
+  onCopyRecipientError,
 }: StreamCardProps) {
   const urgency = getUrgencyLevel(stream.cliffDate, stream.endDate);
   const cliffStatus = getCliffStatusText(stream.cliffDate);
@@ -231,6 +235,14 @@ const StreamCard = memo(function StreamCard({
     },
     [onOpenDetail, stream.id],
   );
+
+  const handleRecipientCopied = useCallback(() => {
+    onCopyRecipient(stream);
+  }, [onCopyRecipient, stream]);
+
+  const handleRecipientCopyError = useCallback(() => {
+    onCopyRecipientError(stream);
+  }, [onCopyRecipientError, stream]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     // Enter/Space selects the card; do not intercept if a button inside is focused
@@ -306,7 +318,12 @@ const StreamCard = memo(function StreamCard({
           <strong>{stream.recipientName}</strong>
           <TruncatedAddress 
             address={stream.recipientAddress} 
-            onCopy={() => {}} 
+            onCopy={handleRecipientCopied}
+            onCopyStateChange={(state) => {
+              if (state === "error") {
+                handleRecipientCopyError();
+              }
+            }}
           />
         </div>
         <div className="stream-meta-block">
@@ -848,6 +865,20 @@ export default function Streams() {
     }
   }, [addToast]);
 
+  const handleRecipientCopied = useCallback((stream: StreamRecord) => {
+    addToast(
+      `Recipient for ${stream.name} copied to your clipboard.`,
+      "success",
+    );
+  }, [addToast]);
+
+  const handleRecipientCopyError = useCallback((_stream: StreamRecord) => {
+    addToast(
+      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+      "error",
+    );
+  }, [addToast]);
+
   const handleToggleStreamCard = useCallback((streamId: string) => {
     setExpandedStreamId((current) => (current === streamId ? "" : streamId));
   }, []);
@@ -1070,6 +1101,8 @@ export default function Streams() {
                   onSelect={handleSelectStreamCard}
                   onAnnounceToggle={handleAnnounceStreamToggle}
                   onOpenDetail={handleOpenStreamDetail}
+                  onCopyRecipient={handleRecipientCopied}
+                  onCopyRecipientError={handleRecipientCopyError}
                 />
               )}
               threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
