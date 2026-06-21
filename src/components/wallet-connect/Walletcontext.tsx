@@ -17,6 +17,7 @@ import {
   isStellarNetworkMismatch,
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
+import { getNetworkLabel } from "../../lib/config";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -39,6 +40,7 @@ interface WalletState {
 
 interface WalletContextType extends WalletState {
   expectedNetwork: StellarNetwork;
+  expectedNetworkLabel: string;
   isNetworkMismatch: boolean;
   connect: (address: string, network: string) => void;
   disconnect: () => void;
@@ -119,6 +121,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   };
 
   const expectedNetwork = getExpectedStellarNetwork();
+  const expectedNetworkLabel = getNetworkLabel(expectedNetwork);
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
@@ -233,6 +236,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         expectedNetwork,
+        expectedNetworkLabel,
         isNetworkMismatch,
         connect,
         disconnect,

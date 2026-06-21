@@ -2,7 +2,7 @@ export const SUPPORTED_STELLAR_NETWORKS = ["PUBLIC", "TESTNET"] as const;
 
 export type StellarNetwork = (typeof SUPPORTED_STELLAR_NETWORKS)[number];
 
-const DEFAULT_EXPECTED_NETWORK: StellarNetwork = "TESTNET";
+export const DEFAULT_EXPECTED_NETWORK: StellarNetwork = "TESTNET";
 
 /** Normalizes Freighter/import.meta network values to the app-supported set. */
 export function normalizeStellarNetwork(

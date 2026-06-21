@@ -7,6 +7,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { signTransaction, getNetwork } from "@stellar/freighter-api";
+import { createConfig } from "../config";
 
 /**
  * Custom error class for wrapping and mapping Stellar/Soroban errors.
@@ -62,7 +63,8 @@ function encodeAddress(addr: string): xdr.ScVal {
  * Validates that the wallet's current connected network matches the expected network.
  */
 async function validateNetwork(): Promise<void> {
-  const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
+  const appConfig = createConfig(import.meta.env);
+  const expectedNet = appConfig.network;
   let connectedNetRes;
   try {
     connectedNetRes = await getNetwork();
@@ -120,7 +122,7 @@ async function waitForTransaction(
 export async function getTransactionStatus(
   hash: string,
 ): Promise<"pending" | "confirmed" | "failed"> {
-  const rpcUrl = import.meta.env.VITE_RPC_URL;
+  const rpcUrl = createConfig(import.meta.env).rpcUrl;
 
   if (!rpcUrl) {
     throw new TransactionError("rpc", "VITE_RPC_URL is not configured in environment variables.");
@@ -150,10 +152,10 @@ async function executeInvocation(
   // 1. Perform network validation
   await validateNetwork();
 
-  const rpcUrl = import.meta.env.VITE_RPC_URL;
-  const contractId = import.meta.env.VITE_STREAM_CONTRACT_ID;
-  const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
-  const passphrase = getNetworkPassphrase(expectedNet);
+  const appConfig = createConfig(import.meta.env);
+  const rpcUrl = appConfig.rpcUrl;
+  const contractId = appConfig.streamContractId;
+  const passphrase = appConfig.networkPassphrase;
 
   if (!contractId) {
     throw new TransactionError("simulation", "VITE_STREAM_CONTRACT_ID is not configured in environment variables.");

@@ -101,13 +101,16 @@ interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void;
+  onStreamCreated?: () => void | Promise<void>;
+  /** Called when stream creation fails after the user confirms the review step. */
+  onStreamError?: (err: unknown) => void;
 }
 
 export default function CreateStreamModal({
   isOpen,
   onClose,
   onStreamCreated,
+  onStreamError,
 }: CreateStreamModalProps) {
   const wallet = useWallet();
   const { addToast } = useToast();
@@ -124,6 +127,7 @@ export default function CreateStreamModal({
   const [cliffDate, setCliffDate] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
@@ -131,6 +135,7 @@ export default function CreateStreamModal({
     useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
+  const submitInFlightRef = useRef(false);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -266,7 +271,14 @@ export default function CreateStreamModal({
     return true;
   };
 
-  const handleNext = () => {
+  const getStreamErrorMessage = (err: unknown): string => {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Stream creation failed. Please try again.";
+  };
+
+  const handleNext = async () => {
     if (isBusyCreating) return;
 
     if (currentStep === 1) {
@@ -280,18 +292,21 @@ export default function CreateStreamModal({
       resetTransactionState();
       setCurrentStep(3);
     } else if (currentStep === 3) {
+      if (submitInFlightRef.current) return;
+
       if (!wallet.connected) {
         setError("Please connect your wallet first.");
         return;
       }
-      const expectedNet = import.meta.env.VITE_NETWORK || "TESTNET";
-      if (wallet.network?.toUpperCase() !== expectedNet.toUpperCase()) {
-        setError(`Wrong Stellar network. Expected ${expectedNet.toUpperCase()}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
+      if (wallet.isNetworkMismatch) {
+        setError(`Wrong Stellar network. Expected ${wallet.expectedNetwork}, but wallet is connected to ${wallet.network?.toUpperCase()}. Please switch network in Freighter.`);
         return;
       }
 
       setError(null);
+      setStreamError(null);
       resetTransactionState();
+      submitInFlightRef.current = true;
       setIsSubmitting(true);
 
       const sender = wallet.address!;
@@ -306,21 +321,29 @@ export default function CreateStreamModal({
       const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
       const end = start + durationSeconds;
 
-      createStream(sender, recipient.trim(), amountStr, start, end)
-        .then((response) => {
-          if (!response.txHash) {
-            throw new Error("Missing transaction hash from Stellar RPC.");
-          }
-
-          setSubmittedTxHash(response.txHash);
-        })
-        .catch((err: any) => {
-          setError(err.message || "Failed to create stream.");
-          addToast(`Failed to create stream: ${err.message || err}`, "error");
-        })
-        .finally(() => {
-          setIsSubmitting(false);
-        });
+      try {
+        const response = await createStream(
+          sender,
+          recipient.trim(),
+          amountStr,
+          start,
+          end,
+        );
+        if (!response.txHash) {
+          throw new Error("Missing transaction hash from Stellar RPC.");
+        }
+        // Hand off to the confirmation poller; the success toast,
+        // onStreamCreated, and onClose fire once polling reports `confirmed`.
+        setSubmittedTxHash(response.txHash);
+      } catch (err) {
+        const message = getStreamErrorMessage(err);
+        setStreamError(message);
+        addToast(`Failed to create stream: ${message}`, "error");
+        onStreamError?.(err);
+      } finally {
+        submitInFlightRef.current = false;
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1074,6 +1097,23 @@ export default function CreateStreamModal({
                       </div>
                     </div>
                   </div>
+
+                  {streamError && (
+                    <div className="review-error-box" role="alert">
+                      <div>
+                        <strong>Stream creation failed.</strong>
+                        <p>{streamError}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="review-error-retry"
+                        onClick={handleNext}
+                        disabled={isSubmitting}
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
 
                   <div
                     className="review-warning-box"

@@ -13,6 +13,11 @@ let walletState = {
 vi.mock("../../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
     disconnect,
   }),
 }));
