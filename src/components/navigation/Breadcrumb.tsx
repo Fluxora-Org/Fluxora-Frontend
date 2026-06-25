@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { isValidStellarAddress, maskAddress } from "../../lib/stellar";
 
@@ -8,6 +9,17 @@ export interface BreadcrumbItem {
 
 interface BreadcrumbProps {
   items: BreadcrumbItem[];
+}
+
+const stellarAddressValidationCache = new Map<string, boolean>();
+
+function isCachedStellarAddress(label: string): boolean {
+  const cached = stellarAddressValidationCache.get(label);
+  if (cached !== undefined) return cached;
+
+  const isAddress = isValidStellarAddress(label);
+  stellarAddressValidationCache.set(label, isAddress);
+  return isAddress;
 }
 
 /**
@@ -26,6 +38,19 @@ interface BreadcrumbProps {
  * WCAG 2.1 AA: 4.5:1 text contrast, 3:1 focus ring contrast
  */
 export default function Breadcrumb({ items }: BreadcrumbProps) {
+  const displayItems = useMemo(
+    () =>
+      items.map((item) => {
+        const isStellarAddress = isCachedStellarAddress(item.label);
+        return {
+          ...item,
+          displayLabel: isStellarAddress ? maskAddress(item.label) : item.label,
+          isStellarAddress,
+        };
+      }),
+    [items],
+  );
+
   if (items.length === 0) return null;
 
   return (
@@ -42,12 +67,8 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
           flexWrap: "wrap",
         }}
       >
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          const isStellarAddress = isValidStellarAddress(item.label);
-          const displayLabel = isStellarAddress
-            ? maskAddress(item.label)
-            : item.label;
+        {displayItems.map((item, index) => {
+          const isLast = index === displayItems.length - 1;
 
           return (
             <li
@@ -56,9 +77,9 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
             >
               {isLast || !item.to ? (
                 <span
-                  aria-label={isStellarAddress ? item.label : undefined}
+                  aria-label={item.isStellarAddress ? item.label : undefined}
                   aria-current={isLast ? "page" : undefined}
-                  title={isStellarAddress ? item.label : undefined}
+                  title={item.isStellarAddress ? item.label : undefined}
                   style={{
                     color: isLast
                       ? "var(--breadcrumb-color-current)"
@@ -70,16 +91,16 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {displayLabel}
+                  {item.displayLabel}
                 </span>
               ) : (
                 <Link
                   to={item.to}
-                  aria-label={isStellarAddress ? item.label : undefined}
-                  title={isStellarAddress ? item.label : undefined}
+                  aria-label={item.isStellarAddress ? item.label : undefined}
+                  title={item.isStellarAddress ? item.label : undefined}
                   className="breadcrumb-link"
                 >
-                  {displayLabel}
+                  {item.displayLabel}
                 </Link>
               )}
 

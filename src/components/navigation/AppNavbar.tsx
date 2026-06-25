@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
@@ -28,6 +28,12 @@ const APP_SECONDARY_LINKS: { to: string; label: string }[] = [
   // Settings and Help go here when added
   // { to: "/app/settings", label: "Settings" },
 ];
+
+const BREADCRUMB_LABELS: Record<string, string> = {
+  streams: "Streams",
+  recipient: "Recipient",
+  treasury: "Treasury",
+};
 
 function FluxoraLogo({ connected }: { connected: boolean }) {
   return (
@@ -92,17 +98,11 @@ function ConnectingSkeleton() {
  * Build breadcrumb items from the current pathname.
  * e.g. /app/streams/STR-001 → [Streams, STR-001]
  */
-function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
+function buildBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (!pathname.startsWith("/app")) return [];
 
   const segments = pathname.replace("/app", "").split("/").filter(Boolean);
   if (segments.length === 0) return [];
-
-  const labelMap: Record<string, string> = {
-    streams: "Streams",
-    recipient: "Recipient",
-    treasury: "Treasury",
-  };
 
   const items: BreadcrumbItem[] = [];
   let accumulatedPath = "/app";
@@ -111,7 +111,7 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
     accumulatedPath += `/${segment}`;
     const isLast = index === segments.length - 1;
     items.push({
-      label: labelMap[segment] ?? segment,
+      label: BREADCRUMB_LABELS[segment] ?? segment,
       to: isLast ? undefined : accumulatedPath,
     });
   });
@@ -142,9 +142,12 @@ export default function AppNavbar({
     return () => clearTimeout(t);
   }, []);
 
-const location = useLocation();
+  const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
-  const breadcrumbs = useBreadcrumbs(location.pathname);
+  const breadcrumbs = useMemo(
+    () => buildBreadcrumbs(location.pathname),
+    [location.pathname],
+  );
   const showBreadcrumb = isAppView && breadcrumbs.length > 1;
   const links = connected ? APP_PRIMARY_LINKS : ANON_LINKS;
 
