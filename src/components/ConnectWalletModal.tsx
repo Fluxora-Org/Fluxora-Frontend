@@ -29,7 +29,8 @@ interface WalletOption {
   name: string;
   description: string;
   icon: string;
-  action: () => void;
+  action?: () => void;
+  unavailableLabel?: string;
 }
 
 export default function ConnectWalletModal({
@@ -211,14 +212,16 @@ export default function ConnectWalletModal({
       name: "Albedo",
       description: "Open in-browser wallet for quick secure approvals.",
       icon: "⭐",
-      action: onConnectAlbedo ?? (() => {}),
+      action: onConnectAlbedo,
+      unavailableLabel: "Coming soon",
     },
     {
       id: "walletconnect",
       name: "WalletConnect",
       description: "Pair with compatible mobile wallets via QR.",
       icon: "🔗",
-      action: onConnectWalletConnect ?? (() => {}),
+      action: onConnectWalletConnect,
+      unavailableLabel: "Coming soon",
     },
   ];
 
@@ -277,15 +280,23 @@ export default function ConnectWalletModal({
 
             <div className={styles.walletList} role="list" aria-label="Wallet providers">
               {walletOptions.map((wallet) => {
+                const isUnavailable = !wallet.action;
                 const isActive =
-                  hoveredOptionId === wallet.id || focusedOptionId === wallet.id;
+                  !isUnavailable &&
+                  (hoveredOptionId === wallet.id || focusedOptionId === wallet.id);
+                const ariaLabel = isUnavailable
+                  ? `${wallet.name} unavailable. ${wallet.unavailableLabel}`
+                  : `Connect with ${wallet.name}`;
 
                 return (
                   <button
                     key={wallet.id}
                     type="button"
                     role="listitem"
-                    className={styles.walletOption}
+                    className={`${styles.walletOption} ${
+                      isUnavailable ? styles.walletOptionUnavailable : ""
+                    }`}
+                    disabled={isUnavailable}
                     style={{
                       background: isActive ? "var(--surface-elevated)" : "var(--surface-neutral)",
                       borderColor: isActive ? "var(--border-interactive)" : "var(--border-neutral)",
@@ -298,7 +309,7 @@ export default function ConnectWalletModal({
                     onMouseLeave={() => setHoveredOptionId(null)}
                     onFocus={() => setFocusedOptionId(wallet.id)}
                     onBlur={() => setFocusedOptionId(null)}
-                    aria-label={`Connect with ${wallet.name}`}
+                    aria-label={ariaLabel}
                   >
                     <div className={styles.walletIcon} aria-hidden="true">
                       {wallet.icon}
@@ -306,6 +317,11 @@ export default function ConnectWalletModal({
                     <div className={styles.walletInfo}>
                       <div className={styles.walletName}>{wallet.name}</div>
                       <div className={styles.walletDescription}>{wallet.description}</div>
+                      {isUnavailable && wallet.unavailableLabel && (
+                        <span className={styles.walletUnavailableBadge}>
+                          {wallet.unavailableLabel}
+                        </span>
+                      )}
                     </div>
                     <svg
                       className={styles.chevron}

@@ -38,6 +38,41 @@ describe("ConnectWalletModal", () => {
     expect(screen.getByText(/By continuing, you agree to Fluxora's/)).toBeInTheDocument();
   });
 
+  it("disables unavailable wallet options instead of wiring no-op handlers", () => {
+    render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    expect(screen.getByLabelText("Connect with Freighter")).toBeEnabled();
+    expect(screen.getByLabelText("Albedo unavailable. Coming soon")).toBeDisabled();
+    expect(screen.getByLabelText("WalletConnect unavailable. Coming soon")).toBeDisabled();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+  });
+
+  it("enables optional wallet providers when handlers are supplied", async () => {
+    const onConnectAlbedo = vi.fn();
+    const onConnectWalletConnect = vi.fn();
+
+    render(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={onClose}
+        onConnectAlbedo={onConnectAlbedo}
+        onConnectWalletConnect={onConnectWalletConnect}
+      />,
+    );
+
+    const albedo = screen.getByLabelText("Connect with Albedo");
+    const walletConnect = screen.getByLabelText("Connect with WalletConnect");
+
+    expect(albedo).toBeEnabled();
+    expect(walletConnect).toBeEnabled();
+
+    await userEvent.click(albedo);
+    await userEvent.click(walletConnect);
+
+    expect(onConnectAlbedo).toHaveBeenCalledTimes(1);
+    expect(onConnectWalletConnect).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onClose when close button is clicked", async () => {
     render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
     const closeBtn = screen.getByLabelText("Close wallet connection dialog");

@@ -185,6 +185,22 @@
   box-shadow: none;
 }
 
+.walletOptionUnavailable {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.walletOptionUnavailable:hover {
+  background: var(--surface-neutral);
+  border-color: var(--border-neutral);
+  box-shadow: none;
+  transform: none;
+}
+
+.walletOptionUnavailable .chevron {
+  display: none;
+}
+
 /* ═══════════════════════════════════════════════════════════
    WALLET OPTION INTERNALS
    ═══════════════════════════════════════════════════════════ */
@@ -216,6 +232,18 @@
   font: var(--font-body-sm);
   color: var(--color-text-tertiary);
   line-height: 1.4;
+}
+
+.walletUnavailableBadge {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: var(--space-xs);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-sm);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
+  font: var(--font-label-sm);
 }
 
 .chevron {
