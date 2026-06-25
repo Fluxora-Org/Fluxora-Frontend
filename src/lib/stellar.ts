@@ -1,7 +1,9 @@
 const STELLAR_ADDRESS_REGEX = /^G[ABCDEFGHIJKLMNOPQRSTUVWXYZ234567]{55}$/;
+const STELLAR_CONTRACT_ID_REGEX = /^C[ABCDEFGHIJKLMNOPQRSTUVWXYZ234567]{55}$/;
 const STRKEY_BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
-const ED25519_PUBLIC_KEY_BYTE_LENGTH = 35;
+const CONTRACT_ID_VERSION_BYTE = 2 << 3;
+const STRKEY_BYTE_LENGTH = 35;
 
 function decodeBase32(value: string): Uint8Array | null {
   let bits = 0;
@@ -52,11 +54,35 @@ export function isValidStellarAddress(value: string): boolean {
   if (!STELLAR_ADDRESS_REGEX.test(trimmed)) return false;
 
   const decoded = decodeBase32(trimmed);
-  if (!decoded || decoded.length !== ED25519_PUBLIC_KEY_BYTE_LENGTH) {
+  if (!decoded || decoded.length !== STRKEY_BYTE_LENGTH) {
     return false;
   }
 
   if (decoded[0] !== ED25519_PUBLIC_KEY_VERSION_BYTE) return false;
+
+  const payload = decoded.slice(0, decoded.length - 2);
+  const checksum = decoded[decoded.length - 2] | (decoded[decoded.length - 1] << 8);
+
+  return crc16XModem(payload) === checksum;
+}
+
+/**
+ * Validates a Stellar StrKey contract ID.
+ *
+ * Contract IDs are 56-character uppercase base32 StrKeys that start with C,
+ * decode to version byte 0x10 plus a 32-byte contract hash, and end with a
+ * little-endian CRC16-XModem checksum over the version byte and payload.
+ */
+export function isValidStellarContractId(value: string): boolean {
+  const trimmed = value.trim();
+  if (!STELLAR_CONTRACT_ID_REGEX.test(trimmed)) return false;
+
+  const decoded = decodeBase32(trimmed);
+  if (!decoded || decoded.length !== STRKEY_BYTE_LENGTH) {
+    return false;
+  }
+
+  if (decoded[0] !== CONTRACT_ID_VERSION_BYTE) return false;
 
   const payload = decoded.slice(0, decoded.length - 2);
   const checksum = decoded[decoded.length - 2] | (decoded[decoded.length - 1] << 8);

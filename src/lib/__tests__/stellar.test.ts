@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { isValidStellarAddress, maskAddress, stellarExplorerUrl } from "../stellar";
+import {
+  isValidStellarAddress,
+  isValidStellarContractId,
+  maskAddress,
+  stellarExplorerUrl,
+} from "../stellar";
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
+const CONTRACT_ID_VERSION_BYTE = 2 << 3;
 
 function crc16XModem(bytes: Uint8Array): number {
   let crc = 0x0000;
@@ -42,9 +48,9 @@ function encodeBase32(bytes: Uint8Array): string {
   return encoded;
 }
 
-function createValidAddress(seed: number): string {
+function createValidStrKey(versionByte: number, seed: number): string {
   const payload = new Uint8Array(33);
-  payload[0] = ED25519_PUBLIC_KEY_VERSION_BYTE;
+  payload[0] = versionByte;
 
   for (let i = 1; i < payload.length; i += 1) {
     payload[i] = (seed + i * 17) & 0xff;
@@ -59,9 +65,13 @@ function createValidAddress(seed: number): string {
   return encodeBase32(bytes);
 }
 
-const VALID_STELLAR_ADDRESS = createValidAddress(277);
+const VALID_STELLAR_ADDRESS = createValidStrKey(ED25519_PUBLIC_KEY_VERSION_BYTE, 277);
 const checksumInvalidAddress = `${VALID_STELLAR_ADDRESS.slice(0, -1)}${
   VALID_STELLAR_ADDRESS[VALID_STELLAR_ADDRESS.length - 1] === "A" ? "B" : "A"
+}`;
+const VALID_STELLAR_CONTRACT_ID = createValidStrKey(CONTRACT_ID_VERSION_BYTE, 311);
+const checksumInvalidContractId = `${VALID_STELLAR_CONTRACT_ID.slice(0, -1)}${
+  VALID_STELLAR_CONTRACT_ID[VALID_STELLAR_CONTRACT_ID.length - 1] === "A" ? "B" : "A"
 }`;
 
 describe("Stellar address helpers", () => {
@@ -89,6 +99,26 @@ describe("Stellar address helpers", () => {
     );
     expect(maskAddress("  GSHORT  ")).toBe("GSHORT");
     expect(maskAddress("")).toBe("-");
+  });
+});
+
+describe("Stellar contract ID helpers", () => {
+  it("accepts a checksum-valid C contract ID", () => {
+    expect(VALID_STELLAR_CONTRACT_ID).toHaveLength(56);
+    expect(VALID_STELLAR_CONTRACT_ID.startsWith("C")).toBe(true);
+    expect(isValidStellarContractId(VALID_STELLAR_CONTRACT_ID)).toBe(true);
+  });
+
+  it("rejects non-contract StrKeys and checksum-invalid contract IDs", () => {
+    expect(isValidStellarContractId(VALID_STELLAR_ADDRESS)).toBe(false);
+    expect(checksumInvalidContractId).toMatch(/^C[ABCDEFGHIJKLMNOPQRSTUVWXYZ234567]{55}$/);
+    expect(isValidStellarContractId(checksumInvalidContractId)).toBe(false);
+  });
+
+  it("rejects wrong length, lowercase, and ambiguous contract characters", () => {
+    expect(isValidStellarContractId(VALID_STELLAR_CONTRACT_ID.slice(0, -1))).toBe(false);
+    expect(isValidStellarContractId(VALID_STELLAR_CONTRACT_ID.toLowerCase())).toBe(false);
+    expect(isValidStellarContractId(`C${"0".repeat(55)}`)).toBe(false);
   });
 });
 

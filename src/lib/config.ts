@@ -2,6 +2,7 @@ import {
   getExpectedStellarNetwork,
   type StellarNetwork,
 } from "./stellarNetwork";
+import { isValidStellarContractId } from "./stellar";
 
 const NETWORK_LABELS: Record<StellarNetwork, string> = {
   PUBLIC: "Public Network (Mainnet)",
@@ -23,9 +24,42 @@ export interface AppConfig {
   useMocks: boolean;
 }
 
+export class ConfigError extends Error {
+  constructor(
+    public readonly envName: string,
+    message: string,
+  ) {
+    super(`${envName}: ${message}`);
+    this.name = "ConfigError";
+  }
+}
+
 function optionalString(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function optionalStreamContractId(value: string | undefined): string | null {
+  const trimmed = optionalString(value);
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed !== value) {
+    throw new ConfigError(
+      "VITE_STREAM_CONTRACT_ID",
+      "must not include leading or trailing whitespace.",
+    );
+  }
+
+  if (!isValidStellarContractId(trimmed)) {
+    throw new ConfigError(
+      "VITE_STREAM_CONTRACT_ID",
+      "must be a valid 56-character Stellar contract ID StrKey starting with C.",
+    );
+  }
+
+  return trimmed;
 }
 
 export function parseBooleanFlag(value: string | undefined): boolean {
@@ -49,7 +83,7 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
     networkLabel: getNetworkLabel(network),
     networkPassphrase: getNetworkPassphrase(network),
     rpcUrl: optionalString(env.VITE_RPC_URL),
-    streamContractId: optionalString(env.VITE_STREAM_CONTRACT_ID),
+    streamContractId: optionalStreamContractId(env.VITE_STREAM_CONTRACT_ID),
     useMocks: parseBooleanFlag(env.VITE_USE_MOCKS),
   };
 }
