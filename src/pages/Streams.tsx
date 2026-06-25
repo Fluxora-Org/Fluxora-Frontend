@@ -34,6 +34,7 @@ import {
   formatDetailTime,
   getUrgencyLevel,
 } from "../lib/timePresentation";
+import { formatUsdc } from "../lib/usdc";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./Streams.css";
@@ -47,12 +48,6 @@ const DISCLOSURE_DURATION_MS = 200;
 const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
 const STREAM_CARD_ESTIMATED_HEIGHT = 420;
-
-function formatUsdc(value: number) {
-  return `${new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
-  }).format(value)} USDC`;
-}
 
 function formatMonthlyRate(value: number) {
   return `${formatUsdc(value)} / mo`;
