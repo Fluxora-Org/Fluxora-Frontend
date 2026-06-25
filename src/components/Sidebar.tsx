@@ -87,8 +87,18 @@ export default function Sidebar({
   ];
 
   const utilityItems = [
-    { href: "#", label: "Documentation", icon: FileText },
-    { href: "#", label: "Legal", icon: Scale },
+    {
+      href: "https://github.com/Fluxora-Org/Fluxora-Frontend#readme",
+      label: "Documentation",
+      icon: FileText,
+      external: true,
+    },
+    {
+      href: "https://github.com/Fluxora-Org/Fluxora-Frontend/blob/main/docs/security.md",
+      label: "Legal",
+      icon: Scale,
+      external: true,
+    },
   ];
 
   return (
@@ -212,6 +222,8 @@ export default function Sidebar({
               <a
                 key={item.label}
                 href={item.href}
+                target={item.external ? "_blank" : undefined}
+                rel={item.external ? "noopener noreferrer" : undefined}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
                 <item.icon size={20} className="flex-shrink-0 group-hover:text-[var(--text)]" />
