@@ -31,6 +31,14 @@ const MAX_VISIBLE = 3;
 const DEFAULT_TIMEOUT = 4000;
 
 /**
+ * Builds toast IDs from a provider-local monotonic sequence so same-tick
+ * additions cannot collide even when clocks or random sources repeat.
+ */
+function createToastId(sequence: number): string {
+  return `toast-${sequence}`;
+}
+
+/**
  * ToastProvider — wraps the app and manages a stacked toast queue.
  *
  * @example
@@ -43,6 +51,7 @@ const DEFAULT_TIMEOUT = 4000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const nextToastId = useRef(0);
 
   const dismiss = useCallback((id: string) => {
     clearTimeout(timers.current.get(id));
@@ -52,7 +61,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback(
     (message: string, variant: ToastVariant, timeout = DEFAULT_TIMEOUT): string => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const id = createToastId(nextToastId.current);
+      nextToastId.current += 1;
       setToasts((prev) => [...prev, { id, message, variant, timeout }]);
       const timer = setTimeout(() => dismiss(id), timeout);
       timers.current.set(id, timer);

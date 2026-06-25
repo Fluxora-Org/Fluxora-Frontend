@@ -112,6 +112,69 @@ describe("ToastProvider / useToast", () => {
     expect(screen.queryByText("B")).not.toBeInTheDocument();
   });
 
+  it("returns unique IDs for same-tick additions and dismisses only the targeted toast", () => {
+    const returnedIds: string[] = [];
+
+    function SameTickAdder() {
+      const { addToast, dismiss } = useToast();
+      return (
+        <button
+          onClick={() => {
+            const firstId = addToast("Same tick A", "info", 99999);
+            const secondId = addToast("Same tick B", "info", 99999);
+            const thirdId = addToast("Same tick C", "info", 99999);
+            returnedIds.push(firstId, secondId, thirdId);
+            dismiss(secondId);
+          }}
+        >
+          same tick
+        </button>
+      );
+    }
+
+    renderWithProvider(<SameTickAdder />);
+    fireEvent.click(screen.getByRole("button", { name: /same tick/i }));
+
+    expect(new Set(returnedIds).size).toBe(3);
+    expect(screen.getByText("Same tick A")).toBeInTheDocument();
+    expect(screen.queryByText("Same tick B")).not.toBeInTheDocument();
+    expect(screen.getByText("Same tick C")).toBeInTheDocument();
+  });
+
+  it("allows dismiss to be invoked repeatedly for the same ID", () => {
+    let toastId = "";
+
+    function DoubleDismissButton() {
+      const { addToast, dismiss } = useToast();
+      return (
+        <>
+          <button
+            onClick={() => {
+              toastId = addToast("Dismiss me once", "success", 99999);
+            }}
+          >
+            add once
+          </button>
+          <button
+            onClick={() => {
+              dismiss(toastId);
+              dismiss(toastId);
+            }}
+          >
+            dismiss twice
+          </button>
+        </>
+      );
+    }
+
+    renderWithProvider(<DoubleDismissButton />);
+    fireEvent.click(screen.getByRole("button", { name: /add once/i }));
+    expect(screen.getByText("Dismiss me once")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /dismiss twice/i }));
+    expect(screen.queryByText("Dismiss me once")).not.toBeInTheDocument();
+  });
+
   it("caps visible toasts at 3 and shows overflow count", () => {
     function ManyAdder() {
       const { addToast } = useToast();
