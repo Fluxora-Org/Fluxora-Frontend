@@ -26,6 +26,14 @@ function clampPage(page: number, totalPages: number): number {
   return Math.min(Math.max(Math.trunc(page), 1), totalPages);
 }
 
+/**
+ * Normalizes untrusted upstream item counts before page math or display.
+ */
+function normalizeTotalItems(totalItems: number): number {
+  if (!Number.isFinite(totalItems)) return 0;
+  return Math.max(0, Math.floor(totalItems));
+}
+
 function getPageTokens(currentPage: number, totalPages: number): PageToken[] {
   if (totalPages <= 1) return [1];
 
@@ -58,16 +66,18 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   onItemsPerPageChange,
 }) => {
-  if (totalItems === 0) return null;
+  const safeTotalItems = normalizeTotalItems(totalItems);
+
+  if (safeTotalItems === 0) return null;
 
   const safeItemsPerPage =
     Number.isFinite(itemsPerPage) && itemsPerPage > 0
       ? Math.trunc(itemsPerPage)
       : PAGE_SIZE_OPTIONS[0];
-  const totalPages = Math.max(1, Math.ceil(totalItems / safeItemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(safeTotalItems / safeItemsPerPage));
   const safeCurrentPage = clampPage(currentPage, totalPages);
   const startItem = (safeCurrentPage - 1) * safeItemsPerPage + 1;
-  const endItem = Math.min(safeCurrentPage * safeItemsPerPage, totalItems);
+  const endItem = Math.min(safeCurrentPage * safeItemsPerPage, safeTotalItems);
   const pageTokens = getPageTokens(safeCurrentPage, totalPages);
 
   const requestPageChange = (page: number) => {
@@ -86,7 +96,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       <div className="pagination-info" aria-live="polite" aria-atomic="true">
         Showing <span className="highlight">{startItem}</span> -{" "}
         <span className="highlight">{endItem}</span> of{" "}
-        <span className="highlight">{totalItems}</span> streams
+        <span className="highlight">{safeTotalItems}</span> streams
       </div>
 
       <div className="pagination-controls">

@@ -107,9 +107,41 @@ describe("Pagination", () => {
     expect(pageButtonNames()).toEqual(["1", "2", "3", "4"]);
   });
 
-  it("does not render when there are no items", () => {
+  it("does not render when there are no items or the total is negative", () => {
     const { container } = renderPagination({ totalItems: 0 });
 
     expect(container).toBeEmptyDOMElement();
+
+    const negative = renderPagination({ totalItems: -12 });
+    expect(negative.container).toBeEmptyDOMElement();
+  });
+
+  it("floors fractional totals before computing and displaying the page range", () => {
+    renderPagination({ currentPage: 2, totalItems: 25.9, itemsPerPage: 10 });
+
+    const info = document.querySelector(".pagination-info");
+    expect(info).toHaveTextContent("Showing 11 - 20 of 25 streams");
+    expect(info).not.toHaveTextContent("25.9");
+    expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(pageButtonNames()).toEqual(["1", "2", "3"]);
+  });
+
+  it("floors fractional page inputs and keeps navigation callbacks in range", () => {
+    const { onPageChange } = renderPagination({
+      currentPage: 2.9,
+      totalItems: 50,
+      itemsPerPage: 10,
+    });
+
+    expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
   });
 });
