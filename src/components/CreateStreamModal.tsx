@@ -11,8 +11,11 @@ import { createStream, getTransactionStatus } from '../lib/stellar/tx';
 import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 import {
   formatLocalDateTime,
+  getStreamEndDate,
+  isAfterStreamEndDateTime,
   isBeforeLocalDateTime,
   isDateTimeInPast,
+  parseLocalDateTime,
 } from '../lib/createStreamDates';
 
 const USDC_DECIMAL_PLACES = 7;
@@ -195,6 +198,12 @@ export default function CreateStreamModal({
     setHasCompletedConfirmation(false);
   };
 
+  const getScheduleStartDate = (): Date | null => {
+    return startTimeOption === "now"
+      ? new Date()
+      : parseLocalDateTime(customStartDate);
+  };
+
   const validateStep1 = (): boolean => {
     if (!recipient.trim()) {
       setError("Recipient is required.");
@@ -267,6 +276,13 @@ export default function CreateStreamModal({
           return false;
         }
       }
+      const scheduleStartDate = getScheduleStartDate();
+      if (
+        scheduleStartDate &&
+        isAfterStreamEndDateTime(cliffDate, scheduleStartDate, durationValue)
+      ) {
+        return false;
+      }
     }
     return true;
   };
@@ -313,13 +329,18 @@ export default function CreateStreamModal({
       const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
       const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
 
-      const start = startTimeOption === "now"
-        ? Math.floor(Date.now() / 1000)
-        : Math.floor(new Date(customStartDate).getTime() / 1000);
-
+      const streamStartDate = getScheduleStartDate();
       const durationDays = parseFloat(duration) || 0;
-      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
-      const end = start + durationSeconds;
+      const streamEndDate = streamStartDate
+        ? getStreamEndDate(streamStartDate, durationDays)
+        : null;
+      if (!streamStartDate || !streamEndDate) {
+        setError("Please enter a valid stream schedule.");
+        return;
+      }
+
+      const start = Math.floor(streamStartDate.getTime() / 1000);
+      const end = Math.floor(streamEndDate.getTime() / 1000);
 
       try {
         const response = await createStream(
@@ -565,6 +586,9 @@ export default function CreateStreamModal({
             : undefined;
           const customStartDateSuccess = startTimeOption === 'custom' && touched.customStartDate && !customStartDateError && Boolean(customStartDate);
 
+          const scheduleStartDate = startTimeOption === 'custom'
+            ? parseLocalDateTime(customStartDate)
+            : new Date();
           const cliffDateError = (cliffEnabled && touched.cliffDate)
             ? (!cliffDate
                 ? 'Cliff date is required.'
@@ -572,6 +596,8 @@ export default function CreateStreamModal({
                 ? 'Cliff date must not be in the past.'
                 : (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate))
                 ? 'Cliff date must be on or after the start date.'
+                : (scheduleStartDate && isAfterStreamEndDateTime(cliffDate, scheduleStartDate, durationValue))
+                ? 'Cliff date must be on or before the stream end date.'
                 : undefined)
             : undefined;
           const cliffDateSuccess = cliffEnabled && touched.cliffDate && !cliffDateError && Boolean(cliffDate);

@@ -4,6 +4,8 @@
  * This keeps start and cliff inputs in one representation and avoids mixing
  * date-only strings, which JavaScript parses as UTC in some environments.
  */
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export function parseLocalDateTime(value: string): Date | null {
   if (!value.trim()) return null;
 
@@ -27,6 +29,42 @@ export function isBeforeLocalDateTime(
   const anchorDate = parseLocalDateTime(anchor);
   if (!candidateDate || !anchorDate) return true;
   return candidateDate.getTime() < anchorDate.getTime();
+}
+
+/**
+ * Computes the stream end from a validated local start datetime and duration.
+ * Invalid starts or non-positive durations return null so callers fail closed.
+ */
+export function getStreamEndDate(
+  startDate: Date,
+  durationDays: number,
+): Date | null {
+  const startTime = startDate.getTime();
+  if (
+    !Number.isFinite(startTime) ||
+    !Number.isFinite(durationDays) ||
+    durationDays <= 0
+  ) {
+    return null;
+  }
+
+  return new Date(startTime + durationDays * MILLISECONDS_PER_DAY);
+}
+
+/**
+ * Returns true when a cliff falls after the computed stream end date.
+ * Equality is allowed because funds can be claimed once the stream completes.
+ */
+export function isAfterStreamEndDateTime(
+  cliffValue: string,
+  startDate: Date,
+  durationDays: number,
+): boolean {
+  const cliffDate = parseLocalDateTime(cliffValue);
+  const endDate = getStreamEndDate(startDate, durationDays);
+  if (!cliffDate || !endDate) return true;
+
+  return cliffDate.getTime() > endDate.getTime();
 }
 
 /** Formats a local datetime string for the review step without changing zones. */

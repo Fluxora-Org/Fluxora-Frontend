@@ -84,4 +84,52 @@ describe("CreateStreamModal date consistency", () => {
       screen.getByText("Cliff date must be on or after the start date."),
     ).toBeInTheDocument();
   });
+
+  it("rejects a cliff datetime after the computed stream end", () => {
+    const { container } = renderStep2();
+
+    fireEvent.click(screen.getByRole("button", { name: /custom date/i }));
+    fireEvent.change(
+      container.querySelector("#create-stream-custom-start-date") as HTMLInputElement,
+      { target: { value: "2026-06-20T14:00" } },
+    );
+    fireEvent.change(
+      container.querySelector("#create-stream-duration") as HTMLInputElement,
+      { target: { value: "1" } },
+    );
+    fireEvent.click(screen.getByText(/enable cliff/i));
+    fireEvent.change(
+      container.querySelector("#create-stream-cliff-date") as HTMLInputElement,
+      { target: { value: "2026-06-21T14:01" } },
+    );
+    goToReview(container);
+
+    expect(
+      screen.getByText("Cliff date must be on or before the stream end date."),
+    ).toBeInTheDocument();
+  });
+
+  it("allows a cliff datetime exactly at the computed stream end", () => {
+    const { container } = renderStep2();
+
+    fireEvent.click(screen.getByRole("button", { name: /custom date/i }));
+    fireEvent.change(
+      container.querySelector("#create-stream-custom-start-date") as HTMLInputElement,
+      { target: { value: "2026-06-20T14:00" } },
+    );
+    fireEvent.change(
+      container.querySelector("#create-stream-duration") as HTMLInputElement,
+      { target: { value: "1" } },
+    );
+    fireEvent.click(screen.getByText(/enable cliff/i));
+    fireEvent.change(
+      container.querySelector("#create-stream-cliff-date") as HTMLInputElement,
+      { target: { value: "2026-06-21T14:00" } },
+    );
+    goToReview(container);
+
+    expect(
+      within(container).getByRole("button", { name: /^create stream$/i }),
+    ).toBeInTheDocument();
+  });
 });
