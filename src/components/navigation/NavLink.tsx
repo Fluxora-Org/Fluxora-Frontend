@@ -7,7 +7,27 @@ interface NavLinkProps {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-    variant?: "primary" | "secondary"; // added
+  variant?: "primary" | "secondary";
+  end?: boolean;
+}
+
+function normalizePath(path: string): string {
+  if (path === "/") return path;
+  return path.replace(/\/+$/, "") || "/";
+}
+
+/**
+ * Matches navigation links on complete path segments instead of raw prefixes.
+ */
+function isPathActive(pathname: string, to: string, end = false): boolean {
+  const currentPath = normalizePath(pathname);
+  const targetPath = normalizePath(to);
+
+  if (targetPath === "/" || end) {
+    return currentPath === targetPath;
+  }
+
+  return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
 /**
@@ -29,10 +49,11 @@ export default function NavLink({
   icon,
   onClick,
   disabled = false,
-  variant = "primary", //added
+  variant = "primary",
+  end = false,
 }: NavLinkProps) {
   const { pathname } = useLocation();
-  const isActive = pathname === to || (to !== "/" && pathname.startsWith(to));
+  const isActive = isPathActive(pathname, to, end);
 
   return (
     <Link
