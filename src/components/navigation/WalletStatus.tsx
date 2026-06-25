@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import { AlertCircle, ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
 import {
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
@@ -14,6 +14,7 @@ interface WalletStatusProps {
   onDisconnect?: () => void;
 }
 
+type CopyState = "idle" | "copied" | "error";
 
 export default function WalletStatus({
   address,
@@ -23,7 +24,7 @@ export default function WalletStatus({
   onDisconnect,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -34,6 +35,36 @@ export default function WalletStatus({
   const networkUpper = normalizeStellarNetwork(network);
   const isWrongNetwork = isNetworkMismatch;
   const isTestnet = networkUpper === "TESTNET";
+
+  const fallbackCopyAddress = () => {
+    const textarea = document.createElement("textarea");
+    textarea.value = address;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      return document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const copyAddress = async () => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(address);
+        return true;
+      } catch {
+        return fallbackCopyAddress();
+      }
+    }
+
+    return fallbackCopyAddress();
+  };
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -69,10 +100,19 @@ export default function WalletStatus({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
+      const didCopy = await copyAddress();
+      if (!didCopy) {
+        throw new Error("Fallback copy command failed");
+      }
+
+      setCopyState("copied");
+      setAnnouncement("Wallet address copied.");
+      setTimeout(() => setCopyState("idle"), 1500);
+    } catch {
+      setCopyState("error");
+      setAnnouncement("Wallet address could not be copied.");
+      setTimeout(() => setCopyState("idle"), 3000);
+    }
   };
 
   const closeMenu = () => {
@@ -175,12 +215,18 @@ export default function WalletStatus({
                   onClick={handleCopy}
                   className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
                 >
-                  {copied ? (
+                  {copyState === "copied" ? (
                     <Check size={16} className="text-emerald-400" />
+                  ) : copyState === "error" ? (
+                    <AlertCircle size={16} className="text-red-400" />
                   ) : (
                     <Copy size={16} />
                   )}
-                  {copied ? "Copied!" : "Copy address"}
+                  {copyState === "copied"
+                    ? "Copied!"
+                    : copyState === "error"
+                      ? "Copy failed"
+                      : "Copy address"}
                 </button>
 
                 <button
