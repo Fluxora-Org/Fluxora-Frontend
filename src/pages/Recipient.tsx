@@ -5,9 +5,44 @@ import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
+import {
+  mockRecipientStreams,
+  type RecipientStream,
+} from "../fixtures/recipientStreams";
 import { withdraw } from "../lib/stellar/tx";
 import "./Streams.css";
 import "./Recipient.css";
+
+const USDC_SCALE = 10_000_000;
+const MAX_U64 = 18_446_744_073_709_551_615n;
+
+/** Returns true when a stream id can be encoded as a positive Soroban u64. */
+export function isValidWithdrawStreamId(streamId: string | undefined): streamId is string {
+  if (!streamId) return false;
+
+  const normalized = streamId.trim();
+  if (!/^\d+$/.test(normalized)) return false;
+
+  const value = BigInt(normalized);
+  return value > 0n && value <= MAX_U64;
+}
+
+/** Selects the active recipient stream that should back the next withdrawal. */
+export function selectWithdrawStream(streams: RecipientStream[]): RecipientStream | null {
+  const activeStreams = streams.filter(
+    (stream) => stream.status === "active" && isValidWithdrawStreamId(stream.id),
+  );
+
+  return activeStreams.find((stream) => stream.isPinned) ?? activeStreams[0] ?? null;
+}
+
+/** Converts the displayed USDC balance to the 7-decimal on-chain amount. */
+export function getWithdrawAmount(balance: number): string | null {
+  if (!Number.isFinite(balance) || balance <= 0) return null;
+
+  const scaledAmount = Math.floor(balance * USDC_SCALE);
+  return scaledAmount > 0 ? scaledAmount.toString() : null;
+}
 
 export default function Recipient() {
   const wallet = useWallet();
@@ -22,13 +57,16 @@ export default function Recipient() {
     return () => clearTimeout(t);
   }, []);
 
+  const recipientStreams = mockRecipientStreams;
+  const selectedWithdrawStream = selectWithdrawStream(recipientStreams);
+
   const balance: number = 22600.0;
-  const activeStreams = 2;
+  const activeStreams = recipientStreams.filter((stream) => stream.status === "active").length;
   const totalAccrued = 43250.0;
   const totalWithdrawn = 20650.0;
 
   const walletConnected = wallet.connected;
-  const hasStreams = activeStreams > 0;
+  const hasStreams = recipientStreams.length > 0;
 
   const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
 
@@ -36,7 +74,7 @@ export default function Recipient() {
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
   
   const isPending = txState === "signing" || txState === "submitting";
-  const disabled = !walletConnected || balance === 0 || networkMismatch || isPending;
+  const disabled = !walletConnected || !wallet.address || balance === 0 || networkMismatch || isPending;
 
   const handleWithdraw = async () => {
     if (disabled) return;
@@ -44,8 +82,18 @@ export default function Recipient() {
     setErrorMsg(null);
 
     const recipientAddr = wallet.address!;
-    const amountStr = Math.floor(balance * 10_000_000).toString(); // Scale to 7 decimals
-    const streamId = "1"; // Default stream ID
+    const amountStr = getWithdrawAmount(balance);
+    const streamId = selectedWithdrawStream?.id;
+
+    if (!isValidWithdrawStreamId(streamId) || !amountStr) {
+      const message = !streamId
+        ? "No valid stream is available for withdrawal."
+        : "Withdrawal amount must be greater than zero.";
+      setTxState("error");
+      setErrorMsg(message);
+      addToast(message, "error");
+      return;
+    }
 
     try {
       setTxState("submitting");
@@ -174,7 +222,7 @@ export default function Recipient() {
           </div>
         </div>
         <div className="mt-6">
-          <RecipientStreams />
+          <RecipientStreams initialStreams={recipientStreams} />
         </div>
       </section>
     </main>

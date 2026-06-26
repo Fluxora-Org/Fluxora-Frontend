@@ -12,7 +12,7 @@ export interface RecipientStream {
 
 export const mockRecipientStreams: RecipientStream[] = [
   {
-    id: "1",
+    id: "101",
     sender: "GD...3X4",
     senderName: "Stellar Dev Foundation",
     amount: 15000,

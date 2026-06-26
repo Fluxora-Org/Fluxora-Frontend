@@ -37,8 +37,14 @@ export function sortRecipientStreams(
   });
 }
 
-export default function RecipientStreams() {
-  const [streams, setStreams] = useState<RecipientStream[]>(mockRecipientStreams);
+interface RecipientStreamsProps {
+  initialStreams?: RecipientStream[];
+}
+
+export default function RecipientStreams({
+  initialStreams = mockRecipientStreams,
+}: RecipientStreamsProps) {
+  const [streams, setStreams] = useState<RecipientStream[]>(initialStreams);
   const [sortKey, setSortKey] = useState<RecipientStreamsSortKey>("pinned");
 
   const togglePin = (id: string) => {
