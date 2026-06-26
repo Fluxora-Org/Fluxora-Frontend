@@ -23,6 +23,33 @@ export class TransactionError extends Error {
 }
 
 /**
+ * Maximum time to wait for Freighter to report its active Stellar network.
+ * Extension updates or locked wallet state can otherwise hang stream creation.
+ */
+export const FREIGHTER_NETWORK_TIMEOUT_MS = 10_000;
+
+/**
+ * Runs an async operation with a timeout and clears the timer on both success
+ * and failure to avoid dangling timers after a fast Freighter response.
+ */
+function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  createError: () => Error,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(createError()), timeoutMs);
+  });
+
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
+
+/**
  * Returns the appropriate network passphrase for a given network name.
  * @param networkName - The name of the network (e.g. "TESTNET", "PUBLIC").
  */
@@ -67,8 +94,18 @@ async function validateNetwork(): Promise<void> {
   const expectedNet = appConfig.network;
   let connectedNetRes;
   try {
-    connectedNetRes = await getNetwork();
+    connectedNetRes = await withTimeout(
+      getNetwork(),
+      FREIGHTER_NETWORK_TIMEOUT_MS,
+      () => new TransactionError(
+        "timeout",
+        "Freighter did not respond while checking the Stellar network. Please unlock or refresh Freighter and try again.",
+      ),
+    );
   } catch (err: any) {
+    if (err instanceof TransactionError) {
+      throw err;
+    }
     throw new TransactionError("rpc", `Freighter not connected or unavailable. Error: ${err.message || err}`);
   }
 

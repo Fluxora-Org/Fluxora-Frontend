@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createStream,
   withdraw,
@@ -6,6 +6,7 @@ import {
   cancelStream,
   getTransactionStatus,
   TransactionError,
+  FREIGHTER_NETWORK_TIMEOUT_MS,
 } from "../tx";
 import * as freighter from "@stellar/freighter-api";
 import { rpc as SorobanRpc, Account } from "@stellar/stellar-sdk";
@@ -99,6 +100,10 @@ describe("Soroban transaction layer (tx.ts)", () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   // ── 1. Happy Paths ─────────────────────────────────────────────────────────
 
   it("should create a stream successfully", async () => {
@@ -175,6 +180,25 @@ describe("Soroban transaction layer (tx.ts)", () => {
     );
   });
 
+  it("should throw timeout error if Freighter network validation hangs", async () => {
+    vi.useFakeTimers();
+    vi.mocked(freighter.getNetwork).mockReturnValue(new Promise(() => {}) as any);
+
+    const expectation = expect(
+      createStream(mockAddress, mockAddress, "1000", 100, 1000)
+    ).rejects.toThrowError(
+      new TransactionError(
+        "timeout",
+        "Freighter did not respond while checking the Stellar network. Please unlock or refresh Freighter and try again.",
+      )
+    );
+
+    await vi.advanceTimersByTimeAsync(FREIGHTER_NETWORK_TIMEOUT_MS);
+    await expectation;
+
+    expect(serverInstance.getAccount).not.toHaveBeenCalled();
+  });
+
   it("should throw rejected error if Freighter signing request is declined by the user", async () => {
     vi.mocked(freighter.signTransaction).mockRejectedValue(new Error("User reject this request"));
 
@@ -219,6 +243,5 @@ describe("Soroban transaction layer (tx.ts)", () => {
 
     // Default maxRetries is 15
     expect(serverInstance.getTransaction).toHaveBeenCalledTimes(15);
-    vi.useRealTimers();
   });
 });
