@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './InfoTooltip.css';
 
 export interface InfoTooltipProps {
@@ -133,13 +133,13 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  // Focus close button when tooltip opens
-  useEffect(() => {
+  // Focus close button when tooltip opens using layout effect for reliable timing
+  useLayoutEffect(() => {
     if (isOpen && closeButtonRef.current) {
-      // Small delay to allow positioning to settle
-      setTimeout(() => {
+      const raf = requestAnimationFrame(() => {
         closeButtonRef.current?.focus();
-      }, 50);
+      });
+      return () => cancelAnimationFrame(raf);
     }
   }, [isOpen]);
 
