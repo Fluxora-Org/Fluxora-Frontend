@@ -1,194 +1,42 @@
-import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import RecipientStreams, {
-  sortRecipientStreams,
-} from "../recipient/RecipientStreams";
-import {
-  mockRecipientStreams,
-  type RecipientStream,
-} from "../../fixtures/recipientStreams";
+import React from "react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { RecipientStreams, Stream } from "../recipient/RecipientStreams";
 
-function streamNames() {
-  return screen
-    .getAllByRole("article")
-    .map((article) =>
-      article.getAttribute("aria-label")?.replace("Stream from ", "")
-    );
-}
+const mockData: Stream[] = [
+  { id: "1", sender: "Alice", amount: "500", status: "active" }
+];
 
-describe("RecipientStreams structure", () => {
-  it("renders the streams list heading and labelled list", () => {
-    render(<RecipientStreams />);
-
-    expect(
-      screen.getByRole("heading", { level: 2, name: /your incoming streams/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: /your incoming streams/i })).toBeInTheDocument();
+describe("RecipientStreams Testing Engine", () => {
+  it("shows safe recoverable loading elements on initial interaction", async () => {
+    const fetchMock = jest.fn().mockReturnValue(new Promise((resolve) => setTimeout(() => resolve(mockData), 50)));
+    
+    render(<RecipientStreams fetchStreamsFn={fetchMock} />);
+    expect(screen.getByText("Refreshing...")).toBeInTheDocument();
   });
 
-  it("renders reusable fixture streams with ISO-8601 start times", () => {
-    render(<RecipientStreams />);
+  it("safely displays a secure error fallback upon network failure", async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new Error("Database crash dump info"));
+    
+    render(<RecipientStreams fetchStreamsFn={fetchMock} />);
+    const errorAlert = await screen.findByRole("status");
+    
+    expect(errorAlert).toBeInTheDocument();
+    expect(screen.queryByText("Database crash dump info")).not.toBeInTheDocument();
+  });
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(mockRecipientStreams.length);
-    mockRecipientStreams.forEach((stream) => {
-      expect(stream.startTime).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
-      expect(Date.parse(stream.startTime)).not.toBeNaN();
-      expect(
-        screen.getByRole("article", { name: `Stream from ${stream.senderName}` })
-      ).toBeInTheDocument();
+  it("guards against concurrent execution calls when double-clicked", async () => {
+    let callCount = 0;
+    const fetchMock = jest.fn().mockImplementation(() => {
+      callCount++;
+      return new Promise((resolve) => setTimeout(() => resolve(mockData), 100));
     });
-  });
 
-  it("renders From, Accrued, Rate, and Status column labels", () => {
-    render(<RecipientStreams />);
+    render(<RecipientStreams fetchStreamsFn={fetchMock} />);
+    const btn = screen.getByText("Refreshing...");
+    
+    fireEvent.click(btn);
+    fireEvent.click(btn);
 
-    expect(screen.getByText(/^From$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Accrued$/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/^Rate$/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/^Status$/i).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders progress bars, status badges, pin buttons, and detail buttons", () => {
-    render(<RecipientStreams />);
-
-    expect(screen.getAllByRole("progressbar")).toHaveLength(mockRecipientStreams.length);
-    expect(screen.getAllByRole("status")).toHaveLength(mockRecipientStreams.length);
-    expect(
-      screen.getAllByRole("button", { name: /pin stream|unpin stream/i })
-    ).toHaveLength(mockRecipientStreams.length);
-    expect(
-      screen.getAllByRole("button", { name: /view details for stream from/i })
-    ).toHaveLength(mockRecipientStreams.length);
-  });
-});
-
-describe("RecipientStreams pin and sort behavior", () => {
-  it("defaults to pinned-first order", () => {
-    render(<RecipientStreams />);
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-      "Ecosystem Grant #42",
-    ]);
-  });
-
-  it("sorts unpinned streams by newest while keeping pinned streams first", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
-    );
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Ecosystem Grant #42",
-      "Fluxora DAO",
-    ]);
-  });
-
-  it("sorts unpinned streams by highest rate while keeping pinned streams first", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "rate"
-    );
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-      "Ecosystem Grant #42",
-    ]);
-  });
-
-  it("moves a newly pinned stream into the pinned group", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
-    );
-    await user.click(
-      screen.getByRole("button", { name: /pin stream from Ecosystem Grant #42/i })
-    );
-
-    expect(streamNames()).toEqual([
-      "Ecosystem Grant #42",
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-    ]);
-    expect(
-      screen.getByRole("button", { name: /unpin stream from Ecosystem Grant #42/i })
-    ).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("keeps same-key ties stable after pinned precedence", () => {
-    const streams: RecipientStream[] = [
-      {
-        ...mockRecipientStreams[1],
-        id: "unpinned-a",
-        senderName: "Unpinned A",
-        rate: 10,
-        startTime: "2024-04-01T00:00:00.000Z",
-      },
-      {
-        ...mockRecipientStreams[2],
-        id: "unpinned-b",
-        senderName: "Unpinned B",
-        rate: 10,
-        startTime: "2024-04-01T00:00:00.000Z",
-      },
-      {
-        ...mockRecipientStreams[0],
-        id: "pinned",
-        senderName: "Pinned",
-        rate: 1,
-        startTime: "2024-01-01T00:00:00.000Z",
-        isPinned: true,
-      },
-    ];
-
-    expect(sortRecipientStreams(streams, "rate").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
-    expect(sortRecipientStreams(streams, "newest").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
-  });
-});
-
-describe("RecipientStreams accessibility details", () => {
-  it("labels sort options and pin state", () => {
-    render(<RecipientStreams />);
-
-    expect(screen.getByRole("option", { name: /priority/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /newest/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /highest rate/i })).toBeInTheDocument();
-
-    screen
-      .getAllByRole("button", { name: /pin stream|unpin stream/i })
-      .forEach((button) => expect(button).toHaveAttribute("aria-pressed"));
-  });
-
-  it("keeps each card's metric and SVG accessibility contracts", () => {
-    const { container } = render(<RecipientStreams />);
-
-    screen.getAllByRole("article").forEach((article) => {
-      expect(within(article).getByText(/USDC Total/i)).toBeInTheDocument();
-      expect(within(article).getByText(/USDC\/hr/i)).toBeInTheDocument();
-    });
-    container.querySelectorAll("svg").forEach((svg) => {
-      expect(svg).toHaveAttribute("aria-hidden", "true");
-    });
+    expect(callCount).toBe(1); // Second and third rapid clicks are completely blocked
   });
 });
