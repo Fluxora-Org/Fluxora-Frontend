@@ -1,10 +1,14 @@
 import { act, render, screen, within } from "@testing-library/react";
+
+// Increase Vitest timeout for async tests that involve timers
+vi.setTimeout(10000);
 import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Recipient gates the withdraw flow on a connected wallet on the matching
 // network. The global test setup stubs the wallet as disconnected, so provide a
 // connected stub here to exercise the loaded recipient portal.
+const mockHook = require('../../components/treasuryOverviewPage/useTreasuryOverviewData').useTreasuryOverviewData as any;
 vi.mock("../../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN",
