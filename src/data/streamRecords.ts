@@ -218,3 +218,115 @@ export const streamRecords: StreamRecord[] = [
 export function getStreamRecord(streamId: string): StreamRecord | undefined {
   return streamRecords.find((stream) => stream.id === streamId);
 }
+
+const STELLAR_ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
+const ABBREVIATED_ADDRESS_PATTERN = /^[GC][A-Z0-9]{3,8}\.{2,4}[A-Za-z0-9]{2,8}$/;
+
+/**
+ * Validate and sanitize a Stellar address string before it is rendered in
+ * explorer links, clipboard payloads, or URL parameters.
+ *
+ * Accepts canonical 56-character Stellar account/contract addresses (G... or
+ * C...) and the abbreviated display form used by mock fixtures (e.g.
+ * `GABC...XYZ1`). Returns an empty string when the input cannot be safely used.
+ */
+export function sanitizeStellarAddress(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return "";
+  if (STELLAR_ADDRESS_PATTERN.test(trimmed)) return trimmed;
+  if (ABBREVIATED_ADDRESS_PATTERN.test(trimmed)) return trimmed;
+  return "";
+}
+
+function readString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function readNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function readStatus(value: unknown): StreamStatus {
+  if (value === "Active" || value === "Paused" || value === "Completed") {
+    return value;
+  }
+  return "Active";
+}
+
+function readHealth(value: unknown): StreamHealth {
+  if (value === "Healthy" || value === "Attention" || value === "Settled") {
+    return value;
+  }
+  return "Healthy";
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function readTimeline(value: unknown): StreamTimelineEvent[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const event = entry as Record<string, unknown>;
+      return {
+        date: readString(event.date),
+        title: readString(event.title),
+        detail: readString(event.detail),
+      } satisfies StreamTimelineEvent;
+    })
+    .filter((entry): entry is StreamTimelineEvent => entry !== null);
+}
+
+/**
+ * Map a raw API or Soroban RPC payload onto a {@link StreamRecord}.
+ *
+ * Recipient and treasury addresses are passed through
+ * {@link sanitizeStellarAddress} before they reach the UI, so a malformed
+ * upstream payload cannot inject arbitrary content into explorer links or the
+ * clipboard. Unknown fields fall back to safe defaults so the rest of the row
+ * can still render rather than blanking the whole page.
+ */
+export function normalizeStreamRecord(raw: unknown): StreamRecord {
+  const source =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    id: readString(source.id),
+    name: readString(source.name, "Untitled stream"),
+    recipientName: readString(source.recipientName, "Unknown recipient"),
+    recipientAddress: sanitizeStellarAddress(source.recipientAddress),
+    treasuryName: readString(source.treasuryName, "Unknown treasury"),
+    treasuryAddress: sanitizeStellarAddress(source.treasuryAddress),
+    asset: readString(source.asset, "USDC"),
+    status: readStatus(source.status),
+    monthlyRate: readNumber(source.monthlyRate),
+    depositAmount: readNumber(source.depositAmount),
+    streamedAmount: readNumber(source.streamedAmount),
+    withdrawableAmount: readNumber(source.withdrawableAmount),
+    remainingAmount: readNumber(source.remainingAmount),
+    progress: Math.min(100, Math.max(0, readNumber(source.progress))),
+    startDate: readString(source.startDate),
+    endDate: readString(source.endDate),
+    cliffDate:
+      typeof source.cliffDate === "string" ? source.cliffDate : undefined,
+    nextUnlockDate:
+      typeof source.nextUnlockDate === "string"
+        ? source.nextUnlockDate
+        : undefined,
+    summary: readString(source.summary),
+    health: readHealth(source.health),
+    healthNote: readString(source.healthNote),
+    auditNote: readString(source.auditNote),
+    tags: readStringArray(source.tags),
+    timeline: readTimeline(source.timeline),
+  };
+}

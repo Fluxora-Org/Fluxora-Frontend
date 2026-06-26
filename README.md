@@ -227,6 +227,37 @@ Stellar metadata:
 Only expose public client metadata through `VITE_` variables. Do not put API
 secrets, signing keys, or wallet credentials in frontend env files.
 
+## Streams data service layer
+
+The treasury overview, streams list, and recipient portal all read through a
+single typed service module at `src/lib/api/streamsService.ts`. The matching
+`useTreasury` and `useRecipientStreams` hooks
+(`src/components/treasuryOverviewPage/useTreasury.ts`) expose
+`{ metrics, streams, loading, error, refetch }` so pages can drive their
+loading skeletons and empty states from one source of truth.
+
+The service is wired with a clear seam to swap in Soroban RPC reads later:
+
+- `VITE_API_URL` sets the live HTTP base URL. When unset or blank the service
+  falls back to a typed `http://localhost:8787` placeholder so the typings
+  stay honest until a real backend lands. Once the Fluxora data service is
+  deployed, point this at the production origin and leave `VITE_USE_MOCKS`
+  unset.
+- `VITE_USE_MOCKS=true` (or `1`) keeps the seeded `streamRecords.ts`
+  fixtures as the data source. Every page renders demo content without
+  contacting the network. Recommended for local dev and screenshot demos
+  until the protocol backend is in place.
+- Untrusted addresses are passed through `sanitizeStellarAddress` before
+  they reach explorer links, the clipboard, or query strings. Filter and
+  path parameters are URL-encoded inside the service, never interpolated
+  raw. Non-2xx responses fail closed by throwing a typed
+  `StreamsServiceError`, which the hook translates into the `error` field
+  on the consumer side.
+- To migrate to direct Soroban RPC reads, replace the `fetchJson` calls
+  inside `streamsService.ts` with the equivalent contract reads (one
+  function per service method) and keep the surface shape identical so
+  hooks and pages keep working without changes.
+
 ## Transaction Signing Layer (Stellar / Soroban)
 
 Fluxora integrates with the Stellar ecosystem for on-chain stream management:

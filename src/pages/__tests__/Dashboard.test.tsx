@@ -8,6 +8,22 @@ vi.mock("@stellar/freighter-api", () => ({
   getAddress: vi.fn(),
 }));
 
+vi.mock("../../components/treasuryOverviewPage/useTreasury", () => ({
+  useTreasury: () => ({
+    metrics: [],
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useRecipientStreams: () => ({
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 describe("Dashboard page accessibility and announcements", () => {
   beforeEach(() => {
     vi.useFakeTimers();

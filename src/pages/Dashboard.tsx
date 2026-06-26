@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
 import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
@@ -10,7 +10,25 @@ import ToastNotification, {
 } from "../components/ToastNotification";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
+import type { StreamRecord } from "../data/streamRecords";
 import "../design-tokens.css";
+
+function formatUsdc(amount: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+    amount,
+  )} USDC`;
+}
+
+function toRecentStream(record: StreamRecord): Stream {
+  return {
+    name: record.name,
+    id: record.id,
+    recipient: record.recipientAddress || record.recipientName,
+    rate: `${formatUsdc(record.monthlyRate)} / mo`,
+    status: record.status,
+  };
+}
 
 const ONBOARDING_KEY = "fluxora_onboarding_dismissed";
 
@@ -31,10 +49,8 @@ function markOnboardingSeen(): void {
 }
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [streams] = useState<Stream[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -45,15 +61,23 @@ export default function Dashboard() {
   const wallet = useWallet();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
+  const treasury = useTreasury();
+  const { loading, error, refetch } = treasury;
+  const streams = useMemo<Stream[]>(
+    () => treasury.streams.map(toRecentStream),
+    [treasury.streams],
+  );
+  const totalStreaming = useMemo(
+    () =>
+      treasury.streams
+        .filter((record) => record.status === "Active")
+        .reduce((sum, record) => sum + record.depositAmount, 0),
+    [treasury.streams],
+  );
 
   useEffect(() => {
     setWithdrawable(walletConnected ? 22600 : null);
   }, [walletConnected]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1200);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -119,6 +143,7 @@ export default function Dashboard() {
   if (loading) return <TreasuryOverviewLoading />;
 
   const hasStreams = streams.length > 0;
+  const hasError = !!error;
 
   return (
     <div>
@@ -192,7 +217,9 @@ export default function Dashboard() {
           >
             Total Streaming
           </div>
-          <div className="text-heading-2">-- USDC</div>
+          <div className="text-heading-2">
+            {totalStreaming > 0 ? formatUsdc(totalStreaming) : "-- USDC"}
+          </div>
         </div>
         <div style={card}>
           <div
@@ -208,6 +235,19 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {hasError && (
+        <div role="alert" style={walletBannerStyle}>
+          <span style={{ color: "var(--text)" }}>{error}</span>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {hasStreams ? (
         <>

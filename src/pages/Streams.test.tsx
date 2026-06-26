@@ -7,6 +7,22 @@ import Streams from "./Streams";
 import { streamRecords } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
 
+vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
+  useTreasury: () => ({
+    metrics: [],
+    streams: streamRecords,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useRecipientStreams: () => ({
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
 type ClipboardMock = {
   writeText: ReturnType<typeof vi.fn>;

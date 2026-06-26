@@ -21,12 +21,11 @@ import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
 import VirtualList from "../components/VirtualList";
 import {
-  getStreamRecord,
-  streamRecords,
   type StreamHealth,
   type StreamRecord,
   type StreamStatus,
 } from "../data/streamRecords";
+import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -744,13 +743,11 @@ export default function Streams() {
   const { addToast } = useToast();
   const hasMountedFilterAnnouncer = useRef(false);
 
-  const [loading, setLoading] = useState(true);
+  const { streams, loading, error, refetch } = useTreasury();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
-  const [expandedStreamId, setExpandedStreamId] = useState<string>(
-    streamRecords[0]?.id ?? "",
-  );
+  const [expandedStreamId, setExpandedStreamId] = useState<string>("");
   const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -764,18 +761,21 @@ export default function Streams() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const walletConnected = true;
+  const hasInitializedExpanded = useRef(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 2000);
-    return () => window.clearTimeout(timer);
-  }, []);
+    if (!hasInitializedExpanded.current && streams.length > 0) {
+      hasInitializedExpanded.current = true;
+      setExpandedStreamId(streams[0]!.id);
+    }
+  }, [streams]);
 
-  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
+  const activeStreams = streams.filter((stream) => stream.status === "Active");
   const monthlyOutflow = activeStreams.reduce(
     (total, stream) => total + stream.monthlyRate,
     0,
   );
-  const withdrawableNow = streamRecords.reduce(
+  const withdrawableNow = streams.reduce(
     (total, stream) => total + stream.withdrawableAmount,
     0,
   );
@@ -786,7 +786,7 @@ export default function Streams() {
   const visibleStreams = useMemo(() => {
     const normalizedSearch = searchQuery.toLowerCase();
 
-    return streamRecords
+    return streams
       .filter((stream) => {
         const matchesStatus =
           statusFilter === "All" || stream.status === statusFilter;
@@ -802,7 +802,7 @@ export default function Streams() {
         // Default to recent (higher ID first for demo)
         return b.id.localeCompare(a.id);
       });
-  }, [searchQuery, sortBy, statusFilter]);
+  }, [searchQuery, sortBy, statusFilter, streams]);
 
   useEffect(() => {
     if (!hasMountedFilterAnnouncer.current) {
@@ -820,8 +820,10 @@ export default function Streams() {
 
     return () => window.clearTimeout(timer);
   }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
-  const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
-  const hasStreams = streamRecords.length > 0;
+  const selectedStream = streamId
+    ? streams.find((stream) => stream.id === streamId)
+    : undefined;
+  const hasStreams = streams.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
   // Zero-accrual: connected + streams exist + nothing is withdrawable yet
   const showZeroAccrual =
@@ -841,14 +843,15 @@ export default function Streams() {
   }, []);
 
   const handleStreamCreated = useCallback(() => {
-    const generatedId = `STR-${String(streamRecords.length + 1).padStart(3, "0")}`;
+    const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
       id: generatedId,
       url: `https://fluxora.io/stream/${generatedId}`,
     });
     setIsCreateModalOpen(false);
     setIsSuccessModalOpen(true);
-  }, []);
+    refetch();
+  }, [refetch, streams.length]);
 
   const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
     try {
@@ -901,6 +904,24 @@ export default function Streams() {
   );
 
   if (loading) return <StreamsLoading />;
+
+  if (error) {
+    return (
+      <section className="streams-page">
+        <h1 style={{ marginTop: 0 }}>Streams</h1>
+        <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
+          {error}
+        </p>
+        <button
+          type="button"
+          className="streams-primary-button"
+          onClick={refetch}
+        >
+          Try again
+        </button>
+      </section>
+    );
+  }
 
   if (streamId && !selectedStream) {
     return (
@@ -983,7 +1004,7 @@ export default function Streams() {
               <button
                 type="button"
                 className="streams-secondary-button"
-                onClick={() => navigate(`/app/streams/${streamRecords[0]?.id}`)}
+                onClick={() => navigate(`/app/streams/${streams[0]?.id}`)}
               >
                 Open featured deep dive
               </button>
@@ -997,9 +1018,7 @@ export default function Streams() {
                 reason="cliff"
                 nextEventDate={nextUnlock}
                 onAction={() => {
-                  const first = streamRecords.find(
-                    (s) => s.status === "Active",
-                  );
+                  const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
                 actionLabel="Check cliff date"
