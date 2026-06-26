@@ -1,0 +1,36 @@
+name: Bundle size
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  bundle-size:
+    name: Check bundle size budget
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and check bundle budget
+        run: npm run build:report
+
+      - name: Upload bundle size report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size-report
+          path: dist/bundle-size-report.md
+          if-no-files-found: warn

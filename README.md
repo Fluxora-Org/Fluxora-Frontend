@@ -102,6 +102,17 @@ the production build. Vite warns when any chunk exceeds 650 kB, and
 `vite.config.ts` splits vendor code into `vendor-react`, `vendor-stellar`, and
 `vendor-icons` chunks so PR reviewers can spot bundle regressions.
 
+The bundle report also enforces CI budgets:
+
+- Total JavaScript gzip: 230 kB
+- Individual JavaScript chunk gzip: 95 kB
+
+If a budget is intentionally raised, update the defaults in
+`scripts/bundle-size-report.mjs` or override them in CI with
+`BUNDLE_TOTAL_JS_GZIP_BUDGET_KB` and `BUNDLE_JS_CHUNK_GZIP_BUDGET_KB`. The
+bundle-size workflow uploads `dist/bundle-size-report.md` as a PR artifact so
+reviewers can inspect the exact chunk table.
+
 ## Project structure
 
 ```
