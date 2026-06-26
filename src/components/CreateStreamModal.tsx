@@ -321,6 +321,10 @@ export default function CreateStreamModal({
       const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
       const end = start + durationSeconds;
 
+      const cliffTime = cliffEnabled && cliffDate
+        ? Math.floor(new Date(cliffDate).getTime() / 1000)
+        : undefined;
+
       try {
         const response = await createStream(
           sender,
@@ -328,6 +332,7 @@ export default function CreateStreamModal({
           amountStr,
           start,
           end,
+          cliffTime,
         );
         if (!response.txHash) {
           throw new Error("Missing transaction hash from Stellar RPC.");

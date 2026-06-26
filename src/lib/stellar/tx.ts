@@ -268,20 +268,30 @@ async function executeInvocation(
  * @param amount - The total amount to be deposited, as a string.
  * @param startTime - The unix timestamp (in seconds) when the stream starts.
  * @param endTime - The unix timestamp (in seconds) when the stream ends.
+ * @param cliffTime - The unix timestamp (in seconds) of the cliff date. Optional. If absent, defaults to startTime.
  */
 export async function createStream(
   sender: string,
   recipient: string,
   amount: string,
   startTime: number,
-  endTime: number
+  endTime: number,
+  cliffTime?: number
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  let cliff = cliffTime ?? startTime;
+  if (cliff < startTime) {
+    cliff = startTime;
+  } else if (cliff > endTime) {
+    cliff = endTime;
+  }
+
   const args = [
     encodeAddress(sender),
     encodeAddress(recipient),
     encodeU64(amount),
     encodeU64(startTime),
     encodeU64(endTime),
+    encodeU64(cliff),
   ];
   return await executeInvocation("create_stream", args);
 }

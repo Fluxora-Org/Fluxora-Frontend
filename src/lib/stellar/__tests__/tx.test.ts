@@ -8,7 +8,7 @@ import {
   TransactionError,
 } from "../tx";
 import * as freighter from "@stellar/freighter-api";
-import { rpc as SorobanRpc, Account } from "@stellar/stellar-sdk";
+import { rpc as SorobanRpc, Account, Contract } from "@stellar/stellar-sdk";
 
 // Mock freighter api
 vi.mock("@stellar/freighter-api", () => {
@@ -102,6 +102,7 @@ describe("Soroban transaction layer (tx.ts)", () => {
   // ── 1. Happy Paths ─────────────────────────────────────────────────────────
 
   it("should create a stream successfully", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
     const res = await createStream(
       mockAddress,
       mockAddress,
@@ -116,6 +117,97 @@ describe("Soroban transaction layer (tx.ts)", () => {
     expect(serverInstance.simulateTransaction).toHaveBeenCalled();
     expect(freighter.signTransaction).toHaveBeenCalled();
     expect(serverInstance.sendTransaction).toHaveBeenCalled();
+
+    // Default cliffTime defaults to startTime (100)
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[0]).toBe("create_stream");
+    expect(callArgs[6].u64().toString()).toBe("100");
+  });
+
+  it("should pass the cliff time argument correctly when provided within the window", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
+    const res = await createStream(
+      mockAddress,
+      mockAddress,
+      "1000",
+      100,
+      1000,
+      500
+    );
+
+    expect(res.status).toBe("SUCCESS");
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[6].u64().toString()).toBe("500");
+  });
+
+  it("should handle cliff equal to start time", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
+    const res = await createStream(
+      mockAddress,
+      mockAddress,
+      "1000",
+      100,
+      1000,
+      100
+    );
+
+    expect(res.status).toBe("SUCCESS");
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[6].u64().toString()).toBe("100");
+  });
+
+  it("should handle cliff equal to end time", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
+    const res = await createStream(
+      mockAddress,
+      mockAddress,
+      "1000",
+      100,
+      1000,
+      1000
+    );
+
+    expect(res.status).toBe("SUCCESS");
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[6].u64().toString()).toBe("1000");
+  });
+
+  it("should clamp cliff time to start time if it is less than start time", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
+    const res = await createStream(
+      mockAddress,
+      mockAddress,
+      "1000",
+      100,
+      1000,
+      50
+    );
+
+    expect(res.status).toBe("SUCCESS");
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[6].u64().toString()).toBe("100");
+  });
+
+  it("should clamp cliff time to end time if it is greater than end time", async () => {
+    const callSpy = vi.spyOn(Contract.prototype, "call");
+    const res = await createStream(
+      mockAddress,
+      mockAddress,
+      "1000",
+      100,
+      1000,
+      1200
+    );
+
+    expect(res.status).toBe("SUCCESS");
+    expect(callSpy).toHaveBeenCalledTimes(1);
+    const callArgs = callSpy.mock.calls[0];
+    expect(callArgs[6].u64().toString()).toBe("1000");
   });
 
   it("maps getTransaction responses into polling statuses", async () => {
