@@ -39,6 +39,7 @@ export function getNetworkPassphrase(networkName: string): string {
 
 /**
  * Encodes a string or numeric value to an ScVal u64.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for scaling rules and usage.
  */
 function encodeU64(val: string | number): xdr.ScVal {
   try {
@@ -50,6 +51,7 @@ function encodeU64(val: string | number): xdr.ScVal {
 
 /**
  * Encodes a Stellar address string to an ScVal Address.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI requirements.
  */
 function encodeAddress(addr: string): xdr.ScVal {
   try {
@@ -263,6 +265,7 @@ async function executeInvocation(
 
 /**
  * Creates a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications (types and 7-decimal scaling).
  * @param sender - The Stellar address of the sender.
  * @param recipient - The Stellar address of the recipient.
  * @param amount - The total amount to be deposited, as a string.
@@ -288,6 +291,7 @@ export async function createStream(
 
 /**
  * Withdraws accrued funds from a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications (types and 7-decimal scaling).
  * @param recipient - The Stellar address of the recipient (withdrawer).
  * @param streamId - The ID of the stream to withdraw from.
  * @param amount - The amount to withdraw (as a string).
@@ -307,6 +311,7 @@ export async function withdraw(
 
 /**
  * Pauses a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
  * @param sender - The Stellar address of the sender/owner.
  * @param streamId - The ID of the stream to pause.
  */
@@ -323,6 +328,7 @@ export async function pauseStream(
 
 /**
  * Cancels a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
  * @param sender - The Stellar address of the sender/owner.
  * @param streamId - The ID of the stream to cancel.
  */
