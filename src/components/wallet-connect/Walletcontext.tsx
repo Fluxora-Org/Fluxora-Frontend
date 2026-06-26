@@ -64,6 +64,37 @@ const DISCONNECTED: WalletState = {
   loading: false,
 };
 
+/** Default Freighter account/network watcher polling interval. */
+export const WALLET_WATCH_INTERVAL_MS = 2000;
+
+/** Minimum watcher interval allowed to avoid hammering the wallet extension. */
+export const MIN_WALLET_WATCH_INTERVAL_MS = 500;
+
+/**
+ * Resolves the Freighter watcher interval from Vite config with a safe default.
+ *
+ * Invalid values fall back to `WALLET_WATCH_INTERVAL_MS`; valid values below
+ * `MIN_WALLET_WATCH_INTERVAL_MS` are clamped to avoid a tight polling loop.
+ */
+export function getWalletWatchIntervalMs() {
+  const configuredInterval = import.meta.env.VITE_WALLET_WATCH_INTERVAL_MS;
+
+  if (!configuredInterval) {
+    return WALLET_WATCH_INTERVAL_MS;
+  }
+
+  const parsedInterval = Number(configuredInterval);
+
+  if (!Number.isFinite(parsedInterval)) {
+    return WALLET_WATCH_INTERVAL_MS;
+  }
+
+  return Math.max(
+    MIN_WALLET_WATCH_INTERVAL_MS,
+    Math.round(parsedInterval),
+  );
+}
+
 type FreighterErrorLike = {
   code?: number;
   message?: string;
@@ -218,7 +249,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     clearWatcher();
     if (!state.connected) return undefined;
 
-    const watcher = new WatchWalletChanges(2000);
+    const watcher = new WatchWalletChanges(getWalletWatchIntervalMs());
     watcherRef.current = watcher;
     watcher.watch(({ address, network }) => {
       setState((prev) =>

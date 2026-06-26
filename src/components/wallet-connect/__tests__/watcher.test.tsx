@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // actual implementation here.
 vi.unmock("../Walletcontext");
 
-import { WalletProvider, useWallet } from "../Walletcontext";
+import {
+  MIN_WALLET_WATCH_INTERVAL_MS,
+  WalletProvider,
+  WALLET_WATCH_INTERVAL_MS,
+  useWallet,
+} from "../Walletcontext";
 
 const isConnected = vi.fn();
 const getAddress = vi.fn();
@@ -15,19 +20,23 @@ const watchCallbacks: Array<(change: { address: string; network: string }) => vo
   [];
 const watcherInstances: Array<{ watch: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }> =
   [];
+const watcherIntervals: number[] = [];
 
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: () => isConnected(),
   getAddress: () => getAddress(),
   getNetwork: () => getNetwork(),
-  WatchWalletChanges: vi.fn().mockImplementation(function WatchWalletChanges() {
-    const watcher = {
-      watch: vi.fn((callback) => watchCallbacks.push(callback)),
-      stop: vi.fn(),
-    };
-    watcherInstances.push(watcher);
-    return watcher;
-  }),
+  WatchWalletChanges: vi
+    .fn()
+    .mockImplementation(function WatchWalletChanges(intervalMs: number) {
+      const watcher = {
+        watch: vi.fn((callback) => watchCallbacks.push(callback)),
+        stop: vi.fn(),
+      };
+      watcherIntervals.push(intervalMs);
+      watcherInstances.push(watcher);
+      return watcher;
+    }),
 }));
 
 function deferred<T>() {
@@ -71,6 +80,8 @@ describe("WalletProvider watcher lifecycle", () => {
     getNetwork.mockReset();
     watchCallbacks.length = 0;
     watcherInstances.length = 0;
+    watcherIntervals.length = 0;
+    vi.unstubAllEnvs();
     isConnected.mockResolvedValue({ isConnected: false });
   });
 
@@ -82,6 +93,7 @@ describe("WalletProvider watcher lifecycle", () => {
     });
 
     expect(watcherInstances).toHaveLength(1);
+    expect(watcherIntervals[0]).toBe(WALLET_WATCH_INTERVAL_MS);
     expect(watcherInstances[0]!.watch).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -102,6 +114,30 @@ describe("WalletProvider watcher lifecycle", () => {
     unmount();
 
     expect(watcherInstances[1]!.stop).toHaveBeenCalled();
+  });
+
+  it("uses the configured watcher interval when provided", async () => {
+    vi.stubEnv("VITE_WALLET_WATCH_INTERVAL_MS", "1250");
+
+    renderWallet();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    expect(watcherIntervals[0]).toBe(1250);
+  });
+
+  it("clamps the configured watcher interval to the safe minimum", async () => {
+    vi.stubEnv("VITE_WALLET_WATCH_INTERVAL_MS", "10");
+
+    renderWallet();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    expect(watcherIntervals[0]).toBe(MIN_WALLET_WATCH_INTERVAL_MS);
   });
 
   it("does not let silent restore reconnect after a user disconnect", async () => {
