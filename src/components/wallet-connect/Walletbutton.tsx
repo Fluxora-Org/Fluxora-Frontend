@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
 
@@ -15,7 +15,24 @@ export default function WalletButton() {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [restoreConnectFocus, setRestoreConnectFocus] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const connectTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!connected && restoreConnectFocus) {
+      connectTriggerRef.current?.focus();
+      setRestoreConnectFocus(false);
+    }
+  }, [connected, restoreConnectFocus]);
+
+  useEffect(() => {
+    if (!announcement) return undefined;
+
+    const timer = setTimeout(() => setAnnouncement(""), 1500);
+    return () => clearTimeout(timer);
+  }, [announcement]);
 
   // The canonical ConnectWalletModal performs the Freighter connection and
   // error handling internally; WalletButton just closes once it succeeds.
@@ -41,6 +58,8 @@ export default function WalletButton() {
   }
 
   function handleDisconnect() {
+    setRestoreConnectFocus(true);
+    setAnnouncement("Wallet disconnected. Use Connect wallet to reconnect.");
     disconnect();
     setDropdownOpen(false);
   }
@@ -53,7 +72,11 @@ export default function WalletButton() {
   if (!connected) {
     return (
       <>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
         <button
+          ref={connectTriggerRef}
           onClick={handleOpenModal}
           className="px-4 py-3 text-base font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
           style={{

@@ -81,10 +81,17 @@ export default function WalletStatus({
     triggerRef.current?.focus();
   };
 
+  const closeMenuWithoutFocus = () => {
+    setOpen(false);
+    setConfirmingDisconnect(false);
+  };
+
   const handleConfirmDisconnect = () => {
     onDisconnect?.();
     setAnnouncement("Wallet disconnected. Use Connect Wallet to reconnect.");
-    closeMenu();
+    // The connected trigger may unmount after disconnect; the parent focuses
+    // the newly rendered Connect Wallet trigger instead.
+    closeMenuWithoutFocus();
   };
 
   return (

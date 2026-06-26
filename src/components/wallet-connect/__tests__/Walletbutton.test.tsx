@@ -104,4 +104,32 @@ describe("WalletButton canonical modal", () => {
     expect(screen.getByText("Connection Rejected")).toBeInTheDocument();
     expect(wallet.connect).not.toHaveBeenCalled();
   });
+
+  it("returns focus to the connect trigger after disconnect", async () => {
+    const user = userEvent.setup();
+    wallet.connected = true;
+    wallet.address = "GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    wallet.network = "TESTNET";
+
+    const { rerender } = render(<WalletButton />);
+
+    await user.click(
+      screen.getByRole("button", { name: /gabcde.*7890/i }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: /^disconnect$/i }));
+
+    expect(wallet.disconnect).toHaveBeenCalledTimes(1);
+
+    wallet.connected = false;
+    wallet.address = null;
+    wallet.network = null;
+    rerender(<WalletButton />);
+
+    expect(
+      screen.getByText("Wallet disconnected. Use Connect wallet to reconnect."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Connect wallet" }),
+    ).toHaveFocus();
+  });
 });

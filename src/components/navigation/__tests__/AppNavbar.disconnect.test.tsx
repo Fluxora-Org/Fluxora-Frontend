@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppNavbar from "../AppNavbar";
 import { ThemeProvider } from "../../../theme/ThemeProvider";
@@ -8,6 +9,12 @@ let walletState = {
   connected: true,
   address: "GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890" as string | undefined,
   network: "TESTNET" as string | undefined,
+};
+type MockLinkProps = Omit<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  "href"
+> & {
+  to: string;
 };
 
 vi.mock("../../wallet-connect/Walletcontext", () => ({
@@ -23,14 +30,12 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
 }));
 
 vi.mock("react-router-dom", () => ({
-  Link: ({
-    children,
-    to,
-    ...props
-  }: React.PropsWithChildren<{ to: string; [key: string]: unknown }>) => (
-    <a href={to} {...props}>
-      {children}
-    </a>
+  Link: React.forwardRef<HTMLAnchorElement, MockLinkProps>(
+    ({ children, to, ...props }, ref) => (
+      <a ref={ref} href={to} {...props}>
+        {children}
+      </a>
+    ),
   ),
   useLocation: () => ({ pathname: "/app" }),
 }));
@@ -58,8 +63,8 @@ describe("AppNavbar wallet disconnect flow", () => {
     vi.useRealTimers();
   });
 
-  it("requires confirmation before disconnecting and returns focus to the wallet trigger", () => {
-    renderNavbar();
+  it("requires confirmation before disconnecting and returns focus to the connect trigger", () => {
+    const { rerender } = renderNavbar();
     act(() => vi.runAllTimers());
 
     const walletTrigger = screen.getByRole("button", {
@@ -81,10 +86,27 @@ describe("AppNavbar wallet disconnect flow", () => {
     fireEvent.click(screen.getByRole("button", { name: /disconnect wallet/i }));
 
     expect(disconnect).toHaveBeenCalledTimes(1);
-    expect(walletTrigger).toHaveFocus();
     expect(
-      screen.getByText("Wallet disconnected. Use Connect Wallet to reconnect."),
-    ).toBeInTheDocument();
+      screen.getAllByText(
+        "Wallet disconnected. Use Connect Wallet to reconnect.",
+      ),
+    ).not.toHaveLength(0);
+
+    walletState = {
+      connected: false,
+      address: "",
+      network: undefined,
+    };
+
+    rerender(
+      <ThemeProvider>
+        <AppNavbar />
+      </ThemeProvider>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: /connect your stellar wallet/i }),
+    ).toHaveFocus();
   });
 
   it("shows the canonical connect-wallet affordance after disconnect", () => {
@@ -116,5 +138,6 @@ describe("AppNavbar wallet disconnect flow", () => {
       name: /connect your stellar wallet/i,
     });
     expect(connectWallet).toHaveAttribute("href", "/connect-wallet");
+    expect(connectWallet).toHaveFocus();
   });
 });

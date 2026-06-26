@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
@@ -134,6 +134,9 @@ export default function AppNavbar({
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [restoreConnectFocus, setRestoreConnectFocus] = useState(false);
+  const [walletAnnouncement, setWalletAnnouncement] = useState("");
+  const connectWalletRef = useRef<HTMLAnchorElement>(null);
 
   // Simulate a brief "connecting" state on first mount when wallet restores session
   useEffect(() => {
@@ -141,6 +144,20 @@ export default function AppNavbar({
     const t = setTimeout(() => setConnecting(false), 600);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!connecting && !connected && restoreConnectFocus) {
+      connectWalletRef.current?.focus();
+      setRestoreConnectFocus(false);
+    }
+  }, [connected, connecting, restoreConnectFocus]);
+
+  useEffect(() => {
+    if (!walletAnnouncement) return undefined;
+
+    const timer = setTimeout(() => setWalletAnnouncement(""), 1500);
+    return () => clearTimeout(timer);
+  }, [walletAnnouncement]);
 
 const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
@@ -158,12 +175,23 @@ const location = useLocation();
 
   const closeMobile = () => setMobileMenuOpen(false);
 
+  const handleWalletDisconnect = () => {
+    setRestoreConnectFocus(true);
+    setWalletAnnouncement(
+      "Wallet disconnected. Use Connect Wallet to reconnect.",
+    );
+    disconnect();
+  };
+
   return (
     <header
       role="banner"
       aria-label="Global navigation"
       className="sticky top-0 z-50 w-full border-b border-[var(--navbar-border)] bg-[var(--navbar-bg)]/80 backdrop-blur-md"
     >
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {walletAnnouncement}
+      </div>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-4">
@@ -240,10 +268,11 @@ const location = useLocation();
               network={network ?? "TESTNET"}
               expectedNetwork={expectedNetwork}
               isNetworkMismatch={isNetworkMismatch}
-              onDisconnect={disconnect}
+              onDisconnect={handleWalletDisconnect}
             />
           ) : (
             <Link
+              ref={connectWalletRef}
               to="/connect-wallet"
               aria-label="Connect your Stellar wallet"
               className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
@@ -323,12 +352,13 @@ const location = useLocation();
                 expectedNetwork={expectedNetwork}
                 isNetworkMismatch={isNetworkMismatch}
                 onDisconnect={() => {
-                  disconnect();
+                  handleWalletDisconnect();
                   closeMobile();
                 }}
               />
             ) : (
               <Link
+                ref={connectWalletRef}
                 to="/connect-wallet"
                 onClick={closeMobile}
                 aria-label="Connect your Stellar wallet"
