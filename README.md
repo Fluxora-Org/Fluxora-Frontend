@@ -223,6 +223,7 @@ Stellar metadata:
 - `VITE_RPC_URL` - Soroban RPC server endpoint
 - `VITE_STREAM_CONTRACT_ID` - deployed stream contract ID (`C...`)
 - `VITE_USE_MOCKS` - `true` or `1` enables mock-data paths
+- `VITE_TX_BASE_FEE` - base fee in stroops for on-chain transactions (defaults to `100`)
 
 Only expose public client metadata through `VITE_` variables. Do not put API
 secrets, signing keys, or wallet credentials in frontend env files.

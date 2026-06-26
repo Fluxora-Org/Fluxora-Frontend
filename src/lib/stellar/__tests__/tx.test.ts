@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createStream,
@@ -9,6 +10,7 @@ import {
 } from "../tx";
 import * as freighter from "@stellar/freighter-api";
 import { rpc as SorobanRpc, Account } from "@stellar/stellar-sdk";
+import { transactionConfig } from "../../transactionConfig";
 
 // Mock freighter api
 vi.mock("@stellar/freighter-api", () => {
@@ -220,5 +222,25 @@ describe("Soroban transaction layer (tx.ts)", () => {
     // Default maxRetries is 15
     expect(serverInstance.getTransaction).toHaveBeenCalledTimes(15);
     vi.useRealTimers();
+  });
+
+  // ── 3. Base Fee Configuration ──────────────────────────────────────────────
+
+  it("defaults to 100 stroops base fee if not overridden", async () => {
+    await createStream(mockAddress, mockAddress, "1000", 100, 1000);
+    const simulatedTx = serverInstance.simulateTransaction.mock.calls[0][0];
+    expect(simulatedTx.fee).toBe("100");
+  });
+
+  it("uses the configured base fee from transactionConfig", async () => {
+    const originalFee = transactionConfig.baseFee;
+    try {
+      transactionConfig.baseFee = 250;
+      await createStream(mockAddress, mockAddress, "1000", 100, 1000);
+      const simulatedTx = serverInstance.simulateTransaction.mock.calls[0][0];
+      expect(simulatedTx.fee).toBe("250");
+    } finally {
+      transactionConfig.baseFee = originalFee;
+    }
   });
 });

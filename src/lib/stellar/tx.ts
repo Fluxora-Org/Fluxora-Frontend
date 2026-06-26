@@ -8,6 +8,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { signTransaction, getNetwork } from "@stellar/freighter-api";
 import { createConfig } from "../config";
+import { transactionConfig } from "../transactionConfig";
 
 /**
  * Custom error class for wrapping and mapping Stellar/Soroban errors.
@@ -197,7 +198,7 @@ async function executeInvocation(
   const op = contract.call(functionName, ...args);
 
   const tx = new TransactionBuilder(account, {
-    fee: "100", // Placeholder, will be replaced by simulation results
+    fee: String(transactionConfig.baseFee),
     networkPassphrase: passphrase,
   })
     .addOperation(op)
