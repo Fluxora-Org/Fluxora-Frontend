@@ -34,6 +34,8 @@ export interface UseTransactionStatusOptions {
   backoffFactor?: number;
 }
 
+export type TransactionStatusErrorKind = "transient" | "permanent";
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
@@ -42,6 +44,50 @@ function getErrorMessage(error: unknown) {
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+/**
+ * Classifies polling source errors without changing the public hook API.
+ * Transient RPC/network failures keep using the existing attempt budget, while
+ * deterministic input/configuration failures stop polling immediately.
+ */
+export function classifyTransactionStatusError(
+  error: unknown,
+): TransactionStatusErrorKind {
+  if (isAbortError(error)) {
+    return "transient";
+  }
+
+  const name = error instanceof Error ? error.name.toLowerCase() : "";
+  const message = getErrorMessage(error).toLowerCase();
+  const transientSignals = [
+    "failed to fetch",
+    "fetch failed",
+    "network error",
+    "networkerror",
+    "timeout",
+    "timed out",
+    "temporarily unavailable",
+    "rate limit",
+    "too many requests",
+    "econnreset",
+    "econnrefused",
+    "etimedout",
+    "socket hang up",
+    "503",
+    "502",
+    "504",
+    "429",
+  ];
+
+  if (
+    (name === "typeerror" && message.includes("fetch")) ||
+    transientSignals.some(signal => message.includes(signal))
+  ) {
+    return "transient";
+  }
+
+  return "permanent";
 }
 
 /**
@@ -147,8 +193,22 @@ export function useTransactionStatus(
         }, delay);
       } catch (caughtError) {
         if (cancelled || isAbortError(caughtError)) return;
+
+        const message = getErrorMessage(caughtError);
+        const errorKind = classifyTransactionStatusError(caughtError);
+
+        if (errorKind === "transient" && attempt < maxAttempts) {
+          const delay = Math.round(
+            pollIntervalMs * Math.pow(backoffFactor, attempt - 1),
+          );
+          timerRef.current = window.setTimeout(() => {
+            void poll(attempt + 1);
+          }, delay);
+          return;
+        }
+
         setStatus("failed");
-        setError(getErrorMessage(caughtError));
+        setError(message);
       }
     };
 
