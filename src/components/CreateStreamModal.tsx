@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
+import { computeStreamEndDate, validateCliffBeforeEnd } from '../lib/createStreamDates';
+import { useModalAccessibility } from './useModalAccessibility';
 
 function maskAddress(addr: string): string {
   const t = addr.trim();
@@ -42,6 +44,7 @@ export default function CreateStreamModal({
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const modalRef = useRef<HTMLDivElement>(null);
+  const recipientInputRef = useRef<HTMLInputElement>(null);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -121,6 +124,9 @@ export default function CreateStreamModal({
         return false;
       }
       const selectedCliffDate = new Date(cliffDate);
+      if (isNaN(selectedCliffDate.getTime())) {
+        return false;
+      }
       if (selectedCliffDate < new Date(new Date().setHours(0, 0, 0, 0))) {
         return false;
       }
@@ -128,6 +134,14 @@ export default function CreateStreamModal({
         if (selectedCliffDate < new Date(customStartDate)) {
           return false;
         }
+      }
+      // Cross-field: cliff must not exceed stream end date
+      const startMs = startTimeOption === 'custom' && customStartDate
+        ? new Date(customStartDate).getTime()
+        : Date.now();
+      const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+      if (endDate && validateCliffBeforeEnd(selectedCliffDate, endDate) !== null) {
+        return false;
       }
     }
     return true;
@@ -293,6 +307,7 @@ export default function CreateStreamModal({
                       onBlur={() => handleBlur('recipient')}
                       placeholder="Paste Stellar address (G...)"
                       autoComplete="off"
+                      ref={recipientInputRef}
                     />
                   </InputField>
 
@@ -359,11 +374,24 @@ export default function CreateStreamModal({
           const cliffDateError = (cliffEnabled && touched.cliffDate)
             ? (!cliffDate
                 ? 'Cliff date is required.'
-                : new Date(cliffDate) < new Date(new Date().setHours(0, 0, 0, 0))
-                ? 'Cliff date must not be in the past.'
-                : (startTimeOption === 'custom' && customStartDate && new Date(cliffDate) < new Date(customStartDate))
-                ? 'Cliff date must be on or after the start date.'
-                : undefined)
+                : (() => {
+                    const cliffMs = new Date(cliffDate);
+                    if (isNaN(cliffMs.getTime())) return 'Cliff date is invalid.';
+                    if (cliffMs < new Date(new Date().setHours(0, 0, 0, 0)))
+                      return 'Cliff date must not be in the past.';
+                    if (startTimeOption === 'custom' && customStartDate && cliffMs < new Date(customStartDate))
+                      return 'Cliff date must be on or after the start date.';
+                    // Cross-field: cliff must be on or before stream end date
+                    const startMs = startTimeOption === 'custom' && customStartDate
+                      ? new Date(customStartDate).getTime()
+                      : Date.now();
+                    const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+                    if (endDate) {
+                      const msg = validateCliffBeforeEnd(cliffMs, endDate);
+                      if (msg) return msg;
+                    }
+                    return undefined;
+                  })())
             : undefined;
           const cliffDateSuccess = cliffEnabled && touched.cliffDate && !cliffDateError && Boolean(cliffDate);
 
@@ -520,251 +548,6 @@ export default function CreateStreamModal({
           </>
           );
         })()}
-
-              {/* Stream Rate */}
-              <div className="form-group">
-                <label className="form-label">
-                  Stream rate <span className="required">*</span>
-                </label>
-                <div className="form-row">
-                  <div className="input-container">
-                    <div className="input-icon">
-                      <svg
-                        width="20"
-                        height="20"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                        />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={accrualRate}
-                      onChange={(e) => {
-                        setAccrualRate(e.target.value);
-                        if (error) setError(null);
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="input-container narrow">
-                    <span style={{ color: "transparent" }}>_</span>
-                    <svg
-                      width="16"
-                      height="16"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      style={{ color: "var(--muted)" }}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-                <span className="form-helper">
-                  How much USDC accrues per time unit.
-                </span>
-              </div>
-
-              {/* Stream Duration */}
-              <div className="form-group">
-                <label className="form-label">
-                  Stream duration <span className="required">*</span>
-                </label>
-                <div className="form-row">
-                  <div className="input-container">
-                    <div className="input-icon">
-                      <svg
-                        width="20"
-                        height="20"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={duration}
-                      onChange={(e) => {
-                        setDuration(e.target.value);
-                        if (error) setError(null);
-                      }}
-                      placeholder="1"
-                    />
-                  </div>
-                  <div className="input-container narrow">
-                    <span style={{ color: "transparent" }}>_</span>
-                    <svg
-                      width="16"
-                      height="16"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      style={{ color: "var(--muted)" }}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-                <span className="form-helper">
-                  How long the stream will run before ending.
-                </span>
-              </div>
-
-              {/* Start Time */}
-              <div className="form-group">
-                <label className="form-label">Start time</label>
-                <div className="segmented-control">
-                  <button
-                    className={`segment-btn ${startTimeOption === "now" ? "active" : ""}`}
-                    onClick={() => setStartTimeOption("now")}
-                  >
-                    Start now
-                  </button>
-                  <button
-                    className={`segment-btn ${startTimeOption === "custom" ? "active" : ""}`}
-                    onClick={() => setStartTimeOption("custom")}
-                  >
-                    Custom date
-                  </button>
-                </div>
-                {startTimeOption === "custom" && (
-                  <div
-                    className="input-container"
-                    style={{ marginTop: "0.75rem" }}
-                  >
-                    <div className="input-icon">
-                      <svg
-                        width="20"
-                        height="20"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <input
-                      type="datetime-local"
-                      className="input-field"
-                      value={customStartDate}
-                      onChange={(e) => {
-                        setCustomStartDate(e.target.value);
-                        if (error) setError(null);
-                      }}
-                    />
-                  </div>
-                )}
-                <span className="form-helper">
-                  When the stream begins accruing USDC.
-                </span>
-              </div>
-
-              {/* Cliff Period */}
-              <div className="form-group">
-                <label className="form-label">
-                  Cliff period{" "}
-                  <span style={{ color: "var(--muted)", fontWeight: "normal" }}>
-                    (optional)
-                  </span>
-                </label>
-                <div
-                  className="toggle-container"
-                  onClick={() => setCliffEnabled(!cliffEnabled)}
-                >
-                  <div className={`toggle-switch ${cliffEnabled ? "on" : ""}`}>
-                    <div className="toggle-knob" />
-                  </div>
-                  <span>Enable cliff (no withdrawals until specific date)</span>
-                </div>
-                {cliffEnabled && (
-                  <div
-                    className="input-container"
-                    style={{ marginTop: "0.75rem" }}
-                  >
-                    <div className="input-icon">
-                      <svg
-                        width="20"
-                        height="20"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={cliffDate}
-                      onChange={(e) => {
-                        setCliffDate(e.target.value);
-                        if (error) setError(null);
-                      }}
-                    />
-                  </div>
-                )}
-                <span className="form-helper">
-                  No accrual until cliff time. Useful for vesting schedules.
-                </span>
-              </div>
-
-              {/* Deposit Summary */}
-              <div className="deposit-summary">
-                <div className="deposit-box">
-                  <div className="deposit-label">Required deposit</div>
-                  <div
-                    className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? "required" : ""}`}
-                  >
-                    {requiredDeposit} USDC
-                  </div>
-                </div>
-                <div className="deposit-box">
-                  <div className="deposit-label">Your deposit</div>
-                  <div className="deposit-value">
-                    {userDeposit.toFixed(2)} USDC
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
           {currentStep === 3 &&
             (() => {
               const mockRecipient =
