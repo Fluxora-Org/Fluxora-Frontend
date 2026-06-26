@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createStream,
   withdraw,
@@ -6,6 +6,8 @@ import {
   cancelStream,
   getTransactionStatus,
   TransactionError,
+  withTimeout,
+  FREIGHTER_NETWORK_TIMEOUT_MS,
 } from "../tx";
 import * as freighter from "@stellar/freighter-api";
 import { rpc as SorobanRpc, Account } from "@stellar/stellar-sdk";
@@ -220,5 +222,127 @@ describe("Soroban transaction layer (tx.ts)", () => {
     // Default maxRetries is 15
     expect(serverInstance.getTransaction).toHaveBeenCalledTimes(15);
     vi.useRealTimers();
+  });
+
+  // ── 3. withTimeout helper ──────────────────────────────────────────────────
+
+  describe("withTimeout helper", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should resolve with the value when the promise settles before the timeout", async () => {
+      const result = await withTimeout(Promise.resolve("ok"), 1000, "test");
+      expect(result).toBe("ok");
+    });
+
+    it("should reject with the original error when the promise rejects before the timeout", async () => {
+      await expect(
+        withTimeout(Promise.reject(new Error("nope")), 1000, "test"),
+      ).rejects.toThrowError("nope");
+    });
+
+    it("should reject with TransactionError('timeout', ...) when the promise never settles", async () => {
+      vi.useFakeTimers();
+
+      const neverSettles = new Promise<void>(() => {});
+      const promise = withTimeout(neverSettles, 500, "Freighter network check");
+
+      // Attach a catch handler before advancing time to prevent Node.js from
+      // detecting the promise rejection as unhandled when vitest fires the
+      // setTimeout callback synchronously during advanceTimersByTimeAsync.
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      await expect(promise).rejects.toThrowError(
+        new TransactionError("timeout", "Freighter network check timed out after 500ms."),
+      );
+    });
+
+    it("should clear the timer when the promise resolves before the timeout", async () => {
+      vi.useFakeTimers();
+
+      await withTimeout(Promise.resolve("ok"), 1000, "test");
+
+      // After resolution no pending timers should remain
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  // ── 4. Freighter network timeout via validateNetwork (integration) ────────
+
+  describe("validateNetwork timeout", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should throw a timeout error when getNetwork never resolves", async () => {
+      vi.useFakeTimers();
+
+      vi.mocked(freighter.getNetwork).mockReturnValue(new Promise(() => {}));
+
+      const promise = createStream(mockAddress, mockAddress, "1000", 100, 1000);
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(FREIGHTER_NETWORK_TIMEOUT_MS);
+
+      await expect(promise).rejects.toThrowError(
+        new TransactionError("timeout", `Freighter network check timed out after ${FREIGHTER_NETWORK_TIMEOUT_MS}ms.`),
+      );
+    });
+
+    it("should produce a timeout error that is distinct from a network_mismatch error", async () => {
+      vi.useFakeTimers();
+
+      vi.mocked(freighter.getNetwork).mockReturnValue(new Promise(() => {}));
+
+      const timeoutPromise = createStream(mockAddress, mockAddress, "1000", 100, 1000);
+      timeoutPromise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(FREIGHTER_NETWORK_TIMEOUT_MS);
+
+      let timeoutError: any;
+      try {
+        await timeoutPromise;
+      } catch (err) {
+        timeoutError = err;
+      }
+
+      expect(timeoutError).toBeInstanceOf(TransactionError);
+      expect(timeoutError.type).toBe("timeout");
+      expect(timeoutError.type).not.toBe("network_mismatch");
+      expect(timeoutError.type).not.toBe("rpc");
+
+      vi.useRealTimers();
+    });
+
+    it("should still detect a network mismatch after the timeout wrapper when getNetwork resolves", async () => {
+      vi.mocked(freighter.getNetwork).mockResolvedValue({
+        network: "PUBLIC",
+        networkPassphrase: "Public Global Stellar Network ; September 2015",
+      });
+
+      await expect(
+        createStream(mockAddress, mockAddress, "1000", 100, 1000),
+      ).rejects.toThrowError(
+        new TransactionError("network_mismatch", "Wrong Stellar network. Expected TESTNET, but wallet is connected to PUBLIC."),
+      );
+    });
+
+    it("should not hang when getNetwork rejects with a Freighter error", async () => {
+      vi.mocked(freighter.getNetwork).mockRejectedValue(new Error("Freighter not installed"));
+
+      let error: any;
+      try {
+        await createStream(mockAddress, mockAddress, "1000", 100, 1000);
+      } catch (err) {
+        error = err;
+      }
+
+      expect(error).toBeInstanceOf(TransactionError);
+      expect(error.type).toBe("rpc");
+      expect(error.message).toContain("Freighter not connected or unavailable.");
+    });
   });
 });
