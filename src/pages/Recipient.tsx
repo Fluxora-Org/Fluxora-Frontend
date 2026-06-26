@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import EmptyState from "../components/EmptyState";
 import RecipientStreams from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
@@ -16,10 +16,32 @@ export default function Recipient() {
   const [loading, setLoading] = useState(true);
   const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(t);
+  }, []);
+
+  /**
+   * Resets transaction state when the active wallet address changes.
+   * This prevents stale errors or pending states from carrying over to a different account.
+   */
+  useEffect(() => {
+    setTxState("idle");
+    setErrorMsg(null);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [wallet.address]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, []);
 
   const balance: number = 22600.0;
@@ -52,7 +74,7 @@ export default function Recipient() {
       await withdraw(recipientAddr, streamId, amountStr);
       setTxState("confirmed");
       addToast("Withdrawal completed successfully on-chain!", "success");
-      setTimeout(() => setTxState("idle"), 5000);
+      timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: any) {
       setTxState("error");
       setErrorMsg(err.message || "Withdrawal failed.");
