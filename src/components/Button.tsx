@@ -23,43 +23,44 @@
 import React, { ReactNode, ButtonHTMLAttributes } from 'react';
 import styles from './Button.module.css';
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Icon size */
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Size token applied to the optional icon wrapper. */
   iconSize?: 'xs' | 'sm' | 'md' | 'lg';
-  /** Button content (text, icon, or both) */
+
+  /** Button label, icon-adjacent text, or custom inline content. */
   children?: ReactNode;
-  
-  /** Visual variant */
+
+  /** Visual style variant mapped to the design system button classes. */
   variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
-  
-  /** Button size */
+
+  /** Control size; medium is the default base style. */
   size?: 'sm' | 'md' | 'lg';
-  
-  /** Full width button */
+
+  /** Expands the button to fill the width of its parent container. */
   fullWidth?: boolean;
-  
-  /** Icon element (SVG, component, etc.) */
+
+  /** Optional icon element rendered before the button content. */
   icon?: ReactNode;
-  
-  /** Icon-only button (no text) */
+
+  /** Applies icon-only sizing; callers should provide an accessible name. */
   iconOnly?: boolean;
-  
-  /** Loading state - shows spinner and disables interaction */
+
+  /** Shows the loading spinner, sets busy/disabled attributes, and blocks clicks. */
   loading?: boolean;
-  
-  /** Loading spinner content (override default) */
+
+  /** Optional content rendered next to the spinner while loading. */
   loadingContent?: ReactNode;
-  
-  /** Disabled state */
+
+  /** Disables the native button and exposes the disabled state to assistive tech. */
   disabled?: boolean;
-  
-  /** Type of button */
+
+  /** Native button type; defaults to "button" to avoid accidental form submits. */
   type?: 'button' | 'submit' | 'reset';
-  
-  /** Click handler */
+
+  /** Click handler invoked only when the button is not disabled or loading. */
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  
-  /** Additional CSS classes */
+
+  /** Additional class names appended after the design-system classes. */
   className?: string;
 }
 
