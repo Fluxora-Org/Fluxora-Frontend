@@ -36,6 +36,7 @@ import {
 } from "../lib/timePresentation";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { useTickingNow } from "../hooks/useTickingNow";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
@@ -483,6 +484,7 @@ function StreamDetail({
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
 }) {
+  const currentDate = useTickingNow();
   return (
     <>
       <button
@@ -565,7 +567,7 @@ function StreamDetail({
         <StreamTimeline
           startDate={stream.startDate}
           cliffDate={stream.cliffDate ?? null}
-          currentDate={new Date().toISOString()}
+          currentDate={currentDate}
           endDate={stream.endDate}
           withdrawableAmount={stream.withdrawableAmount}
           totalAmount={stream.depositAmount}
