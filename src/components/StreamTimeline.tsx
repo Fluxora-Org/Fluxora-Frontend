@@ -1,15 +1,38 @@
 import React from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./StreamTimeline.module.css";
 
 export interface StreamTimelineProps {
+  /** ISO-compatible date string for when the stream begins. */
   startDate: string;
+  /** ISO-compatible date string for when the cliff ends, or null for no cliff. */
   cliffDate: string | null;
+  /** ISO-compatible date string used to place the progress marker. */
   currentDate: string;
+  /** ISO-compatible date string for when the stream fully ends. */
   endDate: string;
+  /** Amount currently available for withdrawal, displayed in the screen-reader summary. */
   withdrawableAmount: number;
+  /** Total stream amount, displayed in the screen-reader summary. */
   totalAmount: number;
+  /** Current stream lifecycle state used to style timeline segments. */
   status: "active" | "paused" | "completed" | "upcoming";
+  /** Shows a polite loading indicator while timeline data is refreshing. */
   isLoading?: boolean;
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function percentBetween(startTime: number, endTime: number, valueTime: number) {
+  const duration = endTime - startTime;
+
+  if (duration <= 0) {
+    return valueTime >= endTime ? 100 : 0;
+  }
+
+  return clampPercent(((valueTime - startTime) / duration) * 100);
 }
 
 /**
@@ -37,6 +60,8 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   status,
   isLoading = false,
 }) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   // Parse dates
   const start = new Date(startDate);
   const cliff = cliffDate ? new Date(cliffDate) : null;
@@ -61,22 +86,20 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   }
 
   // Calculate segments
-  const totalDuration = end.getTime() - start.getTime();
   const cliffEnd = cliff ? cliff.getTime() : start.getTime();
   const currentTime = Math.min(current.getTime(), end.getTime());
 
   // Cliff segment percentage (0-100)
-  const cliffPercent = cliff
-    ? Math.max(
-        0,
-        Math.min(100, ((cliffEnd - start.getTime()) / totalDuration) * 100),
-      )
-    : 0;
+  const cliffPercent =
+    cliff && cliffEnd > start.getTime()
+      ? percentBetween(start.getTime(), end.getTime(), cliffEnd)
+      : 0;
 
   // Accrual segment percentage (from start to current)
-  const accrualPercent = Math.max(
-    0,
-    Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100),
+  const accrualPercent = percentBetween(
+    start.getTime(),
+    end.getTime(),
+    currentTime,
   );
 
   // Format date for display (handle long Stellar addresses)
@@ -101,6 +124,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       className="stream-timeline-container"
       role="region"
       aria-label="Stream timeline visualization"
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
     >
       {/* Accessible text summary for screen readers */}
       <div className="stream-timeline__sr-summary" role="doc-subtitle">
