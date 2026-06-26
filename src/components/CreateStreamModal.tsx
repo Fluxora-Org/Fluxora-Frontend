@@ -32,6 +32,11 @@ export function sanitizeDepositAmountInput(value: string): string {
 
 // Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
 export const MAX_ACCRUAL_RATE = 100_000;
+/**
+ * Minimum schedule length in days. A one-day floor prevents accidental
+ * near-instant streams that make accrual and withdrawal behavior hard to read.
+ */
+export const MIN_STREAM_DURATION_DAYS = 1;
 export const MAX_DURATION_DAYS = 3_650;
 export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
@@ -88,6 +93,11 @@ function validateDuration(value: string): string | undefined {
 
   if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
     return 'Duration must be a positive number.';
+  }
+
+  if (numericValue < MIN_STREAM_DURATION_DAYS) {
+    const unit = MIN_STREAM_DURATION_DAYS === 1 ? 'day' : 'days';
+    return `Duration must be at least ${MIN_STREAM_DURATION_DAYS.toLocaleString()} ${unit}.`;
   }
 
   if (numericValue > MAX_DURATION_DAYS) {

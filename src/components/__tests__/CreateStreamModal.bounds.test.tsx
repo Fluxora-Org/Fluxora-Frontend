@@ -4,6 +4,7 @@ import CreateStreamModal, {
   MAX_ACCRUAL_RATE,
   MAX_DURATION_DAYS,
   MAX_REQUIRED_DEPOSIT,
+  MIN_STREAM_DURATION_DAYS,
 } from '../CreateStreamModal';
 
 // Checksum-valid Stellar public key (required by the centralized
@@ -49,6 +50,14 @@ describe('CreateStreamModal upper bounds', () => {
     expect(screen.queryByText(/or less\./i)).not.toBeInTheDocument();
     expect(rateInput.closest('.input-container')).toHaveClass('input-container--success');
     expect(durationInput.closest('.input-container')).toHaveClass('input-container--success');
+
+    fireEvent.change(durationInput, {
+      target: { value: String(MIN_STREAM_DURATION_DAYS) },
+    });
+    fireEvent.blur(durationInput);
+
+    expect(screen.queryByText(/at least/i)).not.toBeInTheDocument();
+    expect(durationInput.closest('.input-container')).toHaveClass('input-container--success');
   });
 
   it('blocks over-bound accrual rates with an inline validation message', () => {
@@ -77,6 +86,23 @@ describe('CreateStreamModal upper bounds', () => {
 
     expect(
       screen.getByText(`Duration must be ${MAX_DURATION_DAYS.toLocaleString()} days or less.`),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /rate & schedule/i })).toBeInTheDocument();
+  });
+
+  it('blocks durations below the configured minimum with an inline validation message', () => {
+    const { container } = renderModal();
+    advanceToStep2(container);
+
+    const unit = MIN_STREAM_DURATION_DAYS === 1 ? 'day' : 'days';
+
+    fireEvent.change(container.querySelector('#create-stream-duration')!, {
+      target: { value: String(MIN_STREAM_DURATION_DAYS - 0.5) },
+    });
+    fireEvent.click(within(container).getByRole('button', { name: /^next$/i }));
+
+    expect(
+      screen.getByText(`Duration must be at least ${MIN_STREAM_DURATION_DAYS.toLocaleString()} ${unit}.`),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /rate & schedule/i })).toBeInTheDocument();
   });
