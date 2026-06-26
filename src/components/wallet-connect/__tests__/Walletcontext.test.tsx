@@ -25,6 +25,8 @@ const mockedIsConnected = vi.mocked(isConnected);
 const mockedGetAddress = vi.mocked(getAddress);
 const mockedGetNetwork = vi.mocked(getNetwork);
 const mockedWatchWalletChanges = vi.mocked(WatchWalletChanges);
+const VALID_STELLAR_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function WalletProbe() {
   const { address, connected, error, network, loading } = useWallet();
@@ -76,7 +78,7 @@ describe("WalletProvider restore errors", () => {
 
   it("restores an approved wallet and clears previous errors", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: VALID_STELLAR_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
       networkPassphrase: "Test SDF Network ; September 2015",
@@ -86,7 +88,7 @@ describe("WalletProvider restore errors", () => {
 
     await waitFor(() =>
       expect(walletState()).toEqual({
-        address: "GAPPROVEDADDRESS",
+        address: VALID_STELLAR_ADDRESS,
         connected: true,
         error: null,
         network: "TESTNET",
@@ -131,9 +133,25 @@ describe("WalletProvider restore errors", () => {
     expect(mockedGetNetwork).not.toHaveBeenCalled();
   });
 
+  it("rejects invalid addresses returned during silent restore", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: "GINVALID" });
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        address: null,
+        connected: false,
+        error: "invalid_address",
+      }),
+    );
+    expect(mockedGetNetwork).not.toHaveBeenCalled();
+  });
+
   it("records network_error when network lookup fails", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: VALID_STELLAR_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "",
       networkPassphrase: "",
@@ -187,7 +205,7 @@ describe("WalletProvider restore loading", () => {
 
   it("clears loading after restoring a verified address", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: VALID_STELLAR_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
       networkPassphrase: "Test SDF Network ; September 2015",
@@ -197,7 +215,7 @@ describe("WalletProvider restore loading", () => {
 
     await waitFor(() =>
       expect(walletState()).toMatchObject({
-        address: "GAPPROVEDADDRESS",
+        address: VALID_STELLAR_ADDRESS,
         connected: true,
         loading: false,
       }),

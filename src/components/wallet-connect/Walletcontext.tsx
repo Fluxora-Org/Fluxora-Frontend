@@ -17,6 +17,7 @@ import {
   isStellarNetworkMismatch,
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
+import { isValidStellarAddress } from "../../lib/stellar";
 import { getNetworkLabel } from "../../lib/config";
 
 /**
@@ -26,6 +27,7 @@ import { getNetworkLabel } from "../../lib/config";
 export type WalletError =
   | { type: "not_installed" }
   | { type: "rejected" }
+  | { type: "invalid_address" }
   | { type: "network_error" }
   | { type: "unknown" };
 
@@ -69,6 +71,10 @@ type FreighterErrorLike = {
   message?: string;
 };
 
+const INVALID_FREIGHTER_ADDRESS_ERROR = {
+  message: "Freighter returned an invalid Stellar address",
+};
+
 function classifyWalletError(error: unknown): WalletError {
   if (!error || typeof error !== "object") {
     return { type: "unknown" };
@@ -94,6 +100,10 @@ function classifyWalletError(error: unknown): WalletError {
     normalizedMessage.includes("not allowed")
   ) {
     return { type: "rejected" };
+  }
+
+  if (normalizedMessage.includes("invalid stellar address")) {
+    return { type: "invalid_address" };
   }
 
   if (
@@ -125,8 +135,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
-  const connect = (address: string, network: string) =>
+  const connect = (address: string, network: string) => {
+    if (!isValidStellarAddress(address)) {
+      setState({
+        ...DISCONNECTED,
+        error: classifyWalletError(INVALID_FREIGHTER_ADDRESS_ERROR),
+      });
+      return;
+    }
+
     setState({ address, network, connected: true, error: null, loading: false });
+  };
 
   const disconnect = () => {
     disconnectVersionRef.current += 1;
@@ -181,6 +200,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           restoreError({ message: "Freighter address request rejected" });
           return;
         }
+        if (!isValidStellarAddress(addr.address)) {
+          restoreError(INVALID_FREIGHTER_ADDRESS_ERROR);
+          return;
+        }
 
         const net = await getNetwork();
         if (net.error) {
@@ -221,6 +244,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const watcher = new WatchWalletChanges(2000);
     watcherRef.current = watcher;
     watcher.watch(({ address, network }) => {
+      if (!isValidStellarAddress(address)) {
+        setState({
+          ...DISCONNECTED,
+          error: classifyWalletError(INVALID_FREIGHTER_ADDRESS_ERROR),
+        });
+        return;
+      }
+
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev

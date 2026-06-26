@@ -11,6 +11,8 @@ import { WalletProvider, useWallet } from "../Walletcontext";
 const isConnected = vi.fn();
 const getAddress = vi.fn();
 const getNetwork = vi.fn();
+const VALID_STELLAR_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 const watchCallbacks: Array<(change: { address: string; network: string }) => void> =
   [];
 const watcherInstances: Array<{ watch: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }> =
@@ -39,15 +41,23 @@ function deferred<T>() {
 }
 
 function WalletHarness() {
-  const { address, network, connected, connect, disconnect } = useWallet();
+  const { address, network, connected, error, connect, disconnect } =
+    useWallet();
 
   return (
     <div>
       <output aria-label="wallet state">
         {connected ? `${address}:${network}` : "disconnected"}
       </output>
-      <button type="button" onClick={() => connect("GUSER", "TESTNET")}>
+      <output aria-label="wallet error">{error?.type ?? "none"}</output>
+      <button
+        type="button"
+        onClick={() => connect(VALID_STELLAR_ADDRESS, "TESTNET")}
+      >
         Connect
+      </button>
+      <button type="button" onClick={() => connect("GINVALID", "TESTNET")}>
+        Connect invalid
       </button>
       <button type="button" onClick={disconnect}>
         Disconnect
@@ -117,7 +127,7 @@ describe("WalletProvider watcher lifecycle", () => {
     });
 
     expect(screen.getByLabelText("wallet state")).toHaveTextContent(
-      "GUSER:TESTNET",
+      `${VALID_STELLAR_ADDRESS}:TESTNET`,
     );
 
     await act(async () => {
@@ -147,11 +157,46 @@ describe("WalletProvider watcher lifecycle", () => {
     expect(watcherInstances).toHaveLength(1);
 
     await act(async () => {
-      watchCallbacks[0]!({ address: "GNEW", network: "PUBLIC" });
+      watchCallbacks[0]!({ address: VALID_STELLAR_ADDRESS, network: "PUBLIC" });
     });
 
     expect(screen.getByLabelText("wallet state")).toHaveTextContent(
-      "GNEW:PUBLIC",
+      `${VALID_STELLAR_ADDRESS}:PUBLIC`,
     );
+  });
+
+  it("rejects invalid addresses from wallet change events", async () => {
+    renderWallet();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    await act(async () => {
+      watchCallbacks[0]!({ address: "GINVALID", network: "PUBLIC" });
+    });
+
+    expect(screen.getByLabelText("wallet state")).toHaveTextContent(
+      "disconnected",
+    );
+    expect(screen.getByLabelText("wallet error")).toHaveTextContent(
+      "invalid_address",
+    );
+  });
+
+  it("rejects invalid addresses passed to connect", async () => {
+    renderWallet();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect invalid" }));
+    });
+
+    expect(screen.getByLabelText("wallet state")).toHaveTextContent(
+      "disconnected",
+    );
+    expect(screen.getByLabelText("wallet error")).toHaveTextContent(
+      "invalid_address",
+    );
+    expect(watcherInstances).toHaveLength(0);
   });
 });
