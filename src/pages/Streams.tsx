@@ -16,7 +16,9 @@ import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
 import StreamsLoading from "../components/StreamsLoading";
 import Input from "../components/Input";
-import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
+import ZeroAccrualBanner, {
+  type ZeroAccrualReason,
+} from "../components/ZeroAccrualBanner";
 import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
 import VirtualList from "../components/VirtualList";
@@ -61,6 +63,62 @@ function formatMonthlyRate(value: number) {
 function formatDate(value?: string) {
   if (!value) return "Not scheduled";
   return formatDateWithTimezone(value);
+}
+
+function isFutureDate(value: string | undefined, currentDate: Date) {
+  return Boolean(value && new Date(value).getTime() > currentDate.getTime());
+}
+
+/**
+ * Selects the most actionable zero-accrual explanation.
+ *
+ * Schedule and cliff states are time gates, so they keep priority over a zero
+ * rate. Once a stream is active past those gates, a zero monthly rate gets the
+ * explicit `rate-zero` reason instead of the generic cliff fallback.
+ */
+function getZeroAccrualContext(
+  activeStreams: StreamRecord[],
+  currentDate = new Date(),
+): { reason: ZeroAccrualReason; nextEventDate?: string; actionLabel: string } {
+  const futureStart = activeStreams
+    .map((stream) => stream.startDate)
+    .filter((date) => isFutureDate(date, currentDate))
+    .sort()[0];
+  if (futureStart) {
+    return {
+      reason: "schedule-future",
+      nextEventDate: futureStart,
+      actionLabel: "View schedule",
+    };
+  }
+
+  const futureCliff = activeStreams
+    .map((stream) => stream.cliffDate)
+    .filter((date) => isFutureDate(date, currentDate))
+    .sort()[0];
+  if (futureCliff) {
+    return {
+      reason: "cliff",
+      nextEventDate: futureCliff,
+      actionLabel: "Check cliff date",
+    };
+  }
+
+  if (activeStreams.some((stream) => stream.monthlyRate === 0)) {
+    return {
+      reason: "rate-zero",
+      actionLabel: "Review streams",
+    };
+  }
+
+  return {
+    reason: "cliff",
+    nextEventDate: activeStreams
+      .map((stream) => stream.nextUnlockDate)
+      .filter(Boolean)
+      .sort()[0],
+    actionLabel: "Check cliff date",
+  };
 }
 
 function getStatusClassName(status: StreamStatus) {
@@ -830,6 +888,7 @@ export default function Streams() {
     hasStreams &&
     withdrawableNow === 0 &&
     activeStreams.length > 0;
+  const zeroAccrualContext = getZeroAccrualContext(activeStreams);
   const effectiveExpandedId = visibleStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
@@ -994,15 +1053,15 @@ export default function Streams() {
           {showZeroAccrual && (
             <div style={{ marginBottom: "2rem" }}>
               <ZeroAccrualBanner
-                reason="cliff"
-                nextEventDate={nextUnlock}
+                reason={zeroAccrualContext.reason}
+                nextEventDate={zeroAccrualContext.nextEventDate ?? nextUnlock}
                 onAction={() => {
                   const first = streamRecords.find(
                     (s) => s.status === "Active",
                   );
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel="Check cliff date"
+                actionLabel={zeroAccrualContext.actionLabel}
               />
             </div>
           )}

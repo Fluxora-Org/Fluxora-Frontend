@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
-import { streamRecords } from "../data/streamRecords";
+import { streamRecords, type StreamRecord } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
 
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
@@ -62,11 +62,133 @@ function mockClipboard(writeText: ClipboardMock["writeText"]) {
   });
 }
 
+function cloneStreamRecords(records: StreamRecord[] = streamRecords): StreamRecord[] {
+  return records.map((record) => ({
+    ...record,
+    tags: [...record.tags],
+    timeline: record.timeline.map((event) => ({ ...event })),
+  }));
+}
+
+const originalStreamRecords = cloneStreamRecords();
+
+function replaceStreamRecords(records: StreamRecord[]) {
+  streamRecords.splice(0, streamRecords.length, ...cloneStreamRecords(records));
+}
+
+function restoreStreamRecords() {
+  replaceStreamRecords(originalStreamRecords);
+}
+
+function zeroWithdrawableRecords(
+  activeOverride: Partial<StreamRecord>,
+): StreamRecord[] {
+  return originalStreamRecords.map((record, index) =>
+    index === 0
+      ? {
+          ...record,
+          ...activeOverride,
+          status: "Active",
+          withdrawableAmount: 0,
+        }
+      : {
+          ...record,
+          status: "Completed",
+          withdrawableAmount: 0,
+          remainingAmount: 0,
+          progress: 100,
+        },
+  );
+}
+
 async function finishLoading() {
   await act(async () => {
     vi.advanceTimersByTime(2000);
   });
 }
+
+describe("Streams zero accrual banner reason", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-26T12:00:00Z"));
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+  });
+
+  afterEach(() => {
+    restoreStreamRecords();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("shows the rate-zero reason once active streams are past schedule gates", async () => {
+    replaceStreamRecords(
+      zeroWithdrawableRecords({
+        monthlyRate: 0,
+        startDate: "2026-01-01",
+        cliffDate: "2026-01-15",
+        nextUnlockDate: "2026-07-01",
+      }),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.getByText("Streams configured with zero rate")).toBeInTheDocument();
+    expect(screen.queryByText(/cliff period in progress/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps schedule-future ahead of the rate-zero reason", async () => {
+    replaceStreamRecords(
+      zeroWithdrawableRecords({
+        monthlyRate: 0,
+        startDate: "2026-12-01",
+        cliffDate: "2026-12-15",
+        nextUnlockDate: "2026-12-15",
+      }),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.getByText(/Streams scheduled/i)).toBeInTheDocument();
+    expect(screen.queryByText("Streams configured with zero rate")).not.toBeInTheDocument();
+  });
+
+  it("keeps cliff ahead of the rate-zero reason after the start date", async () => {
+    replaceStreamRecords(
+      zeroWithdrawableRecords({
+        monthlyRate: 0,
+        startDate: "2026-01-01",
+        cliffDate: "2026-12-01",
+        nextUnlockDate: "2026-12-01",
+      }),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.getByText(/Streams are live/i)).toBeInTheDocument();
+    expect(screen.queryByText("Streams configured with zero rate")).not.toBeInTheDocument();
+  });
+
+  it("does not show rate-zero copy for nonzero-rate active streams", async () => {
+    replaceStreamRecords(
+      zeroWithdrawableRecords({
+        monthlyRate: 1000,
+        startDate: "2026-01-01",
+        cliffDate: "2026-01-15",
+        nextUnlockDate: "2026-07-01",
+      }),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    expect(screen.getByText(/Streams are live/i)).toBeInTheDocument();
+    expect(screen.queryByText("Streams configured with zero rate")).not.toBeInTheDocument();
+  });
+});
 
 describe("Streams disclosure motion", () => {
   beforeEach(() => {
