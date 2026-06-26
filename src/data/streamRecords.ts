@@ -34,6 +34,116 @@ export interface StreamRecord {
   timeline: StreamTimelineEvent[];
 }
 
+type RawStreamRecord = Partial<
+  Omit<
+    StreamRecord,
+    | "monthlyRate"
+    | "depositAmount"
+    | "streamedAmount"
+    | "withdrawableAmount"
+    | "remainingAmount"
+    | "progress"
+    | "tags"
+    | "timeline"
+  >
+> & {
+  monthlyRate?: number | string;
+  depositAmount?: number | string;
+  streamedAmount?: number | string;
+  withdrawableAmount?: number | string;
+  remainingAmount?: number | string;
+  progress?: number | string;
+  tags?: unknown;
+  timeline?: unknown;
+};
+
+const STATUS_VALUES: StreamStatus[] = ["Active", "Paused", "Completed"];
+const HEALTH_VALUES: StreamHealth[] = ["Healthy", "Attention", "Settled"];
+const SAFE_ADDRESS_PATTERN = /^[A-Za-z0-9._:-]{1,80}$/;
+
+function safeText(value: unknown, fallback = ""): string {
+  if (typeof value !== "string") return fallback;
+  return (
+    value
+      .replace(/[<>`"']/g, "")
+      .trim()
+      .slice(0, 240) || fallback
+  );
+}
+
+function safeNumber(value: unknown, fallback = 0): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function safePercent(value: unknown): number {
+  return Math.max(0, Math.min(100, safeNumber(value)));
+}
+
+/** Sanitize display/copy addresses before they can reach links or clipboard UI. */
+export function sanitizeStreamAddress(value: unknown): string {
+  const text = safeText(value);
+  return SAFE_ADDRESS_PATTERN.test(text) ? text : "";
+}
+
+function normalizeStatus(value: unknown): StreamStatus {
+  return STATUS_VALUES.includes(value as StreamStatus)
+    ? (value as StreamStatus)
+    : "Active";
+}
+
+function normalizeHealth(value: unknown): StreamHealth {
+  return HEALTH_VALUES.includes(value as StreamHealth)
+    ? (value as StreamHealth)
+    : "Healthy";
+}
+
+function normalizeTimeline(value: unknown): StreamTimelineEvent[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((event) => {
+    const item = event as Partial<StreamTimelineEvent>;
+    return {
+      date: safeText(item.date),
+      title: safeText(item.title),
+      detail: safeText(item.detail),
+    };
+  });
+}
+
+/** Normalize untrusted API/RPC stream payloads into the UI's StreamRecord shape. */
+export function normalizeStreamRecord(raw: RawStreamRecord): StreamRecord {
+  const id = safeText(raw.id, "STR-UNKNOWN");
+
+  return {
+    id,
+    name: safeText(raw.name, id),
+    recipientName: safeText(raw.recipientName, "Unknown recipient"),
+    recipientAddress: sanitizeStreamAddress(raw.recipientAddress),
+    treasuryName: safeText(raw.treasuryName, "Treasury"),
+    treasuryAddress: sanitizeStreamAddress(raw.treasuryAddress),
+    asset: safeText(raw.asset, "USDC"),
+    status: normalizeStatus(raw.status),
+    monthlyRate: safeNumber(raw.monthlyRate),
+    depositAmount: safeNumber(raw.depositAmount),
+    streamedAmount: safeNumber(raw.streamedAmount),
+    withdrawableAmount: safeNumber(raw.withdrawableAmount),
+    remainingAmount: safeNumber(raw.remainingAmount),
+    progress: safePercent(raw.progress),
+    startDate: safeText(raw.startDate),
+    endDate: safeText(raw.endDate),
+    cliffDate: safeText(raw.cliffDate) || undefined,
+    nextUnlockDate: safeText(raw.nextUnlockDate) || undefined,
+    summary: safeText(raw.summary),
+    health: normalizeHealth(raw.health),
+    healthNote: safeText(raw.healthNote),
+    auditNote: safeText(raw.auditNote),
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.map((tag) => safeText(tag)).filter(Boolean)
+      : [],
+    timeline: normalizeTimeline(raw.timeline),
+  };
+}
+
 export const streamRecords: StreamRecord[] = [
   {
     id: "STR-001",
@@ -66,7 +176,8 @@ export const streamRecords: StreamRecord[] = [
       {
         date: "2026-01-15",
         title: "Stream activated",
-        detail: "Treasury Ops funded the stream and released the initial schedule.",
+        detail:
+          "Treasury Ops funded the stream and released the initial schedule.",
       },
       {
         date: "2026-03-12",
@@ -76,7 +187,8 @@ export const streamRecords: StreamRecord[] = [
       {
         date: "2026-04-03",
         title: "Next unlock window",
-        detail: "Projected 4,200 USDC becomes available if the stream remains active.",
+        detail:
+          "Projected 4,200 USDC becomes available if the stream remains active.",
       },
     ],
   },
@@ -161,7 +273,8 @@ export const streamRecords: StreamRecord[] = [
       {
         date: "2026-03-18",
         title: "Stream paused",
-        detail: "Treasury Council paused accrual after the monthly review call.",
+        detail:
+          "Treasury Council paused accrual after the monthly review call.",
       },
       {
         date: "2026-04-18",

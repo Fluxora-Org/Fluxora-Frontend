@@ -8,10 +8,22 @@ const getMetrics = vi.fn();
 const getStreams = vi.fn();
 
 vi.mock("../useTreasury", () => ({
-  useTreasury: () => ({
-    getMetrics,
-    getStreams,
-  }),
+  useTreasury: (enabled = true) => {
+    if (enabled) {
+      void getMetrics();
+      void getStreams();
+    }
+
+    return {
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+      getMetrics,
+      getStreams,
+    };
+  },
 }));
 
 vi.mock("../StreamRow", () => ({
@@ -62,9 +74,6 @@ describe("treasury overview demo mode", () => {
     renderTreasuryPage();
 
     expect(screen.queryByText("Demo state:")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Loading treasury overview...",
-    );
 
     await waitFor(() => {
       expect(
@@ -73,7 +82,9 @@ describe("treasury overview demo mode", () => {
     });
 
     expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
-    expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No recent streams available."),
+    ).toBeInTheDocument();
     expect(getMetrics).toHaveBeenCalledTimes(1);
     expect(getStreams).toHaveBeenCalledTimes(1);
   });

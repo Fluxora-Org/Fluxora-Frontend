@@ -26,9 +26,11 @@ import Recipient from "../Recipient";
 describe("Recipient page accessibility", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.stubEnv("VITE_USE_MOCKS", "true");
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.useRealTimers();
   });
 
@@ -54,12 +56,14 @@ describe("Recipient page accessibility", () => {
     await renderLoadedRecipient();
 
     const withdrawButton = screen.getByRole("button", {
-      name: /withdraw 22,600 usdc/i,
+      name: /withdraw 6,700 usdc/i,
     });
     expect(withdrawButton).toBeEnabled();
 
     const summary = screen.getByRole("region", { name: /stream summary/i });
     expect(within(summary).getByText(/withdrawable now/i)).toBeInTheDocument();
-    expect(within(summary).getByText(/22,600 usdc/i)).toBeInTheDocument();
+    expect(within(summary).getAllByText(/6,700 usdc/i).length).toBeGreaterThan(
+      0,
+    );
   });
 });

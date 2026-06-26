@@ -9,39 +9,49 @@ import {
   type RecipientStream,
 } from "../../fixtures/recipientStreams";
 
+function renderRecipientStreams() {
+  return render(<RecipientStreams streams={mockRecipientStreams} />);
+}
+
 function streamNames() {
   return screen
     .getAllByRole("article")
     .map((article) =>
-      article.getAttribute("aria-label")?.replace("Stream from ", "")
+      article.getAttribute("aria-label")?.replace("Stream from ", ""),
     );
 }
 
 describe("RecipientStreams structure", () => {
   it("renders the streams list heading and labelled list", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     expect(
-      screen.getByRole("heading", { level: 2, name: /your incoming streams/i })
+      screen.getByRole("heading", { level: 2, name: /your incoming streams/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: /your incoming streams/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: /your incoming streams/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders reusable fixture streams with ISO-8601 start times", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(mockRecipientStreams.length);
+    expect(screen.getAllByRole("listitem")).toHaveLength(
+      mockRecipientStreams.length,
+    );
     mockRecipientStreams.forEach((stream) => {
       expect(stream.startTime).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
       expect(Date.parse(stream.startTime)).not.toBeNaN();
       expect(
-        screen.getByRole("article", { name: `Stream from ${stream.senderName}` })
+        screen.getByRole("article", {
+          name: `Stream from ${stream.senderName}`,
+        }),
       ).toBeInTheDocument();
     });
   });
 
   it("renders From, Accrued, Rate, and Status column labels", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     expect(screen.getByText(/^From$/i)).toBeInTheDocument();
     expect(screen.getByText(/^Accrued$/i)).toBeInTheDocument();
@@ -50,22 +60,26 @@ describe("RecipientStreams structure", () => {
   });
 
   it("renders progress bars, status badges, pin buttons, and detail buttons", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
-    expect(screen.getAllByRole("progressbar")).toHaveLength(mockRecipientStreams.length);
-    expect(screen.getAllByRole("status")).toHaveLength(mockRecipientStreams.length);
+    expect(screen.getAllByRole("progressbar")).toHaveLength(
+      mockRecipientStreams.length,
+    );
+    expect(screen.getAllByRole("status")).toHaveLength(
+      mockRecipientStreams.length,
+    );
     expect(
-      screen.getAllByRole("button", { name: /pin stream|unpin stream/i })
+      screen.getAllByRole("button", { name: /pin stream|unpin stream/i }),
     ).toHaveLength(mockRecipientStreams.length);
     expect(
-      screen.getAllByRole("button", { name: /view details for stream from/i })
+      screen.getAllByRole("button", { name: /view details for stream from/i }),
     ).toHaveLength(mockRecipientStreams.length);
   });
 });
 
 describe("RecipientStreams pin and sort behavior", () => {
   it("defaults to pinned-first order", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     expect(streamNames()).toEqual([
       "Stellar Dev Foundation",
@@ -76,11 +90,11 @@ describe("RecipientStreams pin and sort behavior", () => {
 
   it("sorts unpinned streams by newest while keeping pinned streams first", async () => {
     const user = userEvent.setup();
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
+      "newest",
     );
 
     expect(streamNames()).toEqual([
@@ -92,11 +106,11 @@ describe("RecipientStreams pin and sort behavior", () => {
 
   it("sorts unpinned streams by highest rate while keeping pinned streams first", async () => {
     const user = userEvent.setup();
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: /sort by/i }),
-      "rate"
+      "rate",
     );
 
     expect(streamNames()).toEqual([
@@ -108,14 +122,16 @@ describe("RecipientStreams pin and sort behavior", () => {
 
   it("moves a newly pinned stream into the pinned group", async () => {
     const user = userEvent.setup();
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
     await user.selectOptions(
       screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
+      "newest",
     );
     await user.click(
-      screen.getByRole("button", { name: /pin stream from Ecosystem Grant #42/i })
+      screen.getByRole("button", {
+        name: /pin stream from Ecosystem Grant #42/i,
+      }),
     );
 
     expect(streamNames()).toEqual([
@@ -124,7 +140,9 @@ describe("RecipientStreams pin and sort behavior", () => {
       "Fluxora DAO",
     ]);
     expect(
-      screen.getByRole("button", { name: /unpin stream from Ecosystem Grant #42/i })
+      screen.getByRole("button", {
+        name: /unpin stream from Ecosystem Grant #42/i,
+      }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -154,26 +172,28 @@ describe("RecipientStreams pin and sort behavior", () => {
       },
     ];
 
-    expect(sortRecipientStreams(streams, "rate").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
-    expect(sortRecipientStreams(streams, "newest").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
+    expect(
+      sortRecipientStreams(streams, "rate").map((stream) => stream.senderName),
+    ).toEqual(["Pinned", "Unpinned A", "Unpinned B"]);
+    expect(
+      sortRecipientStreams(streams, "newest").map(
+        (stream) => stream.senderName,
+      ),
+    ).toEqual(["Pinned", "Unpinned A", "Unpinned B"]);
   });
 });
 
 describe("RecipientStreams accessibility details", () => {
   it("labels sort options and pin state", () => {
-    render(<RecipientStreams />);
+    renderRecipientStreams();
 
-    expect(screen.getByRole("option", { name: /priority/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /priority/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /newest/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /highest rate/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /highest rate/i }),
+    ).toBeInTheDocument();
 
     screen
       .getAllByRole("button", { name: /pin stream|unpin stream/i })
@@ -181,7 +201,9 @@ describe("RecipientStreams accessibility details", () => {
   });
 
   it("keeps each card's metric and SVG accessibility contracts", () => {
-    const { container } = render(<RecipientStreams />);
+    const { container } = render(
+      <RecipientStreams streams={mockRecipientStreams} />,
+    );
 
     screen.getAllByRole("article").forEach((article) => {
       expect(within(article).getByText(/USDC Total/i)).toBeInTheDocument();

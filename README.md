@@ -227,6 +227,24 @@ Stellar metadata:
 Only expose public client metadata through `VITE_` variables. Do not put API
 secrets, signing keys, or wallet credentials in frontend env files.
 
+### Streams data service
+
+Treasury and stream screens load through `src/lib/api/streamsService.ts`.
+The service reads `VITE_API_URL`, normalizes API/RPC payloads into the existing
+`StreamRecord` and treasury `Metric` shapes, and encodes all URL path/query
+values before requesting data.
+
+Expected initial API paths:
+
+- `GET /treasury/metrics`
+- `GET /streams`
+- `GET /streams/:id`
+- `GET /recipients/:address/streams`
+
+Set `VITE_USE_MOCKS=true` to keep using the seeded local stream fixtures without
+network calls. This is intended for demos, local review, and tests while the
+backend and Soroban RPC readers are still being wired in.
+
 ## Transaction Signing Layer (Stellar / Soroban)
 
 Fluxora integrates with the Stellar ecosystem for on-chain stream management:

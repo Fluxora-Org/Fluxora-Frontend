@@ -21,12 +21,11 @@ import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
 import VirtualList from "../components/VirtualList";
 import {
-  getStreamRecord,
-  streamRecords,
   type StreamHealth,
   type StreamRecord,
   type StreamStatus,
 } from "../data/streamRecords";
+import { getStreams as fetchStreams } from "../lib/api/streamsService";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -38,7 +37,6 @@ import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
-
 
 type StatusFilter = "All" | StreamStatus;
 
@@ -244,16 +242,19 @@ const StreamCard = memo(function StreamCard({
     onCopyRecipientError(stream);
   }, [onCopyRecipientError, stream]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
-    // Enter/Space selects the card; do not intercept if a button inside is focused
-    if (
-      e.target === e.currentTarget &&
-      (e.key === "Enter" || e.key === " ")
-    ) {
-      e.preventDefault();
-      handleSelect();
-    }
-  }, [handleSelect]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLElement>) => {
+      // Enter/Space selects the card; do not intercept if a button inside is focused
+      if (
+        e.target === e.currentTarget &&
+        (e.key === "Enter" || e.key === " ")
+      ) {
+        e.preventDefault();
+        handleSelect();
+      }
+    },
+    [handleSelect],
+  );
 
   const classNames = [
     "stream-card",
@@ -316,8 +317,8 @@ const StreamCard = memo(function StreamCard({
         <div className="stream-meta-block">
           <span>Recipient</span>
           <strong>{stream.recipientName}</strong>
-          <TruncatedAddress 
-            address={stream.recipientAddress} 
+          <TruncatedAddress
+            address={stream.recipientAddress}
             onCopy={handleRecipientCopied}
             onCopyStateChange={(state) => {
               if (state === "error") {
@@ -351,10 +352,16 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__cliff is-${cliffStatus}`}
             aria-label={`Cliff date: ${formatDateWithTimezone(stream.cliffDate)} (${cliffStatus})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">⏱</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              ⏱
+            </span>
             <span className="stream-time-bar__label">Cliff</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.cliffDate)}</span>
-            <span className="stream-time-bar__relative">({getRelativeTime(stream.cliffDate)})</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.cliffDate)}
+            </span>
+            <span className="stream-time-bar__relative">
+              ({getRelativeTime(stream.cliffDate)})
+            </span>
           </div>
         )}
         {stream.endDate && (
@@ -362,9 +369,13 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__end is-${urgency.end}`}
             aria-label={`End date: ${formatDateWithTimezone(stream.endDate)} (${endRelative})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">→</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              →
+            </span>
             <span className="stream-time-bar__label">End</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.endDate)}</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.endDate)}
+            </span>
             <span className="stream-time-bar__relative">({endRelative})</span>
           </div>
         )}
@@ -430,7 +441,9 @@ const StreamCard = memo(function StreamCard({
                 <div className="stream-panel__row">
                   <span className="stream-panel__row-label">End date</span>
                   <div className="stream-panel__row-value">
-                    {formatDetailTime(stream.endDate, { includeTimezone: true })}
+                    {formatDetailTime(stream.endDate, {
+                      includeTimezone: true,
+                    })}
                   </div>
                 </div>
                 <div className="stream-panel__row">
@@ -505,8 +518,12 @@ function StreamDetail({
           <div className="stream-detail__meta">
             <span className="stream-chip">{stream.id}</span>
             <span className="stream-chip">{stream.recipientName}</span>
-            <span className="stream-chip">{formatMonthlyRate(stream.monthlyRate)}</span>
-            <span className="stream-chip">Ends {formatDate(stream.endDate)}</span>
+            <span className="stream-chip">
+              {formatMonthlyRate(stream.monthlyRate)}
+            </span>
+            <span className="stream-chip">
+              Ends {formatDate(stream.endDate)}
+            </span>
           </div>
         </div>
 
@@ -590,8 +607,8 @@ function StreamDetail({
                 <div className="stream-panel__row-value">
                   {stream.recipientName}
                   <div className="mt-1">
-                    <TruncatedAddress 
-                      address={stream.recipientAddress} 
+                    <TruncatedAddress
+                      address={stream.recipientAddress}
                       onCopy={onCopyAddress}
                     />
                   </div>
@@ -647,7 +664,10 @@ function StreamDetail({
             <h2 className="stream-panel__header">Timeline</h2>
             <div className="stream-timeline">
               {stream.timeline.map((event) => (
-                <div className="stream-timeline__item" key={event.date + event.title}>
+                <div
+                  className="stream-timeline__item"
+                  key={event.date + event.title}
+                >
                   <div className="stream-timeline__date">
                     {formatDate(event.date)}
                   </div>
@@ -745,12 +765,12 @@ export default function Streams() {
   const hasMountedFilterAnnouncer = useRef(false);
 
   const [loading, setLoading] = useState(true);
+  const [streams, setStreams] = useState<StreamRecord[]>([]);
+  const [streamsError, setStreamsError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
-  const [expandedStreamId, setExpandedStreamId] = useState<string>(
-    streamRecords[0]?.id ?? "",
-  );
+  const [expandedStreamId, setExpandedStreamId] = useState<string>("");
   const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -766,16 +786,38 @@ export default function Streams() {
   const walletConnected = true;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 2000);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    const minimumSkeleton = new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 2000);
+    });
+
+    Promise.all([fetchStreams(), minimumSkeleton])
+      .then(([records]) => {
+        if (cancelled) return;
+        setStreams(records);
+        setExpandedStreamId((current) => current || records[0]?.id || "");
+        setStreamsError(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStreams([]);
+        setStreamsError("Unable to load streams.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const activeStreams = streamRecords.filter((stream) => stream.status === "Active");
+  const activeStreams = streams.filter((stream) => stream.status === "Active");
   const monthlyOutflow = activeStreams.reduce(
     (total, stream) => total + stream.monthlyRate,
     0,
   );
-  const withdrawableNow = streamRecords.reduce(
+  const withdrawableNow = streams.reduce(
     (total, stream) => total + stream.withdrawableAmount,
     0,
   );
@@ -786,7 +828,7 @@ export default function Streams() {
   const visibleStreams = useMemo(() => {
     const normalizedSearch = searchQuery.toLowerCase();
 
-    return streamRecords
+    return streams
       .filter((stream) => {
         const matchesStatus =
           statusFilter === "All" || stream.status === statusFilter;
@@ -802,7 +844,7 @@ export default function Streams() {
         // Default to recent (higher ID first for demo)
         return b.id.localeCompare(a.id);
       });
-  }, [searchQuery, sortBy, statusFilter]);
+  }, [searchQuery, sortBy, statusFilter, streams]);
 
   useEffect(() => {
     if (!hasMountedFilterAnnouncer.current) {
@@ -820,8 +862,10 @@ export default function Streams() {
 
     return () => window.clearTimeout(timer);
   }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
-  const selectedStream = streamId ? getStreamRecord(streamId) : undefined;
-  const hasStreams = streamRecords.length > 0;
+  const selectedStream = streamId
+    ? streams.find((stream) => stream.id === streamId)
+    : undefined;
+  const hasStreams = streams.length > 0;
   const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
   // Zero-accrual: connected + streams exist + nothing is withdrawable yet
   const showZeroAccrual =
@@ -841,38 +885,44 @@ export default function Streams() {
   }, []);
 
   const handleStreamCreated = useCallback(() => {
-    const generatedId = `STR-${String(streamRecords.length + 1).padStart(3, "0")}`;
+    const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
       id: generatedId,
       url: `https://fluxora.io/stream/${generatedId}`,
     });
     setIsCreateModalOpen(false);
     setIsSuccessModalOpen(true);
-  }, []);
+  }, [streams.length]);
 
-  const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
-    try {
-      await navigator.clipboard.writeText(stream.recipientAddress);
+  const handleCopyRecipient = useCallback(
+    async (stream: StreamRecord) => {
+      try {
+        await navigator.clipboard.writeText(stream.recipientAddress);
+        addToast(
+          `Recipient for ${stream.name} copied to your clipboard.`,
+          "success",
+        );
+      } catch {
+        addToast(
+          "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+          "error",
+        );
+      }
+    },
+    [addToast],
+  );
+
+  const handleRecipientCopied = useCallback(
+    (stream: StreamRecord) => {
       addToast(
         `Recipient for ${stream.name} copied to your clipboard.`,
         "success",
       );
-    } catch {
-      addToast(
-        "Clipboard access is unavailable in this browser. Copy the address manually instead.",
-        "error",
-      );
-    }
-  }, [addToast]);
+    },
+    [addToast],
+  );
 
-  const handleRecipientCopied = useCallback((stream: StreamRecord) => {
-    addToast(
-      `Recipient for ${stream.name} copied to your clipboard.`,
-      "success",
-    );
-  }, [addToast]);
-
-  const handleRecipientCopyError = useCallback((_stream: StreamRecord) => {
+  const handleRecipientCopyError = useCallback(() => {
     addToast(
       "Clipboard access is unavailable in this browser. Copy the address manually instead.",
       "error",
@@ -887,9 +937,12 @@ export default function Streams() {
     setSelectedStreamId(streamId);
   }, []);
 
-  const handleOpenStreamDetail = useCallback((streamId: string) => {
-    navigate(`/app/streams/${streamId}`);
-  }, [navigate]);
+  const handleOpenStreamDetail = useCallback(
+    (streamId: string) => {
+      navigate(`/app/streams/${streamId}`);
+    },
+    [navigate],
+  );
 
   const handleAnnounceStreamToggle = useCallback(
     (streamName: string, nextExpanded: boolean) => {
@@ -935,6 +988,14 @@ export default function Streams() {
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
+      {streamsError && (
+        <p
+          className="validation-message validation-message--error"
+          role="alert"
+        >
+          {streamsError}
+        </p>
+      )}
 
       {selectedStream ? (
         <StreamDetail
@@ -983,7 +1044,7 @@ export default function Streams() {
               <button
                 type="button"
                 className="streams-secondary-button"
-                onClick={() => navigate(`/app/streams/${streamRecords[0]?.id}`)}
+                onClick={() => navigate(`/app/streams/${streams[0]?.id}`)}
               >
                 Open featured deep dive
               </button>
@@ -997,9 +1058,7 @@ export default function Streams() {
                 reason="cliff"
                 nextEventDate={nextUnlock}
                 onAction={() => {
-                  const first = streamRecords.find(
-                    (s) => s.status === "Active",
-                  );
+                  const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
                 actionLabel="Check cliff date"
@@ -1039,7 +1098,10 @@ export default function Streams() {
                   stream detail route for the complete layout.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label="Filter and search streams">
+              <div
+                className="flex flex-wrap items-center gap-3 w-full mt-4"
+                aria-label="Filter and search streams"
+              >
                 <div className="flex-1 min-w-[200px]">
                   <Input
                     id="streams-search"

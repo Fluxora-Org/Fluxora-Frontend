@@ -1,6 +1,13 @@
 vi.unmock("../components/toast/ToastProvider");
 
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
@@ -22,9 +29,11 @@ function mockMatchMedia(matches: boolean) {
       matches,
       media: "(prefers-reduced-motion: reduce)",
       onchange: null,
-      addEventListener: vi.fn((_: string, callback: MatchMediaChangeHandler) => {
-        listeners.push(callback);
-      }),
+      addEventListener: vi.fn(
+        (_: string, callback: MatchMediaChangeHandler) => {
+          listeners.push(callback);
+        },
+      ),
       removeEventListener: vi.fn(
         (_: string, callback: MatchMediaChangeHandler) => {
           const index = listeners.indexOf(callback);
@@ -44,6 +53,8 @@ function mockMatchMedia(matches: boolean) {
 }
 
 function renderStreams() {
+  vi.stubEnv("VITE_USE_MOCKS", "true");
+
   return render(
     <ToastProvider>
       <MemoryRouter initialEntries={["/app/streams"]}>
@@ -137,7 +148,9 @@ describe("Streams disclosure motion", () => {
 
     expect(list).toHaveAttribute("data-virtualized", "false");
     expect(screen.getByText(streamRecords[0]!.name)).toBeInTheDocument();
-    expect(screen.getByText(streamRecords[streamRecords.length - 1]!.name)).toBeInTheDocument();
+    expect(
+      screen.getByText(streamRecords[streamRecords.length - 1]!.name),
+    ).toBeInTheDocument();
   });
 
   it("keeps the stream list in sync after filtering and sorting", async () => {
@@ -155,9 +168,12 @@ describe("Streams disclosure motion", () => {
     expect(cards[0]).toHaveTextContent("Dev Grant - Alice");
     expect(cards[1]).toHaveTextContent("Marketing Budget");
 
-    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
-      target: { value: "Nebula" },
-    });
+    fireEvent.change(
+      screen.getByLabelText("Search streams by name, ID or recipient"),
+      {
+        target: { value: "Nebula" },
+      },
+    );
 
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(screen.getByText("Marketing Budget")).toBeInTheDocument();
@@ -169,13 +185,20 @@ describe("Streams disclosure motion", () => {
     renderStreams();
     await finishLoading();
 
-    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/^Showing \d+ streams\.$/),
+    ).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
-      target: { value: "Marketing" },
-    });
+    fireEvent.change(
+      screen.getByLabelText("Search streams by name, ID or recipient"),
+      {
+        target: { value: "Marketing" },
+      },
+    );
 
-    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/^Showing \d+ streams\.$/),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(300);
@@ -189,9 +212,12 @@ describe("Streams disclosure motion", () => {
     renderStreams();
     await finishLoading();
 
-    fireEvent.change(screen.getByLabelText("Search streams by name, ID or recipient"), {
-      target: { value: "STR-" },
-    });
+    fireEvent.change(
+      screen.getByLabelText("Search streams by name, ID or recipient"),
+      {
+        target: { value: "STR-" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: "Active" }));
     fireEvent.change(screen.getByLabelText(/Sort streams/i), {
       target: { value: "name" },
@@ -200,7 +226,9 @@ describe("Streams disclosure motion", () => {
     await act(async () => {
       vi.advanceTimersByTime(299);
     });
-    expect(screen.queryByText(/^Showing \d+ streams\.$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/^Showing \d+ streams\.$/),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(1);
@@ -245,7 +273,9 @@ describe("Streams card recipient copy", () => {
       expect(writeText).toHaveBeenCalledWith(stream.recipientAddress);
     });
     expect(
-      await screen.findByText(`Recipient for ${stream.name} copied to your clipboard.`),
+      await screen.findByText(
+        `Recipient for ${stream.name} copied to your clipboard.`,
+      ),
     ).toBeInTheDocument();
     expect(streamCard).toHaveAttribute("aria-selected", "false");
     expect(streamCard).toHaveAttribute("aria-expanded", "true");

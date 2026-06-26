@@ -6,6 +6,11 @@ import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
 import { withdraw } from "../lib/stellar/tx";
+import {
+  getRecipientStreams,
+  streamRecordToRecipientStream,
+} from "../lib/api/streamsService";
+import type { RecipientStream } from "../components/recipient/RecipientStreams";
 import "./Streams.css";
 import "./Recipient.css";
 
@@ -14,18 +19,53 @@ export default function Recipient() {
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
+  const [streams, setStreams] = useState<RecipientStream[]>([]);
+  const [txState, setTxState] = useState<
+    "idle" | "signing" | "submitting" | "confirmed" | "error"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(t);
-  }, []);
+    if (!wallet.connected || !wallet.address) {
+      setStreams([]);
+      setLoading(false);
+      return undefined;
+    }
 
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
+    let cancelled = false;
+    setLoading(true);
+    const minimumSkeleton = new Promise<void>((resolve) => {
+      setTimeout(resolve, 2000);
+    });
+
+    Promise.all([getRecipientStreams(wallet.address), minimumSkeleton])
+      .then(([records]) => {
+        if (cancelled) return;
+        setStreams(records.map(streamRecordToRecipientStream));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStreams([]);
+        setErrorMsg("Unable to load incoming streams.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet.address, wallet.connected]);
+
+  const balance = streams.reduce(
+    (total, stream) => total + (stream.withdrawableAmount ?? 0),
+    0,
+  );
+  const activeStreams = streams.filter(
+    (stream) => stream.status === "active",
+  ).length;
+  const totalAccrued = balance;
+  const totalWithdrawn = 0;
 
   const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
@@ -34,9 +74,10 @@ export default function Recipient() {
 
   // Zero-accrual: connected + streams exist + no withdrawable balance yet
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
-  
+
   const isPending = txState === "signing" || txState === "submitting";
-  const disabled = !walletConnected || balance === 0 || networkMismatch || isPending;
+  const disabled =
+    !walletConnected || balance === 0 || networkMismatch || isPending;
 
   const handleWithdraw = async () => {
     if (disabled) return;
@@ -53,10 +94,14 @@ export default function Recipient() {
       setTxState("confirmed");
       addToast("Withdrawal completed successfully on-chain!", "success");
       setTimeout(() => setTxState("idle"), 5000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       setTxState("error");
-      setErrorMsg(err.message || "Withdrawal failed.");
-      addToast(`Withdrawal failed: ${err.message || err}`, "error");
+      setErrorMsg(message || "Withdrawal failed.");
+      addToast(
+        `Withdrawal failed: ${message || "Withdrawal failed."}`,
+        "error",
+      );
     }
   };
 
@@ -107,8 +152,12 @@ export default function Recipient() {
             withdrawal to your connected wallet.
           </p>
           {(errorMsg || networkMismatch) && (
-            <p className="validation-message validation-message--error" style={{ color: "var(--color-danger)", marginTop: "1rem" }} role="alert">
-              {networkMismatch 
+            <p
+              className="validation-message validation-message--error"
+              style={{ color: "var(--color-danger)", marginTop: "1rem" }}
+              role="alert"
+            >
+              {networkMismatch
                 ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${wallet.expectedNetworkLabel}.`
                 : errorMsg}
             </p>
@@ -158,7 +207,9 @@ export default function Recipient() {
         </div>
         <div className="streams-summary-card">
           <span>Withdrawable now</span>
-          <strong style={{ color: "var(--accent)" }}>{balance.toLocaleString()} USDC</strong>
+          <strong style={{ color: "var(--accent)" }}>
+            {balance.toLocaleString()} USDC
+          </strong>
           <p>Available for immediate withdrawal.</p>
         </div>
       </section>
@@ -169,12 +220,13 @@ export default function Recipient() {
           <div>
             <h2>Incoming streams</h2>
             <p className="streams-subtitle">
-              Review and manage each individual stream currently committing funds to you.
+              Review and manage each individual stream currently committing
+              funds to you.
             </p>
           </div>
         </div>
         <div className="mt-6">
-          <RecipientStreams />
+          <RecipientStreams streams={streams} />
         </div>
       </section>
     </main>

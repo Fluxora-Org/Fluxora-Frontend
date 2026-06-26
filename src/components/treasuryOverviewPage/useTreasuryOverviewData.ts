@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   treasuryDemoMetrics,
   treasuryDemoStreams,
@@ -20,63 +19,24 @@ export function isTreasuryDemoMode(value = import.meta.env.VITE_DEMO_MODE) {
 }
 
 export function useTreasuryOverviewData(): TreasuryOverviewData {
-  const { getMetrics, getStreams } = useTreasury();
   const isDemoMode = isTreasuryDemoMode();
-  const [data, setData] = useState<TreasuryOverviewData>({
-    metrics: isDemoMode ? treasuryDemoMetrics : [],
-    streams: isDemoMode ? treasuryDemoStreams : [],
-    isDemoMode,
-    loading: !isDemoMode,
-    error: null,
-  });
+  const treasury = useTreasury(!isDemoMode);
 
-  useEffect(() => {
-    if (isDemoMode) {
-      setData({
-        metrics: treasuryDemoMetrics,
-        streams: treasuryDemoStreams,
-        isDemoMode: true,
-        loading: false,
-        error: null,
-      });
-      return undefined;
-    }
-
-    let cancelled = false;
-    setData({
-      metrics: [],
-      streams: [],
-      isDemoMode: false,
-      loading: true,
+  if (isDemoMode) {
+    return {
+      metrics: treasuryDemoMetrics,
+      streams: treasuryDemoStreams,
+      isDemoMode: true,
+      loading: false,
       error: null,
-    });
-
-    Promise.all([getMetrics(), getStreams()])
-      .then(([metrics, streams]) => {
-        if (cancelled) return;
-        setData({
-          metrics,
-          streams,
-          isDemoMode: false,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setData({
-          metrics: [],
-          streams: [],
-          isDemoMode: false,
-          loading: false,
-          error: "Unable to load treasury overview data.",
-        });
-      });
-
-    return () => {
-      cancelled = true;
     };
-  }, [getMetrics, getStreams, isDemoMode]);
+  }
 
-  return data;
+  return {
+    metrics: treasury.metrics,
+    streams: treasury.streams,
+    isDemoMode: false,
+    loading: treasury.loading,
+    error: treasury.error,
+  };
 }
