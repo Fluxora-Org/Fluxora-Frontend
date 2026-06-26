@@ -215,17 +215,26 @@ authorization before returning privileged treasury or stream data.
 
 ## Environment
 
-Copy `.env.example` to `.env` or `.env.local` when configuring public API or
-Stellar metadata:
+Copy `.env.example` to `.env` or `.env.local` when configuring public API endpoints or Stellar metadata.
 
-- `VITE_API_URL` - backend API base URL
-- `VITE_NETWORK` - Stellar network (`TESTNET` or `PUBLIC`); unsupported values fail closed to `TESTNET`
-- `VITE_RPC_URL` - Soroban RPC server endpoint
-- `VITE_STREAM_CONTRACT_ID` - deployed stream contract ID (`C...`)
-- `VITE_USE_MOCKS` - `true` or `1` enables mock-data paths
+> [!CAUTION]
+> **Security Warning**:
+> All environment variables prefixed with `VITE_` are statically compiled into the client-side bundle and are visible to anyone. **Never store API secrets, signing keys, seed phrases, or private credentials in frontend env files.**
 
-Only expose public client metadata through `VITE_` variables. Do not put API
-secrets, signing keys, or wallet credentials in frontend env files.
+For full documentation of environment variables, including formats, expected values, constraints, and timing controls, see the dedicated [Environment Variables Documentation](file:///c:/Users/cisat/.antigravity-ide/Fluxora-Frontend/docs/environment.md).
+
+Here is a summary of the supported variables (parsed by [src/lib/config.ts](file:///c:/Users/cisat/.antigravity-ide/Fluxora-Frontend/src/lib/config.ts) and [src/lib/transactionConfig.ts](file:///c:/Users/cisat/.antigravity-ide/Fluxora-Frontend/src/lib/transactionConfig.ts)):
+
+- `VITE_API_URL` - Base URL for the Fluxora backend API service (absolute HTTP/HTTPS URL).
+- `VITE_NETWORK` - Stellar network to expect Freighter to use (`TESTNET` or `PUBLIC`; defaults to `TESTNET`).
+- `VITE_RPC_URL` - Soroban RPC server endpoint URL.
+- `VITE_STREAM_CONTRACT_ID` - Deployed smart contract ID (starts with `C...`).
+- `VITE_USE_MOCKS` - `"true"` or `"1"` enables client-side mocks.
+- `VITE_DEMO_MODE` - `"true"` or `"1"` renders static treasury overview fixture data.
+- `VITE_TX_POLL_INTERVAL_MS` - Polling interval in milliseconds for transaction status checks.
+- `VITE_TX_POLL_MAX_ATTEMPTS` - Maximum number of transaction polling attempts.
+- `VITE_TX_POLL_BACKOFF_FACTOR` - Exponential backoff multiplier applied to the poll interval.
+- `VITE_TX_DEMO_CONFIRMATION_ATTEMPTS` - Number of simulated poll confirmation checks for mock transactions.
 
 ## Transaction Signing Layer (Stellar / Soroban)
 
@@ -240,8 +249,6 @@ Fluxora integrates with the Stellar ecosystem for on-chain stream management:
 Search and link-preview metadata lives in `index.html`. Update the description,
 canonical URL, Open Graph tags, Twitter Card tags, and absolute HTTPS preview
 image there when launching a new campaign or changing the public marketing URL.
-
-- `VITE_DEMO_MODE` - Set to `true` or `1` to render treasury overview fixture data for screenshots and tests. Leave unset for the default live-data path.
 
 ## Related repos
 
