@@ -15,17 +15,40 @@ const TOAST_COPY: Record<ToastVariant, { label: string; icon: string }> = {
   warning: { label: "Warning", icon: "⚠" },
 };
 
+/**
+ * Maps each toast variant to its ARIA live-region semantics.
+ *
+ * - `error` / `warning` → `role="alert"` + `aria-live="assertive"` so screen
+ *   readers interrupt the current announcement immediately.
+ * - `success` / `info`  → `role="status"` + `aria-live="polite"` for non-urgent
+ *   updates that wait for a natural pause.
+ * - Unknown variants default to `assertive` alert semantics as the fail-safe
+ *   choice: it is safer to over-announce an unexpected toast than to silently
+ *   miss a potentially critical message.
+ */
+const VARIANT_SEMANTICS: Record<
+  ToastVariant,
+  { role: "alert" | "status"; "aria-live": "assertive" | "polite" }
+> = {
+  error:   { role: "alert",  "aria-live": "assertive" },
+  warning: { role: "alert",  "aria-live": "assertive" },
+  success: { role: "status", "aria-live": "polite" },
+  info:    { role: "status", "aria-live": "polite" },
+};
+
+/** Fail-safe semantics used when a variant is not in {@link VARIANT_SEMANTICS}. */
+const FALLBACK_SEMANTICS = { role: "alert" as const, "aria-live": "assertive" as const };
+
+const FALLBACK_COPY = { label: "Alert", icon: "!" };
+
 export default function ToastNotification({
   message,
   variant,
   onClose,
 }: ToastNotificationProps) {
-  const semantics =
-    variant === "error" || variant === "warning"
-      ? { role: "alert" as const, "aria-live": "assertive" as const }
-      : { role: "status" as const, "aria-live": "polite" as const };
+  const semantics = VARIANT_SEMANTICS[variant] ?? FALLBACK_SEMANTICS;
 
-  const { label, icon } = TOAST_COPY[variant];
+  const { label, icon } = TOAST_COPY[variant] ?? FALLBACK_COPY;
 
   return (
     <div
