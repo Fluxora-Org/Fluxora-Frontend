@@ -4,6 +4,7 @@ import { Menu, X, Moon, Sun } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
+import Breadcrumb from "./Breadcrumb";
 
 interface AppNavbarProps {
   onThemeToggle?: () => void;
@@ -149,6 +150,13 @@ export default function AppNavbar({
             <NavLink key={link.to} to={link.to} label={link.label} />
           ))}
         </nav>
+
+        {/* Breadcrumb (app view only, desktop) */}
+        {isAppView && (
+          <div className="hidden md:block text-sm">
+            <Breadcrumb />
+          </div>
+        )}
 
         {/* Right: Actions (desktop) */}
         <div className="hidden md:flex items-center gap-3">
