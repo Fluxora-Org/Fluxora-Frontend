@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ConnectWalletModal from "../ConnectWalletModal";
+import { getNetwork } from "@stellar/freighter-api";
 
 vi.mock("@stellar/freighter-api", () => {
   return {
@@ -160,9 +161,123 @@ describe("ConnectWalletModal", () => {
     await userEvent.click(wrongNetworkBtn);
     expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
 
+    // Switch to Timed Out
+    const timeoutBtn = screen.getByRole("button", { name: "Timed Out" });
+    await userEvent.click(timeoutBtn);
+    expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
+
     // Switch back to Default View
     const defaultBtn = screen.getByRole("button", { name: "Default View" });
     await userEvent.click(defaultBtn);
     expect(screen.getByText("Choose your wallet")).toBeInTheDocument();
+  });
+
+  describe("network timeout", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows timeout error when getNetwork never resolves", async () => {
+      vi.useFakeTimers();
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+      // Drain microtasks (isConnected, requestAccess) so we reach withTimeout(getNetwork)
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Advance past the timeout duration
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
+      expect(screen.getByText(/The network check did not respond in time/)).toBeInTheDocument();
+    });
+
+    it("shows timeout error state with retry button", async () => {
+      vi.useFakeTimers();
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // Should have a retry button
+      const retryBtn = screen.getByRole("button", { name: "Retry network check" });
+      expect(retryBtn).toBeInTheDocument();
+
+      // Back button should also be present
+      expect(
+        screen.getByRole("button", { name: "Back to wallet selection list" })
+      ).toBeInTheDocument();
+    });
+
+    it("recovers with retry after timeout when getNetwork succeeds on next attempt", async () => {
+      vi.useFakeTimers();
+      const neverPromise = new Promise(() => {});
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(neverPromise);
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      // First attempt — times out
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
+
+      // Now make getNetwork resolve
+      (getNetwork as ReturnType<typeof vi.fn>).mockResolvedValue({ network: "TESTNET" });
+
+      // Click retry
+      fireEvent.click(screen.getByRole("button", { name: "Retry network check" }));
+
+      // Let all microtasks resolve
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Should succeed — modal should close
+      expect(onClose).toHaveBeenCalled();
+      expect(screen.queryByText("Network Check Timed Out")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("network case normalization", () => {
+    it("matches network case-insensitively", async () => {
+      (getNetwork as ReturnType<typeof vi.fn>).mockResolvedValue({ network: "testnet" });
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      await userEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+      // Should succeed since "testnet" === "TESTNET" case-insensitively
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it("detects network mismatch correctly", async () => {
+      (getNetwork as ReturnType<typeof vi.fn>).mockResolvedValue({ network: "PUBLIC" });
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      await userEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+      expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
+    });
+  });
+
+  describe("controlled network_timeout state", () => {
+    it("renders network_timeout from controlled errorState prop", () => {
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="network_timeout"
+        />
+      );
+
+      expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
+    });
   });
 });
