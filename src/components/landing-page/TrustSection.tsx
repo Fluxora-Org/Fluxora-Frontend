@@ -1,3 +1,10 @@
+/**
+ * TrustSection — Landing page "Powered by Stellar" section
+ *
+ * Uses CSS variables from design-tokens.css so colors respond
+ * to the active theme (light / dark) without inline hex values.
+ */
+
 interface TrustSectionProps {
   theme?: "light" | "dark";
 }
@@ -31,13 +38,13 @@ function CheckCircleIcon() {
         cx="12"
         cy="12"
         r="10"
-        stroke="#0097a7"
+        stroke="var(--color-accent-primary-dark)"
         strokeWidth="1.5"
         fill="none"
       />
       <path
         d="M8 12.5l2.5 2.5 5.5-6"
-        stroke="#0097a7"
+        stroke="var(--color-accent-primary-dark)"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -52,7 +59,7 @@ function StarIcon() {
       width="20"
       height="20"
       viewBox="0 0 24 24"
-      fill="#0097a7"
+      fill="var(--color-accent-primary-dark)"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
@@ -62,75 +69,89 @@ function StarIcon() {
 }
 
 export default function TrustSection({ theme = "light" }: TrustSectionProps) {
-  const isDark = theme === "dark";
+  // The data-theme attribute on <html> drives CSS variable values.
+  // We keep the `theme` prop for any JS-driven conditional classes
+  // but avoid inline hex colors — tokens handle the rest.
+  void theme; // consumed by parent; CSS variables handle theming
 
   return (
     <section
+      aria-labelledby="landing-trust-title"
       className="w-full font-['Plus_Jakarta_Sans',system-ui,sans-serif]"
       style={{
-        background: isDark ? "#0a0e17" : "#ffffff",
+        background: "var(--color-bg-primary)",
         paddingTop: "72px",
         paddingBottom: "80px",
       }}
     >
       <div className="mx-auto max-w-6xl px-6 flex flex-col items-center gap-6">
+        {/* "Powered by Stellar" badge */}
         <div
           className="flex items-center gap-2 rounded-full px-5 py-2"
           style={{
-            background: isDark ? "rgba(0,184,212,0.08)" : "#e8f6fb",
-            border: isDark
-              ? "1px solid rgba(0,184,212,0.25)"
-              : "1px solid #b3dff0",
+            background: "var(--color-info-bg)",
+            border: "1px solid var(--border-interactive)",
           }}
         >
           <StarIcon />
           <span
             className="text-sm font-semibold"
-            style={{ color: isDark ? "#e8ecf4" : "#1e293b" }}
+            style={{ color: "var(--color-text-primary)" }}
           >
             Powered by Stellar
           </span>
         </div>
 
+        <h2
+          id="landing-trust-title"
+          className="text-center text-3xl font-extrabold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          Trusted Stellar treasury patterns
+        </h2>
+
+        {/* Description */}
         <p
           className="text-center text-base leading-relaxed max-w-md"
-          style={{ color: isDark ? "#94a3b8" : "#475569" }}
+          style={{ color: "var(--color-text-tertiary)" }}
         >
           Built specifically for the Stellar ecosystem. Native integration with
           Soroban smart contracts and USDC.
         </p>
 
+        {/* Use-case cards */}
         <div className="mt-8 grid w-full grid-cols-1 gap-6 sm:grid-cols-3">
           {useCases.map(({ title, subtitle }) => (
             <div
               key={title}
               className="flex flex-col items-center gap-4 rounded-2xl p-8"
               style={{
-                background: isDark ? "#121a2a" : "#f7f8f9",
-                border: isDark ? "1px solid #1e2d42" : "1px solid #e8edf2",
+                background: "var(--color-surface-default)",
+                border: "1px solid var(--color-border-default)",
               }}
             >
+              {/* Icon container */}
               <div
                 className="flex items-center justify-center rounded-xl"
                 style={{
                   width: 48,
                   height: 48,
-                  background: isDark ? "rgba(0,151,167,0.15)" : "#e0f5f8",
+                  background: "var(--color-info-bg)",
                 }}
               >
                 <CheckCircleIcon />
               </div>
 
-              <p
+              <h3
                 className="text-base font-bold text-center"
-                style={{ color: isDark ? "#e8ecf4" : "#1e293b" }}
+                style={{ color: "var(--color-text-primary)" }}
               >
                 {title}
-              </p>
+              </h3>
 
               <p
                 className="text-sm text-center"
-                style={{ color: isDark ? "#6b7a94" : "#94a3b8" }}
+                style={{ color: "var(--color-text-tertiary)" }}
               >
                 {subtitle}
               </p>

@@ -159,6 +159,117 @@ Before running tests, ensure:
 
 ---
 
+## Section 1.5: Typography Normalization (Plus Jakarta Sans)
+
+> Verifies that the typography token system is correctly applied across Landing and Dashboard pages.
+> All text elements must use `--font-*` tokens via `.text-*` utility classes — no hardcoded `font-size` or `font-weight` inline styles.
+
+### 1.5.1 Token Utility Classes
+
+#### Test: Utility classes resolve to correct token values
+
+| Class | Token | Expected (size/weight/line-height) |
+|-------|-------|------------------------------------|
+| `.text-heading-1` | `--font-heading-1` | 36px / 500 / 44px |
+| `.text-heading-2` | `--font-heading-2` | 24px / 600 / 32px |
+| `.text-heading-3` | `--font-heading-3` | 18px / 600 / 28px |
+| `.text-heading-4` | `--font-heading-4` | 16px / 600 / 24px |
+| `.text-body-lg`   | `--font-body-lg`   | 16px / 400 / 24px |
+| `.text-body-md`   | `--font-body-md`   | 14px / 400 / 20px |
+| `.text-body-sm`   | `--font-body-sm`   | 12px / 400 / 16px |
+| `.text-label-lg`  | `--font-label-lg`  | 14px / 500 / 20px |
+| `.text-label-md`  | `--font-label-md`  | 12px / 500 / 16px |
+| `.text-label-sm`  | `--font-label-sm`  | 11px / 500 / 14px |
+| `.text-mono-sm`   | `--font-mono-sm`   | 12px / 400 / 16px (monospace) |
+
+**Steps**:
+1. Open DevTools → Elements, select an element with a `.text-*` class
+2. In Computed tab, verify `font-size`, `font-weight`, `line-height`
+3. Verify `font-family` starts with "Plus Jakarta Sans"
+
+**Pass Criteria**: All classes resolve to the values in the table above with no overrides from inline styles.
+
+---
+
+### 1.5.2 Dashboard Typography
+
+#### Test: Dashboard page uses token classes (no inline font styles)
+
+| Element | Expected class | Expected computed |
+|---------|---------------|-------------------|
+| `<h1>` Treasury overview | `.text-heading-1` | 36px / 500 / 44px |
+| Description `<p>` | `.text-body-lg` | 16px / 400 / 24px |
+| Wallet banner `<span>` | `.text-body-md` | 14px / 400 / 20px |
+| Card label (Active Streams) | `.text-label-md` | 12px / 500 / 16px |
+| Card value (stream count) | `.text-heading-2` | 24px / 600 / 32px |
+
+**Steps**:
+1. Navigate to `/dashboard`
+2. Inspect each element listed above
+3. Confirm the element has the expected class in the class list
+4. Confirm no `font-size` or `font-weight` inline style overrides are present
+
+**Pass Criteria**: All elements use `.text-*` classes; no `style={{ fontSize: … }}` or `style={{ fontWeight: … }}` present.
+
+---
+
+### 1.5.3 Landing Page Typography
+
+#### Test: Landing page components use token classes
+
+| Element | Component | Expected class |
+|---------|-----------|---------------|
+| `<h2>` subtitle | HeroSection | `.text-heading-3` |
+| Body paragraph | HeroSection | `.text-body-lg` |
+| Metrics label (Streamed, etc.) | HeroSection | `.text-label-sm` |
+| Stream card `<h3>` | HeroSection | `.text-heading-4` |
+| "Powered by Stellar" badge | TrustSection | `.text-label-lg` |
+| Section body paragraph | TrustSection | `.text-body-md` |
+| Use-case card title | TrustSection | `.text-heading-4` |
+| Use-case card subtitle | TrustSection | `.text-body-sm` |
+
+**Steps**:
+1. Navigate to `/` (Landing page)
+2. Inspect each element listed above in DevTools
+3. Confirm the expected class is present
+
+**Pass Criteria**: All listed elements carry the correct `.text-*` class.
+
+---
+
+### 1.5.4 Font Family Consistency
+
+#### Test: Plus Jakarta Sans loads and applies everywhere
+
+**Steps**:
+1. Open DevTools → Network tab, filter by "Font"
+2. Reload the page and confirm `Plus+Jakarta+Sans` is fetched from Google Fonts
+3. In Elements, inspect `<body>` — Computed `font-family` should start with "Plus Jakarta Sans"
+4. Inspect a heading and a body paragraph — both should inherit "Plus Jakarta Sans"
+
+**Pass Criteria**: Font loads successfully; no fallback system font visible in rendered text.
+
+---
+
+### 1.5.5 Accessibility: Typography Contrast
+
+#### Test: Text contrast meets WCAG 2.1 AA
+
+| Text role | Color token | Background | Min ratio |
+|-----------|-------------|------------|-----------|
+| Primary text | `--text` (#e8ecf4 dark) | `--bg` (#0a0e17) | 4.5:1 |
+| Muted text | `--muted` (#6b7a94) | `--bg` (#0a0e17) | 3:1 (large text) |
+| Card label | `--muted` | `--surface` (#121a2a) | 3:1 (large text) |
+
+**Steps**:
+1. Use the WAVE extension or https://webaim.org/resources/contrastchecker/
+2. Input foreground/background hex values from the table
+3. Verify ratio meets the minimum
+
+**Pass Criteria**: All text passes WCAG 2.1 AA contrast ratio requirements.
+
+---
+
 ## Section 2: Interactive States
 
 ### 2.1 Button States
@@ -1151,15 +1262,18 @@ This section documents the accessibility enhancements implemented during this sp
 - ✅ Color contrast compliance verified
 - ✅ Keyboard navigation tested
 - ✅ Skeleton loading states with a11y
+- ✅ Hardcoded colors migrated to design tokens (Recipient.css, Button.module.css, ConnectWalletModal.tsx, etc.)
 
-**Future Improvements (Next Sprint):**
-- [ ] High contrast mode support (Windows high contrast)
-- [ ] Forced colors media query optimization
-- [ ] Screen reader testing with Narrator (Windows), NVDA (full suite)
-- [ ] VoiceOver testing on macOS
-- [ ] Form validation live region announcements (per ARIA 1.2)
-- [ ] Data table ARIA patterns (if tables added)
-- [ ] Drag-and-drop keyboard alternative (if needed)
+**Hardcoded Color Migration Completed:**
+- ✅ Recipient.css: All colors now use `--recipient-*` tokens with light/dark theme support
+- ✅ Button.module.css: Hover/active states use `--color-danger-*` and `--color-success-*` tokens
+- ✅ ConnectWalletModal.tsx: All inline styles use CSS variables
+- ✅ AppNavbar.tsx: Inline styles use semantic tokens
+- ✅ Dashboard.tsx: Warning icon uses `--status-warning` token
+- ✅ ErrorPage.css: All colors use status/surface tokens
+- ✅ CreateStreamModal.css: Button and warning colors use tokens
+- ✅ Footer.css: Logo icon uses `--accent` token
+- ✅ GetStartedCTA.tsx: Card uses surface/border tokens
 
 ---
 

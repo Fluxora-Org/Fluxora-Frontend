@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import * as fc from "fast-check";
 import AppNavbar from "../AppNavbar";
+import { ThemeProvider } from "../../../theme/ThemeProvider";
 
 // Mock useWallet
 vi.mock("../../wallet-connect/Walletcontext", () => ({
@@ -12,6 +13,11 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
     connected: false,
     address: undefined,
     network: undefined,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
     disconnect: () => {},
   }),
 }));
@@ -51,8 +57,12 @@ describe("Property 3: Icon-only buttons have non-empty aria-labels", () => {
           fc.boolean(),
           fc.constantFrom("light" as const, "dark" as const),
           (_mobileOpen, theme) => {
+            // Seed the persisted choice so the provider initialises with it.
+            localStorage.setItem("theme", theme);
             const { unmount } = render(
-              <AppNavbar theme={theme} onThemeToggle={() => {}} />
+              <ThemeProvider>
+                <AppNavbar />
+              </ThemeProvider>
             );
 
             // Flush the connecting setTimeout
@@ -101,8 +111,11 @@ describe("Property 4: aria-expanded reflects mobileOpen state", () => {
         fc.property(
           fc.array(fc.constant("click"), { minLength: 0, maxLength: 10 }),
           (clicks) => {
+            localStorage.setItem("theme", "dark");
             const { unmount } = render(
-              <AppNavbar theme="dark" onThemeToggle={() => {}} />
+              <ThemeProvider>
+                <AppNavbar />
+              </ThemeProvider>
             );
 
             // Flush connecting skeleton timer

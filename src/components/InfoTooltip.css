@@ -1,0 +1,194 @@
+/* ========================================
+   InfoTooltip Component Styles
+   ======================================== */
+
+.info-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Trigger Button (Info Icon) */
+.info-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--icon-info-default, var(--text-muted));
+  cursor: pointer;
+  transition: color 0.15s ease;
+  position: relative;
+}
+
+.info-tooltip-trigger:hover {
+  color: var(--icon-info-hover, var(--brand-primary));
+}
+
+.info-tooltip-trigger:focus {
+  outline: none;
+  color: var(--icon-info-hover, var(--brand-primary));
+}
+
+.info-tooltip-trigger:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Popover Container */
+.info-tooltip-popover {
+  position: absolute;
+  z-index: var(--tooltip-z-index, 1100);
+  background: var(--tooltip-bg, var(--surface-elevated));
+  border: 1px solid var(--tooltip-border, var(--border-neutral));
+  border-radius: 8px;
+  box-shadow: var(--tooltip-shadow, 0 8px 24px rgba(0, 0, 0, 0.15));
+  padding: 16px;
+  max-width: min(360px, calc(100vw - 32px));
+  width: max-content;
+  animation: tooltip-fade-in 0.15s ease;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Position Variants */
+.info-tooltip-popover--bottom {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.info-tooltip-popover--top {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.info-tooltip-popover--left {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.info-tooltip-popover--right {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Mobile: Always bottom, full width minus margins */
+@media (max-width: 480px) {
+  .info-tooltip-popover {
+    top: calc(100% + 8px);
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    width: calc(100vw - 32px);
+  }
+}
+
+/* Header */
+.info-tooltip-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.info-tooltip-title {
+  margin: 0;
+  font: var(--font-heading-sm, 600 14px/1.3 inherit);
+  color: var(--tooltip-title-color, var(--text-vivid));
+}
+
+/* Close Button */
+.info-tooltip-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.info-tooltip-close:hover {
+  color: var(--text-vivid);
+  background: var(--surface-neutral);
+}
+
+.info-tooltip-close:focus {
+  outline: none;
+}
+
+.info-tooltip-close:focus-visible {
+  outline: 2px solid var(--border-interactive);
+  outline-offset: 1px;
+}
+
+/* Content */
+.info-tooltip-content {
+  font: var(--font-body-sm, 400 13px/1.5 inherit);
+  color: var(--tooltip-text-color, var(--text-secondary));
+}
+
+.info-tooltip-content p {
+  margin: 0 0 8px 0;
+}
+
+.info-tooltip-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Dark Theme */
+[data-theme="dark"] .info-tooltip-popover {
+  --tooltip-bg: #2a2f3a;
+  --tooltip-border: #404854;
+  --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .info-tooltip-trigger:focus-visible {
+    outline-width: 3px;
+  }
+  
+  .info-tooltip-popover {
+    border-width: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .info-tooltip-popover {
+    animation: none;
+  }
+  
+  .info-tooltip-trigger,
+  .info-tooltip-close {
+    transition: none;
+  }
+}

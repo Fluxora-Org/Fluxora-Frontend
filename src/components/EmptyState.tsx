@@ -2,7 +2,13 @@ import React from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type EmptyStateVariant = "treasury" | "streams" | "recipient";
+export type EmptyStateVariant =
+  | "treasury"
+  | "streams"
+  | "recipient"
+  | "zero-accrual"
+  | "search-no-results"
+  | "error";
 
 export interface EmptyStateProps {
   variant: EmptyStateVariant;
@@ -14,6 +20,17 @@ export interface EmptyStateProps {
   error?: string | null;
   onRetry?: () => void;
   onPrimaryAction?: () => void;
+  /** search-no-results: callback to clear active filters */
+  onClearFilters?: () => void;
+  /** error variant: optional descriptive message override */
+  errorMessage?: string;
+  /** Disable the primary CTA (e.g. while a retry is in-flight) */
+  ctaDisabled?: boolean;
+  /**
+   * Zero-accrual context: streams exist but balance = 0.
+   * Drives distinct icon and copy vs true empty state.
+   */
+  zeroAccrual?: boolean;
 }
 
 // ── Per-variant copy & icon config ───────────────────────────────────────────
@@ -88,19 +105,93 @@ const CONFIG: Record<
       </svg>
     ),
   },
+  "zero-accrual": {
+    connectedTitle: "Streams active — accrual pending",
+    connectedDescription:
+      "Your streams are live but haven't produced a withdrawable balance yet. This is normal during cliff periods or when streams started recently.",
+    connectedCta: "View stream details",
+    anonymousTitle: "Connect your wallet",
+    anonymousDescription:
+      "Connect a Stellar wallet to view incoming streams and withdraw accrued USDC.",
+    anonymousCta: "Connect wallet",
+    regionLabel: "Zero accrual state",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 2h14M5 22h14M6 2v5l6 5-6 5v5M18 2v5l-6 5 6 5v5"
+          stroke="#f59e0b" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  "search-no-results": {
+    connectedTitle: "No results found",
+    connectedDescription:
+      "Your search or filters didn't match any streams. Try adjusting your query or clearing all filters to see everything.",
+    connectedCta: "Clear filters",
+    anonymousTitle: "No results found",
+    anonymousDescription:
+      "Your search or filters didn't match any streams. Try adjusting your query or clearing all filters.",
+    anonymousCta: "Clear filters",
+    regionLabel: "Search no results state",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        {/* Magnifying glass body */}
+        <circle cx="14" cy="14" r="8" stroke="var(--es-search-icon-stroke, #5ED3F3)" strokeWidth="2" fill="none" />
+        {/* Lens tint */}
+        <circle cx="14" cy="14" r="8" fill="var(--es-search-icon-fill, rgba(94,211,243,0.08))" />
+        {/* Handle */}
+        <line x1="20" y1="20" x2="27" y2="27" stroke="var(--es-search-icon-stroke, #5ED3F3)" strokeWidth="2" strokeLinecap="round" />
+        {/* X inside lens */}
+        <path d="M11 11l6 6M17 11l-6 6" stroke="var(--es-search-icon-stroke, #5ED3F3)" strokeWidth="1.75" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  error: {
+    connectedTitle: "Something went wrong",
+    connectedDescription:
+      "We couldn't load this data. This may be a temporary issue — please try again. If the problem persists, check your connection or contact support.",
+    connectedCta: "Try again",
+    anonymousTitle: "Something went wrong",
+    anonymousDescription:
+      "We couldn't load this data. Please try again or refresh the page.",
+    anonymousCta: "Try again",
+    regionLabel: "Error state",
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        {/* Warning triangle */}
+        <path
+          d="M16 4L29 27H3L16 4Z"
+          fill="var(--es-error-icon-fill, rgba(239,68,68,0.10))"
+          stroke="var(--es-error-icon-stroke, #EF4444)"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        {/* Exclamation stem */}
+        <line x1="16" y1="13" x2="16" y2="20" stroke="var(--es-error-icon-stroke, #EF4444)" strokeWidth="2" strokeLinecap="round" />
+        {/* Exclamation dot */}
+        <circle cx="16" cy="23.5" r="1.25" fill="var(--es-error-icon-stroke, #EF4444)" />
+      </svg>
+    ),
+  },
 };
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (
-    <div role="status" aria-label="Loading" style={skeletonWrap}>
-      <div style={{ ...skeletonBox, width: 72, height: 72, borderRadius: 20, marginBottom: 24 }} />
-      <div style={{ ...skeletonBox, width: 160, height: 20, borderRadius: 6, marginBottom: 12 }} />
-      <div style={{ ...skeletonBox, width: 280, height: 14, borderRadius: 6, marginBottom: 8 }} />
-      <div style={{ ...skeletonBox, width: 220, height: 14, borderRadius: 6, marginBottom: 28 }} />
-      <div style={{ ...skeletonBox, width: 140, height: 44, borderRadius: 8 }} />
-      <span className="sr-only">Loading content…</span>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label="Loading content"
+      style={skeletonWrap}
+    >
+      {/* Announced to screen readers immediately */}
+      <span className="sr-only">Loading content, please wait…</span>
+      <div aria-hidden="true" style={{ ...skeletonBox, width: 72, height: 72, borderRadius: 20, marginBottom: 24 }} />
+      <div aria-hidden="true" style={{ ...skeletonBox, width: 160, height: 20, borderRadius: 6, marginBottom: 12 }} />
+      <div aria-hidden="true" style={{ ...skeletonBox, width: 280, height: 14, borderRadius: 6, marginBottom: 8 }} />
+      <div aria-hidden="true" style={{ ...skeletonBox, width: 220, height: 14, borderRadius: 6, marginBottom: 28 }} />
+      <div aria-hidden="true" style={{ ...skeletonBox, width: 140, height: 44, borderRadius: 8 }} />
     </div>
   );
 }
@@ -114,30 +205,52 @@ export default function EmptyState({
   error = null,
   onRetry,
   onPrimaryAction,
+  onClearFilters,
+  errorMessage,
+  ctaDisabled = false,
+  zeroAccrual = false,
 }: EmptyStateProps) {
-  const cfg = CONFIG[variant];
+  // When zero-accrual is flagged and variant is not already zero-accrual,
+  // override the icon+copy to zero-accrual semantics.
+  const effectiveVariant: EmptyStateVariant =
+    zeroAccrual && variant !== "zero-accrual" ? "zero-accrual" : variant;
+  const cfg = CONFIG[effectiveVariant];
   const isConnected = walletConnected;
 
   if (loading) return <LoadingSkeleton />;
 
   const title = isConnected ? cfg.connectedTitle : cfg.anonymousTitle;
-  const description = isConnected ? cfg.connectedDescription : cfg.anonymousDescription;
+  // For the error variant, allow an override message via errorMessage prop
+  const description =
+    effectiveVariant === "error" && errorMessage
+      ? errorMessage
+      : isConnected
+      ? cfg.connectedDescription
+      : cfg.anonymousDescription;
   const ctaLabel = isConnected ? cfg.connectedCta : cfg.anonymousCta;
+
+  // Determine the primary action handler for each variant
+  const handlePrimaryAction =
+    effectiveVariant === "search-no-results"
+      ? onClearFilters ?? onPrimaryAction
+      : effectiveVariant === "error"
+      ? onRetry ?? onPrimaryAction
+      : onPrimaryAction;
 
   return (
     <div style={wrapper} role="region" aria-label={cfg.regionLabel}>
       <div style={container}>
         {/* Icon */}
-        <div style={iconBox(variant)} aria-hidden="true">
+        <div style={iconBox(effectiveVariant)} aria-hidden="true">
           {cfg.icon}
         </div>
 
         {/* Heading — announced by screen readers when region updates */}
         <h2 style={titleStyle}>{title}</h2>
 
-        {/* Error banner */}
+        {/* Error banner — assertive so AT announces immediately */}
         {error && (
-          <div role="alert" aria-live="assertive" style={errorBanner}>
+          <div role="alert" aria-live="assertive" aria-atomic="true" style={errorBanner}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
               <circle cx="8" cy="8" r="7" stroke="#FF4D4F" strokeWidth="1.5" />
               <path d="M8 5v3.5M8 10.5v.5" stroke="#FF4D4F" strokeWidth="1.5" strokeLinecap="round" />
@@ -156,9 +269,11 @@ export default function EmptyState({
 
         {/* Primary CTA */}
         <button
-          style={ctaStyle(variant, isConnected)}
-          onClick={onPrimaryAction}
+          style={ctaStyle(effectiveVariant, isConnected, ctaDisabled)}
+          onClick={handlePrimaryAction}
           aria-label={ctaLabel}
+          disabled={ctaDisabled}
+          aria-disabled={ctaDisabled}
           onMouseOver={(e) => {
             (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.12)";
             (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
@@ -175,7 +290,7 @@ export default function EmptyState({
             (e.currentTarget as HTMLButtonElement).style.outline = "none";
           }}
         >
-          {isConnected && variant !== "recipient" && (
+          {isConnected && variant !== "recipient" && effectiveVariant !== "search-no-results" && effectiveVariant !== "error" && (
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
               <path d="M6 1v10M1 6h10" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" />
             </svg>
@@ -214,11 +329,17 @@ function iconBox(variant: EmptyStateVariant): React.CSSProperties {
     treasury: "rgba(0,212,170,0.08)",
     streams: "rgba(94,211,243,0.08)",
     recipient: "rgba(106,114,130,0.08)",
+    "zero-accrual": "rgba(245,158,11,0.08)",
+    "search-no-results": "var(--es-search-icon-bg, rgba(94,211,243,0.08))",
+    error: "var(--es-error-icon-bg, rgba(239,68,68,0.08))",
   };
   const borders: Record<EmptyStateVariant, string> = {
     treasury: "rgba(0,212,170,0.18)",
     streams: "rgba(94,211,243,0.15)",
     recipient: "rgba(106,114,130,0.18)",
+    "zero-accrual": "rgba(245,158,11,0.22)",
+    "search-no-results": "var(--es-search-icon-border, rgba(94,211,243,0.20))",
+    error: "var(--es-error-icon-border, rgba(239,68,68,0.25))",
   };
   return {
     width: 72,
@@ -249,7 +370,7 @@ const descStyle: React.CSSProperties = {
   maxWidth: 400,
 };
 
-function ctaStyle(variant: EmptyStateVariant, connected: boolean): React.CSSProperties {
+function ctaStyle(variant: EmptyStateVariant, connected: boolean, disabled = false): React.CSSProperties {
   const bg: Record<EmptyStateVariant, string> = {
     treasury: connected
       ? "linear-gradient(135deg, #00D4AA 0%, #00A884 100%)"
@@ -257,10 +378,13 @@ function ctaStyle(variant: EmptyStateVariant, connected: boolean): React.CSSProp
     streams: connected
       ? "linear-gradient(135deg, #2DD4BF 0%, #0EA5A0 100%)"
       : "rgba(255,255,255,0.06)",
-    recipient: connected
-      ? "rgba(255,255,255,0.06)"
-      : "rgba(255,255,255,0.06)",
+    recipient: "rgba(255,255,255,0.06)",
+    "zero-accrual": "rgba(245,158,11,0.12)",
+    "search-no-results": "var(--es-search-cta-bg, rgba(94,211,243,0.12))",
+    error: "var(--es-error-cta-bg, rgba(239,68,68,0.12))",
   };
+  const isSpecial =
+    variant === "search-no-results" || variant === "error";
   return {
     display: "inline-flex",
     alignItems: "center",
@@ -269,15 +393,24 @@ function ctaStyle(variant: EmptyStateVariant, connected: boolean): React.CSSProp
     minHeight: 44,
     minWidth: 44,
     borderRadius: 8,
-    border: connected && variant !== "recipient" ? "none" : "1px solid rgba(255,255,255,0.15)",
-    background: bg[variant],
-    color: "#FFFFFF",
+    border: isSpecial
+      ? `1px solid var(${variant === "error" ? "--es-error-cta-border" : "--es-search-cta-border"}, ${variant === "error" ? "rgba(239,68,68,0.30)" : "rgba(94,211,243,0.25)"})`
+      : connected && variant !== "recipient"
+      ? "none"
+      : "1px solid rgba(255,255,255,0.15)",
+    background: disabled ? "rgba(255,255,255,0.04)" : bg[variant],
+    color: disabled
+      ? "rgba(255,255,255,0.28)"
+      : isSpecial
+      ? `var(${variant === "error" ? "--es-error-cta-text" : "--es-search-cta-text"}, ${variant === "error" ? "#EF4444" : "#5ED3F3"})`
+      : "#FFFFFF",
     fontSize: 14,
     fontWeight: 600,
-    cursor: "pointer",
-    transition: "filter 0.15s ease, transform 0.15s ease",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.45 : 1,
+    transition: "filter 0.15s ease, transform 0.15s ease, opacity 0.15s ease",
     boxShadow:
-      connected && variant !== "recipient"
+      !disabled && connected && variant !== "recipient" && !isSpecial
         ? "0 0 14px rgba(45,212,191,0.2)"
         : "none",
   };

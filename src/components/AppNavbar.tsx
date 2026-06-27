@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { stellarExplorerUrl } from "../lib/stellar";
 
 interface AppNavbarProps {
   onThemeToggle?: () => void;
@@ -26,7 +27,7 @@ function usePageTitle(): string {
 
 function MoonIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg" aria-hidden="true">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"
         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -35,7 +36,7 @@ function MoonIcon() {
 
 function SunIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg" aria-hidden="true">
       <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" />
       {[["12","1","12","3"],["12","21","12","23"],["4.22","4.22","5.64","5.64"],
         ["18.36","18.36","19.78","19.78"],["1","12","3","12"],["21","12","23","12"],
@@ -50,7 +51,7 @@ function SunIcon() {
 
 function ChevronDownIcon({ open }: { open: boolean }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg"
       style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}
       aria-hidden="true">
       <polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2.5"
@@ -61,7 +62,7 @@ function ChevronDownIcon({ open }: { open: boolean }) {
 
 function CopyIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg" aria-hidden="true">
       <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
         stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -71,7 +72,7 @@ function CopyIcon() {
 
 function ExternalLinkIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg" aria-hidden="true">
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <polyline points="15 3 21 3 21 9" stroke="currentColor" strokeWidth="2"
@@ -83,7 +84,7 @@ function ExternalLinkIcon() {
 
 function DisconnectIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-lg" aria-hidden="true">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2"
@@ -148,10 +149,11 @@ function FluxoraLogo() {
 
 interface WalletDropdownProps {
   address: string;
+  network: "TESTNET" | "MAINNET";
   onDisconnect?: () => void;
 }
 
-function WalletDropdown({ address, onDisconnect }: WalletDropdownProps) {
+function WalletDropdown({ address, network, onDisconnect }: WalletDropdownProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -177,7 +179,7 @@ function WalletDropdown({ address, onDisconnect }: WalletDropdownProps) {
   };
 
   const handleViewExplorer = () => {
-    window.open(`https://stellar.expert/explorer/testnet/account/${address}`, "_blank", "noopener");
+    window.open(stellarExplorerUrl(address, network), "_blank", "noopener");
     setOpen(false);
   };
 
@@ -215,7 +217,7 @@ function WalletDropdown({ address, onDisconnect }: WalletDropdownProps) {
             View in explorer
           </button>
           <div style={styles.dropdownDivider} role="separator" />
-          <button role="menuitem" onClick={handleDisconnect} style={{ ...styles.dropdownItem, color: "#f87171" }}
+          <button role="menuitem" onClick={handleDisconnect} style={{ ...styles.dropdownItem, color: "var(--status-error)" }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
             <DisconnectIcon />
@@ -267,10 +269,14 @@ export default function AppNavbar({
           {network}
         </button>
         {walletAddress ? (
-          <WalletDropdown address={walletAddress} onDisconnect={onDisconnect} />
+          <WalletDropdown
+            address={walletAddress}
+            network={network}
+            onDisconnect={onDisconnect}
+          />
         ) : (
           <span style={styles.noWallet} aria-label="No wallet connected">
-            <span style={{ ...styles.connectedDot, background: "#6b7a94" }} />
+            <span style={{ ...styles.connectedDot, background: "var(--text-muted)" }} />
             Not connected
           </span>
         )}
@@ -304,7 +310,7 @@ const styles: Record<string, React.CSSProperties> = {
   iconButton: { background: "transparent", border: "1px solid var(--navbar-icon-border)", borderRadius: "50%", width: "40px", height: "40px", minWidth: "44px", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--navbar-icon-color)", transition: "background 0.2s ease", padding: 0, outline: "none" },
   networkBadge: { display: "inline-flex", alignItems: "center", padding: "0 12px", height: "32px", minHeight: "44px", borderRadius: "20px", border: "none", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.07em", cursor: "pointer", whiteSpace: "nowrap", transition: "opacity 0.15s", outline: "none" },
   walletPill: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 12px", height: "36px", minHeight: "44px", borderRadius: "20px", border: "none", background: "var(--surface)", color: "var(--text)", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", outline: "none", transition: "background 0.15s" },
-  connectedDot: { width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", flexShrink: 0, boxShadow: "0 0 0 2px rgba(34,197,94,0.25)" },
+  connectedDot: { width: "8px", height: "8px", borderRadius: "50%", background: "var(--status-success)", flexShrink: 0, boxShadow: "0 0 0 2px rgba(30, 201, 142, 0.25)" },
   walletAddress: { fontFamily: "monospace", fontSize: "0.8rem" },
   noWallet: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 12px", height: "36px", borderRadius: "20px", background: "var(--surface)", color: "var(--muted)", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", fontSize: "0.82rem", whiteSpace: "nowrap" },
   dropdown: { position: "absolute", right: 0, top: "calc(100% + 8px)", minWidth: "185px", background: "var(--navbar-bg)", border: "1px solid var(--navbar-border)", borderRadius: "10px", boxShadow: "var(--navbar-shadow)", padding: "5px", zIndex: 200 },

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
@@ -19,8 +19,19 @@ export default function StreamCreatedModal({
   onCreateAnother,
 }: StreamCreatedModalProps) {
   const [copied, setCopied] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const [isPopupBlocked, setIsPopupBlocked] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAnnouncement("Success! Your USDC stream is now live on Stellar.");
+      setIsPopupBlocked(false);
+      const timer = setTimeout(() => setAnnouncement(""), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   useModalAccessibility({
     isOpen,
@@ -37,6 +48,32 @@ export default function StreamCreatedModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  /**
+   * Opens the stream URL in a new tab.
+   * Enforces https: scheme for security (preventing javascript: or data: injection).
+   * Detects popup-blocker null return and shows an accessible inline link fallback.
+   */
+  const handleViewStream = () => {
+    try {
+      const parsedUrl = new URL(streamUrl);
+      if (parsedUrl.protocol !== "https:") {
+        console.error("Invalid URL scheme. Only https is allowed.");
+        return;
+      }
+    } catch (e) {
+      console.error("Invalid URL provided.");
+      return;
+    }
+
+    const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
+    if (!newWindow) {
+      setIsPopupBlocked(true);
+      setAnnouncement("Popup blocked. Please use the fallback link to view your stream.");
+    } else {
+      setIsPopupBlocked(false);
+    }
+  };
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div
@@ -49,6 +86,9 @@ export default function StreamCreatedModal({
         aria-describedby="stream-created-description"
         tabIndex={-1}
       >
+        <div className="sr-only" aria-live="assertive">
+          {announcement}
+        </div>
         <button
           ref={closeButtonRef}
           className={styles.closeButton}
@@ -141,6 +181,20 @@ export default function StreamCreatedModal({
           </p>
         </div>
 
+        {isPopupBlocked && (
+          <div className={styles.popupBlockedMessage} role="alert">
+            Popup blocked.{" "}
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.fallbackLink}
+            >
+              Click here to view your stream
+            </a>
+          </div>
+        )}
+
         <div className={styles.actions}>
           <button
             className={`${styles.btn} ${styles.btnSecondary}`}
@@ -164,9 +218,7 @@ export default function StreamCreatedModal({
           </button>
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}
-            onClick={() =>
-              window.open(streamUrl, "_blank", "noopener,noreferrer")
-            }
+            onClick={handleViewStream}
             type="button"
           >
             View stream

@@ -5,13 +5,13 @@
   --skeleton-edge-stop: 22%;
   --skeleton-shine-start: 42%;
   --skeleton-shine-end: 58%;
-  --skeleton-speed: 1.5s;
+  --skeleton-speed: 1.4s;
   --skeleton-glow: rgba(255, 255, 255, 0.5);
 }
 
 :root[data-theme="dark"] {
-  --skeleton-base: #1f2a3e;
-  --skeleton-shine: #38516f;
+  --skeleton-base: #1a2438;
+  --skeleton-shine: #243048;
   --skeleton-glow: rgba(143, 194, 255, 0.18);
 }
 
@@ -19,6 +19,11 @@
   --skeleton-base: #e6edf5;
   --skeleton-shine: #ffffff;
   --skeleton-glow: rgba(255, 255, 255, 0.72);
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .skeleton {
@@ -30,9 +35,9 @@
     var(--skeleton-shine) var(--skeleton-shine-end),
     var(--skeleton-base) 100%
   );
-  background-size: 240% 100%;
+  background-size: 400% 100%;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skeleton-base) 82%, transparent);
-  animation: shimmer var(--skeleton-speed) ease-in-out infinite;
+  animation: shimmer var(--skeleton-speed) linear infinite;
   border-radius: 6px;
   will-change: background-position;
 }

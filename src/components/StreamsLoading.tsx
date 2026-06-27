@@ -15,6 +15,7 @@ export default function StreamsLoading() {
 
       {/* Table card */}
       <SkeletonCard style={{ padding: 0, overflow: "hidden" }} aria-hidden="true">
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
           <thead>
             <tr>
@@ -59,6 +60,7 @@ export default function StreamsLoading() {
             ))}
           </tbody>
         </table>
+        </div>
       </SkeletonCard>
     </div>
   );

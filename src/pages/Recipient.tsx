@@ -1,152 +1,233 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import EmptyState from "../components/EmptyState";
-import RecipientStreams from "../components/recipient/RecipientStreams";
+import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
+import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useToast } from "../components/toast/ToastProvider";
+import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
+import { withdraw } from "../lib/stellar/tx";
+import "./Streams.css";
+import "./Recipient.css";
+
+// Demo balances used as a UI fallback when the service returns no recipient
+// streams (no live backend yet, or no seeded match for the connected address).
+const DEMO_BALANCE = 22600.0;
+const DEMO_ACTIVE = 2;
+const DEMO_TOTAL_ACCRUED = 43250.0;
+const DEMO_TOTAL_WITHDRAWN = 20650.0;
 
 export default function Recipient() {
+  const wallet = useWallet();
+  const { addToast } = useToast();
+
   const [loading, setLoading] = useState(true);
+  const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const recipientStreams = useRecipientStreams(wallet.address);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(t);
   }, []);
 
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
-  const walletConnected = true;
-  // Replace with real stream data
+  /**
+   * Resets transaction state when the active wallet address changes.
+   * This prevents stale errors or pending states from carrying over to a different account.
+   */
+  useEffect(() => {
+    setTxState("idle");
+    setErrorMsg(null);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [wallet.address]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const fetchIncomingStreams = async (): Promise<Stream[]> => [
+    { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+    { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+  ];
+
+  const liveStreams = recipientStreams.streams;
+  const hasLiveStreams = liveStreams.length > 0;
+
+  const balance = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.withdrawableAmount, 0)
+    : DEMO_BALANCE;
+  const activeStreams = hasLiveStreams
+    ? liveStreams.filter((stream) => stream.status === "Active").length
+    : DEMO_ACTIVE;
+  const totalAccrued = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.streamedAmount, 0)
+    : DEMO_TOTAL_ACCRUED;
+  const totalWithdrawn = hasLiveStreams
+    ? liveStreams.reduce(
+        (sum, stream) => sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
+        0,
+      )
+    : DEMO_TOTAL_WITHDRAWN;
+
+  const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
 
-  const disabled = !walletConnected || balance === 0;
+  const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
+
+  // Zero-accrual: connected + streams exist + no withdrawable balance yet
+  const isZeroAccrual = walletConnected && hasStreams && balance === 0;
+  
+  const isPending = txState === "signing" || txState === "submitting";
+  const disabled = !walletConnected || balance === 0 || networkMismatch || isPending;
+
+  const handleWithdraw = async () => {
+    if (disabled) return;
+    setTxState("signing");
+    setErrorMsg(null);
+
+    const recipientAddr = wallet.address!;
+    const amountStr = Math.floor(balance * 10_000_000).toString(); // Scale to 7 decimals
+    const streamId = "1"; // Default stream ID
+
+    try {
+      setTxState("submitting");
+      await withdraw(recipientAddr, streamId, amountStr);
+      setTxState("confirmed");
+      addToast("Withdrawal completed successfully on-chain!", "success");
+      timerRef.current = setTimeout(() => setTxState("idle"), 5000);
+    } catch (err: any) {
+      setTxState("error");
+      setErrorMsg(err.message || "Withdrawal failed.");
+      addToast(`Withdrawal failed: ${err.message || err}`, "error");
+    }
+  };
+
+  const getButtonText = () => {
+    switch (txState) {
+      case "signing":
+        return "Signing in Freighter...";
+      case "submitting":
+        return "Submitting to RPC...";
+      case "confirmed":
+        return "Withdrawn successfully!";
+      case "error":
+        return "Withdrawal Failed - Retry";
+      default:
+        return `Withdraw ${balance.toLocaleString()} USDC`;
+    }
+  };
 
   if (loading) return <RecipientLoading />;
 
   if (!walletConnected || !hasStreams) {
     return (
-      <div>
-        <h1 style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}>Your streams</h1>
+      <main aria-labelledby="recipient-page-title">
+        <h1
+          id="recipient-page-title"
+          style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}
+        >
+          Your streams
+        </h1>
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
           View your incoming streams and withdraw accrued USDC at any time.
         </p>
-        <EmptyState
-          variant="recipient"
-          walletConnected={walletConnected}
-        />
-      </div>
+        <EmptyState variant="recipient" walletConnected={walletConnected} />
+      </main>
     );
   }
 
   return (
-    <div className="flex flex-col gap-10 max-w-7xl mx-auto px-4 py-8 animate-fade-in">
-      {/* Header & Overview Stats */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-extrabold text-white tracking-tight">Recipient Portal</h1>
-          <p className="text-slate-500 font-medium max-w-md">
-            Manage your incoming streams, track accrued balances, and withdraw USDC in real-time.
+    <main className="streams-page">
+      {/* ── Page Header (Hero) ── */}
+      <section className="streams-hero">
+        <div className="streams-hero__copy">
+          <p className="streams-eyebrow">Recipient Portal</p>
+          <h1>Your streams</h1>
+          <p className="streams-subtitle">
+            Manage your incoming streams, track accrued balances, and withdraw
+            USDC in real-time. Your accumulated balance is available for instant
+            withdrawal to your connected wallet.
           </p>
+          {(errorMsg || networkMismatch) && (
+            <p className="validation-message validation-message--error" style={{ color: "var(--color-danger)", marginTop: "1rem" }} role="alert">
+              {networkMismatch 
+                ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${wallet.expectedNetworkLabel}.`
+                : errorMsg}
+            </p>
+          )}
         </div>
-
-        {/* Global Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6 rounded-[2rem] bg-slate-900/50 border border-slate-800 backdrop-blur-sm">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Streams</span>
-            <span className="text-xl font-black text-white">{activeStreams}</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Accrued</span>
-            <span className="text-xl font-black text-emerald-500">{totalAccrued.toLocaleString()} USDC</span>
-          </div>
-          <div className="flex flex-col hidden md:flex">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Withdrawn</span>
-            <span className="text-xl font-black text-slate-400">{totalWithdrawn.toLocaleString()} USDC</span>
-          </div>
+        <div className="streams-hero__actions">
+          <button
+            disabled={disabled}
+            className={`streams-primary-button ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={handleWithdraw}
+          >
+            {getButtonText()}
+          </button>
         </div>
-      </div>
+      </section>
 
-      {/* Main Action Card: Withdrawable Balance */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-black border border-slate-800 p-8 md:p-12 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]">
-        {/* Animated Background Glow */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-[100px] -mr-32 -mt-32" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="flex flex-col gap-4 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 self-center md:self-start rounded-full bg-cyan-500/10 px-4 py-1.5 border border-cyan-500/20">
-               <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
-               <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Available to Claim</span>
-            </div>
-            
-            <div className="flex items-baseline gap-3 mb-2">
-              <span className="text-6xl md:text-7xl font-black text-white tabular-nums tracking-tighter">
-                {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
-              <span className="text-2xl font-bold text-slate-500 tracking-tight uppercase">USDC</span>
-            </div>
-            
-            <p className="text-slate-400 font-medium max-w-sm">
-                Your accumulated balance from all active streams across all DAOs.
-                Funds are available for instant withdrawal to your connected wallet.
+      {/* ── Zero-accrual banner (streams live, balance = 0) ── */}
+      {isZeroAccrual && (
+        <div style={{ marginBottom: "2rem" }}>
+          <ZeroAccrualBanner
+            reason="cliff"
+            onAction={() => {
+              /* Navigate to streams page for cliff details */
+              window.location.href = "/app/streams";
+            }}
+            actionLabel="View stream details"
+          />
+        </div>
+      )}
+
+      {/* ── Overview Metrics ── */}
+      <section className="streams-summary-grid" aria-label="Stream summary">
+        <div className="streams-summary-card">
+          <span>Active streams</span>
+          <strong>{activeStreams}</strong>
+          <p>Currently accruing funds for your wallet.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Total Accrued</span>
+          <strong>{totalAccrued.toLocaleString()} USDC</strong>
+          <p>Total amount earned over the lifetime of all streams.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Withdrawn</span>
+          <strong>{totalWithdrawn.toLocaleString()} USDC</strong>
+          <p>Total funds already transferred to your wallet.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Withdrawable now</span>
+          <strong style={{ color: "var(--accent)" }}>{balance.toLocaleString()} USDC</strong>
+          <p>Available for immediate withdrawal.</p>
+        </div>
+      </section>
+
+      {/* ── Streams List ── */}
+      <section className="streams-list-shell">
+        <div className="streams-list-head">
+          <div>
+            <h2>Incoming streams</h2>
+            <p className="streams-subtitle">
+              Review and manage each individual stream currently committing funds to you.
             </p>
           </div>
-
-          {/* Action Area */}
-          <div className="flex flex-col items-center gap-4 w-full md:w-auto">
-            <button
-              disabled={disabled}
-              className={`
-                group relative w-full md:w-[280px] py-6 px-8 rounded-2xl flex items-center justify-center gap-3 transition-all duration-300 font-black text-lg uppercase tracking-wider
-                ${
-                  disabled
-                    ? "bg-slate-800 text-slate-600 cursor-not-allowed border-slate-700"
-                    : "bg-cyan-500 text-white hover:scale-[1.03] hover:bg-cyan-400 shadow-[0_20px_40px_-10px_rgba(6,182,212,0.5)] active:scale-95 border-none"
-                }
-              `}
-            >
-              <span>Withdraw USDC</span>
-              {!disabled && (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="transition-transform duration-300 group-hover:translate-x-1"
-                >
-                  <path d="m11 5 7 7-7 7" />
-                  <path d="M4 12h14" />
-                </svg>
-              )}
-            </button>
-            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                Secure On-Chain Transaction
-            </span>
-          </div>
         </div>
-      </div>
-
-      {/* Streams Overview Section */}
-      <div className="mt-4">
-        <RecipientStreams />
-      </div>
-
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out forwards;
-        }
-      `}</style>
-    </div>
+        <div className="mt-6">
+          <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,19 +1,12 @@
-/**
- * Tests for createStreamDates helpers and cliff-before-end validation
- * in CreateStreamModal step 2.
- *
- * Covers: computeStreamEndDate, validateCliffBeforeEnd, and the UI integration.
- * Issue: #354 — Validate cliff date falls before stream end date
- */
-
-import { describe, it, expect } from 'vitest';
-import { render, fireEvent, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { render, fireEvent, screen, within } from '@testing-library/react';
 import * as fc from 'fast-check';
 import {
   computeStreamEndDate,
   validateCliffBeforeEnd,
 } from '../../lib/createStreamDates';
 import CreateStreamModal from '../CreateStreamModal';
+
 
 // ─── Unit tests: computeStreamEndDate ───────────────────────────────────────
 
@@ -57,7 +50,7 @@ describe('computeStreamEndDate', () => {
   it('property: end > start for any valid positive duration', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-01-01') }),
+        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-01-01'), noInvalidDate: true }),
         fc.float({ min: Math.fround(0.01), max: Math.fround(120), noNaN: true }),
         (start, months) => {
           const end = computeStreamEndDate(start, months);
@@ -104,7 +97,7 @@ describe('validateCliffBeforeEnd', () => {
   it('property: no error when cliff <= end', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2024-01-01'), max: new Date('2029-12-31') }),
+        fc.date({ min: new Date('2024-01-01'), max: new Date('2029-12-31'), noInvalidDate: true }),
         fc.float({ min: Math.fround(0.1), max: Math.fround(24), noNaN: true }),
         fc.float({ min: Math.fround(0), max: Math.fround(1), noNaN: true }),
         (start, months, fraction) => {
@@ -122,7 +115,7 @@ describe('validateCliffBeforeEnd', () => {
   it('property: always error when cliff > end by any positive offset', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2024-01-01'), max: new Date('2029-12-31') }),
+        fc.date({ min: new Date('2024-01-01'), max: new Date('2029-12-31'), noInvalidDate: true }),
         fc.float({ min: Math.fround(0.1), max: Math.fround(24), noNaN: true }),
         fc.integer({ min: 1, max: 365 * 24 * 60 * 60 * 1000 }), // ms offset > 0
         (start, months, offsetMs) => {
@@ -138,7 +131,8 @@ describe('validateCliffBeforeEnd', () => {
 
 // ─── Integration tests: cliff validation in CreateStreamModal UI ─────────────
 
-const VALID_STELLAR = 'GABC' + 'ABCDEFGHJKLMNPQRSTUVWXYZ234567'.repeat(2).slice(0, 52);
+const CLIFF_TEST_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderModal() {
   return render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
@@ -147,7 +141,7 @@ function renderModal() {
 function advanceToStep2(container: HTMLElement) {
   fireEvent.change(
     container.querySelector('#create-stream-recipient') as HTMLInputElement,
-    { target: { value: VALID_STELLAR } }
+    { target: { value: CLIFF_TEST_ADDRESS } }
   );
   fireEvent.change(
     container.querySelector('#create-stream-deposit') as HTMLInputElement,
@@ -176,7 +170,7 @@ describe('CreateStreamModal — cliff-before-end UI validation', () => {
 
     // Set duration to 1 month (default); set cliff 60 days out (past 30-day end)
     const future60 = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
-    const cliffValue = future60.toISOString().split('T')[0]; // YYYY-MM-DD
+    const cliffValue = future60.toISOString().slice(0, 16); // YYYY-MM-DD
     fireEvent.change(cliffInput, { target: { value: cliffValue } });
     fireEvent.blur(cliffInput);
 
@@ -197,7 +191,7 @@ describe('CreateStreamModal — cliff-before-end UI validation', () => {
 
     // Duration = 1 month = 30 days from now
     const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const cliffValue = endDate.toISOString().split('T')[0];
+    const cliffValue = endDate.toISOString().slice(0, 16);
     fireEvent.change(cliffInput, { target: { value: cliffValue } });
     fireEvent.blur(cliffInput);
 
@@ -214,7 +208,7 @@ describe('CreateStreamModal — cliff-before-end UI validation', () => {
 
     // 15 days from now — well within 1 month duration
     const cliff15 = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
-    const cliffValue = cliff15.toISOString().split('T')[0];
+    const cliffValue = cliff15.toISOString().slice(0, 16);
     fireEvent.change(cliffInput, { target: { value: cliffValue } });
     fireEvent.blur(cliffInput);
 
@@ -230,7 +224,7 @@ describe('CreateStreamModal — cliff-before-end UI validation', () => {
 
     // Set cliff to 20 days from now — valid for 1-month duration
     const cliff20 = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
-    const cliffValue = cliff20.toISOString().split('T')[0];
+    const cliffValue = cliff20.toISOString().slice(0, 16);
     fireEvent.change(cliffInput, { target: { value: cliffValue } });
     fireEvent.blur(cliffInput);
 
@@ -255,11 +249,96 @@ describe('CreateStreamModal — cliff-before-end UI validation', () => {
 
     // Set cliff far past end
     const future120 = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000);
-    fireEvent.change(cliffInput, { target: { value: future120.toISOString().split('T')[0] } });
+    fireEvent.change(cliffInput, { target: { value: future120.toISOString().slice(0, 16) } });
     fireEvent.blur(cliffInput);
 
     // The error should be on the cliff input's container, not a global .error element
     const cliffContainer = cliffInput.closest('.input-container');
     expect(cliffContainer?.classList.contains('input-container--error')).toBe(true);
+  });
+});
+
+
+// Checksum-valid Stellar public key (required by the centralized
+// isValidStellarAddress validator introduced in #331).
+const VALID_STELLAR =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+
+function renderStep2() {
+  const view = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+
+  fireEvent.change(
+    view.container.querySelector("#create-stream-recipient") as HTMLInputElement,
+    { target: { value: VALID_STELLAR } },
+  );
+  fireEvent.change(
+    view.container.querySelector("#create-stream-deposit") as HTMLInputElement,
+    { target: { value: "100" } },
+  );
+  fireEvent.click(within(view.container).getByRole("button", { name: /^next$/i }));
+
+  return view;
+}
+
+function goToReview(container: HTMLElement) {
+  fireEvent.click(within(container).getByRole("button", { name: /^next$/i }));
+}
+
+describe("CreateStreamModal date consistency", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-20T12:00:00"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("uses datetime-local for custom start and cliff inputs", () => {
+    const { container } = renderStep2();
+
+    fireEvent.click(screen.getByRole("button", { name: /custom date/i }));
+    fireEvent.click(screen.getByText(/enable cliff/i));
+
+    expect(
+      container.querySelector("#create-stream-custom-start-date"),
+    ).toHaveAttribute("type", "datetime-local");
+    expect(container.querySelector("#create-stream-cliff-date")).toHaveAttribute(
+      "type",
+      "datetime-local",
+    );
+  });
+
+  it("rejects a custom start datetime in the past", () => {
+    const { container } = renderStep2();
+
+    fireEvent.click(screen.getByRole("button", { name: /custom date/i }));
+    fireEvent.change(
+      container.querySelector("#create-stream-custom-start-date") as HTMLInputElement,
+      { target: { value: "2026-06-20T11:59" } },
+    );
+    goToReview(container);
+
+    expect(screen.getByText("Start date must be in the future.")).toBeInTheDocument();
+  });
+
+  it("rejects a cliff datetime before the custom start datetime", () => {
+    const { container } = renderStep2();
+
+    fireEvent.click(screen.getByRole("button", { name: /custom date/i }));
+    fireEvent.change(
+      container.querySelector("#create-stream-custom-start-date") as HTMLInputElement,
+      { target: { value: "2026-06-20T14:00" } },
+    );
+    fireEvent.click(screen.getByText(/enable cliff/i));
+    fireEvent.change(
+      container.querySelector("#create-stream-cliff-date") as HTMLInputElement,
+      { target: { value: "2026-06-20T13:00" } },
+    );
+    goToReview(container);
+
+    expect(
+      screen.getByText("Cliff date must be on or after the start date."),
+    ).toBeInTheDocument();
   });
 });

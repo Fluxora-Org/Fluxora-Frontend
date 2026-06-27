@@ -1,83 +1,152 @@
+/**
+ * ConnectWalletModal Styles
+ * ──────────────────────────────────────
+ * All values use design tokens — no hardcoded hex colors.
+ * Supports light and dark themes via CSS variable overrides.
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   BACKDROP
+   ═══════════════════════════════════════════════════════════ */
+
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: var(--space-lg);
+  animation: fadeIn var(--transition-base);
 }
+
+:root[data-theme="dark"] .backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL DIALOG
+   ═══════════════════════════════════════════════════════════ */
 
 .modal {
   position: relative;
   background: var(--color-bg-primary);
   border-radius: var(--radius-xl);
   padding: clamp(1.25rem, 5vw, 2rem);
-  max-width: 480px;
+  max-width: 520px;
   width: 100%;
   box-shadow: var(--shadow-xl);
   border: 1px solid var(--color-border-default);
   max-height: 90vh;
   overflow-y: auto;
+  font-family: var(--font-family-base);
+  animation: modalEnter var(--transition-base);
 }
 
-.focusable {
-  outline: none;
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.focusable:focus-visible {
-  box-shadow: var(--focus-ring);
-}
+/* ═══════════════════════════════════════════════════════════
+   CLOSE BUTTON
+   ═══════════════════════════════════════════════════════════ */
 
 .closeButton {
   position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: transparent;
-  border: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   color: var(--color-text-tertiary);
-  font-size: 1.5rem;
   cursor: pointer;
-  padding: 0.25rem;
-  line-height: 1;
   transition:
     color var(--transition-base),
     background-color var(--transition-base),
-    box-shadow var(--transition-base);
-  border-radius: var(--radius-full);
+    border-color var(--transition-base);
 }
 
 .closeButton:hover {
   color: var(--color-text-primary);
-  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-secondary);
 }
 
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════ */
+
 .header {
-  margin-bottom: 1.5rem;
-  padding-right: 2.75rem;
+  margin-bottom: var(--space-xl);
+  padding-right: 2.75rem; /* clear close button */
+}
+
+.badge {
+  display: inline-block;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(0, 184, 212, 0.35);
+  color: var(--status-info);
+  background: rgba(0, 184, 212, 0.1);
+  padding: 5px var(--space-md);
+  font: var(--font-label-sm);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  margin-bottom: var(--space-md);
 }
 
 .title {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-sm);
   font: var(--font-heading-3);
   color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .subtitle {
   margin: 0;
   font: var(--font-body-md);
   color: var(--color-text-tertiary);
-  line-height: 1.5;
+  line-height: 1.55;
+  max-width: 420px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WALLET LIST
+   ═══════════════════════════════════════════════════════════ */
 
 .walletList {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WALLET OPTION BUTTON
+   ═══════════════════════════════════════════════════════════ */
 
 .walletOption {
   display: flex;
@@ -88,30 +157,45 @@
   border-radius: var(--radius-lg);
   padding: clamp(0.75rem, 3vw, 1rem);
   cursor: pointer;
-  transition:
-    background-color var(--transition-base),
-    border-color var(--transition-base),
-    box-shadow var(--transition-base),
-    transform var(--transition-fast);
   text-align: left;
   width: 100%;
   color: inherit;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .walletOption:hover {
   background: var(--color-surface-elevated);
-  border-color: color-mix(in srgb, var(--color-focus) 40%, var(--color-border-default));
+  border-color: var(--border-interactive);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .walletOption:focus-visible {
-  transform: translateY(-1px);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
+.walletOption:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   WALLET OPTION INTERNALS
+   ═══════════════════════════════════════════════════════════ */
+
 .walletIcon {
-  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
   flex-shrink: 0;
-  width: clamp(40px, 12vw, 48px);
-  height: clamp(40px, 12vw, 48px);
+  width: clamp(40px, 11vw, 48px);
+  height: clamp(40px, 11vw, 48px);
+  border-radius: var(--radius-md);
+  background: var(--interactive-bg-default);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,7 +209,7 @@
 .walletName {
   font: var(--font-label-lg);
   color: var(--color-text-primary);
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-xs);
 }
 
 .walletDescription {
@@ -135,33 +219,311 @@
 }
 
 .chevron {
-  font-size: 1.25rem;
   color: var(--color-text-tertiary);
   flex-shrink: 0;
+  transition: transform var(--transition-base), color var(--transition-base);
 }
+
+.walletOption:hover .chevron {
+  color: var(--color-accent-primary);
+  transform: translateX(2px);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════ */
 
 .footer {
   font: var(--font-body-sm);
   color: var(--color-text-tertiary);
   text-align: center;
   line-height: 1.5;
+  margin: 0;
 }
 
 .termsLink {
   color: var(--color-accent-secondary);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   border-radius: var(--radius-sm);
-  transition:
-    color var(--transition-base),
-    box-shadow var(--transition-base);
+  transition: color var(--transition-base);
 }
 
 .termsLink:hover {
   color: var(--color-accent-secondary-dark);
 }
 
+.termsLink:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+
 @media (max-width: 480px) {
   .modal {
-    padding: 1.5rem;
+    padding: var(--space-xl);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .modal,
+  .walletOption {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR STATES
+   ═══════════════════════════════════════════════════════════ */
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-md) 0 var(--space-lg);
+  animation: fadeIn var(--transition-base);
+}
+
+.errorIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-lg);
+  font-size: 1.75rem;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.errorIcon::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: var(--radius-full);
+  border: 2px dashed currentColor;
+  opacity: 0.15;
+  animation: spin 20s linear infinite;
+}
+
+.iconNotInstalled {
+  background: var(--color-info-bg);
+  color: var(--status-info);
+}
+
+.iconRejected {
+  background: var(--color-danger-bg);
+  color: var(--status-error);
+}
+
+.iconMismatch {
+  background: var(--color-warning-bg);
+  color: var(--status-warning);
+}
+
+.errorTitle {
+  font: var(--font-heading-3);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-sm);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.errorDescription {
+  font: var(--font-body-md);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 var(--space-xl);
+  max-width: 440px;
+}
+
+/* Specific Instructions for Network Mismatch */
+.errorInstructions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto var(--space-xl);
+  padding: 0;
+  list-style: none;
+}
+
+.instructionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  text-align: left;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.instructionNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--interactive-bg-default);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.instructionText {
+  font: var(--font-body-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.instructionText strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* Action buttons */
+.actionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 320px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-cta-primary-bg);
+  color: var(--color-cta-primary-text);
+  font: var(--font-label-lg);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-cta-primary);
+  transition:
+    background-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.primaryButton:hover {
+  background: var(--color-cta-primary-bg-hover);
+  box-shadow: var(--shadow-cta-primary-hover);
+  transform: translateY(-1px);
+}
+
+.primaryButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+.primaryButton:active {
+  transform: translateY(0);
+  background: var(--color-cta-primary-bg-active);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-cta-secondary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-cta-secondary-bg);
+  color: var(--color-cta-secondary-text);
+  font: var(--font-label-lg);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.secondaryButton:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+}
+
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DESIGN QA PREVIEW TOOLBAR
+   ═══════════════════════════════════════════════════════════ */
+
+.previewToolbar {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px dashed var(--color-border-default);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.previewTitle {
+  font: var(--font-label-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.previewBtnGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  justify-content: center;
+}
+
+.previewButton {
+  background: var(--interactive-bg-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px var(--space-sm);
+  font: var(--font-label-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.previewButton:hover {
+  background: var(--interactive-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-secondary);
+}
+
+.previewButtonActive {
+  background: var(--color-accent-primary);
+  color: var(--color-cta-primary-text);
+  border-color: var(--color-accent-primary);
+  font-weight: 600;
 }
