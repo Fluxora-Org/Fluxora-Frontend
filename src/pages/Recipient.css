@@ -7,17 +7,15 @@
   font-size: clamp(1.8rem, 2.2vw, 2.15rem);
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #f5f8ff;
+  color: var(--recipient-title-text);
 }
 
 .recipient-table-wrap {
   width: 100%;
   overflow-x: auto;
-  border: 1px solid #29364b;
+  border: 1px solid var(--recipient-border);
   border-radius: 14px;
-  background:
-    linear-gradient(100deg, #111a2c 0%, #131f33 36%, #131a2c 100%),
-    #121a2d;
+  background: var(--card-gradient);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -42,12 +40,12 @@
   letter-spacing: 0.07em;
   font-weight: 500;
   text-align: left;
-  color: #9aabc9;
+  color: var(--recipient-header-text);
   white-space: nowrap;
 }
 
 .recipient-streams-table td {
-  color: #eef3ff;
+  color: var(--recipient-body-text);
   vertical-align: middle;
 }
 
@@ -64,13 +62,13 @@
 .recipient-from-address {
   margin-top: 0.25rem;
   font-size: 0.82rem;
-  color: #8998b3;
+  color: var(--text-muted);
   font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 .recipient-rate {
   font-size: 1.05rem;
-  color: #e3ebff;
+  color: var(--text-vivid);
 }
 
 .recipient-status {
@@ -119,7 +117,7 @@
 .recipient-accrued {
   font-size: 1.12rem;
   font-weight: 500;
-  color: #f0f4ff;
+  color: var(--text-vivid);
   white-space: nowrap;
 }
 
@@ -168,7 +166,7 @@
 }
 
 .recipient-no-withdraw {
-  color: #73809a;
+  color: var(--text-muted);
   font-size: 1rem;
   white-space: nowrap;
 }
@@ -176,7 +174,7 @@
 .recipient-empty-state {
   margin: 0;
   padding: 1rem 1.15rem;
-  color: #9aabc9;
+  color: var(--text-muted);
 }
 
 @media (max-width: 1024px) {
@@ -242,12 +240,12 @@
   .recipient-streams-table tr {
     border: 1px solid rgba(69, 88, 116, 0.45);
     border-radius: 10px;
-    background: rgba(11, 18, 31, 0.52);
+    background: var(--surface-raised);
     overflow: hidden;
   }
 
   .recipient-streams-table td {
-    border-bottom: 1px solid rgba(68, 87, 112, 0.34);
+    border-bottom: 1px solid var(--border);
     padding: 0.72rem;
     display: flex;
     align-items: flex-start;

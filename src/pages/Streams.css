@@ -24,7 +24,7 @@
   padding: clamp(1.5rem, 4vw, 2.25rem);
   background:
     radial-gradient(circle at top right, rgba(45, 212, 191, 0.16), transparent 38%),
-    linear-gradient(135deg, rgba(15, 22, 36, 0.96), rgba(18, 26, 42, 0.94));
+    var(--card-gradient);
   overflow: hidden;
 }
 
@@ -53,7 +53,7 @@
 .stream-empty-state p {
   margin: 0.85rem 0 0;
   max-width: 42rem;
-  color: #b4c0d4;
+  color: var(--text-secondary);
   font-size: 1rem;
   line-height: 1.7;
 }
@@ -100,9 +100,20 @@
 
 .streams-secondary-button {
   padding: 0.75rem 1.1rem;
-  background: rgba(45, 212, 191, 0.08);
-  border-color: rgba(45, 212, 191, 0.28);
-  color: #dffcf7;
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: var(--color-text-primary);
+}
+
+.streams-secondary-button:hover {
+  background: rgba(45, 212, 191, 0.18);
+  border-color: rgba(45, 212, 191, 0.5);
+}
+
+.streams-secondary-button[aria-expanded="true"] {
+  background: rgba(45, 212, 191, 0.2);
+  border-color: rgba(45, 212, 191, 0.58);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08);
 }
 
 .streams-ghost-button {
@@ -135,8 +146,8 @@
 .stream-metric-card {
   padding: 1.15rem;
   border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  background: linear-gradient(180deg, rgba(19, 31, 48, 0.92), rgba(15, 22, 36, 0.94));
+  border: 1px solid var(--border);
+  background: var(--card-gradient);
 }
 
 .streams-summary-card span,
@@ -164,7 +175,7 @@
 .stream-panel__body p,
 .stream-action-card p {
   margin: 0.5rem 0 0;
-  color: #b4c0d4;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -216,7 +227,7 @@
   border-radius: 22px;
   background:
     radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(15, 22, 36, 0.95), rgba(18, 26, 42, 0.95));
+    var(--card-gradient);
   padding: 1.2rem;
 }
 
@@ -265,10 +276,10 @@
 .stream-chip {
   padding: 0.45rem 0.75rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #d7e3f3;
+  background: var(--surface-raised);
+  color: var(--text-vivid);
   font-size: 0.85rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--border);
 }
 
 .stream-status-pill {
@@ -330,6 +341,30 @@
   margin-top: 1rem;
 }
 
+.stream-card__disclosure {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  transition:
+    max-height var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure),
+    opacity var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure),
+    margin-top var(--motion-duration-stream-disclosure)
+      var(--motion-ease-stream-disclosure);
+}
+
+.stream-card__disclosure.is-open {
+  max-height: var(--stream-disclosure-max-height);
+  opacity: 1;
+  margin-top: 1rem;
+}
+
+.stream-card__disclosure-inner {
+  overflow: hidden;
+}
+
 .stream-card__facts,
 .stream-panel__rows,
 .stream-action-note,
@@ -359,7 +394,7 @@
 .stream-meta-block code,
 .stream-card__mono,
 .stream-panel__mono {
-  color: #dbeafe;
+  color: var(--text-vivid);
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.82rem;
 }
@@ -375,7 +410,7 @@
   gap: 0.75rem;
   margin-bottom: 0.5rem;
   font-size: 0.88rem;
-  color: #d7e3f3;
+  color: var(--text-secondary);
 }
 
 .stream-progress__bar {
@@ -394,7 +429,6 @@
 }
 
 .stream-card__expanded {
-  margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
@@ -435,6 +469,8 @@
 .stream-panel__row-value {
   font-size: 0.98rem;
   line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .stream-tag-list {
@@ -447,10 +483,10 @@
   width: fit-content;
   padding: 0.55rem 0.8rem;
   border-radius: 999px;
-  background: rgba(45, 212, 191, 0.08);
-  color: #d9fff6;
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--color-text-primary);
   font-size: 0.84rem;
-  border: 1px solid rgba(45, 212, 191, 0.16);
+  border: 1px solid rgba(45, 212, 191, 0.3);
 }
 
 .stream-timeline__item {
@@ -482,7 +518,7 @@
 }
 
 .stream-timeline__detail {
-  color: #b4c0d4;
+  color: var(--text-secondary);
   line-height: 1.55;
 }
 
@@ -494,7 +530,7 @@
   padding: clamp(1.4rem, 4vw, 2rem);
   background:
     radial-gradient(circle at top right, rgba(45, 212, 191, 0.12), transparent 35%),
-    linear-gradient(135deg, rgba(15, 22, 36, 0.98), rgba(18, 26, 42, 0.96));
+    var(--card-gradient);
 }
 
 .stream-detail__headline {
@@ -559,5 +595,202 @@
   .stream-card__facts,
   .stream-panel__rows {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TIME PRESENTATION STYLES (Issue #174)
+   Cliffs, end dates, and ledger-relative clarity
+   ═══════════════════════════════════════════════════════════ */
+
+/* Time bar - displays cliff and end dates in card header */
+.stream-time-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stream-time-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.stream-time-bar__icon {
+  font-size: 0.9rem;
+}
+
+.stream-time-bar__label {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.stream-time-bar__date {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stream-time-bar__relative {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Cliff time bar variations */
+.stream-time-bar__cliff.is-passed {
+  background: rgba(107, 114, 128, 0.12);
+}
+
+.stream-time-bar__cliff.is-passed .stream-time-bar__date,
+.stream-time-bar__cliff.is-passed .stream-time-bar__relative {
+  color: var(--muted);
+}
+
+.stream-time-bar__cliff.is-upcoming {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.stream-time-bar__cliff.is-upcoming .stream-time-bar__date {
+  color: var(--status-warning);
+}
+
+.stream-time-bar__cliff.is-soon {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.stream-time-bar__cliff.is-soon .stream-time-bar__date {
+  color: var(--status-error);
+}
+
+/* End time bar variations */
+.stream-time-bar__end.is-high {
+  background: rgba(0, 184, 212, 0.1);
+}
+
+.stream-time-bar__end.is-high .stream-time-bar__date {
+  color: var(--color-accent-primary);
+}
+
+.stream-time-bar__end.is-medium {
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.stream-time-bar__end.is-medium .stream-time-bar__date {
+  color: var(--accent);
+}
+
+.stream-time-bar__end.is-low {
+  background: rgba(107, 114, 128, 0.08);
+}
+
+/* Cliff badge in expanded view */
+.stream-cliff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.stream-cliff-badge.is-passed {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--muted);
+}
+
+.stream-cliff-badge.is-upcoming {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--status-warning);
+}
+
+.stream-cliff-badge.is-soon {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--status-error);
+}
+
+.stream-cliff-badge.is-none {
+  background: rgba(107, 114, 128, 0.08);
+  color: var(--muted);
+}
+
+/* Time value in panel rows */
+.stream-time-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Responsive adjustments for time display */
+@media (max-width: 640px) {
+  .stream-time-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .stream-time-bar__item {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .stream-time-bar__relative {
+    display: none;
+  }
+
+  .stream-time-bar__date {
+    font-size: 0.9rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STREAM TIMELINE SECTION
+   Visual timeline visualization for stream lifecycle
+   ═══════════════════════════════════════════════════════════ */
+
+.stream-detail__timeline-section {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(5, 11, 24, 0.2);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.stream-detail__section-header {
+  margin: 0 0 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-vivid);
+}
+
+/* Responsive adjustments for timeline section */
+@media (max-width: 768px) {
+  .stream-detail__timeline-section {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  .stream-detail__section-header {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stream-detail__timeline-section {
+    padding: 0.875rem;
+  }
+
+  .stream-detail__section-header {
+    font-size: 0.95rem;
   }
 }

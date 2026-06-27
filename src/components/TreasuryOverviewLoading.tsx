@@ -37,14 +37,16 @@ export default function TreasuryOverviewLoading() {
 
       {/* Streams table skeleton */}
       <div
+        className="streams-table-scroll"
         style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
+          background: "var(--color-surface-default)",
+          border: "1px solid var(--color-border-default)",
           borderRadius: 12,
           overflow: "hidden",
         }}
         aria-hidden="true"
       >
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table className="recent-table" style={{ minWidth: 600 }}>
           <thead>
             <tr>
@@ -70,6 +72,7 @@ export default function TreasuryOverviewLoading() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

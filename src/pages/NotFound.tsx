@@ -4,7 +4,7 @@ export default function NotFound() {
   const navigate = useNavigate();
 
   return (
-    <div className="notfound-root" role="main">
+    <main id="main-content" className="notfound-root">
       <div className="notfound-shapes" aria-hidden="true">
         <div className="shape shape-left" />
         <div className="shape shape-right" />
@@ -63,6 +63,6 @@ export default function NotFound() {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

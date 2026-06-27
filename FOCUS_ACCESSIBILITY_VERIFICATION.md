@@ -14,19 +14,24 @@ This document covers the keyboard focus order and visible focus-ring updates for
 
 - Standardized visible focus indicators to the documented cyan focus treatment using a shared `--focus-ring` token.
 - Updated navbar controls and shared navbar subcomponents to use the same keyboard-visible focus ring and offset treatment.
-- Improved sidebar keyboard usability by:
+- Improved keyboard usability by:
+  - adding a "Skip to content" link at the top of the application pointing to `#main-content`.
+  - standardized landmark roles (`header`, `nav`, `main`, `footer`) across all pages.
+  - ensured every page has a single `<main id="main-content">` landmark.
   - preserving accessible names when the sidebar is collapsed
   - replacing hover-only inline styling with keyboard-visible focus states
   - aligning app routes and utility-link targets with the repo's existing paths
-- Improved connect wallet modal keyboard flow by:
-  - moving initial focus to the first wallet option
-  - keeping the close button reachable in the tab sequence
-  - adding visible focus states to wallet options, the close button, and the terms link
 
 ## Manual Verification Against `TESTING_CHECKLIST.md`
 
 Status verified by code inspection and build verification:
 
+- "Skip to content" link appears as the first focusable element on all pages and correctly jumps to the main content area.
+- Landmark roles are correctly applied:
+  - `header` (role="banner") in `AppNavbar`
+  - `nav` in `AppNavbar`, `Sidebar`, and `Footer`
+  - `main` (id="main-content") in all page components
+  - `footer` in `Footer`
 - Navbar logo, nav links, theme toggle, wallet controls, and mobile menu button show a visible focus ring when tabbed to
 - Sidebar interactive elements show a visible focus ring and remain keyboard reachable in expanded and collapsed states
 - Collapsed sidebar items still expose accessible names through `aria-label`
@@ -36,7 +41,7 @@ Status verified by code inspection and build verification:
 
 ## Automated Verification
 
-- `pnpm test`: not available in this repo (`package.json` does not define a `test` script)
+- `pnpm test`: available (`package.json` defines `vitest run`)
 - `pnpm build`: passed
 
 ## Accessibility Tooling Notes

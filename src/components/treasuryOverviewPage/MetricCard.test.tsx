@@ -1,3 +1,12 @@
+/**
+ * MetricCard Tests
+ * ─────────────────
+ * Tests for the MetricCard component.
+ * 
+ * Note: jsdom doesn't resolve CSS variables, so we assert the variable
+ * names (e.g., "var(--color-surface-default)") rather than resolved values.
+ */
+
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import MetricCard from "./MetricCard";
@@ -21,8 +30,10 @@ describe("MetricCard", () => {
   it("applies correct styles from design tokens", () => {
     const { container } = render(<MetricCard {...mockMetric} />);
     const card = container.firstChild as HTMLElement;
-    const style = window.getComputedStyle(card);
-    expect(style.backgroundColor).toBe("var(--color-surface-default)");
-    expect(style.border).toBe("1px solid var(--color-border-default)");
+    
+    // Check inline styles use CSS variables (jsdom doesn't resolve them)
+    const inlineStyle = card.getAttribute("style") || "";
+    expect(inlineStyle).toContain("var(--color-surface-default)");
+    expect(inlineStyle).toContain("var(--color-border-default)");
   });
 });

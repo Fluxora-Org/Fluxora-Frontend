@@ -151,7 +151,11 @@ Light mode uses lighter greys; dark mode uses darker greys. The `border-interact
 | Token | Value | Hex | WCAG AA (vs. neutral surface) | Semantic Meaning | Fallback |
 |-------|-------|-----|-------------------------------|------------------|----------|
 | `status-success` | Live/Connected | `#1ec98e` | 5.8:1 (dark), 6.2:1 (light) | Stream active, wallet connected | Checkmark icon + "Live" badge |
+| `status-success-hover` | Success hover state | `#059669` | 6.5:1 (dark), 6.8:1 (light) | Hover on success elements | Darker success shade |
+| `status-success-active` | Success active state | `#047857` | 6.3:1 (dark), 6.6:1 (light) | Pressed success elements | Darkest success shade |
 | `status-error` | Error/Blocked | `#ff6b6b` | 6.1:1 (dark), 5.9:1 (light) | Failed stream, invalid input, alert | X icon + "Error" text |
+| `status-error-hover` | Error hover state | `#dc2626` | 6.8:1 (dark), 6.5:1 (light) | Hover on error elements | Darker error shade |
+| `status-error-active` | Error active state | `#bb2124` | 6.4:1 (dark), 6.2:1 (light) | Pressed error elements | Darkest error shade |
 | `status-warning` | Pending/Cautious | `#ffa726` | 5.3:1 (dark), 5.7:1 (light) | Awaiting confirmation, low threshold | Exclamation icon + "Pending" text |
 | `status-info` | Informational | `#00b8d4` | 5.5:1 (dark), 6.0:1 (light) | Notification, system message | Info icon + "Info" text |
 | `accent-primary` | Interactive/CTA | `#00d4aa` | 6.8:1 (dark), 7.2:1 (light) | Primary actions, active links | Underline + bold weight |

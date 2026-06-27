@@ -10,23 +10,52 @@
 
 ## 1. Executive Summary
 
-### Problem Statement
-Fluxora-Frontend exhibits visual inconsistencies between:
-- **Marketing site** (Landing page): Uses modern Tailwind CSS patterns, hero-driven layout
-- **Authenticated app** (Dashboard): Uses inline styles, mixed CSS approaches
+### Problem
+Fluxora has inconsistent UI between:
+- Marketing site (Tailwind-based, modern spacing)
+- Authenticated app (custom CSS + inline styles)
 
 ### Impact
-- Users experience jarring UX transitions when moving from landing to app
-- Inconsistent button styles, spacing, color tokens reduce professionalism
-- Treasury/recipient mental models suffer from unclear hierarchy
-- Accessibility gaps (focus order, live regions, contrast) create compliance risk
+- Inconsistent user experience
+- Weak visual hierarchy in dashboard
+- Accessibility gaps (focus, contrast, ARIA)
+- Poor design system scalability
 
 ### Solution
-Unified visual system with:
-- Consistent design tokens (colors, spacing, typography)
-- Standardized component states across authenticated and anonymous surfaces
-- WCAG 2.1 AA accessibility compliance built-in
-- Implementation-ready specifications preventing engineering guesswork
+Introduce a unified **token-based design system**:
+- Spacing grid system
+- Consistent typography scale
+- Standardized colors + states
+- WCAG 2.1 AA accessibility compliance
+- Shared layout structure across app + landing
+
+---
+
+## 2. Design Principles
+
+- Consistency over creativity per screen
+- Token-driven styling (no magic numbers)
+- Accessibility-first UI
+- Predictable interaction patterns
+- Mobile-first responsive system
+
+---
+
+## 3. Design Tokens (Core System)
+
+### 3.1 Spacing System (Grid)
+```css
+:root {
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+}
 
 ---
 
@@ -1172,3 +1201,105 @@ No backend/API or wallet integration architecture was modified.
 - [ ] Copy clearly explains connection flow and private-key safety.
 - [ ] Layout remains readable and touch-friendly on mobile viewport widths.
 - [ ] Axe/WAVE scans reviewed and findings noted in PR description.
+
+---
+
+## 15. Design Token Unification — Implementation Record
+
+**Branch**: `uiux/unify-design-tokens-across-marketing-and-auth`  
+**Completed**: April 27, 2026  
+**Scope**: `src/design-tokens.css`, `src/index.css`, `src/components/ConnectWalletModal.tsx`, `src/components/ConnectWalletModal.module.css`, `src/components/landing-page/TrustSection.tsx`, `src/components/landing-page/HeroSection.tsx`
+
+### 15.1 Root Cause Analysis
+
+The primary inconsistency was a **token override bug** in `src/index.css`: a `:root` block hardcoded dark-theme hex values (`#0a0e17`, `#121a2a`, etc.) that ran *after* the light-theme defaults in `design-tokens.css`, making the app always render in dark mode regardless of the `data-theme` attribute. This caused the landing page and authenticated app to share the same dark palette even when the user selected light mode.
+
+Secondary issues:
+- Semantic tokens (`--color-bg-primary`, `--color-surface-default`, `--color-text-primary`, `--color-focus`, etc.) were referenced by components but never defined — causing silent fallbacks to browser defaults.
+- `ConnectWalletModal.tsx` used a `styles` object with hardcoded dark hex values, bypassing the token system entirely.
+- `TrustSection.tsx` used inline hex colors instead of CSS variables.
+- Skeleton tokens (`--skeleton-base`, `--skeleton-shine`) were specified in `DARK_THEME_SPEC.md` but never added to the token file.
+
+### 15.2 Changes Made
+
+#### `src/design-tokens.css`
+- Added full **semantic token layer** under `:root` (light) and `:root[data-theme="dark"]`:
+  - `--color-bg-primary/secondary/tertiary` → map to surface tokens
+  - `--color-surface-default/elevated/raised/highest` → map to surface tokens
+  - `--color-border-default/secondary` → map to border tokens
+  - `--color-text-primary/secondary/tertiary/muted/inverse`
+  - `--color-focus` (light: `#0ea5e9`, dark: `#00d4aa`)
+  - `--color-success/warning/danger/info` (semantic status aliases)
+- Added **skeleton tokens**: `--skeleton-base` and `--skeleton-shine` for both themes
+- Added `--shimmer` keyframe animation for skeleton loading
+- Moved `@keyframes shimmer` here (was duplicated in `index.css`)
+- All legacy tokens (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, etc.) preserved as aliases for backward compatibility
+
+#### `src/index.css`
+- **Removed** the `:root` block that hardcoded dark-theme values — this was the root cause of the light/dark inconsistency
+- All color references now use `var(--color-*)` tokens
+- `body` background/color now use `var(--color-bg-primary)` / `var(--color-text-primary)`
+- `.button--secondary` text color changed from hardcoded `#ffffff` to `var(--color-text-primary)` (readable in both themes)
+- `.btn-secondary` (404 page) updated to use `var(--surface-raised)` / `var(--color-text-primary)`
+- `.skeleton` utility class added using `--skeleton-base` / `--skeleton-shine` tokens
+- `--nf-bg`, `--nf-cyan`, `--nf-muted` now reference semantic tokens instead of hardcoded hex
+
+#### `src/components/ConnectWalletModal.tsx`
+- Replaced the entire inline `styles: Record<string, CSSProperties>` object with CSS module class references
+- All visual properties now come from `ConnectWalletModal.module.css` tokens
+- Close button replaced with an SVG X icon (was a `✕` text character — inconsistent sizing across fonts)
+- Removed `hoveredOptionId` / `focusedOptionId` / `isCloseFocused` state — hover/focus styles handled by CSS `:hover` and `:focus-visible` (simpler, more accessible, no JS dependency)
+
+#### `src/components/ConnectWalletModal.module.css`
+- Full rewrite using design tokens exclusively
+- Added `modalEnter` animation using `--transition-base`
+- Wallet option hover: uses `var(--color-surface-elevated)` + `var(--border-interactive)` border
+- Chevron icon animates on hover (`translateX(2px)`) for affordance
+- Dark theme backdrop opacity override via `:root[data-theme="dark"] .backdrop`
+- `prefers-reduced-motion` disables all animations
+
+#### `src/components/landing-page/TrustSection.tsx`
+- Replaced all inline hex colors with CSS variable references:
+  - `#0097a7` → `var(--color-accent-primary-dark)`
+  - `#0a0e17` / `#ffffff` → `var(--color-bg-primary)`
+  - `#121a2a` / `#f7f8f9` → `var(--color-surface-default)`
+  - `#1e2d42` / `#e8edf2` → `var(--color-border-default)`
+  - `#e8ecf4` / `#1e293b` → `var(--color-text-primary)`
+  - `#6b7a94` / `#94a3b8` → `var(--color-text-tertiary)`
+  - Icon container background → `var(--color-info-bg)`
+  - Badge background/border → `var(--color-info-bg)` / `var(--border-interactive)`
+
+#### `src/components/landing-page/HeroSection.tsx`
+- Secondary "Watch Demo" button: replaced Tailwind dark/light conditional classes with inline CSS variable references (`var(--color-border-default)`, `var(--color-surface-default)`, `var(--color-text-secondary)`)
+- Primary CTA already used `.ui-primary-cta` — no change needed
+
+### 15.3 Token Coverage After This Change
+
+| Category | Before | After |
+|----------|--------|-------|
+| Semantic bg/surface tokens defined | ❌ | ✅ |
+| Semantic text tokens defined | ❌ | ✅ |
+| `--color-focus` defined | ❌ | ✅ |
+| Skeleton tokens defined | ❌ | ✅ |
+| `index.css` dark override bug | ❌ Fixed | ✅ |
+| `ConnectWalletModal` uses tokens | ❌ | ✅ |
+| `TrustSection` uses tokens | ❌ | ✅ |
+| Light theme renders correctly | ❌ | ✅ |
+
+### 15.4 Accessibility Notes
+
+- No accessibility regressions introduced
+- `ConnectWalletModal` focus trap, `role="dialog"`, `aria-modal`, `aria-labelledby`, `aria-describedby` all preserved
+- Close button now uses an SVG icon with `aria-hidden="true"` and an explicit `aria-label` on the button
+- Wallet option buttons retain `aria-label="Connect with [Name]"` and `role="listitem"`
+- All interactive elements continue to use `:focus-visible` rings via `--color-focus`
+
+### 15.5 Verification Steps
+
+1. Toggle theme via DevTools: `document.documentElement.setAttribute("data-theme", "light")` — verify light surfaces render
+2. Toggle to dark: `document.documentElement.setAttribute("data-theme", "dark")` — verify dark surfaces render
+3. Inspect `--color-bg-primary` in DevTools Computed tab — should resolve to `#ffffff` (light) or `#0a0e17` (dark)
+4. Open ConnectWalletModal — verify no hardcoded dark colors bleed through in light mode
+5. Visit `/landing` — TrustSection cards should use theme-appropriate backgrounds
+6. Run `pnpm test` for automated checks
+7. Run Axe DevTools scan on Dashboard and ConnectWallet pages

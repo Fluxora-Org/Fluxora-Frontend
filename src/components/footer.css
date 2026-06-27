@@ -48,7 +48,7 @@
 .footer__logo-icon svg {
   width: 1rem;
   height: 1rem;
-  stroke: #ffffff;
+  stroke: var(--accent);
   stroke-width: 1.9;
   fill: none;
   stroke-linecap: round;

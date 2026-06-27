@@ -227,15 +227,15 @@ Each frame: skeleton state side-by-side with the resolved data state for direct 
 
 ## 10. Acceptance Criteria
 
-- [ ] All three surfaces show a skeleton on initial load before data resolves
-- [ ] Skeleton colors match dark theme (`#1a2438` / `#243048`) — no light-grey flash
-- [ ] No layout shift between skeleton and resolved state (heading, card dimensions match)
-- [ ] Screen reader announces "Loading [surface]…" on mount via `role="status"`
-- [ ] No focusable elements inside any skeleton
-- [ ] Table skeletons scroll horizontally at < 768px without clipping
-- [ ] Metric card grid collapses to 1-column at < 480px
-- [ ] Skeleton → EmptyState transition works (loading resolves to empty data)
-- [ ] Skeleton → Error transition works (loading resolves to error)
+- [x] All three surfaces show a skeleton on initial load before data resolves
+- [x] Skeleton colors match dark theme (`#1a2438` / `#243048`) — no light-grey flash
+- [x] No layout shift between skeleton and resolved state (heading, card dimensions match)
+- [x] Screen reader announces "Loading [surface]…" on mount via `role="status"`
+- [x] No focusable elements inside any skeleton
+- [x] Table skeletons scroll horizontally at < 768px without clipping
+- [x] Metric card grid collapses to 1-column at < 480px
+- [x] Skeleton → EmptyState transition works (loading resolves to empty data)
+- [x] Skeleton → Error transition works (loading resolves to error)
 
 ---
 

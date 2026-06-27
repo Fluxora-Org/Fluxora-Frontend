@@ -1,95 +1,103 @@
-import { useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from "react-router-dom";
+import { isValidStellarAddress, maskAddress } from "../../lib/stellar";
 
-/**
- * Static label map for known route segments.
- *
- * Hoisted to module scope so it is never rebuilt per render.
- * Add entries here when new routes are introduced.
- */
-export const LABEL_MAP: Record<string, string> = {
-  app: 'Dashboard',
-  streams: 'Streams',
-  recipient: 'Recipient',
-  settings: 'Settings',
-};
-
-/** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
-function isValidStellarAddress(value: string): boolean {
-  const t = value.trim();
-  if (t.length !== 56 || t[0] !== 'G') return false;
-  return /^G[ABCDEFGHJKLMNPQRSTUVWXYZ234567]{55}$/.test(t);
-}
-
-function maskAddress(addr: string): string {
-  const t = addr.trim();
-  if (t.length <= 12) return t || '—';
-  return `${t.slice(0, 6)}…${t.slice(-4)}`;
-}
-
-interface BreadcrumbItem {
+export interface BreadcrumbItem {
   label: string;
-  href: string;
-  isCurrent: boolean;
+  to?: string;
+}
+
+interface BreadcrumbProps {
+  items: BreadcrumbItem[];
 }
 
 /**
- * Derives breadcrumb items from the current pathname.
+ * Breadcrumb
+ * ──────────────────────────────────────
+ * Semantic breadcrumb trail for deep pages (e.g. Streams / Stream #ABC123).
  *
- * Per-item address validation is memoized so it only re-runs when the
- * pathname changes, not on every render.
- */
-export function useBreadcrumbs(labelMap: Record<string, string> = LABEL_MAP): BreadcrumbItem[] {
-  const { pathname } = useLocation();
-
-  return useMemo(() => {
-    const segments = pathname.split('/').filter(Boolean);
-    let accumulated = '';
-
-    return segments.map((seg, i) => {
-      accumulated += `/${seg}`;
-      const isCurrent = i === segments.length - 1;
-      const rawLabel = labelMap[seg] ?? seg;
-      const label = isValidStellarAddress(seg) ? maskAddress(seg) : rawLabel;
-      return { label, href: accumulated, isCurrent };
-    });
-  }, [pathname, labelMap]);
-}
-
-/**
- * Breadcrumb navigation component.
+ * Accessibility:
+ * - nav[aria-label="Breadcrumb"] wraps the trail
+ * - ol > li structure (ordered, represents hierarchy)
+ * - aria-current="page" on the last (current) item
+ * - Separator chevrons are aria-hidden
+ * - All link items are keyboard-focusable with visible focus ring
+ * - Truncates checksum-valid Stellar addresses at 8...4 chars
  *
- * Labels are derived from LABEL_MAP (module-scope constant).
- * Address segments are masked; validation result is memoized per pathname.
+ * WCAG 2.1 AA: 4.5:1 text contrast, 3:1 focus ring contrast
  */
-export default function Breadcrumb() {
-  const items = useBreadcrumbs();
-
+export default function Breadcrumb({ items }: BreadcrumbProps) {
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb">
+    <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center" }}>
       <ol
-        style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', listStyle: 'none', margin: 0, padding: 0 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--breadcrumb-gap)",
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          font: "var(--breadcrumb-font)",
+          flexWrap: "wrap",
+        }}
       >
-        {items.map((item, i) => (
-          <li key={item.href} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            {i > 0 && (
-              <span aria-hidden="true" style={{ color: 'var(--muted)' }}>
-                /
-              </span>
-            )}
-            {item.isCurrent ? (
-              <span aria-current="page" style={{ color: 'var(--text)' }}>
-                {item.label}
-              </span>
-            ) : (
-              <Link to={item.href} style={{ color: 'var(--muted)', textDecoration: 'none' }}>
-                {item.label}
-              </Link>
-            )}
-          </li>
-        ))}
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
+          const isStellarAddress = isValidStellarAddress(item.label);
+          const displayLabel = isStellarAddress
+            ? maskAddress(item.label)
+            : item.label;
+
+          return (
+            <li
+              key={item.label}
+              style={{ display: "flex", alignItems: "center", gap: "var(--breadcrumb-gap)" }}
+            >
+              {isLast || !item.to ? (
+                <span
+                  aria-label={isStellarAddress ? item.label : undefined}
+                  aria-current={isLast ? "page" : undefined}
+                  title={isStellarAddress ? item.label : undefined}
+                  style={{
+                    color: isLast
+                      ? "var(--breadcrumb-color-current)"
+                      : "var(--breadcrumb-color)",
+                    fontWeight: isLast ? 500 : 400,
+                    maxWidth: "200px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {displayLabel}
+                </span>
+              ) : (
+                <Link
+                  to={item.to}
+                  aria-label={isStellarAddress ? item.label : undefined}
+                  title={isStellarAddress ? item.label : undefined}
+                  className="breadcrumb-link"
+                >
+                  {displayLabel}
+                </Link>
+              )}
+
+              {!isLast && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    color: "var(--breadcrumb-separator-color)",
+                    userSelect: "none",
+                    fontSize: "10px",
+                  }}
+                >
+                  /
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </nav>
   );

@@ -1,17 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useState, type ReactElement } from "react";
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
+import { Skeleton, SkeletonCard } from "./components/Skeleton";
+import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
+import { ToastProvider } from "./components/toast/ToastProvider";
+import { I18nProvider } from "./i18n";
+import ErrorBoundary from "./components/ErrorBoundary";
+import RequireWallet from "./components/RequireWallet";
 import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
-import Streams from "./pages/Streams";
-import Recipient from "./pages/Recipient";
 import ConnectWallet from "./pages/ConnectWallet";
-import Landing from "./pages/Landing";
-import TreasuryPage from "./pages/TreasuryPage";
 import ErrorPage from "./pages/ErrorPage";
 import NotFound from "./pages/NotFound";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Streams = lazy(() => import("./pages/Streams"));
+const Recipient = lazy(() => import("./pages/Recipient"));
+const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
+const EmptyStateDemo = lazy(() => import("./pages/EmptyStateDemo"));
 
 function LegacyStreamRedirect() {
   const { streamId } = useParams();
@@ -23,62 +30,113 @@ function LegacyStreamRedirect() {
   );
 }
 
+function AppRouteFallback() {
+  return (
+    <div role="status" aria-label="Loading app page" aria-busy="true">
+      <span className="sr-only">Loading app page...</span>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          marginBottom: "1.5rem",
+        }}
+      >
+        <Skeleton width={220} height={28} borderRadius={8} />
+        <Skeleton width={340} height={14} />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "1rem",
+        }}
+        aria-hidden="true"
+      >
+        {[0, 1, 2].map((item) => (
+          <SkeletonCard
+            key={item}
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <Skeleton width={40} height={40} borderRadius={8} />
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <Skeleton height={10} width="45%" />
+              <Skeleton height={18} width="70%" />
+            </div>
+          </SkeletonCard>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function lazyAppRoute(element: ReactElement) {
+  return <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>;
+}
+
 export default function App() {
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    return (document.documentElement.getAttribute("data-theme") as "light" | "dark") || "light";
-  });
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const handleThemeToggle = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  };
 
   const handleSidebarToggle = () => {
     setIsSidebarOpen((prev) => !prev);
   };
 
   return (
-    <BrowserRouter>
-      <WalletProvider>
-        <AppNavbar 
-          onThemeToggle={handleThemeToggle} 
-          theme={theme} 
-          onSidebarToggle={handleSidebarToggle}
-          isSidebarOpen={isSidebarOpen}
-        />
-
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Navigate to="/app" replace />} />
-          <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
-          <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
-          <Route path="/landing" element={<Landing theme={theme} />} />
-          <Route
-            path="/app"
-            element={
-              <Layout 
+    <ThemeProvider>
+      <I18nProvider>
+        <BrowserRouter>
+          <WalletProvider>
+            <ToastProvider>
+              <a href="#main-content" className="skip-link">
+                Skip to content
+              </a>
+              <AppNavbar
+                onSidebarToggle={handleSidebarToggle}
                 isSidebarOpen={isSidebarOpen}
-                onSidebarClose={() => setIsSidebarOpen(false)}
               />
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="streams" element={<Streams />} />
-            <Route path="streams/:streamId" element={<Streams />} />
-            <Route path="recipient" element={<Recipient />} />
-            <Route path="treasurypage" element={<TreasuryPage />} />
-            <Route path="error" element={<ErrorPage />} />
-          </Route>
-          <Route path="/connect-wallet" element={<ConnectWallet />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </WalletProvider>
-    </BrowserRouter>
+
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+                  <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
+                  <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
+                  <Route path="/landing" element={<Navigate to="/" replace />} />
+                  <Route
+                    path="/app"
+                    element={
+                      <RequireWallet>
+                        <Layout />
+                      </RequireWallet>
+                    }
+                  >
+                    <Route index element={lazyAppRoute(<Dashboard />)} />
+                    <Route path="streams" element={lazyAppRoute(<Streams />)} />
+                    <Route path="streams/:streamId" element={lazyAppRoute(<Streams />)} />
+                    <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
+                    <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
+                    <Route path="error" element={<ErrorPage />} />
+                    <Route
+                      path="empty-state-demo"
+                      element={lazyAppRoute(<EmptyStateDemo />)}
+                    />
+                  </Route>
+                  <Route path="/connect-wallet" element={<ConnectWallet />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ErrorBoundary>
+            </ToastProvider>
+          </WalletProvider>
+        </BrowserRouter>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }

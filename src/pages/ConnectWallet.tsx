@@ -1,14 +1,30 @@
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import GlowingDot from "../components/GlowingDot";
 import WalletIcon from "../components/WalletIcon";
 import ConnectWalletModal from "../components/ConnectWalletModal";
+import { sanitizeReturnTo } from "../components/RequireWallet";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 export default function ConnectWallet() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCtaFocused, setIsCtaFocused] = useState(false);
+  const wallet = useWallet();
+  const location = useLocation();
+  const state = location.state as { returnTo?: string } | null;
+  const returnTo = sanitizeReturnTo(state?.returnTo);
+
+  useEffect(() => {
+    if (!wallet.connected) return;
+    setIsModalOpen(false);
+  }, [wallet.connected]);
+
+  if (wallet.connected) {
+    return <Navigate to={returnTo} replace />;
+  }
 
   return (
-    <main style={styles.page} aria-labelledby="connect-wallet-heading">
+    <main id="main-content" style={styles.page} aria-labelledby="connect-wallet-heading">
       <GlowingDot top="34%" right="40%" size={18} opacity={0.6} />
       <GlowingDot top="42%" left="40%" size={12} opacity={0.5} />
 
@@ -37,7 +53,7 @@ export default function ConnectWallet() {
           style={{
             ...styles.connectCta,
             boxShadow: isCtaFocused
-              ? "0 0 0 2px #06111f, 0 0 0 4px #0ea5e9, 0 10px 25px rgba(0, 184, 212, 0.26)"
+              ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring), 0 10px 25px rgba(0, 184, 212, 0.26)"
               : styles.connectCta.boxShadow,
           }}
           onClick={() => setIsModalOpen(true)}
@@ -93,7 +109,7 @@ const styles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     border: "1px solid rgba(34, 211, 238, 0.32)",
-    color: "#9ce8f7",
+    color: "var(--status-info)",
     background: "rgba(34, 211, 238, 0.12)",
     borderRadius: 9999,
     padding: "6px 10px",
@@ -104,7 +120,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 12,
   },
   heading: {
-    color: "#ffffff",
+    color: "var(--text-vivid)",
     fontSize: "clamp(1.5rem, 4vw, 2rem)",
     fontWeight: 700,
     margin: "0 0 10px 0",
@@ -138,8 +154,8 @@ const styles: Record<string, CSSProperties> = {
   },
   connectCta: {
     borderRadius: 10,
-    border: "1.5px solid #00b8d4",
-    background: "linear-gradient(180deg, #00b8d4 0%, #0097af 100%)",
+    border: "1.5px solid var(--color-accent-primary)",
+    background: "var(--color-cta-primary-bg)",
     color: "#ffffff",
     fontWeight: 700,
     letterSpacing: "0.01em",

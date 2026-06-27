@@ -57,8 +57,8 @@ const GetStartedCTA: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   card: {
-    backgroundColor: "#FFFFFF",
-    border: "0.69px solid #E5E7EB",
+    backgroundColor: "var(--surface-base)",
+    border: "0.69px solid var(--border-neutral)",
     borderRadius: "24px",
     padding: "48px 32px",
     textAlign: "center", 

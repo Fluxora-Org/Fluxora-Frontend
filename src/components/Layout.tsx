@@ -1,60 +1,154 @@
-import { useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
-import Sidebar from "./Sidebar";
+import { useRef, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
 import "./Layout.css";
 
-interface LayoutProps {
-  isSidebarOpen: boolean;
-  onSidebarClose: () => void;
-}
+type NavItem = { to: string; label: string; shortLabel: string };
 
-export default function Layout({
-  isSidebarOpen,
-  onSidebarClose,
-}: LayoutProps) {
+const NAV_ITEMS: NavItem[] = [
+  { to: "/app", label: "Dashboard", shortLabel: "D" },
+  { to: "/app/streams", label: "Streams", shortLabel: "S" },
+  { to: "/app/recipient", label: "Recipient", shortLabel: "R" },
+];
+
+export default function Layout() {
   const location = useLocation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const connectBtnRef = useRef<HTMLButtonElement>(null);
+
   const showFooter = !location.pathname.includes("/treasurypage");
 
-  return (
-    <div className="flex flex-col min-h-screen bg-[var(--bg)]">
-      <div className="flex flex-1 overflow-hidden">
-        {/* Unified Sidebar Component */}
-        <Sidebar
-          collapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          mobileOpen={isSidebarOpen}
-          onMobileClose={onSidebarClose}
-        />
+  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
 
-        {/* Main Content Area */}
-        <div className="flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out">
-          <main 
-            className={cn(
-              "flex-1 p-4 md:p-8 overflow-auto transition-all duration-300 ease-in-out",
-              isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
-            )}
-            role="main"
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    connectBtnRef.current?.focus();
+  };
+
+  return (
+    <div
+      className={[
+        "app-layout",
+        isSidebarCollapsed && "is-collapsed",
+        isMobileSidebarOpen && "is-mobile-open",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="app-layout__body">
+        {/* SIDEBAR */}
+        <aside
+          id="app-sidebar"
+          className="app-sidebar"
+          aria-label="Primary navigation"
+          role="navigation"
+        >
+          <div className="app-sidebar-header">
+            <div className="app-logo">
+              {isSidebarCollapsed ? "Fx" : "Fluxora"}
+            </div>
+
+            <button
+              className="app-sidebar-toggle"
+              onClick={() => setIsSidebarCollapsed((p) => !p)}
+              aria-label="Toggle sidebar"
+              aria-expanded={!isSidebarCollapsed}
+              aria-controls="app-sidebar"
+            >
+              <span
+                className={`app-toggle-chevron ${
+                  isSidebarCollapsed ? "is-rotated" : ""
+                }`}
+              >
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M15 19l-7-7 7-7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            </button>
+          </div>
+
+          {/* NAV */}
+          <nav className="app-nav" aria-label="Main navigation">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/app"}
+                className={({ isActive }) =>
+                  `app-nav-link ${isActive ? "is-active" : ""}`
+                }
+                onClick={closeMobileSidebar}
+              >
+                <span className="app-nav-badge">{item.shortLabel}</span>
+                <span className="app-nav-label">{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* CTA */}
+          <button
+            ref={connectBtnRef}
+            className="app-connect-button"
+            onClick={() => setIsModalOpen(true)}
+            aria-haspopup="dialog"
+            aria-label="Connect wallet"
           >
+            <span className="app-connect-label">Connect wallet</span>
+          </button>
+        </aside>
+
+        {/* CONTENT */}
+        <div className="app-content-area">
+          <header className="app-mobile-topbar">
+            <button
+              className="app-mobile-menu-btn"
+              onClick={() => setIsMobileSidebarOpen((p) => !p)}
+              aria-label="Toggle menu"
+              aria-expanded={isMobileSidebarOpen}
+              aria-controls="app-sidebar"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+
+            <div className="app-mobile-title">Fluxora</div>
+          </header>
+
+          <main className="app-main">
             <Outlet />
           </main>
 
-          <div className={cn("transition-all duration-300 ease-in-out", isSidebarCollapsed ? "md:ml-20" : "md:ml-64")}>
-            {showFooter ? <Footer /> : null}
-          </div>
+          {showFooter && <Footer />}
         </div>
       </div>
 
+      {/* BACKDROP */}
+      <button
+        className="app-sidebar-backdrop"
+        onClick={closeMobileSidebar}
+        aria-label="Close sidebar"
+        type="button"
+      />
+
+      {/* MODAL */}
       <ConnectWalletModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConnectFreighter={() => setIsModalOpen(false)}
-        onConnectAlbedo={() => setIsModalOpen(false)}
-        onConnectWalletConnect={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
+        onConnectFreighter={handleCloseModal}
+        onConnectAlbedo={handleCloseModal}
+        onConnectWalletConnect={handleCloseModal}
       />
     </div>
   );

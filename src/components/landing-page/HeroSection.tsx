@@ -1,6 +1,23 @@
 import { useState, useEffect } from "react";
 import "../../design-tokens.css";
 
+export type HeroMetric = {
+  label: string;
+  value: string;
+};
+
+/**
+ * Placeholder marketing metrics displayed in the Hero section.
+ * These values are intentionally centralized as a placeholder data source
+ * and can later be replaced by live data without modifying the JSX.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const HERO_METRICS: HeroMetric[] = [
+  { value: "$2.4M+", label: "Streamed" },
+  { value: "150+", label: "Active Streams" },
+  { value: "45+", label: "Verified DAOs" },
+];
+
 interface HeroSectionProps {
   theme?: "light" | "dark";
 }
@@ -15,6 +32,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
 
   return (
     <section
+      aria-labelledby="landing-hero-title"
       className="relative min-h-[90vh] w-full overflow-hidden font-['Plus_Jakarta_Sans',system-ui,sans-serif] flex items-center"
       style={{
         background: isDark
@@ -61,6 +79,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             {/* Headline Hierarchy */}
             <div className="flex flex-col gap-3">
               <h1
+                id="landing-hero-title"
                 className={`
                   text-5xl font-extrabold leading-[1.1] tracking-tight lg:text-7xl
                   ${isDark ? "text-white" : "text-slate-900"}
@@ -71,16 +90,16 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                   Treasury Streaming
                 </span>
               </h1>
-              <h2 className={`text-xl font-medium max-w-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+              <p className={`text-heading-3 max-w-xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                 Real-time USDC infrastructure for DAOs, grants, and ecosystem funds. 
                 Automate your payouts with second-by-second precision.
-              </h2>
+              </p>
             </div>
 
             {/* Subtext Detail (Accessibility & Trust) */}
             <p
               className={`
-                max-w-lg text-base leading-relaxed opacity-80
+                text-body-lg max-w-lg opacity-80
                 ${isDark ? "text-slate-500" : "text-slate-500"}
               `}
             >
@@ -97,6 +116,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                 <span className="relative z-10 flex items-center gap-2">
                   Launch App
                   <svg
+                    aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
                     width="20"
                     height="20"
@@ -115,18 +135,24 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
               </button>
 
               <button
-                className={`
-                  flex cursor-pointer items-center gap-3 rounded-2xl border px-8 py-4 text-lg font-bold transition-all duration-300 hover:bg-white/5 active:scale-95
-                  ${
-                    isDark
-                      ? "border-slate-800 bg-slate-900/50 text-slate-300 hover:border-slate-600"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 shadow-sm"
-                  }
-                `}
+                className="flex cursor-pointer items-center gap-3 rounded-2xl border px-8 py-4 text-lg font-bold transition-all duration-300 active:scale-95"
+                style={{
+                  borderColor: "var(--color-border-default)",
+                  background: "var(--color-surface-default)",
+                  color: "var(--color-text-secondary)",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--color-border-secondary)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--color-border-default)";
+                }}
                 onClick={() => alert("Watch demo clicked")}
               >
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-500">
                   <svg
+                    aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
                     width="14"
                     height="14"
@@ -141,27 +167,25 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             </div>
 
             {/* Social Proof / Metrics */}
-            <div className={`flex flex-wrap gap-12 mt-8 pt-8 border-t ${isDark ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
-              {[
-                { value: "$2.4M+", label: "Streamed" },
-                { value: "150+", label: "Active Streams" },
-                { value: "45+", label: "Verified DAOs" },
-              ].map(({ value, label }) => (
-                <div key={label} className="flex flex-col gap-1 group">
-                  <span
-                    className={`
-                      text-3xl font-extrabold tracking-tight transition-colors duration-300
-                      ${isDark ? "text-white group-hover:text-cyan-400" : "text-slate-900 group-hover:text-cyan-600"}
-                    `}
-                  >
-                    {value}
-                  </span>
-                  <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {HERO_METRICS.length > 0 && (
+              <div className={`flex flex-wrap gap-12 mt-8 pt-8 border-t ${isDark ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
+                {HERO_METRICS.map(({ value, label }) => (
+                  <div key={label} className="flex flex-col gap-1 group">
+                    <span
+                      className={`
+                        text-3xl font-extrabold tracking-tight transition-colors duration-300
+                        ${isDark ? "text-white group-hover:text-cyan-400" : "text-slate-900 group-hover:text-cyan-600"}
+                      `}
+                    >
+                      {value}
+                    </span>
+                    <span className={`text-label-sm uppercase tracking-widest ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ─── RIGHT: Glassmorphic Stream Card ─── */}
@@ -194,6 +218,7 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                 <div className="flex items-center gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 shadow-lg shadow-cyan-500/20 shrink-0">
                     <svg
+                      aria-hidden="true"
                       width="28"
                       height="28"
                       viewBox="0 0 24 24"
@@ -207,9 +232,9 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
                     </svg>
                   </div>
                   <div className="flex flex-col">
-                    <h3 className={`text-lg font-bold leading-none mb-1.5 ${isDark ? "text-white" : "text-slate-800"}`}>
+                    <p className={`text-heading-4 leading-none mb-1.5 ${isDark ? "text-white" : "text-slate-800"}`}>
                       Stellar Growth Grant
-                    </h3>
+                    </p>
                     <div className="flex items-center gap-2">
                        <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>from SCF Treasury</span>
                        <span className="h-1 w-1 rounded-full bg-slate-500" />

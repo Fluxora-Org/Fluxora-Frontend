@@ -2,44 +2,52 @@
 @import "tailwindcss";
 @import "./design-tokens.css";
 
-:root {
-  --bg: #0a0e17;
-  --surface: #121a2a;
-  --surface-elevated: #0f1624;
-  --surface-raised: #151e2e;
-  --surface-highest: #192436;
-  --surface-switch: #1e2c40;
-  --danger: #ff4d4f;
-  --primary: #00b8d4;
-  --border: #1e2d42;
-  --text: #e8ecf4;
-  --muted: #6b7a94;
-  --accent: #00d4aa;
-  --accent-dim: #00a884;
-  --nf-bg: #1a1e29;
-  --nf-cyan: #4bc0d9;
-  --nf-muted: #a0aec0;
-  --navbar-bg: #0f1419;
-  --navbar-border: #1a2534;
-  --navbar-logo-color: #e8ecf4;
-  --navbar-link-color: #4a5565;
-  --navbar-icon-color: #9ca3af;
-  --navbar-icon-border: #374151;
-  --navbar-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --cta-bg: #00d4aa;
-  --cta-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+/**
+ * index.css — Global application styles
+ * ──────────────────────────────────────
+ * All color values come from design-tokens.css via CSS variables.
+ * Do NOT add hardcoded hex colors here; use tokens instead.
+ *
+ * Theme switching is handled by data-theme="light" | "dark" on <html>.
+ * Token definitions live in design-tokens.css.
+ */
 
-  /* Focus ring tokens — used across the app to keep focus indicators
-     consistent and prevent clipping inside rounded containers/modals.
-     The ring is painted as a box-shadow so it follows border-radius and
-     renders above sibling content; an additional outline is kept as a
+/* ═══════════════════════════════════════════════════════════
+   ADDITIONAL TOKENS (app-specific, not in design-tokens.css)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Card gradient — used on authenticated surfaces */
+  --card-gradient: linear-gradient(
+    135deg,
+    var(--surface-raised) 0%,
+    var(--surface-neutral) 60%,
+    var(--surface-sunken) 100%
+  );
+
+  /* Accent gradient — used for progress bars, highlights */
+  --accent-gradient: linear-gradient(135deg, #2dd4bf 0%, #0ea5e9 100%);
+
+  /* Accent border / glow — used on landing card decorations */
+  --accent-border: #4fd1c5;
+  --accent-glow: 0 0 20px rgba(45, 212, 191, 0.35);
+  --accent-soft: #7dd3fc;
+
+  /* NotFound page */
+  --nf-bg: var(--surface-sunken);
+  --nf-cyan: var(--status-info);
+  --nf-muted: var(--text-muted);
+
+  /* Focus ring tokens — consistent across the app.
+     The ring is painted as a box-shadow so it follows border-radius
+     and renders above sibling content; an outline is kept as a
      fallback for forced-colors / high-contrast modes. */
   --focus-ring-color: var(--accent);
   --focus-ring-halo: rgba(0, 212, 170, 0.35);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --focus-ring-shadow:
-    0 0 0 var(--focus-ring-offset) var(--bg),
+    0 0 0 var(--focus-ring-offset) var(--color-bg-primary),
     0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width))
       var(--focus-ring-color),
     0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width) + 2px)
@@ -49,22 +57,9 @@
     inset 0 0 0 calc(var(--focus-ring-width) + 2px) var(--focus-ring-halo);
 }
 
-:root {
-  --card-gradient: linear-gradient(
-    135deg,
-    #142033 0%,
-    #0f1726 60%,
-    #0b1220 100%
-  );
-
-  --accent-gradient: linear-gradient(135deg, #2dd4bf 0%, #0ea5e9 100%);
-
-  --accent-border: #4fd1c5;
-
-  --accent-glow: 0 0 20px rgba(45, 212, 191, 0.35);
-
-  --accent-soft: #7dd3fc;
-}
+/* ═══════════════════════════════════════════════════════════
+   BASE RESET & DOCUMENT
+   ═══════════════════════════════════════════════════════════ */
 
 * {
   box-sizing: border-box;
@@ -79,22 +74,19 @@ body {
 
 body {
   margin: 0;
-  font-family:
-    "Plus Jakarta Sans",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "DM Sans",
-    system-ui,
-    sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--font-family-base);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
   min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LINKS
+   ═══════════════════════════════════════════════════════════ */
 
 a {
   color: var(--accent);
@@ -106,13 +98,18 @@ a:hover {
   color: var(--accent-dim);
 }
 
-/* Baseline focus styles.
-   Outlines follow the element's border-radius in modern browsers, but
-   can be clipped by ancestors with `overflow: hidden` (common on
-   rounded modals/cards). We therefore ALSO paint the ring as an
-   outset box-shadow so the ring remains visible even when outlines
-   are clipped — while keeping an `outline` so high-contrast and
-   forced-colors modes still show an indicator. */
+/* ═══════════════════════════════════════════════════════════
+   FOCUS MANAGEMENT
+   ─────────────────────────────────────────────────────────
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance Compliant
+   
+   Baseline focus styles use a dual-layer approach:
+   - Outline: Follows border-radius, visible in high-contrast mode
+   - Box-shadow: Not clipped by overflow:hidden ancestors
+   
+   This ensures focus ring visibility in all scenarios.
+   ═══════════════════════════════════════════════════════════ */
+
 button:focus,
 a:focus,
 input:focus,
@@ -123,8 +120,7 @@ textarea:focus,
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Prefer focus-visible when available: hide focus ring for mouse users
-   but keep full, non-clipped ring for keyboard users. */
+/* Hide focus ring for mouse clicks in modern browsers */
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible),
 input:focus:not(:focus-visible),
@@ -135,6 +131,7 @@ textarea:focus:not(:focus-visible),
   box-shadow: none;
 }
 
+/* Full, non-clipped ring for keyboard users */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -143,15 +140,10 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
-  /* Box-shadow halo is not clipped by the element's own border-radius
-     and, together with `isolation`, stays visible above siblings. */
   box-shadow: var(--focus-ring-shadow);
 }
 
-/* When an interactive element lives inside a container that must use
-   `overflow: hidden` (e.g. to clip its own rounded corners), the
-   outset ring would be clipped. Opt those elements into an inset
-   ring instead by adding `data-focus-inset` or `.focus-inset`. */
+/* Inset ring for elements inside overflow:hidden containers */
 .focus-inset:focus-visible,
 [data-focus-inset]:focus-visible {
   outline: none;
@@ -173,23 +165,29 @@ nav a:focus-visible {
   box-shadow: var(--focus-ring-shadow);
 }
 
+/* ═══════════════════════════════════════════════════════════
+   BUTTON UTILITY CLASSES
+   ─────────────────────────────────────────────────────────
+   Used by Dashboard and other app pages via className="button button--primary"
+   ═══════════════════════════════════════════════════════════ */
+
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0.85rem 1.3rem;
-  border-radius: 0.875rem;
+  border-radius: var(--radius-lg);
   border: 1px solid transparent;
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    opacity 0.2s ease;
+    background var(--transition-base),
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base),
+    opacity var(--transition-base);
   text-decoration: none;
 }
 
@@ -198,9 +196,9 @@ nav a:focus-visible {
 }
 
 .button:focus-visible {
-  outline: 2px solid rgba(0, 212, 170, 0.7);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: 4px;
-  box-shadow: 0 0 0 4px rgba(0, 212, 170, 0.16);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 .button:active:not(:disabled) {
@@ -215,7 +213,7 @@ nav a:focus-visible {
 
 .button--primary {
   background: var(--accent);
-  color: #071117;
+  color: var(--color-text-inverse);
   box-shadow: var(--cta-shadow);
 }
 
@@ -225,7 +223,7 @@ nav a:focus-visible {
 
 .button--secondary {
   background: rgba(0, 212, 170, 0.12);
-  color: #ffffff;
+  color: var(--color-text-primary);
   border-color: rgba(0, 212, 170, 0.3);
 }
 
@@ -258,11 +256,9 @@ nav a:focus-visible {
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* ═══════════════════════════════════════════════════════════
+   NAVBAR INTERACTIVE OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
 
 button[aria-label*="Switch"]:hover {
   border-color: var(--accent);
@@ -270,13 +266,49 @@ button[aria-label*="Switch"]:hover {
   background: rgba(0, 212, 170, 0.08);
 }
 
-button:has(+ button[aria-label*="Connect"]):hover,
 [aria-label="Connect wallet"]:hover {
   background: var(--accent-dim);
   box-shadow:
     var(--cta-shadow),
     0 8px 16px rgba(0, 212, 170, 0.25);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   EMPTY STATE — RESPONSIVE BREAKPOINTS
+   Covers search-no-results and error variants (Issue #220).
+   The base component uses clamp() for padding/font; these rules
+   handle layout adjustments at the four QA breakpoints.
+   ═══════════════════════════════════════════════════════════ */
+
+/* 320px — narrowest supported viewport */
+@media (max-width: 320px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 32px 12px;
+  }
+}
+
+/* 375px — standard mobile */
+@media (max-width: 375px) {
+  [role="region"][aria-label="Search no results state"],
+  [role="region"][aria-label="Error state"] {
+    padding: 36px 14px;
+  }
+}
+
+/* 768px — tablet: ensure description text doesn't overflow */
+@media (max-width: 768px) {
+  [role="region"][aria-label="Search no results state"] p,
+  [role="region"][aria-label="Error state"] p {
+    max-width: 100%;
+  }
+}
+
+/* 1024px — desktop: no overrides needed; clamp() handles it */
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
   nav {
@@ -295,8 +327,10 @@ button:has(+ button[aria-label*="Connect"]):hover,
   }
 }
 
-/* Forced-colors / Windows High Contrast: ensure the focus indicator
-   uses the OS highlight colour and is never suppressed. */
+/* ═══════════════════════════════════════════════════════════
+   FORCED COLORS / HIGH CONTRAST
+   ═══════════════════════════════════════════════════════════ */
+
 @media (forced-colors: active) {
   button:focus-visible,
   a:focus-visible,
@@ -312,19 +346,21 @@ button:has(+ button[aria-label*="Connect"]):hover,
   }
 }
 
-/* 404 Not Found styles */
+/* ═══════════════════════════════════════════════════════════
+   404 NOT FOUND PAGE
+   ═══════════════════════════════════════════════════════════ */
+
 .notfound-root {
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #020c1b; /* plain blue background */
+  background: var(--color-bg-primary);
   position: relative;
   padding: 0;
   overflow: hidden;
 }
 
-/* removed gradient lighting effect */
 .notfound-shapes {
   display: none;
 }
@@ -356,8 +392,8 @@ button:has(+ button[aria-label*="Connect"]):hover,
   max-width: 740px;
   width: 100%;
   text-align: center;
-  padding: 48px 36px;
-  border-radius: 12px;
+  padding: var(--space-3xl) var(--space-2xl);
+  border-radius: var(--radius-lg);
   z-index: 10;
 }
 
@@ -365,20 +401,20 @@ button:has(+ button[aria-label*="Connect"]):hover,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-xl);
 }
 
 .nf-code {
   font-size: 4.25rem;
-  margin: 8px 0 6px;
+  margin: var(--space-sm) 0 var(--space-xs);
   color: var(--nf-cyan);
   font-weight: 800;
 }
 
 .nf-title {
   font-size: 1.375rem;
-  margin: 0 0 8px;
-  color: var(--text);
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text-primary);
   font-weight: 600;
 }
 
@@ -392,9 +428,9 @@ button:has(+ button[aria-label*="Connect"]):hover,
 
 .nf-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
   justify-content: center;
-  margin-top: 8px;
+  margin-top: var(--space-sm);
   flex-wrap: wrap;
 }
 
@@ -402,7 +438,7 @@ button:has(+ button[aria-label*="Connect"]):hover,
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 10px var(--space-lg);
   border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -427,9 +463,9 @@ button:has(+ button[aria-label*="Connect"]):hover,
 }
 
 .btn-secondary {
-  background: #2b303b;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-raised);
+  color: var(--color-text-primary);
+  border: 1px solid var(--border-neutral);
 }
 
 @media (max-width: 560px) {
@@ -437,14 +473,97 @@ button:has(+ button[aria-label*="Connect"]):hover,
     font-size: 3rem;
   }
   .notfound-card {
-    padding: 28px 18px;
+    padding: var(--space-2xl) var(--space-lg);
   }
 }
 
-/* Skeleton shimmer */
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+/* ═══════════════════════════════════════════════════════════
+   SKELETON SHIMMER UTILITY
+   ═══════════════════════════════════════════════════════════ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 25%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION
+   Disable all CSS animations, transitions, and the shimmer /
+   spin keyframe animations for users who prefer reduced motion.
+   JS-driven animations (e.g. GlowingDot glow) are handled in
+   the component via the matchMedia API.
+   ═══════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITY CLASSES
+   Maps design-token font shorthands to reusable class names.
+   Usage: <h1 className="text-heading-1">…</h1>
+   ═══════════════════════════════════════════════════════════ */
+
+.text-heading-1 {
+  font: var(--font-heading-1);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.text-heading-2 {
+  font: var(--font-heading-2);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.text-heading-3 {
+  font: var(--font-heading-3);
+}
+
+.text-heading-4 {
+  font: var(--font-heading-4);
+}
+
+.text-body-lg {
+  font: var(--font-body-lg);
+}
+
+.text-body-md {
+  font: var(--font-body-md);
+}
+
+.text-body-sm {
+  font: var(--font-body-sm);
+}
+
+.text-label-lg {
+  font: var(--font-label-lg);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.text-label-md {
+  font: var(--font-label-md);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.text-label-sm {
+  font: var(--font-label-sm);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.text-mono-sm {
+  font: var(--font-mono-sm);
 }
 
 /* Screen-reader only utility */
@@ -458,4 +577,25 @@ button:has(+ button[aria-label*="Connect"]):hover,
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Skip to content link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #000;
+  padding: 12px 24px;
+  z-index: 9999;
+  font-weight: 700;
+  border-radius: 0 0 8px 8px;
+  transition: top 0.2s ease-in-out;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: none;
 }
