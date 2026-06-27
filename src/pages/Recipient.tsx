@@ -1,167 +1,311 @@
-export default function Recipient() {
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
-  const walletConnected = true;
+import { useEffect, useState, useRef } from "react";
+import EmptyState from "../components/EmptyState";
+import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
+import RecipientLoading from "../components/RecipientLoading";
+import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useToast } from "../components/toast/ToastProvider";
+import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
+import type { StreamRecord } from "../data/streamRecords";
+import { withdraw } from "../lib/stellar/tx";
+import "./Streams.css";
+import "./Recipient.css";
 
-  const disabled = !walletConnected || balance === 0;
+// Demo balances used as a UI fallback when the service returns no recipient
+// streams (no live backend yet, or no seeded match for the connected address).
+const DEMO_BALANCE = 22600.0;
+const DEMO_ACTIVE = 2;
+const DEMO_TOTAL_ACCRUED = 43250.0;
+const DEMO_TOTAL_WITHDRAWN = 20650.0;
+const USDC_SCALE = 10_000_000;
+const MAX_U64 = 18_446_744_073_709_551_615n;
+
+type WithdrawStreamCandidate = Pick<
+  StreamRecord,
+  "id" | "status" | "withdrawableAmount"
+> & {
+  isPinned?: boolean;
+};
+
+/** Returns true when a stream id can be encoded as a positive Soroban u64. */
+export function isValidWithdrawStreamId(
+  streamId: string | null | undefined,
+): streamId is string {
+  if (!streamId) return false;
+
+  const normalized = streamId.trim();
+  if (!/^\d+$/.test(normalized)) return false;
+
+  const value = BigInt(normalized);
+  return value > 0n && value <= MAX_U64;
+}
+
+/**
+ * Selects the recipient stream that should back the next withdrawal.
+ * Live recipient data takes precedence; the demo fallback is only used when
+ * no backend stream is available yet.
+ */
+export function selectWithdrawStream(
+  streams: WithdrawStreamCandidate[],
+): WithdrawStreamCandidate | null {
+  const activeWithdrawableStreams = streams.filter(
+    (stream) =>
+      stream.status === "Active" &&
+      stream.withdrawableAmount > 0 &&
+      isValidWithdrawStreamId(stream.id),
+  );
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}>
-        Your streams
-      </h1>
-      <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
-        View your incoming streams and withdraw accrued USDC at any time.
-      </p>
-      <div style={card}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "1rem",
-          }}
-        >
-          <div>
-            <div style={cardLabel}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                height="20px"
-                viewBox="0 -960 960 960"
-                width="20px"
-                fill="var(--accent-soft)"
-              >
-                <path d="m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z" />
-              </svg>{" "}
-              WITHDRAWABLE BALANCE
-            </div>
-            <div style={cardValue}>
-              {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              <span
-                style={{
-                  fontSize: "2rem",
-                  color: "var(--muted)",
-                  fontWeight: 500,
-                }}
-              >
-                USDC
-              </span>
-            </div>
-            <div style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-              Available to withdraw immediately
-            </div>
-          </div>
-          <button style={button(disabled)} disabled={disabled}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="15px"
-              viewBox="0 -960 960 960"
-              width="15px"
-              fill="white"
-            >
-              <path d="M160-160v-640 640Zm0 80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v320h-80v-320H160v640h200v80H160Zm72-140h16q14 0 23-9t9-23v-48h80v-80h-80v-120h480v-16l-66-192q-5-14-16.5-23t-25.5-9H308q-14 0-25.5 9T266-708l-66 192v264q0 14 9 23t23 9Zm74-360 28-80h292l28 80H306Zm82.5 168.5Q400-423 400-440t-11.5-28.5Q377-480 360-480t-28.5 11.5Q320-457 320-440t11.5 28.5Q343-400 360-400t28.5-11.5ZM557-140h246q5-21 20.5-36.5T860-197v-86q-21-5-36.5-20.5T803-340H557q-5 21-20.5 36.5T500-283v86q21 5 36.5 20.5T557-140Zm165.5-57.5Q740-215 740-240t-17.5-42.5Q705-300 680-300t-42.5 17.5Q620-265 620-240t17.5 42.5Q655-180 680-180t42.5-17.5ZM520-80q-33 0-56.5-23.5T440-160v-160q0-33 23.5-56.5T520-400h320q33 0 56.5 23.5T920-320v160q0 33-23.5 56.5T840-80H520Z" />
-            </svg>
-            Withdraw USDC
-          </button>
-        </div>
-
-        <div style={divider} />
-        <div style={statsRow}>
-          <div>
-            <div style={statLabel}>Active streams</div>
-            <div style={statValue}>{activeStreams}</div>
-          </div>
-
-          <div>
-            <div style={statLabel}>Total accrued</div>
-            <div style={statValue}>
-              {totalAccrued.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-              })}{" "}
-              USDC
-            </div>
-          </div>
-
-          <div>
-            <div style={statLabel}>Total withdrawn</div>
-            <div style={statValue}>
-              {totalWithdrawn.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-              })}{" "}
-              USDC
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    activeWithdrawableStreams.find((stream) => stream.isPinned) ??
+    activeWithdrawableStreams[0] ??
+    null
   );
 }
 
-const card: React.CSSProperties = {
-  marginTop: "1.5rem",
-  maxWidth: 900,
-  width: "100%",
-  background: "var(--card-gradient)",
-  border: "1px solid var(--border)",
-  borderRadius: 20,
-  padding: "2rem",
-};
+/** Converts the displayed USDC balance to the 7-decimal on-chain amount. */
+export function getWithdrawAmount(balance: number): string | null {
+  if (!Number.isFinite(balance) || balance <= 0) return null;
 
-const cardLabel: React.CSSProperties = {
-  fontSize: "0.875rem",
-  color: "var(--accent-soft)",
-  marginBottom: "0.25rem",
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  fontWeight: 600,
-};
+  const scaledAmount = Math.floor(balance * USDC_SCALE);
+  return scaledAmount > 0 ? scaledAmount.toString() : null;
+}
 
-const cardValue: React.CSSProperties = {
-  fontSize: "3rem",
-  fontWeight: 700,
-  marginBottom: "0.5rem",
-};
+export default function Recipient() {
+  const wallet = useWallet();
+  const { addToast } = useToast();
 
-const button = (disabled: boolean): React.CSSProperties => ({
-  padding: "0.75rem 1rem",
-  background: disabled ? "var(--surface)" : "var(--accent-gradient)",
-  color: disabled ? "var(--muted)" : "white",
-  border: "1px solid var(--accent-border)",
-  borderRadius: 12,
-  fontWeight: 600,
-  cursor: disabled ? "not-allowed" : "pointer",
-  boxShadow: disabled ? "none" : "var(--accent-glow)",
-  height: 40,
-  width: 170,
-  transition: "all 0.2s ease",
-  display: "flex",
-  justifyContent: "space-between",
-  marginTop: 28,
-});
+  const [loading, setLoading] = useState(true);
+  const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-const divider: React.CSSProperties = {
-  margin: "2rem 0 1.5rem",
-  height: 1,
-  background: "rgba(255, 255, 255, 0.06)",
-};
+  const recipientStreams = useRecipientStreams(wallet.address);
 
-const statsRow: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  gap: "2rem",
-  width: "80%",
-};
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
-const statLabel: React.CSSProperties = {
-  color: "var(--muted)",
-  fontSize: "0.85rem",
-  marginBottom: "0.4rem",
-};
+  /**
+   * Resets transaction state when the active wallet address changes.
+   * This prevents stale errors or pending states from carrying over to a different account.
+   */
+  useEffect(() => {
+    setTxState("idle");
+    setErrorMsg(null);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [wallet.address]);
 
-const statValue: React.CSSProperties = {
-  fontWeight: 600,
-  fontSize: "1.1rem",
-};
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const fetchIncomingStreams = async (): Promise<Stream[]> => [
+    { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+    { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+  ];
+
+  const liveStreams = recipientStreams.streams;
+  const hasLiveStreams = liveStreams.length > 0;
+
+  const demoWithdrawStream: WithdrawStreamCandidate = {
+    id: "1",
+    status: "Active",
+    withdrawableAmount: DEMO_BALANCE,
+  };
+  const selectedWithdrawStream = selectWithdrawStream(
+    hasLiveStreams ? liveStreams : [demoWithdrawStream],
+  );
+
+  const balance = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.withdrawableAmount, 0)
+    : DEMO_BALANCE;
+  const activeStreams = hasLiveStreams
+    ? liveStreams.filter((stream) => stream.status === "Active").length
+    : DEMO_ACTIVE;
+  const totalAccrued = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.streamedAmount, 0)
+    : DEMO_TOTAL_ACCRUED;
+  const totalWithdrawn = hasLiveStreams
+    ? liveStreams.reduce(
+        (sum, stream) => sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
+        0,
+      )
+    : DEMO_TOTAL_WITHDRAWN;
+
+  const walletConnected = wallet.connected;
+  const hasStreams = activeStreams > 0;
+
+  const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
+
+  // Zero-accrual: connected + streams exist + no withdrawable balance yet
+  const isZeroAccrual = walletConnected && hasStreams && balance === 0;
+  
+  const isPending = txState === "signing" || txState === "submitting";
+  const disabled =
+    !walletConnected ||
+    !wallet.address ||
+    balance === 0 ||
+    networkMismatch ||
+    isPending ||
+    !selectedWithdrawStream;
+
+  const handleWithdraw = async () => {
+    if (disabled) return;
+    setTxState("signing");
+    setErrorMsg(null);
+
+    const recipientAddr = wallet.address!;
+    const amountStr = getWithdrawAmount(balance);
+    const streamId = selectedWithdrawStream?.id;
+
+    if (!isValidWithdrawStreamId(streamId) || !amountStr) {
+      const message = !streamId
+        ? "No valid stream is available for withdrawal."
+        : "Withdrawal amount must be greater than zero.";
+      setTxState("error");
+      setErrorMsg(message);
+      addToast(message, "error");
+      return;
+    }
+
+    try {
+      setTxState("submitting");
+      await withdraw(recipientAddr, streamId, amountStr);
+      setTxState("confirmed");
+      addToast("Withdrawal completed successfully on-chain!", "success");
+      timerRef.current = setTimeout(() => setTxState("idle"), 5000);
+    } catch (err: any) {
+      setTxState("error");
+      setErrorMsg(err.message || "Withdrawal failed.");
+      addToast(`Withdrawal failed: ${err.message || err}`, "error");
+    }
+  };
+
+  const getButtonText = () => {
+    switch (txState) {
+      case "signing":
+        return "Signing in Freighter...";
+      case "submitting":
+        return "Submitting to RPC...";
+      case "confirmed":
+        return "Withdrawn successfully!";
+      case "error":
+        return "Withdrawal Failed - Retry";
+      default:
+        return `Withdraw ${balance.toLocaleString()} USDC`;
+    }
+  };
+
+  if (loading) return <RecipientLoading />;
+
+  if (!walletConnected || !hasStreams) {
+    return (
+      <main aria-labelledby="recipient-page-title">
+        <h1
+          id="recipient-page-title"
+          style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}
+        >
+          Your streams
+        </h1>
+        <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
+          View your incoming streams and withdraw accrued USDC at any time.
+        </p>
+        <EmptyState variant="recipient" walletConnected={walletConnected} />
+      </main>
+    );
+  }
+
+  return (
+    <main className="streams-page">
+      {/* ── Page Header (Hero) ── */}
+      <section className="streams-hero">
+        <div className="streams-hero__copy">
+          <p className="streams-eyebrow">Recipient Portal</p>
+          <h1>Your streams</h1>
+          <p className="streams-subtitle">
+            Manage your incoming streams, track accrued balances, and withdraw
+            USDC in real-time. Your accumulated balance is available for instant
+            withdrawal to your connected wallet.
+          </p>
+          {(errorMsg || networkMismatch) && (
+            <p className="validation-message validation-message--error" style={{ color: "var(--color-danger)", marginTop: "1rem" }} role="alert">
+              {networkMismatch 
+                ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${wallet.expectedNetworkLabel}.`
+                : errorMsg}
+            </p>
+          )}
+        </div>
+        <div className="streams-hero__actions">
+          <button
+            disabled={disabled}
+            className={`streams-primary-button ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={handleWithdraw}
+          >
+            {getButtonText()}
+          </button>
+        </div>
+      </section>
+
+      {/* ── Zero-accrual banner (streams live, balance = 0) ── */}
+      {isZeroAccrual && (
+        <div style={{ marginBottom: "2rem" }}>
+          <ZeroAccrualBanner
+            reason="cliff"
+            onAction={() => {
+              /* Navigate to streams page for cliff details */
+              window.location.href = "/app/streams";
+            }}
+            actionLabel="View stream details"
+          />
+        </div>
+      )}
+
+      {/* ── Overview Metrics ── */}
+      <section className="streams-summary-grid" aria-label="Stream summary">
+        <div className="streams-summary-card">
+          <span>Active streams</span>
+          <strong>{activeStreams}</strong>
+          <p>Currently accruing funds for your wallet.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Total Accrued</span>
+          <strong>{totalAccrued.toLocaleString()} USDC</strong>
+          <p>Total amount earned over the lifetime of all streams.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Withdrawn</span>
+          <strong>{totalWithdrawn.toLocaleString()} USDC</strong>
+          <p>Total funds already transferred to your wallet.</p>
+        </div>
+        <div className="streams-summary-card">
+          <span>Withdrawable now</span>
+          <strong style={{ color: "var(--accent)" }}>{balance.toLocaleString()} USDC</strong>
+          <p>Available for immediate withdrawal.</p>
+        </div>
+      </section>
+
+      {/* ── Streams List ── */}
+      <section className="streams-list-shell">
+        <div className="streams-list-head">
+          <div>
+            <h2>Incoming streams</h2>
+            <p className="streams-subtitle">
+              Review and manage each individual stream currently committing funds to you.
+            </p>
+          </div>
+        </div>
+        <div className="mt-6">
+          <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
+        </div>
+      </section>
+    </main>
+  );
+}

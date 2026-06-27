@@ -1,10 +1,15 @@
 .footer {
   margin-top: 2rem;
-  background: #ffffff;
-  color: #303947;
-  border: 1px solid #e7ebf1;
-  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  border-top: 1px solid var(--border);
   container-type: inline-size;
+}
+
+.footer__container {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .footer__primary {
@@ -25,7 +30,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  color: #303947;
+  color: var(--text);
   text-decoration: none;
   font-weight: 700;
 }
@@ -34,7 +39,7 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 0.45rem;
-  background: #6fd0ee;
+  background: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -43,7 +48,7 @@
 .footer__logo-icon svg {
   width: 1rem;
   height: 1rem;
-  stroke: #ffffff;
+  stroke: var(--accent);
   stroke-width: 1.9;
   fill: none;
   stroke-linecap: round;
@@ -58,7 +63,7 @@
   max-width: 19rem;
   font-size: 0.875rem;
   line-height: 1.45;
-  color: #556071;
+  color: var(--muted);
 }
 
 .footer__socials {
@@ -70,11 +75,11 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 0.45rem;
-  border: 1px solid #d5dbe5;
+  border: 1px solid var(--border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #4a5669;
+  color: var(--muted);
   text-decoration: none;
   transition: all 0.2s ease;
 }
@@ -99,7 +104,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
-  color: #3a4556;
+  color: var(--text);
 }
 
 .footer__column-list {
@@ -111,14 +116,14 @@
 }
 
 .footer__link {
-  color: #4e5a6d;
+  color: var(--muted);
   text-decoration: none;
   font-size: 0.875rem;
   line-height: 1.2;
 }
 
 .footer__secondary {
-  border-top: 1px solid #e7ebf1;
+  border-top: 1px solid var(--border);
   padding: 1rem 2.2rem;
   display: flex;
   align-items: center;
@@ -128,7 +133,7 @@
 
 .footer__copyright {
   margin: 0;
-  color: #5a6577;
+  color: var(--muted);
   font-size: 0.78rem;
 }
 
@@ -141,7 +146,7 @@
 }
 
 .footer__utility-link {
-  color: #5a6577;
+  color: var(--muted);
   font-size: 0.78rem;
   text-decoration: none;
 }
@@ -149,19 +154,19 @@
 .footer__link:hover,
 .footer__icon-button:hover,
 .footer__utility-link:hover {
-  color: #1f2733;
+  color: var(--text);
 }
 
 .footer__icon-button:hover {
-  border-color: #c1cad8;
-  background: #f5f8fc;
+  border-color: var(--accent);
+  background: var(--surface-elevated);
 }
 
 .footer__link:focus-visible,
 .footer__icon-button:focus-visible,
 .footer__utility-link:focus-visible,
 .footer__logo-link:focus-visible {
-  outline: 2px solid #6fd0ee;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 0.4rem;
 }

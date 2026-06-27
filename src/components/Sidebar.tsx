@@ -1,298 +1,275 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import {
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+  isMobileViewport,
+} from "../lib/breakpoints";
+import {
+  LayoutDashboard,
+  List,
+  User,
+  FileText,
+  Scale,
+  ChevronLeft,
+  X,
+} from "lucide-react";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const navigate = useNavigate();
-
-  return (
-    <aside style={{
-      ...styles.sidebar,
-      width: collapsed ? '80px' : '255.99px',
-    }}>
-      <div style={styles.content}>
-        {/* Logo */}
-        <button
-          onClick={() => navigate('/')}
-          style={styles.logoButton}
-          aria-label="Go to home"
-        >
-          <div style={styles.logoIcon}>F</div>
-          {!collapsed && <span style={styles.logoText}>Fluxora</span>}
-        </button>
-
-        <div style={styles.divider} />
-
-        {/* Main Navigation */}
-        <nav style={styles.nav}>
-          <NavLink
-            to="/"
-            end
-            style={({ isActive }) => ({
-              ...styles.navLink,
-              ...(isActive && styles.activeLink),
-            })}
-            onMouseEnter={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#0ea5e9')}
-            onMouseLeave={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#6b7280')}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && <div style={styles.activeBar} />}
-                <svg style={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <rect x="3" y="3" width="7" height="7" strokeWidth="2" />
-                  <rect x="14" y="3" width="7" height="7" strokeWidth="2" />
-                  <rect x="3" y="14" width="7" height="7" strokeWidth="2" />
-                  <rect x="14" y="14" width="7" height="7" strokeWidth="2" />
-                </svg>
-                {!collapsed && <span>Dashboard</span>}
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/streams"
-            style={({ isActive }) => ({
-              ...styles.navLink,
-              ...(isActive && styles.activeLink),
-            })}
-            onMouseEnter={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#0ea5e9')}
-            onMouseLeave={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#6b7280')}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && <div style={styles.activeBar} />}
-                <svg style={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <line x1="8" y1="6" x2="21" y2="6" strokeWidth="2" />
-                  <line x1="8" y1="12" x2="21" y2="12" strokeWidth="2" />
-                  <line x1="8" y1="18" x2="21" y2="18" strokeWidth="2" />
-                  <line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2" />
-                  <line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2" />
-                  <line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2" />
-                </svg>
-                {!collapsed && <span>Streams</span>}
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/recipient"
-            style={({ isActive }) => ({
-              ...styles.navLink,
-              ...(isActive && styles.activeLink),
-            })}
-            onMouseEnter={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#0ea5e9')}
-            onMouseLeave={(e) => !e.currentTarget.classList.contains('active') && (e.currentTarget.style.color = '#6b7280')}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && <div style={styles.activeBar} />}
-                <svg style={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="8" r="4" strokeWidth="2" />
-                  <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" strokeWidth="2" />
-                </svg>
-                {!collapsed && <span>Recipient</span>}
-              </>
-            )}
-          </NavLink>
-        </nav>
-
-        {/* Utility Links */}
-        <div style={styles.utility}>
-          <a 
-            href="#" 
-            style={styles.utilityLink}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#0ea5e9'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
-          >
-            <svg style={styles.icon} viewBox="0 0 20 20" fill="none">
-              <g clipPath="url(#clip0_1_1594)">
-                <path d="M12.497 1.66626H4.99879C4.55687 1.66626 4.13305 1.84181 3.82056 2.1543C3.50807 2.46679 3.33252 2.89061 3.33252 3.33253V16.6627C3.33252 17.1046 3.50807 17.5284 3.82056 17.8409C4.13305 18.1534 4.55687 18.329 4.99879 18.329H14.9964C15.4383 18.329 15.8622 18.1534 16.1746 17.8409C16.4871 17.5284 16.6627 17.1046 16.6627 16.6627V5.83194L12.497 1.66626Z" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M11.6641 1.66626V4.9988C11.6641 5.44072 11.8396 5.86455 12.1521 6.17703C12.4646 6.48952 12.8884 6.66507 13.3303 6.66507H16.6629" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M8.33131 7.49823H6.66504" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M13.3301 10.8307H6.66504" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M13.3301 14.1633H6.66504" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-              </g>
-            </svg>
-            {!collapsed && <span>Documentation</span>}
-          </a>
-
-          <a 
-            href="#" 
-            style={styles.utilityLink}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#0ea5e9'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
-          >
-            <svg style={styles.icon} viewBox="0 0 20 20" fill="none">
-              <g clipPath="url(#clip0_1_1603)">
-                <path d="M13.3301 13.3302L15.8295 6.6651L18.3289 13.3302C17.6041 13.8717 16.7293 14.1633 15.8295 14.1633C14.9297 14.1633 14.0549 13.8717 13.3301 13.3302Z" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M1.6665 13.3302L4.16591 6.6651L6.66532 13.3302C5.94049 13.8717 5.0657 14.1633 4.16591 14.1633C3.26612 14.1633 2.39133 13.8717 1.6665 13.3302Z" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M5.83203 17.4958H14.1634" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9.99756 2.49939V17.4958" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2.49951 5.83192H4.16578C5.83205 5.83192 8.33146 4.99878 9.99773 4.16565C11.664 4.99878 14.1634 5.83192 15.8297 5.83192H17.4959" stroke="currentColor" strokeWidth="1.66627" strokeLinecap="round" strokeLinejoin="round"/>
-              </g>
-            </svg>
-            {!collapsed && <span>Legal</span>}
-          </a>
-
-          <div style={styles.divider} />
-
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            style={styles.collapseButton}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#0ea5e9'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
-          >
-            <svg
-              style={{
-                ...styles.icon,
-                transform: collapsed ? 'rotate(180deg)' : 'none',
-              }}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-            >
-              <polyline points="15,18 9,12 15,6" strokeWidth="2" />
-            </svg>
-            {!collapsed && <span>Collapse</span>}
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  sidebar: {
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    width: '255.99px',
-    height: '100vh',
-    backgroundColor: '#FFFFFF',
-    borderRight: '0.69px solid #E5E7EB',
-    transition: 'width 0.3s ease',
-    zIndex: 100,
-    opacity: 1,
-  },
-  content: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    padding: '16px 0',
-  },
-  logoButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '0 24px',
-    marginBottom: '12px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    width: '100%',
-    textAlign: 'left',
-  },
-  logoIcon: {
-    width: '32px',
-    height: '32px',
-    background: 'linear-gradient(180deg, #00B8D4 0%, #0097A7 100%)',
-    borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#fff',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    flexShrink: 0,
-    opacity: 1,
-    boxShadow: '0px 4px 6px -4px rgba(0, 184, 212, 0.3), 0px 10px 15px -3px rgba(0, 184, 212, 0.3)',
-  },
-  logoText: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1f2937',
-    whiteSpace: 'nowrap',
-  },
-  nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    flex: 1,
-  },
-  navLink: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '10px 24px',
-    color: '#6b7280',
-    textDecoration: 'none',
-    fontSize: '15px',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-  },
-  navLinkHover: {
-    color: '#0ea5e9',
-  },
-  activeLink: {
-    backgroundColor: '#dbeafe',
-    color: '#0ea5e9',
-  },
-  activeBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '3px',
-    backgroundColor: '#0ea5e9',
-  },
-  icon: {
-    width: '20px',
-    height: '20px',
-    flexShrink: 0,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-  },
-  utility: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    paddingTop: '24px',
-    paddingBottom: '16px',
-    borderTop: '1px solid #e5e7eb',
-    marginTop: 'auto',
-  },
-  utilityLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '8px 24px',
-    color: '#6b7280',
-    textDecoration: 'none',
-    fontSize: '15px',
-    fontWeight: '500',
-    transition: 'color 0.2s',
-    cursor: 'pointer',
-  },
-  collapseButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 24px',
-    color: '#6b7280',
-    fontSize: '15px',
-    fontWeight: '500',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    textAlign: 'left',
-    width: '100%',
-    transition: 'color 0.2s',
-  },
-  divider: {
-    height: '1px',
-    backgroundColor: '#e5e7eb',
-    margin: '8px 0',
-  },
-};
+interface SidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export default function Sidebar({
+  collapsed,
+  onToggleCollapse,
+  mobileOpen,
+  onMobileClose,
+}: SidebarProps) {
+  const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+
+    const syncMobileState = () => {
+      const mobile = isMobileViewport();
+      setIsMobile((prev) => (prev === mobile ? prev : mobile));
+    };
+
+    const handleResize = () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(syncMobileState, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    syncMobileState();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(debounceId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  // Escape key support
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onMobileClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen, onMobileClose]);
+
+  // Focus trapping
+  useEffect(() => {
+    if (!mobileOpen || !sidebarRef.current) return;
+
+    const focusableElements = sidebarRef.current.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0] as HTMLElement;
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleTab);
+    return () => window.removeEventListener("keydown", handleTab);
+  }, [mobileOpen]);
+
+  const navItems = [
+    { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "/app/streams", label: "Streams", icon: List },
+    { to: "/app/recipient", label: "Recipient", icon: User },
+  ];
+
+  const utilityItems = [
+    { href: "#", label: "Documentation", icon: FileText },
+    { href: "#", label: "Legal", icon: Scale },
+  ];
+
+  return (
+    <>
+      {/* Backdrop for mobile */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onMobileClose}
+        aria-hidden="true"
+      />
+
+      {/* Sidebar Drawer */}
+      <aside
+        ref={sidebarRef}
+        id="app-sidebar"
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col",
+          // Mobile state
+          "max-md:w-[280px] max-md:shadow-xl",
+          mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+          // Desktop state
+          "md:translate-x-0",
+          collapsed ? "md:w-20" : "md:w-64"
+        )}
+        role="navigation"
+        aria-label="Primary navigation"
+        aria-hidden={isMobile && !mobileOpen}
+      >
+        <div className="flex flex-col h-full py-4">
+          {/* Header / Logo */}
+          <div className="flex items-center justify-between px-6 mb-6">
+            <button
+              onClick={() => {
+                navigate("/");
+                onMobileClose();
+              }}
+              className="flex items-center gap-3 group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
+              aria-label="Fluxora home"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-[#00B8D4] to-[#0097A7] flex items-center justify-center text-white font-bold shadow-lg shadow-[#00B8D4]/20 group-hover:scale-105 transition-transform">
+                F
+              </div>
+              <span
+                className={cn(
+                  "text-lg font-bold text-[var(--text)] transition-opacity duration-300",
+                  collapsed ? "md:opacity-0 md:w-0" : "opacity-100"
+                )}
+              >
+                Fluxora
+              </span>
+            </button>
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={onMobileClose}
+              className="md:hidden p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-md"
+              aria-label="Close sidebar"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="h-px bg-[var(--border)] mx-4 mb-4" />
+
+          {/* Main Navigation */}
+          <nav className="flex-1 px-3 space-y-1">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onMobileClose}
+                aria-current="page"
+                className={({ isActive }) =>
+                  cn(
+                    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
+                    isActive
+                      ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                      : "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)]"
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {/* Active Indicator (Design Spec 4.2) */}
+                    <div 
+                      className={cn(
+                        "absolute left-0 top-1 bottom-1 w-[3px] bg-[var(--accent)] rounded-r-full transition-opacity duration-200",
+                        isActive ? "opacity-100" : "opacity-0"
+                      )} 
+                    />
+                    <item.icon
+                      size={20}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        isActive ? "text-[var(--accent)]" : "group-hover:text-[var(--text)]"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "transition-opacity duration-300 whitespace-nowrap",
+                        collapsed ? "md:opacity-0 md:w-0" : "opacity-100"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Utility / Bottom Links */}
+          <div className="mt-auto px-3 space-y-1">
+            <div className="h-px bg-[var(--border)] mx-1 my-4" />
+            
+            {utilityItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                <item.icon size={20} className="flex-shrink-0 group-hover:text-[var(--text)]" />
+                <span
+                  className={cn(
+                    "transition-opacity duration-300 whitespace-nowrap",
+                    collapsed ? "md:opacity-0 md:w-0" : "opacity-100"
+                  )}
+                >
+                  {item.label}
+                </span>
+              </a>
+            ))}
+
+            {/* Desktop Collapse Toggle */}
+            <button
+              onClick={onToggleCollapse}
+              className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <ChevronLeft
+                size={20}
+                className={cn(
+                  "transition-transform duration-300",
+                  collapsed ? "rotate-180" : "rotate-0"
+                )}
+              />
+              <span
+                className={cn(
+                  "transition-opacity duration-300 font-medium",
+                  collapsed ? "opacity-0 w-0" : "opacity-100"
+                )}
+              >
+                Collapse
+              </span>
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}

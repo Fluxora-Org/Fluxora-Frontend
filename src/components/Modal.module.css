@@ -1,0 +1,223 @@
+/**
+ * Modal Component Styles
+ * ──────────────────────────────────────
+ * Implements DESIGN_SPEC.md § 4.3 Modal specifications
+ * Includes animations, focus trap, and accessibility
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL OVERLAY (Backdrop)
+   ═══════════════════════════════════════════════════════════ */
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999;
+  
+  /* Light theme */
+  background-color: rgba(0, 0, 0, 0.4);
+  
+  /* Animation */
+  animation: fadeIn var(--transition-base);
+  
+  /* Prevent scrolling */
+  overflow: hidden;
+}
+
+/* Dark theme adjustments */
+:root[data-theme="dark"] .backdrop {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* Light fade-in animation for backdrop */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL DIALOG
+   ═══════════════════════════════════════════════════════════ */
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  
+  /* Sizing */
+  width: calc(100% - var(--space-xl)); /* 16px margin on mobile */
+  max-width: 500px;
+  max-height: 90vh;
+  
+  /* Style */
+  background-color: var(--color-surface-default);
+  border-radius: var(--radius-lg); /* 12px */
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-2xl); /* 32px */
+  
+  /* Content overflow */
+  overflow-y: auto;
+  
+  /* Animation */
+  animation: slideInUp var(--transition-base);
+  
+  /* Remove scrollbar */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Webkit scrollbar (Chrome, Safari, Edge) */
+.dialog::-webkit-scrollbar {
+  display: none;
+}
+
+/* Modal entrance animation */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL HEADER
+   ═══════════════════════════════════════════════════════════ */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-lg); /* 16px */
+  margin-bottom: var(--space-xl); /* 24px */
+}
+
+.title {
+  font: var(--font-heading-3); /* 600 18px/28px */
+  color: var(--color-text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CLOSE BUTTON
+   ═══════════════════════════════════════════════════════════ */
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md); /* 8px */
+  border: none;
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  
+  /* Icon */
+  font-size: 20px;
+  line-height: 1;
+  
+  /* Interaction */
+  transition: all var(--transition-base);
+}
+
+.closeButton:hover {
+  background-color: var(--color-surface-highest);
+  color: var(--color-text-secondary);
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.closeButton:active {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL CONTENT SECTIONS
+   ═══════════════════════════════════════════════════════════ */
+
+.body {
+  margin-bottom: var(--space-xl); /* 24px */
+}
+
+.footer {
+  display: flex;
+  gap: var(--space-lg); /* 16px */
+  justify-content: flex-end;
+  padding-top: var(--space-lg); /* 16px */
+  border-top: 1px solid var(--color-border-default);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL ANIMATIONS - REDUCED MOTION
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .dialog {
+    animation: none;
+  }
+  
+  .closeButton:hover {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+  .dialog {
+    width: calc(100% - var(--space-lg)); /* 8px margin on mobile */
+    max-width: none;
+    padding: var(--space-xl); /* 24px */
+  }
+  
+  .header {
+    margin-bottom: var(--space-lg); /* 16px */
+  }
+  
+  .footer {
+    flex-direction: column;
+    gap: var(--space-md); /* 12px */
+  }
+  
+  .closeButton {
+    align-self: flex-end;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HIGH CONTRAST MODE (Windows)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-contrast: more) {
+  .dialog {
+    border: 2px solid var(--color-border-default);
+  }
+  
+  .closeButton {
+    border: 1px solid var(--color-border-default);
+  }
+}

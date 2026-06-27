@@ -11,7 +11,7 @@ export default function Header() {
       </div>
 
       <button
-        onClick={() => navigate("/streams/create")}
+        onClick={() => navigate("/app/streams")}
         className="flex items-center gap-2 bg-cyan-600/70 shadow-cyan-600/70 px-4 py-2 text-white rounded-lg"
       >
         <span className="text-xl font-bold">+</span>

@@ -1,0 +1,146 @@
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  background: var(--color-surface-default);
+  border-right: 1px solid var(--color-border-default);
+  transition: width var(--transition-slow);
+  z-index: 100;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-lg) 0;
+}
+
+.interactive {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  outline: none;
+  transition:
+    color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.interactive:hover {
+  color: var(--color-focus);
+  background: color-mix(in srgb, var(--color-focus) 8%, transparent);
+}
+
+.interactive:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.interactiveCompact {
+  margin: 0 var(--space-md);
+}
+
+.logoButton {
+  padding: 0 var(--space-xl);
+  margin-bottom: var(--space-md);
+  text-align: left;
+}
+
+.logoIcon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(180deg, #00b8d4 0%, #0097a7 100%);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-inverse);
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-accent-primary);
+}
+
+.logoText {
+  font: var(--font-heading-4);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border-default);
+  margin: var(--space-sm) 0;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.navLink {
+  padding: 10px var(--space-xl);
+  font: var(--font-label-lg);
+}
+
+.navLinkActive {
+  background: color-mix(in srgb, var(--color-focus) 16%, transparent);
+  color: var(--color-focus);
+}
+
+.activeBar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--color-focus);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.utility {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-lg);
+  border-top: 1px solid var(--color-border-default);
+  margin-top: auto;
+}
+
+.utilityLink {
+  padding: var(--space-sm) var(--space-xl);
+  font: var(--font-label-lg);
+}
+
+.collapseButton {
+  padding: var(--space-md) var(--space-xl);
+  font: var(--font-label-lg);
+  text-align: left;
+}
+
+.rotated {
+  transform: rotate(180deg);
+}

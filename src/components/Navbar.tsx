@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import WalletButton from "./wallet-connect/Walletbutton";
 
@@ -497,7 +497,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     padding: "0 1.5rem",
     height: "72px",
-    background: "var(--navbar-bg)",
+    background: "var(--color-bg-primary)",
+    borderBottom: "1px solid var(--color-border-default)",
     position: "sticky",
     top: 0,
     zIndex: 1000,
@@ -514,7 +515,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "0.5rem",
     textDecoration: "none",
-    color: "inherit",
+    color: "var(--color-text-primary)",
     outline: "none",
   },
   logoBrand: {
@@ -536,8 +537,8 @@ const styles: Record<string, React.CSSProperties> = {
   logoText: {
     fontSize: "1.25rem",
     fontWeight: 700,
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-    color: "var(--navbar-logo-color)",
+    fontFamily: "var(--font-primary)",
+    color: "var(--color-text-primary)",
     letterSpacing: "-0.5px",
     lineHeight: 1.2,
     margin: 0,
@@ -545,19 +546,17 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap",
   },
   navTitle: {
-    color: "var(--navbar-link-color)",
+    color: "var(--color-text-muted)",
     fontSize: "1rem",
     fontWeight: 600,
     textTransform: "uppercase",
   },
   navLinksContainer: {
     display: "flex",
-    gap: "1rem",
+    gap: "1.5rem",
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
-  } as React.CSSProperties & {
-    "@media (max-width: 768px)"?: Record<string, string | number>;
   },
   navLinksContainerOpen: {
     position: "absolute",
@@ -566,8 +565,8 @@ const styles: Record<string, React.CSSProperties> = {
     right: 0,
     flexDirection: "column",
     gap: "0",
-    background: "var(--navbar-bg)",
-    borderBottom: "1px solid var(--navbar-border)",
+    background: "var(--color-bg-primary)",
+    borderBottom: "1px solid var(--color-border-default)",
     padding: "0",
     animation: "slideDown 0.3s ease-out",
     display: "flex",
@@ -577,37 +576,35 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: "1rem",
     padding: "1rem 1.5rem",
-    borderTop: "1px solid var(--navbar-border)",
+    borderTop: "1px solid var(--color-border-default)",
     justifyContent: "center",
     alignItems: "center",
     width: "100%",
   } as React.CSSProperties,
   navLink: {
-    color: "var(--navbar-link-color)",
+    color: "var(--color-text-tertiary)",
     textDecoration: "none",
-    fontSize: "0.95rem",
+    fontSize: "14px",
     fontWeight: 500,
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-    padding: "0.75rem 1.5rem",
+    fontFamily: "var(--font-primary)",
+    padding: "0.5rem 1rem",
     position: "relative",
     cursor: "pointer",
-    transition: "color 0.2s ease",
+    transition: "var(--transition-base)",
     outline: "none",
     minHeight: "44px",
     display: "flex",
     alignItems: "center",
-  } as React.CSSProperties,
+  },
   rightContainer: {
     display: "flex",
     alignItems: "center",
     gap: "1rem",
     flexShrink: 0,
-  } as React.CSSProperties & {
-    "@media (max-width: 768px)"?: Record<string, string | number>;
   },
   themeToggle: {
     background: "transparent",
-    border: "1px solid var(--navbar-icon-border)",
+    border: "1px solid var(--color-border-default)",
     borderRadius: "50%",
     width: "40px",
     height: "40px",
@@ -617,8 +614,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    color: "var(--navbar-icon-color)",
-    transition: "all 0.2s ease",
+    color: "var(--color-text-primary)",
+    transition: "var(--transition-base)",
     padding: 0,
     outline: "none",
   },
@@ -672,62 +669,66 @@ const styles: Record<string, React.CSSProperties> = {
 
 // Add keyframe animation via style tag
 if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
+  const styleId = "navbar-animation-styles";
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+
+      nav > div:nth-of-type(1) a {
+        transition: transform 0.2s ease;
       }
-    }
 
-    nav > div:nth-of-type(1) a {
-      transition: transform 0.2s ease;
-    }
+      nav > div:nth-of-type(1) a:hover {
+        transform: scale(1.05);
+      }
 
-    nav > div:nth-of-type(1) a:hover {
-      transform: scale(1.05);
-    }
+      nav > div:nth-of-type(2) a,
+      nav > div:nth-of-type(2) > div > a {
+        transition: color 0.2s ease;
+      }
 
-    nav > div:nth-of-type(2) a,
-    nav > div:nth-of-type(2) > div > a {
-      transition: color 0.2s ease;
-    }
-
-    nav > div:nth-of-type(2) a:hover,
-    nav > div:nth-of-type(2) > div > a:hover {
-      opacity: 0.8;
-    }
-    
-    @media (max-width: 768px) {
-      nav {
-        padding: 0 1rem;
+      nav > div:nth-of-type(2) a:hover,
+      nav > div:nth-of-type(2) > div > a:hover {
+        opacity: 0.8;
       }
       
-      nav a:focus {
-        outline: 2px solid var(--accent);
-        outline-offset: -4px;
+      @media (max-width: 768px) {
+        nav {
+          padding: 0 1rem;
+        }
+        
+        nav a:focus {
+          outline: 2px solid var(--accent);
+          outline-offset: -4px;
+        }
+        
+        /* Show hamburger on mobile */
+        button[aria-label*="Toggle navigation"] {
+          display: flex !important;
+        }
+        
+        /* Keep logo visible on mobile */
+        nav > div:nth-of-type(1) {
+          display: flex !important;
+        }
+        
+        /* Hide right container (theme toggle and connect wallet) on mobile - 3rd div is rightContainer */
+        nav > div:nth-of-type(3) {
+          display: none !important;
+        }
       }
-      
-      /* Show hamburger on mobile */
-      button[aria-label*="Toggle navigation"] {
-        display: flex !important;
-      }
-      
-      /* Keep logo visible on mobile */
-      nav > div:nth-of-type(1) {
-        display: flex !important;
-      }
-      
-      /* Hide right container (theme toggle and connect wallet) on mobile - 3rd div is rightContainer */
-      nav > div:nth-of-type(3) {
-        display: none !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
+    `;
+    document.head.appendChild(style);
+  }
 }

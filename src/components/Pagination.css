@@ -1,0 +1,120 @@
+.fluxora-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  margin-top: 2rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.875rem;
+}
+
+.pagination-info .highlight {
+  color: var(--text-primary, #f8fafc);
+  font-weight: 600;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.limit-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.limit-selector select {
+  background: var(--surface-alt, rgba(15, 23, 42, 0.6));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.limit-selector select:focus {
+  border-color: var(--primary, #3b82f6);
+}
+
+.page-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-num-btn,
+.page-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.page-num-btn:hover:not(.is-active) {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text-primary);
+}
+
+.page-num-btn.is-active {
+  background: var(--primary-glow, rgba(59, 130, 246, 0.1));
+  border-color: var(--primary, #3b82f6);
+  color: var(--primary, #3b82f6);
+  font-weight: 700;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.page-nav-btn {
+  background: var(--surface-alt, rgba(15, 23, 42, 0.4));
+  border-color: var(--border-subtle);
+}
+
+.page-nav-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.page-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.page-nav-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .fluxora-pagination {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+  }
+  
+  .pagination-controls {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

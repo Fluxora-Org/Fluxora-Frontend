@@ -1,245 +1,212 @@
+:root {
+  /* spacing tokens */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* layout */
+  --sidebar-width: 244px;
+  --sidebar-collapsed: 84px;
+  --layout-gutter: var(--space-6);
+  --section-gap: var(--space-8);
+
+  /* radius */
+  --radius-md: 10px;
+}
+
+/* ======================
+   BASE LAYOUT
+====================== */
+
 .app-layout {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  position: relative;
   background: var(--bg);
 }
 
+.app-layout__body {
+  display: flex;
+  flex: 1;
+  gap: var(--layout-gutter);
+  padding: var(--layout-gutter);
+  overflow: hidden;
+}
+
+/* ======================
+   SIDEBAR
+====================== */
+
 .app-sidebar {
-  width: 244px;
-  background: var(--surface);
+  width: var(--sidebar-width);
+  background: var(--surface-elevated);
   border-right: 1px solid var(--border);
-  padding: 1.2rem 0.9rem;
+  border-radius: var(--radius-md);
+
+  padding: var(--space-5) var(--space-4);
+
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  transition: width 0.22s ease, transform 0.22s ease;
+  gap: var(--space-4);
+
+  transition:
+    width 0.22s ease,
+    transform 0.22s ease;
   z-index: 40;
 }
 
-.app-sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.app-logo {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-
-.app-sidebar-toggle {
-  width: 2rem;
-  height: 2rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.app-toggle-chevron {
-  width: 1rem;
-  height: 1rem;
-  display: inline-flex;
-  transition: transform 0.2s ease;
-}
-
-.app-toggle-chevron svg {
-  width: 100%;
-  height: 100%;
-}
-
-.app-toggle-chevron.is-rotated {
-  transform: rotate(180deg);
-}
+/* ======================
+   NAV
+====================== */
 
 .app-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--space-2);
   flex: 1;
-  min-height: 0;
 }
 
 .app-nav-link {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  min-height: 2.6rem;
-  padding: 0.5rem 0.6rem;
-  border-radius: 10px;
+  gap: var(--space-3);
+
+  min-height: 2.8rem;
+  padding: var(--space-2) var(--space-3);
+
+  border-radius: var(--radius-md);
+
   color: var(--text);
   text-decoration: none;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
 }
 
 .app-nav-link:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: #ecf4ff;
+  background: var(--surface-raised);
+  transform: translateX(2px);
 }
 
+/* ACTIVE STATE */
+.app-nav-link.is-active {
+  background: var(--surface-raised);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+}
+
+/* badge */
 .app-nav-badge {
   width: 1.6rem;
   height: 1.6rem;
   border-radius: 999px;
-  display: inline-flex;
+
+  display: flex;
   align-items: center;
   justify-content: center;
+
   font-size: 0.76rem;
   font-weight: 600;
-  background: rgba(107, 145, 209, 0.18);
-  color: #b8d4ff;
-  flex-shrink: 0;
+
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
 }
 
-.app-nav-label {
-  white-space: nowrap;
-}
+/* ======================
+   BUTTON
+====================== */
 
 .app-connect-button {
   margin-top: auto;
-  min-height: 2.7rem;
-  border-radius: 10px;
+
+  min-height: 2.8rem;
+
+  border-radius: var(--radius-md);
   border: none;
-  display: inline-flex;
+
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+
   cursor: pointer;
+
   background: var(--accent);
   color: #0a0e17;
+
   font-weight: 600;
-  padding: 0.75rem 0.9rem;
+
+  padding: var(--space-3) var(--space-4);
 }
 
-.app-connect-icon {
-  width: 1rem;
-  height: 1rem;
-  display: inline-flex;
-}
-
-.app-connect-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.app-connect-label {
-  white-space: nowrap;
-}
+/* ======================
+   CONTENT
+====================== */
 
 .app-content-area {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
-}
-
-.app-mobile-topbar {
-  display: none;
+  gap: var(--section-gap);
 }
 
 .app-main {
   flex: 1;
-  padding: 2rem;
+  padding: var(--layout-gutter);
   overflow: auto;
+}
+
+/* ======================
+   COLLAPSED
+====================== */
+
+.app-layout.is-collapsed .app-sidebar {
+  width: var(--sidebar-collapsed);
+}
+
+.app-layout.is-collapsed .app-nav-label {
+  display: none;
+}
+
+.app-layout.is-collapsed .app-nav-link {
+  justify-content: center;
+}
+
+/* ======================
+   MOBILE
+====================== */
+
+.app-mobile-topbar {
+  display: none;
 }
 
 .app-sidebar-backdrop {
   display: none;
 }
 
-.app-layout.is-collapsed .app-sidebar {
-  width: 84px;
-  padding-left: 0.65rem;
-  padding-right: 0.65rem;
-}
-
-.app-layout.is-collapsed .app-logo {
-  font-size: 1.04rem;
-}
-
-.app-layout.is-collapsed .app-nav-link {
-  justify-content: center;
-  padding-left: 0.35rem;
-  padding-right: 0.35rem;
-}
-
-.app-layout.is-collapsed .app-nav-label,
-.app-layout.is-collapsed .app-connect-label {
-  display: none;
-}
-
-.app-layout.is-collapsed .app-connect-button {
-  padding-left: 0;
-  padding-right: 0;
-}
-
 @media (max-width: 1024px) {
-  .app-main {
-    padding: 1.5rem;
+  .app-layout__body {
+    padding: var(--space-4);
   }
 }
 
 @media (max-width: 860px) {
+  .app-layout__body {
+    padding: 0;
+  }
+
   .app-sidebar {
     position: fixed;
     left: 0;
     top: 0;
     height: 100vh;
-    transform: translateX(-105%);
-    width: 244px;
-  }
 
-  .app-mobile-topbar {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.9rem 1rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-elevated);
-    position: sticky;
-    top: 0;
-    z-index: 35;
-  }
-
-  .app-mobile-menu-btn {
-    width: 2.1rem;
-    height: 2rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text);
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.18rem;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .app-mobile-menu-btn span {
-    width: 1rem;
-    height: 2px;
-    background: currentColor;
-    border-radius: 3px;
-  }
-
-  .app-mobile-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .app-main {
-    padding: 1rem;
+    transform: translateX(-110%);
   }
 
   .app-layout.is-mobile-open .app-sidebar {
@@ -250,35 +217,42 @@
     display: block;
     position: fixed;
     inset: 0;
-    border: none;
-    padding: 0;
-    margin: 0;
+
     background: rgba(0, 0, 0, 0.46);
+
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
-    z-index: 30;
   }
 
   .app-layout.is-mobile-open .app-sidebar-backdrop {
     opacity: 1;
     pointer-events: auto;
   }
+}
 
-  .app-layout.is-collapsed .app-sidebar {
-    width: 244px;
-    padding-left: 0.9rem;
-    padding-right: 0.9rem;
+/* Forced-colors fallback: replace box-shadow halos with a plain
+   outline that the high-contrast mode respects. */
+@media (forced-colors: active) {
+  .app-sidebar-toggle:focus-visible,
+  .app-nav-link:focus-visible,
+  .app-connect-button:focus-visible,
+  .app-mobile-menu-btn:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
   }
+}
 
-  .app-layout.is-collapsed .app-nav-link {
-    justify-content: flex-start;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
-  }
-
-  .app-layout.is-collapsed .app-nav-label,
-  .app-layout.is-collapsed .app-connect-label {
-    display: inline;
+/* Forced-colors fallback: replace box-shadow halos with a plain
+   outline that the high-contrast mode respects. */
+@media (forced-colors: active) {
+  .app-sidebar-toggle:focus-visible,
+  .app-nav-link:focus-visible,
+  .app-connect-button:focus-visible,
+  .app-mobile-menu-btn:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
   }
 }

@@ -1,0 +1,178 @@
+/**
+ * Loading Skeleton Styles
+ * ──────────────────────────────────────
+ * Implements DESIGN_SPEC.md skeleton loading specifications
+ * Includes pulse animation, staggered delays, and responsive sizing
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   BASE SKELETON STYLES
+   ═══════════════════════════════════════════════════════════ */
+
+.skeleton {
+  /* Base styles */
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm); /* 4px */
+  
+  /* Animation */
+  animation: pulse 2s var(--ease-in-out) infinite;
+  
+  /* Accessibility */
+  display: block;
+  opacity: 0.8;
+}
+
+/* Pulse animation per DESIGN_SPEC.md */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKELETON SIZES
+   ═══════════════════════════════════════════════════════════ */
+
+/* Line / Text skeleton (common size) */
+.skeletonLine {
+  height: 16px;
+  width: 100%;
+  margin-bottom: var(--space-md); /* 12px */
+}
+
+/* Heading skeleton */
+.skeletonHeading {
+  height: 28px;
+  width: 60%;
+  margin-bottom: var(--space-lg); /* 16px */
+  border-radius: var(--radius-md); /* 8px */
+}
+
+/* Card skeleton (full-width block) */
+.skeletonCard {
+  height: 120px;
+  width: 100%;
+  border-radius: var(--radius-lg); /* 12px */
+  margin-bottom: var(--space-xl); /* 24px */
+}
+
+/* Avatar skeleton (circle) */
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full); /* 9999px */
+  display: inline-block;
+}
+
+/* Button skeleton */
+.skeletonButton {
+  height: 40px;
+  width: 120px;
+  border-radius: var(--radius-md); /* 8px */
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STAGGERED ANIMATION DELAYS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Used for multiple skeletons in sequence */
+.skeleton:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.skeleton:nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.skeleton:nth-child(3) {
+  animation-delay: 200ms;
+}
+
+.skeleton:nth-child(4) {
+  animation-delay: 300ms;
+}
+
+.skeleton:nth-child(5) {
+  animation-delay: 400ms;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SKELETON CONTAINER (Multiple items)
+   ═══════════════════════════════════════════════════════════ */
+
+.skeletonContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md); /* 12px */
+}
+
+.skeletonGrid {
+  display: grid;
+  gap: var(--space-lg); /* 16px */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE SKELETON ROW
+   ═══════════════════════════════════════════════════════════ */
+
+.skeletonRow {
+  display: flex;
+  gap: var(--space-lg); /* 16px */
+  align-items: center;
+  padding: var(--space-lg); /* 16px */
+  border-radius: var(--radius-md); /* 8px */
+}
+
+.skeletonCell {
+  flex: 1;
+  height: 20px;
+  border-radius: var(--radius-sm); /* 4px */
+}
+
+.skeletonCell.narrow {
+  flex: 0 0 80px;
+}
+
+.skeletonCell.wide {
+  flex: 2;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION SUPPORT
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NO-LAYOUT-SHIFT GUARANTEE
+   ═══════════════════════════════════════════════════════════ */
+
+/*
+  Ensure skeleton dimensions match actual content to prevent
+  Cumulative Layout Shift (CLS) during loading → loaded transition
+*/
+.skeletonCard {
+  /* Matches typical card dimensions */
+  height: 120px;
+  aspect-ratio: auto;
+}
+
+.skeletonLine {
+  /* Matches typical body text line-height */
+  height: 20px;
+}
+
+.skeletonHeading {
+  /* Matches typical heading dimensions */
+  height: 32px;
+}

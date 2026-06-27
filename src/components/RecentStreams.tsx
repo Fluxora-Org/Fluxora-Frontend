@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export type StreamStatus = 'Active' | 'Paused' | 'Completed';
@@ -16,9 +17,25 @@ interface RecentStreamsProps {
   viewAllUrl?: string;
 }
 
-export default function RecentStreams({ streams, viewAllUrl = '/streams' }: RecentStreamsProps) {
+export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: RecentStreamsProps) {
+  const [announcement, setAnnouncement] = useState('');
+
+  useEffect(() => {
+    if (streams.length > 0) {
+      setAnnouncement(`Found ${streams.length} matching streams.`);
+    } else {
+      setAnnouncement('No matching streams found.');
+    }
+    
+    const timer = setTimeout(() => setAnnouncement(''), 1000);
+    return () => clearTimeout(timer);
+  }, [streams.length]);
+
   return (
     <section style={sectionContainer}>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
       <div style={header}>
         <h2 style={title}>Recent streams</h2>
         <Link to={viewAllUrl} style={viewAllLink}>
@@ -55,7 +72,7 @@ export default function RecentStreams({ streams, viewAllUrl = '/streams' }: Rece
                 </td>
                 <td style={td}>
                   <Link 
-                    to={stream.detailUrl || `/streams/${stream.id}`} 
+                    to={stream.detailUrl || `/app/streams/${stream.id}`} 
                     style={viewLink}
                     aria-label={`View details for ${stream.name}`}
                   >

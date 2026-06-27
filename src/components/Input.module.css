@@ -1,0 +1,188 @@
+/**
+ * Input Component Styles
+ * ──────────────────────────────────────
+ * Implements DESIGN_SPEC.md form input specifications
+ * Includes all states: default, focus, error, disabled
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   BASE INPUT STYLE
+   ═══════════════════════════════════════════════════════════ */
+
+.inputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm); /* 8px */
+}
+
+.input {
+  /* Layout & Sizing */
+  width: 100%;
+  padding: 10px var(--space-md); /* 10px 12px */
+  border-radius: var(--radius-md); /* 8px */
+  border: 1px solid var(--color-border-default);
+  
+  /* Typography */
+  font: var(--font-body-md); /* 400 14px/20px */
+  font-family: var(--font-family-base);
+  
+  /* Colors */
+  background-color: var(--color-surface-default);
+  color: var(--color-text-primary);
+  
+  /* Other */
+  box-sizing: border-box;
+  transition: all var(--transition-base);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* Placeholder text styling */
+.input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FOCUS STATE (Keyboard Navigation)
+   ─────────────────────────────────────────────────────────
+   WCAG 2.4.7 Focus Visible & 2.4.11 Focus Appearance
+   Form inputs use border + glow instead of outline
+   ═══════════════════════════════════════════════════════════ */
+
+.input:focus-visible,
+.input:focus {
+  outline: none;
+  border: var(--focus-ring-input-border);
+  padding: 9px calc(var(--space-md) - 1px); /* Adjust for 2px border */
+  box-shadow: var(--focus-ring-input-shadow);
+}
+
+/* Remove focus styles for mouse clicks */
+.input:focus:not(:focus-visible) {
+  border: 1px solid var(--color-border-default);
+  padding: 10px var(--space-md);
+  box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DISABLED STATE
+   ═══════════════════════════════════════════════════════════ */
+
+.input:disabled {
+  background-color: var(--color-surface-raised);
+  border-color: var(--color-border-default);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.input:disabled::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.4;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR STATE
+   ═══════════════════════════════════════════════════════════ */
+
+.input[aria-invalid="true"],
+.input.error {
+  border-color: var(--color-danger);
+  border-width: 2px;
+  padding: 9px calc(var(--space-md) - 1px); /* Adjust for border width */
+  background-color: rgba(239, 68, 68, 0.02);
+}
+
+.input[aria-invalid="true"]:focus-visible,
+.input.error:focus-visible {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  border-color: var(--color-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LABEL STYLING
+   ═══════════════════════════════════════════════════════════ */
+
+.label {
+  display: block;
+  font: var(--font-label-md); /* 500 12px/16px */
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs); /* 4px */
+}
+
+/* Required indicator */
+.labelRequired {
+  color: var(--color-danger);
+  margin-left: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR MESSAGE
+   ═══════════════════════════════════════════════════════════ */
+
+.errorMessage {
+  font: var(--font-body-sm); /* 400 12px/16px */
+  color: var(--color-danger);
+  margin-top: var(--space-xs); /* 4px */
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HELPER TEXT
+   ═══════════════════════════════════════════════════════════ */
+
+.helperText {
+  font: var(--font-body-sm); /* 400 12px/16px */
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-xs); /* 4px */
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TEXTAREA
+   ═══════════════════════════════════════════════════════════ */
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+  max-width: 100%;
+}
+
+.textarea:focus-visible {
+  border-width: 2px;
+  padding: 9px calc(var(--space-md) - 1px);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SELECT / DROPDOWN
+   ═══════════════════════════════════════════════════════════ */
+
+.select {
+  cursor: pointer;
+  padding-right: 32px; /* Space for dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%231a1f36' stroke-width='1.5'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 20px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+:root[data-theme="dark"] .select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23e8ecf4' stroke-width='1.5'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION SUPPORT
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .textarea,
+  .select {
+    transition: none;
+  }
+}

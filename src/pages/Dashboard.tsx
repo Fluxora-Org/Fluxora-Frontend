@@ -1,80 +1,256 @@
-import React, { useEffect, useState } from 'react';
-import RecentStreams, { Stream } from '../components/RecentStreams';
-import CreateStreamModal from '../components/CreateStreamModal';
-import TreasuryOverviewLoading from '../components/TreasuryOverviewLoading';
-import TreasuryEmptyState from '../components/TreasuryEmptyState';
+import React, { useEffect, useMemo, useState } from "react";
+import RecentStreams, { Stream } from "../components/RecentStreams";
+import CreateStreamModal from "../components/CreateStreamModal";
+import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
+import TreasuryEmptyState from "../components/TreasuryEmptyState";
+import TreasuryOnboarding from "../components/TreasuryOnboarding";
+import ConnectWalletModal from "../components/ConnectWalletModal";
+import ToastNotification, {
+  type ToastVariant,
+} from "../components/ToastNotification";
+import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
+import type { StreamRecord } from "../data/streamRecords";
+import { readOnboardingDismissed } from "../lib/onboarding";
+import "../design-tokens.css";
+
+function formatUsdc(amount: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+    amount,
+  )} USDC`;
+}
+
+function toRecentStream(record: StreamRecord): Stream {
+  return {
+    name: record.name,
+    id: record.id,
+    recipient: record.recipientAddress || record.recipientName,
+    rate: `${formatUsdc(record.monthlyRate)} / mo`,
+    status: record.status,
+  };
+}
+
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [streams] = useState<Stream[]>([]);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    variant: ToastVariant;
+  } | null>(null);
+  const [withdrawable, setWithdrawable] = useState<number | null>(null);
+  const { announcement, announce } = useLiveAnnouncer();
+  const wallet = useWallet();
+  const walletConnected = wallet.connected;
+  const walletAddress = wallet.address;
+  const treasury = useTreasury();
+  const { loading, error, refetch } = treasury;
+  const streams = useMemo<Stream[]>(
+    () => treasury.streams.map(toRecentStream),
+    [treasury.streams],
+  );
+  const totalStreaming = useMemo(
+    () =>
+      treasury.streams
+        .filter((record) => record.status === "Active")
+        .reduce((sum, record) => sum + record.depositAmount, 0),
+    [treasury.streams],
+  );
 
   useEffect(() => {
-    // Demo: simulate async fetch — remove when wiring real fetch.
-    const t = setTimeout(() => {
-      // For testing empty state, we keep it empty. 
-      // To see the data state, uncomment the following:
-      /*
-      setStreams([
-        {
-          id: "STR-001",
-          name: "Dev Grant - Alice",
-          recipient: "GABC...xyz1",
-          rate: "5,000 USDC/mo",
-          status: "Active",
-        },
-        {
-          id: "STR-002",
-          name: "Marketing Budget",
-          recipient: "GDEF...abc2",
-          rate: "3,200 USDC/mo",
-          status: "Active",
-        },
-      ]);
-      */
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(t);
-  }, []);
+    setWithdrawable(walletConnected ? 22600 : null);
+  }, [walletConnected]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timer = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!loading && streams.length === 0 && !readOnboardingDismissed()) {
+      setShowOnboarding(true);
+    }
+
+    if (!loading && streams.length > 0) {
+      announce(`${streams.length} active streams loaded.`);
+    }
+  }, [loading, streams.length, announce]);
+
+  useEffect(() => {
+    if (walletConnected && walletAddress) {
+      announce(
+        `Wallet connected: ${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`,
+      );
+    }
+  }, [walletConnected, walletAddress, announce]);
+
+  useEffect(() => {
+    if (withdrawable !== null) {
+      announce(
+        `Available balance updated to ${withdrawable.toLocaleString()} USDC.`,
+      );
+    }
+  }, [withdrawable, announce]);
+
+  const handleDismissOnboarding = () => {
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingCreateStream = () => {
+    setShowOnboarding(false);
+    setIsModalOpen(true);
+  };
+
+  const handleStreamCreated = () => {
+    setIsModalOpen(false);
+    setToast({
+      message:
+        "Stream created successfully. Review the new stream from the treasury overview.",
+      variant: "success",
+    });
+  };
+
+  const handleWalletProviderUnavailable = (providerName: string) => {
+    setIsWalletModalOpen(false);
+    setToast({
+      message: `${providerName} connection is not available in this demo yet. Try again once wallet integration is enabled.`,
+      variant: "error",
+    });
+  };
 
   if (loading) return <TreasuryOverviewLoading />;
 
   const hasStreams = streams.length > 0;
+  const hasError = !!error;
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Treasury overview</h1>
-      <p style={{ color: "var(--muted)" }}>
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+
+      <h1 className="text-heading-1" style={{ marginTop: 0 }}>
+        Treasury overview
+      </h1>
+      <p className="text-body-lg" style={{ color: "var(--muted)" }}>
         Treasury overview and active stream summary. Connect your wallet to see
         real-time capital flow.
       </p>
+
+      {!walletConnected && !showOnboarding && (
+        <div style={walletBannerStyle} role="alert" aria-live="polite">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.625rem",
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+              style={{ color: "var(--status-warning)", flexShrink: 0 }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="text-body-md" style={{ color: "var(--text)" }}>
+              Connect your Stellar wallet to see real balances and create
+              streams.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => setIsWalletModalOpen(true)}
+            aria-label="Connect Stellar wallet"
+          >
+            Connect wallet
+          </button>
+        </div>
+      )}
+
       <div style={cardGrid}>
         <div style={card}>
-          <div style={cardLabel}>Active Streams</div>
-          <div style={cardValue}>{streams.length || "—"}</div>
+          <div
+            className="text-label-md"
+            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
+          >
+            Active Streams
+          </div>
+          <div className="text-heading-2">{streams.length || "--"}</div>
         </div>
         <div style={card}>
-          <div style={cardLabel}>Total Streaming</div>
-          <div style={cardValue}>— USDC</div>
+          <div
+            className="text-label-md"
+            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
+          >
+            Total Streaming
+          </div>
+          <div className="text-heading-2">
+            {totalStreaming > 0 ? formatUsdc(totalStreaming) : "-- USDC"}
+          </div>
         </div>
         <div style={card}>
-          <div style={cardLabel}>Withdrawable</div>
-          <div style={cardValue}>— USDC</div>
+          <div
+            className="text-label-md"
+            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
+          >
+            Withdrawable
+          </div>
+          <div className="text-heading-2">
+            {withdrawable !== null
+              ? `${withdrawable.toLocaleString()} USDC`
+              : "-- USDC"}
+          </div>
         </div>
       </div>
+
+      {hasError && (
+        <div role="alert" style={walletBannerStyle}>
+          <span style={{ color: "var(--text)" }}>{error}</span>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={refetch}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {hasStreams ? (
         <>
           <RecentStreams streams={streams} />
           <button
             type="button"
-            style={createBtnStyle}
+            className="button button--primary"
             onClick={() => setIsModalOpen(true)}
             aria-label="Create stream"
           >
             Create stream
           </button>
         </>
+      ) : showOnboarding ? (
+        <TreasuryOnboarding
+          walletConnected={walletConnected}
+          walletAddress={walletAddress}
+          onConnectWallet={() => setIsWalletModalOpen(true)}
+          onCreateStream={handleOnboardingCreateStream}
+          onDismiss={handleDismissOnboarding}
+        />
       ) : (
         <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} />
       )}
@@ -82,24 +258,42 @@ export default function Dashboard() {
       <CreateStreamModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onStreamCreated={handleStreamCreated}
       />
+
+      <ConnectWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        onConnectFreighter={() => handleWalletProviderUnavailable("Freighter")}
+        onConnectAlbedo={() => handleWalletProviderUnavailable("Albedo")}
+        onConnectWalletConnect={() =>
+          handleWalletProviderUnavailable("WalletConnect")
+        }
+      />
+
+      {toast ? (
+        <ToastNotification
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
-const createBtnStyle: React.CSSProperties = {
+const walletBannerStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: "0.5rem",
-  background: "var(--accent)",
-  color: "#ffffff",
-  border: "none",
-  padding: "0.625rem 1.25rem",
-  borderRadius: "8px",
-  fontWeight: 600,
-  fontSize: "1rem",
-  cursor: "pointer",
-  boxShadow: "0 4px 24px rgba(0, 212, 170, 0.4)",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
+  gap: "0.75rem",
+  background: "rgba(245, 158, 11, 0.06)",
+  border: "1px solid rgba(245, 158, 11, 0.25)",
+  borderRadius: "10px",
+  padding: "0.75rem 1rem",
+  marginTop: "0.75rem",
+  marginBottom: "0.25rem",
 };
 
 const cardGrid: React.CSSProperties = {
@@ -114,15 +308,4 @@ const card: React.CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: 12,
   padding: "1.25rem",
-};
-
-const cardLabel: React.CSSProperties = {
-  fontSize: "0.875rem",
-  color: "var(--muted)",
-  marginBottom: "0.25rem",
-};
-
-const cardValue: React.CSSProperties = {
-  fontSize: "1.5rem",
-  fontWeight: 600,
 };

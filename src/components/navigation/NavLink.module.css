@@ -1,0 +1,139 @@
+/**
+ * Navigation Item Styles
+ * ──────────────────────────────────────
+ * Implements DESIGN_SPEC.md § 4.2 Navigation specifications
+ * Includes all states: default, hover, active, focus
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   BASE NAV ITEM STYLE
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem {
+  /* Layout */
+  display: flex;
+  align-items: center;
+  height: 44px; /* Touch-friendly minimum */
+  padding: var(--space-md) var(--space-sm); /* 12px 8px vertical, 8px horizontal */
+  
+  /* Typography */
+  font: var(--font-body-md); /* 400 14px/20px */
+  color: var(--color-text-tertiary);
+  
+  /* Border */
+  border-left: 3px solid transparent;
+  
+  /* Interaction */
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition-base);
+  position: relative;
+  white-space: nowrap;
+  
+  /* Remove default link color */
+  color: var(--color-text-tertiary);
+  
+  /* Accessibility */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ICON STYLING
+   ═══════════════════════════════════════════════════════════ */
+
+.navIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-right: var(--space-sm); /* 8px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-base);
+}
+
+.navItem:hover .navIcon {
+  color: var(--color-text-secondary);
+}
+
+.navItem[aria-current="page"] .navIcon {
+  color: var(--color-accent-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LABEL / TEXT
+   ═══════════════════════════════════════════════════════════ */
+
+.navLabel {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HOVER STATE
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem:not([aria-current="page"]):hover {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  border-left-color: var(--color-accent-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACTIVE STATE (aria-current="page")
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem[aria-current="page"] {
+  background-color: transparent;
+  color: var(--color-accent-secondary);
+  border-left-color: var(--color-accent-secondary);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FOCUS STATE (Keyboard Navigation)
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DISABLED STATE
+   ═══════════════════════════════════════════════════════════ */
+
+.navItem[aria-disabled="true"] {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REDUCED MOTION SUPPORT
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .navItem {
+    transition: none;
+  }
+  
+  .navIcon {
+    transition: none;
+  }
+}
+
+/* Secondary/utility nav items — reduced visual weight */
+.navItemSecondary {
+  color: var(--nav-secondary-color);
+  font: var(--nav-secondary-font);
+}
+
+.navItemSecondary:hover {
+  color: var(--nav-secondary-color-hover);
+}

@@ -1,25 +1,86 @@
-import { streams } from "./sample-streams.tsx"; 
+import { useRef, useState } from "react";
 import StreamRow from "./StreamRow";
 import { Stream } from "./Stream";
 
-export default function StreamsTable() {
+export default function StreamsTable({ streams }: { streams: Stream[] }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+
+  /**
+   * Arrow-key navigation within the table body.
+   * Up/Down moves focus between rows; Home/End jump to first/last.
+   * This satisfies WCAG 2.1 SC 2.1.1 (Keyboard) and the grid pattern.
+   */
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTableSectionElement>) {
+    const rows = Array.from(
+      tbodyRef.current?.querySelectorAll<HTMLTableRowElement>("tr[tabindex]") ?? []
+    );
+    const focused = document.activeElement as HTMLElement;
+    const idx = rows.indexOf(focused as HTMLTableRowElement);
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      rows[Math.min(idx + 1, rows.length - 1)]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      rows[Math.max(idx - 1, 0)]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      rows[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      rows[rows.length - 1]?.focus();
+    }
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
+    <div
+      className="overflow-x-auto rounded-lg"
+      style={{ border: "1px solid var(--color-border-default)" }}
+    >
+      <table
+        className="w-full text-left border-collapse"
+        role="grid"
+        aria-label="Active streams"
+        aria-rowcount={streams.length}
+      >
         <thead>
-          <tr className="text-gray-500 text-sm border-b border-gray-200">
-            <th className="py-2">STREAM</th>
-            <th className="py-2">RECIPIENT</th>
-            <th className="py-2">RATE</th>
-            <th className="py-2">STATUS</th>
-            <th className="py-2">ACTION</th>
+          <tr
+            style={{
+              backgroundColor: "var(--color-surface-raised)",
+              color: "var(--color-text-muted)",
+              fontSize: "12px",
+              fontWeight: "600",
+              letterSpacing: "0.05em",
+            }}
+          >
+            <th scope="col" className="py-4 px-3">STREAM</th>
+            <th scope="col" className="py-4 px-3">RECIPIENT</th>
+            <th scope="col" className="py-4 px-3">RATE</th>
+            <th scope="col" className="py-4 px-3">STATUS</th>
+            <th scope="col" className="py-4 px-3">ACTION</th>
           </tr>
         </thead>
 
-        <tbody>
-          {streams.map((s: Stream, i: number) => (
-            <StreamRow key={i} stream={s} />
-          ))}
+        <tbody ref={tbodyRef} onKeyDown={handleKeyDown}>
+          {streams.length > 0 ? (
+            streams.map((s: Stream) => (
+              <StreamRow
+                key={s.id}
+                stream={s}
+                isSelected={selectedId === s.id}
+                onSelect={(id) =>
+                  setSelectedId((prev) => (prev === id ? null : id))
+                }
+              />
+            ))
+          ) : (
+            <tr>
+              <td colSpan={5} className="py-4 px-3 text-gray-500">
+                No recent streams available.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

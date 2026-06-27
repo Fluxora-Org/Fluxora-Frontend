@@ -14,7 +14,7 @@
   background: #0d1421;
   border: 1px solid #1e2d42;
   border-radius: 20px;
-  
+
   width: 558.6px;
   padding: 2.5rem;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
@@ -23,6 +23,39 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.closeButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: #99a1af;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.closeButton:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #0d1421,
+    0 0 0 4px #0ea5e9;
 }
 
 .successIconWrapper {
@@ -48,7 +81,7 @@
 
 .description {
   font-size: 1rem;
-  color: #99A1AF;
+  color: #99a1af;
   line-height: 1.5;
   margin: 0 0 2rem;
   max-width: 400px;
@@ -76,7 +109,7 @@
 }
 
 .streamIdValue {
-  color: #00B8D4;
+  color: #00b8d4;
   font-weight: 700;
   font-size: 1.25rem;
 }
@@ -125,7 +158,7 @@
 
 .nextStepsBox {
   width: 100%;
-  background: #1C398E33;
+  background: #1c398e33;
   border-radius: 12px;
   padding: 1.25rem;
   text-align: left;
@@ -135,12 +168,12 @@
 .nextStepsTitle {
   display: block;
   font-weight: 700;
-  color: #8EC5FF;
+  color: #8ec5ff;
   margin-bottom: 0.5rem;
 }
 
 .nextStepsText {
-  color: #8EC5FF;
+  color: #8ec5ff;
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -167,7 +200,7 @@
 }
 
 .btnSecondary {
-  background: #2626264D;
+  background: #2626264d;
   color: #ffffff;
 }
 
@@ -176,7 +209,7 @@
 }
 
 .btnPrimary {
-  background: #00B8D4;
+  background: #00b8d4;
   color: #ffffff;
 }
 
@@ -195,3 +228,26 @@
     font-size: 1.5rem;
   }
 }
+
+.popupBlockedMessage {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.fallbackLink {
+  color: #60a5fa;
+  text-decoration: underline;
+  margin-left: 0.5rem;
+}
+
+.fallbackLink:hover {
+  color: #93c5fd;
+}
+

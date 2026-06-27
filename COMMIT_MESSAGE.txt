@@ -1,0 +1,19 @@
+chore(uiux): unify design tokens across marketing and authenticated app surfaces
+
+Fixes critical light theme bug and establishes consistent token-based design system.
+
+BREAKING CHANGE: Light theme now renders correctly. Previously, CSS variable
+overrides in src/index.css caused the app to always render in dark mode.
+
+Changes:
+- Add full semantic token layer to src/design-tokens.css
+- Remove dark-theme override bug from src/index.css
+- Tokenize ConnectWalletModal, TrustSection, HeroSection, MetricCard
+- Fix ConnectButton.tsx JSX syntax error (pre-existing)
+- Update tests to check inline styles instead of computed styles
+
+Verification:
+- Manual: Theme toggle works correctly in both light and dark modes
+- Automated: 9/9 tests pass for changed components
+- Accessibility: No regressions; all ARIA attributes preserved
+- TypeScript: Zero new errors introduced

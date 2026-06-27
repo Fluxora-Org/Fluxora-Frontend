@@ -1,0 +1,751 @@
+/**
+ * Design Tokens: Base + Theme Overrides
+ * ──────────────────────────────────────
+ *
+ * Single source of truth for all visual attributes:
+ * colors, typography, spacing, shadows, animations.
+ *
+ * Usage:
+ * .my-element {
+ * background: var(--color-bg-primary);
+ * padding: var(--space-lg);
+ * }
+ *
+ * Theme switching:
+ * document.documentElement.setAttribute("data-theme", "dark");
+ * document.documentElement.setAttribute("data-theme", "light");
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   1. COLOR TOKENS – LIGHT THEME (default)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ===== SURFACES ===== */
+  --surface-base: #ffffff;
+  --surface-sunken: #f5f7fa;
+  --surface-neutral: #fafbfc;
+  --surface-elevated: #f0f3f7;
+  --surface-raised: #e8ecf1;
+  --surface-highest: #dfe5ed;
+
+/* Icon sizes */
+--icon-size-xs: 16px;   /* inline */
+--icon-size-sm: 20px;   /* button/label */
+--icon-size-md: 24px;   /* standalone */
+--icon-size-lg: 32px;   /* hero/empty-state */
+
+/* Utility classes for icon sizing */
+.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
+.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
+.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); }
+.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+
+  /* ===== TEXT ===== */
+  --text-vivid: #1a1f36;
+  --text-secondary: #4a5565;
+  --text-muted: #6b7a94;
+  --text-disabled: #b8bec9;
+
+  /* ===== BORDERS ===== */
+  --border-strong: #d0d7e0;
+  --border-neutral: #e0e6ed;
+  --border-subtle: #ececec;
+  --border-subtle-opacity: 0.5;
+  --border-interactive: #00a884;
+
+  /* ===== STATUS ===== */
+  --status-success: #1ec98e;
+  --status-error: #ff6b6b;
+  --status-warning: #ffa726;
+  --status-info: #00b8d4;
+
+    /* ─── Component-friendly semantic status tokens (dark) ─── */
+    --status-success: var(--color-success);
+    --status-warning: var(--color-warning);
+    --status-error: var(--color-danger);
+    --status-info: var(--color-info);
+
+    --status-success-bg: var(--color-success-bg);
+    --status-warning-bg: var(--color-warning-bg);
+    --status-error-bg: var(--color-danger-bg);
+    --status-info-bg: var(--color-info-bg);
+  /* ===== INTERACTIVE ===== */
+  --interactive-bg-default: #f0f3f7;
+  --interactive-bg-hover: #e8ecf1;
+  --interactive-bg-active: #dfe5ed;
+  --interactive-bg-disabled: #fafbfc;
+
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(14, 165, 233, 0.1);
+  
+  /* Dual-layer focus ring (outline + box-shadow for visibility) */
+  --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
+                       0 0 0 4px var(--focus-ring-color);
+  
+  /* Inset variant for overflow-clipped containers */
+  --focus-ring-shadow-inset: inset 0 0 0 2px var(--focus-ring-color);
+  
+  /* Input-specific focus (border + subtle glow) */
+  --focus-ring-input-border: 2px solid var(--focus-ring-color);
+  --focus-ring-input-shadow: 0 0 0 3px var(--focus-ring-halo);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
+
+  /* ===== SEMANTIC COLOR TOKENS (used by components) ===== */
+  /* Backgrounds */
+  --color-bg-primary: var(--surface-base);
+  --color-bg-secondary: var(--surface-sunken);
+  --color-bg-tertiary: var(--surface-elevated);
+
+  /* Surfaces */
+  --color-surface-default: var(--surface-neutral);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-highest: var(--surface-highest);
+
+  /* Borders */
+  --color-border-default: var(--border-neutral);
+  --color-border-secondary: var(--border-strong);
+
+  /* Text */
+  --color-text-primary: var(--text-vivid);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-muted);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: #ffffff;
+
+  /* Focus */
+  --color-focus: var(--focus-ring-color); /* Alias for consistency */
+
+  /* Status (semantic aliases) */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  --color-error-border: #DC2626;
+  --color-error-text: #B91C1C;
+  --color-error-bg: #FEF2F2;
+
+  /* ===== LEGACY / COMPATIBILITY MAP ===== */
+  /* These keep existing components working without changes */
+  --bg: var(--surface-base);
+  --surface: var(--surface-neutral);
+  --surface-elevated-legacy: var(--surface-elevated);
+  --surface-raised-legacy: var(--surface-raised);
+  --surface-highest-legacy: var(--surface-highest);
+  --primary: #00b8d4;
+  --accent: #00d4aa;
+  --accent-dim: #00a884;
+  --danger: #ef4444;
+  --border: var(--border-neutral);
+  --text: var(--text-vivid);
+  --muted: var(--text-muted);
+
+  /* ─── Interactive / Brand ─── */
+  --color-accent-primary: #00b8d4;
+  --color-accent-secondary: #00d4aa;
+  --color-accent-primary-dark: #0097a7;
+  --color-accent-secondary-dark: #00a884;
+  --color-accent-primary-darkest: #006f7a;
+
+  /* ─── Status Hover/Active Variants ─── */
+  --color-danger-hover: #dc2626;
+  --color-danger-active: #bb2124;
+  --color-success-hover: #059669;
+  --color-success-active: #047857;
+
+  /* ─── Recipient Page ─── */
+  --recipient-title-text: #f5f8ff;
+  --recipient-border: #29364b;
+  --recipient-header-text: #9aabc9;
+  --recipient-body-text: #eef3ff;
+
+  /* ─── Semantic CTA Tokens ─── */
+  --color-cta-primary-bg: var(--color-accent-primary);
+  --color-cta-primary-bg-hover: var(--color-accent-primary-dark);
+  --color-cta-primary-bg-active: var(--color-accent-primary-darkest);
+  --color-cta-primary-text: #04131a;
+  --color-cta-secondary-bg: var(--color-surface-default);
+  --color-cta-secondary-border: var(--color-border-default);
+  --color-cta-secondary-text: var(--color-text-secondary);
+
+  /* ─── Status Background Tints ─── */
+  --color-success-bg: rgba(30, 201, 142, 0.1);
+  --color-warning-bg: rgba(255, 167, 38, 0.1);
+  --color-danger-bg: rgba(255, 107, 107, 0.1);
+  --color-info-bg: rgba(0, 184, 212, 0.1);
+
+  /* ─── Skeleton Loading ─── */
+  --skeleton-base: #e6edf5;
+  --skeleton-shine: #ffffff;
+
+  /* ─── Tooltip ─── */
+  --tooltip-bg: var(--surface-elevated);
+  --tooltip-border: var(--border-neutral);
+  --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --tooltip-title-color: var(--text-vivid);
+  --tooltip-text-color: var(--text-secondary);
+  --tooltip-z-index: 1100;
+
+  /* ─── Inline Unit Badge (for input suffixes) ─── */
+  --input-badge-bg: var(--surface-neutral);
+  --input-badge-color: var(--text-muted);
+  --input-badge-padding: 4px 8px;
+  --input-badge-border-radius: 4px;
+
+  /* ─── Info Icon ─── */
+  --icon-info-default: var(--text-muted);
+  --icon-info-hover: var(--accent);
+  --icon-info-active: var(--accent-dim);
+  --icon-info-size: 16px;
+
+  /* Navbar */
+  --navbar-bg: #ffffff;
+  --navbar-border: #e0e6ed;
+  --navbar-logo-color: #1a1f36;
+  --navbar-link-color: #4a5565;
+  --navbar-icon-color: #6b7a94;
+  --navbar-icon-border: #d0d7e0;
+  --navbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* CTA */
+  --cta-bg: #00d4aa;
+  --cta-shadow: 0 4px 12px rgba(0, 212, 170, 0.2);
+
+  /* Network */
+  --network-testnet-bg: #fef3c7;
+  --network-testnet-text: #92400e;
+
+  /* Recipient Page */
+  --recipient-title-text: #f5f8ff;
+  --recipient-border: #29364b;
+  --recipient-header-text: #9aabc9;
+  --recipient-body-text: #eef3ff;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. COLOR TOKENS – DARK THEME (override via data-theme)
+   ═══════════════════════════════════════════════════════════ */
+
+:root[data-theme="dark"] {
+  /* ===== SURFACES ===== */
+  --surface-base: #0a0e17;
+  --surface-sunken: #0f1624;
+  --surface-neutral: #121a2a;
+  --surface-elevated: #151e2e;
+  --surface-raised: #192436;
+  --surface-highest: #1e2c40;
+
+  /* ===== TEXT ===== */
+  --text-vivid: #e8ecf4;
+  --text-secondary: #b0b8c9;
+  --text-muted: #6b7a94;
+  --text-disabled: #3d4559;
+
+  /* ===== BORDERS ===== */
+  --border-strong: #1e2d42;
+  --border-neutral: #192436;
+  --border-subtle: #151e2e;
+  --border-subtle-opacity: 0.5;
+  --border-interactive: #00b8d4;
+
+  /* ===== STATUS ===== */
+  --status-success: #1ec98e;
+  --status-error: #ff6b6b;
+  --status-warning: #ffa726;
+  --status-info: #00b8d4;
+
+  /* ===== INTERACTIVE ===== */
+  --interactive-bg-default: #192436;
+  --interactive-bg-hover: #1e3448;
+  --interactive-bg-active: #2a4563;
+  --interactive-bg-disabled: #0f1624;
+
+  /* ─── Focus Ring System (Dark Theme) ─── */
+  --focus-ring-color: #00d4aa; /* Teal - 6.2:1 contrast vs surface-elevated */
+  --focus-ring-halo: rgba(0, 212, 170, 0.15);
+  
+  /* Legacy aliases (backward compatibility) */
+  --interactive-focus-ring: var(--focus-ring-color);
+  --interactive-focus-ring-offset: var(--focus-ring-offset);
+
+  /* ===== SEMANTIC COLOR TOKENS (dark overrides) ===== */
+  /* Backgrounds */
+  --color-bg-primary: var(--surface-base);
+  --color-bg-secondary: var(--surface-sunken);
+  --color-bg-tertiary: var(--surface-elevated);
+
+  /* Surfaces */
+  --color-surface-default: var(--surface-neutral);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-highest: var(--surface-highest);
+
+  /* Borders */
+  --color-border-default: var(--border-neutral);
+  --color-border-secondary: var(--border-strong);
+
+  /* Text */
+  --color-text-primary: var(--text-vivid);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-muted);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: #0a0e17;
+
+  /* Focus */
+  --color-focus: var(--focus-ring-color); /* Teal for dark theme */
+
+  /* Status (semantic aliases) */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  --color-error-border: #EF4444;
+  --color-error-text: #FCA5A5;
+  --color-error-bg: rgba(220, 38, 38, 0.1);
+
+  /* ===== LEGACY / COMPATIBILITY MAP ===== */
+  --bg: var(--surface-base);
+  --surface: var(--surface-neutral);
+  --primary: #00b8d4;
+  --accent: #00d4aa;
+  --accent-dim: #00a884;
+  --danger: #ff6b6b;
+  --border: var(--border-neutral);
+  --text: var(--text-vivid);
+  --muted: var(--text-muted);
+
+  /* ─── Status Background Tints ─── */
+  --color-success-bg: rgba(30, 201, 142, 0.15);
+  --color-warning-bg: rgba(255, 167, 38, 0.15);
+  --color-danger-bg: rgba(255, 107, 107, 0.15);
+  --color-info-bg: rgba(0, 184, 212, 0.15);
+
+  /* ─── Skeleton Loading ─── */
+  --skeleton-base: #1f2a3e;
+  --skeleton-shine: #38516f;
+
+  /* ─── Tooltip (dark theme) ─── */
+  --tooltip-bg: #2a2f3a;
+  --tooltip-border: #404854;
+  --tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* ─── Inline Unit Badge (dark theme) ─── */
+  --input-badge-bg: #1f242c;
+  --input-badge-color: #9ca5b4;
+
+  /* Navbar */
+  --navbar-bg: #0f1419;
+  --navbar-border: #1a2534;
+  --navbar-logo-color: #e8ecf4;
+  --navbar-link-color: #9ca3af;
+  --navbar-icon-color: #9ca3af;
+  --navbar-icon-border: #374151;
+  --navbar-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  /* CTA */
+  --cta-bg: #00d4aa;
+  --cta-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+
+  /* Network */
+  --network-testnet-bg: rgba(250, 224, 141, 0.15);
+  --network-testnet-text: #fbd96a;
+
+  /* Recipient Page */
+  --recipient-title-text: var(--text-vivid);
+  --recipient-border: var(--border-neutral);
+  --recipient-header-text: var(--text-muted);
+  --recipient-body-text: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. TYPOGRAPHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --font-family-base: "Plus Jakarta Sans", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+
+  /* ─── Heading Scale ─── */
+  --font-heading-1: 500 36px / 44px var(--font-family-base);
+  --font-heading-2: 600 24px / 32px var(--font-family-base);
+  --font-heading-3: 600 18px / 28px var(--font-family-base);
+  --font-heading-4: 600 16px / 24px var(--font-family-base);
+
+  /* ─── Body Scale ─── */
+  --font-body-lg: 400 16px / 24px var(--font-family-base);
+  --font-body-md: 400 14px / 20px var(--font-family-base);
+  --font-body-sm: 400 12px / 16px var(--font-family-base);
+
+  /* ─── Labels & Controls ─── */
+  --font-label-lg: 500 14px / 20px var(--font-family-base);
+  --font-label-md: 500 12px / 16px var(--font-family-base);
+  --font-label-sm: 500 11px / 14px var(--font-family-base);
+
+  /* ─── Code / Monospace ─── */
+  --font-mono-sm: 400 12px / 16px var(--font-family-mono);
+
+  /* ─── Letter Spacing ─── */
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. SPACING TOKENS (8px base scale)
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. BORDER RADIUS TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. SHADOWS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  --focus-ring: 0 0 0 2px var(--color-bg-primary),
+    0 0 0 4px var(--color-focus);
+    
+  --shadow-error-focus: 0 0 0 3px rgba(220, 38, 38, 0.2);
+
+  /* ─── Accent-specific shadows ─── */
+  --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.2);
+  --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.2);
+  --shadow-cta-primary: var(--shadow-accent-primary);
+  --shadow-cta-primary-hover: 0 8px 16px rgba(0, 184, 212, 0.3);
+}
+
+/* Dark theme shadow adjustments */
+:root[data-theme="dark"] {
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  
+  --shadow-error-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);
+
+  --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.25);
+  --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.25);
+  --shadow-cta-primary: var(--shadow-accent-primary);
+  --shadow-cta-primary-hover: 0 8px 16px rgba(0, 184, 212, 0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. TRANSITIONS & ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 200ms ease-in-out;
+  --transition-slow: 300ms ease-in-out;
+
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+  --ease-cubic: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /* Component motion tokens */
+  --motion-duration-stream-disclosure: 200ms;
+  --motion-ease-stream-disclosure: var(--ease-out);
+}
+
+/* ─── Pulse animation (skeletons, loaders) ─── */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ─── Shimmer animation (skeleton loading) ─── */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ─── Spin animation (loading spinners) ─── */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Modal entrance animation ─── */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Modal exit animation ─── */
+@keyframes modalExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. SHARED UI COMPONENT CLASSES
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * .ui-primary-cta
+ * Primary call-to-action button — used on both landing and app surfaces.
+ * Keeps visual language consistent across marketing and authenticated views.
+ */
+.ui-primary-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-cta-primary-bg);
+  color: var(--color-cta-primary-text);
+  font: var(--font-label-lg);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: var(--shadow-cta-primary);
+  transition:
+    background-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.ui-primary-cta:hover {
+  background: var(--color-cta-primary-bg-hover);
+  box-shadow: var(--shadow-cta-primary-hover);
+}
+
+.ui-primary-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--shadow-cta-primary-hover);
+}
+
+.ui-primary-cta:active {
+  background: var(--color-cta-primary-bg-active);
+}
+
+.ui-primary-cta:disabled {
+  background: color-mix(
+    in srgb,
+    var(--color-text-tertiary) 40%,
+    transparent
+  );
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.ui-primary-cta--compact {
+  min-height: 36px;
+  padding: var(--space-sm) var(--space-lg);
+  font: var(--font-label-md);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/**
+ * .ui-secondary-control
+ * Secondary/ghost button — used alongside primary CTAs.
+ */
+.ui-secondary-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-cta-secondary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-cta-secondary-bg);
+  color: var(--color-cta-secondary-text);
+  font: var(--font-label-lg);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.ui-secondary-control:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+}
+
+.ui-secondary-control:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NAVIGATION HIERARCHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Primary nav items (Dashboard, Streams, Recipient) ─── */
+  --nav-primary-color: var(--navbar-link-color);
+  --nav-primary-color-hover: var(--color-text-primary);
+  --nav-primary-color-active: var(--color-accent-secondary);
+  --nav-primary-bg-hover: var(--color-surface-raised);
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+  --nav-primary-font: var(--font-label-lg);
+  --nav-primary-border-active: 2px solid var(--color-accent-secondary);
+
+  /* ─── Secondary/utility nav items (Settings, Help) ─── */
+  --nav-secondary-color: var(--color-text-muted);
+  --nav-secondary-color-hover: var(--color-text-secondary);
+  --nav-secondary-font: var(--font-label-md);
+
+  /* ─── Breadcrumb ─── */
+  --breadcrumb-color: var(--color-text-tertiary);
+  --breadcrumb-color-hover: var(--color-text-primary);
+  --breadcrumb-color-current: var(--color-text-primary);
+  --breadcrumb-separator-color: var(--color-text-muted);
+  --breadcrumb-font: var(--font-body-sm);
+  --breadcrumb-gap: var(--space-sm);
+  --breadcrumb-focus-ring: var(--focus-ring);
+}
+
+:root[data-theme="dark"] {
+  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 15%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. BREAKPOINTS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --breakpoint-xs: 320px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. STREAM TIMELINE TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Timeline bar segments */
+  --timeline-segment-cliff-color: var(--color-warning, #f59e0b);
+  --timeline-segment-cliff-opacity: 0.85;
+  --timeline-segment-accrual-start: #2dd4bf;
+  --timeline-segment-accrual-end: #0ea5e9;
+  --timeline-segment-accrual-opacity: 0.95;
+  --timeline-segment-remaining-bg: var(--color-surface-raised, #e8ecf1);
+  --timeline-segment-remaining-opacity: 0.6;
+
+  /* Marker and animations */
+  --timeline-marker-color: var(--color-text-primary, #1a1f36);
+  --timeline-marker-pulse: 2s ease-in-out infinite;
+
+  /* Status-specific overrides */
+  --timeline-status-active: inherit;
+  --timeline-status-completed: var(--color-success, #10b981);
+  --timeline-status-paused: grayscale(50%);
+
+  /* Responsive dimensions */
+  --timeline-bar-height-mobile: 36px;
+  --timeline-bar-height-tablet: 56px;
+  --timeline-bar-height-desktop: 64px;
+  --timeline-label-gap: 0.5rem;
+  --timeline-legend-gap: 1rem;
+}
+
+[data-theme="dark"] {
+  --timeline-segment-cliff-opacity: 0.9;
+  --timeline-segment-accrual-opacity: 1;
+  --timeline-segment-remaining-bg: var(--color-surface-raised, #3a4556);
+  --timeline-segment-remaining-opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. FOCUS / ACCESSIBILITY
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Comprehensive focus outline and offset */
+  --focus-outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  --focus-outline-offset: var(--focus-ring-offset);
+}
+
+/* ─── High Contrast Mode Support ─── */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring-width: 3px;
+    --focus-ring-offset: 3px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   11. RESPONSIVE MOTION (prefers-reduced-motion)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-stream-disclosure: 0ms;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

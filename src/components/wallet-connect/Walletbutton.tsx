@@ -1,17 +1,13 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
-import WalletConnectModal from "./Walletconnectmodal";
+import ConnectWalletModal from "../ConnectWalletModal";
 
 import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { stellarExplorerUrl } from "../../lib/stellar";
 
 function truncate(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
-function explorerUrl(address: string, network: string | null) {
-  const net = network === "PUBLIC" ? "public" : "testnet";
-  return `https://stellar.expert/explorer/${net}/account/${address}`;
 }
 
 export default function WalletButton() {
@@ -20,6 +16,16 @@ export default function WalletButton() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // The canonical ConnectWalletModal performs the Freighter connection and
+  // error handling internally; WalletButton just closes once it succeeds.
+  function handleConnectFreighter() {
+    setModalOpen(false);
+  }
+
+  function handleOpenModal() {
+    setModalOpen(true);
+  }
 
   function handleCopy() {
     if (!address) return;
@@ -30,7 +36,7 @@ export default function WalletButton() {
 
   function handleExplorer() {
     if (!address) return;
-    window.open(explorerUrl(address, network), "_blank", "noopener,noreferrer");
+    window.open(stellarExplorerUrl(address, network), "_blank", "noopener,noreferrer");
     setDropdownOpen(false);
   }
 
@@ -48,14 +54,20 @@ export default function WalletButton() {
     return (
       <>
         <button
-          onClick={() => setModalOpen(true)}
-          className="px-5 py-2 text-sm font-medium text-white rounded-xl bg-red-400 dark:bg-linear-to-br from-[#00B8D4] to-[#0097A7] shadow-[0_0_20px_rgba(6,182,212,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-[#0d1117] cursor-pointer"
+          onClick={handleOpenModal}
+          className="px-4 py-3 text-base font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
+          style={{
+            backgroundColor: "var(--color-accent-primary)",
+            boxShadow: "var(--shadow-accent-primary)",
+          }}
         >
           Connect wallet
         </button>
-        <WalletConnectModal
+        <ConnectWalletModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
+          onConnectFreighter={handleConnectFreighter}
+          showStateSwitcher={false}
         />
       </>
     );
