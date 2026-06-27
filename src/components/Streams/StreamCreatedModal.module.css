@@ -228,3 +228,26 @@
     font-size: 1.5rem;
   }
 }
+
+.popupBlockedMessage {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.fallbackLink {
+  color: #60a5fa;
+  text-decoration: underline;
+  margin-left: 0.5rem;
+}
+
+.fallbackLink:hover {
+  color: #93c5fd;
+}
+
