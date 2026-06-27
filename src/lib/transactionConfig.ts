@@ -49,3 +49,11 @@ export const transactionPollingConfig = {
     ),
   ),
 };
+
+const DEFAULT_BASE_FEE = 100;
+
+export const transactionConfig = {
+  baseFee: Math.floor(
+    readPositiveNumber("VITE_TX_BASE_FEE", DEFAULT_BASE_FEE, { min: 0 })
+  ),
+};

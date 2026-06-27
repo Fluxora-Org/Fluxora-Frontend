@@ -20,6 +20,9 @@ export interface StreamTimelineProps {
  * - Accrual phase (progress fill)
  * - Remaining period (empty)
  *
+ * Preconditions:
+ * - The end date must be strictly after the start date (`totalDuration > 0`).
+ *
  * Accessible to screen readers via:
  * - ARIA labels and descriptions
  * - Text-based summary (hidden but announced)
@@ -44,10 +47,12 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   const end = new Date(endDate);
 
   // Validate dates
+  const totalDuration = end.getTime() - start.getTime();
   if (
     isNaN(start.getTime()) ||
     isNaN(current.getTime()) ||
-    isNaN(end.getTime())
+    isNaN(end.getTime()) ||
+    totalDuration <= 0
   ) {
     return (
       <div
@@ -61,7 +66,6 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   }
 
   // Calculate segments
-  const totalDuration = end.getTime() - start.getTime();
   const cliffEnd = cliff ? cliff.getTime() : start.getTime();
   const currentTime = Math.min(current.getTime(), end.getTime());
 

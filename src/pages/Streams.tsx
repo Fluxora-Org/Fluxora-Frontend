@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useI18n } from "../i18n";
 import CreateStreamModal from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
@@ -47,9 +48,18 @@ const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
 const STREAM_CARD_ESTIMATED_HEIGHT = 420;
 
-function formatUsdc(value: number) {
+/**
+ * Formats a USDC amount with full fractional precision (2 decimal places).
+ * Returns a safe placeholder for NaN or negative inputs.
+ *
+ * @param value - The numeric USDC amount to format.
+ * @returns A locale-aware string such as "1,234.56 USDC".
+ */
+export function formatUsdc(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "— USDC";
   return `${new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)} USDC`;
 }
 
@@ -741,9 +751,16 @@ export default function Streams() {
   const { streamId } = useParams();
   const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
+  const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
 
   const { streams, loading, error, refetch } = useTreasury();
+  const filterLabels: Record<StatusFilter, string> = {
+    All: t("streams.filter.all"),
+    Active: t("streams.filter.active"),
+    Paused: t("streams.filter.paused"),
+    Completed: t("streams.filter.completed"),
+  };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("recent");
@@ -966,10 +983,9 @@ export default function Streams() {
         />
       ) : showEmptyState ? (
         <section>
-          <h1 style={{ marginTop: 0 }}>Streams</h1>
+          <h1 style={{ marginTop: 0 }}>{t("streams.hero.title")}</h1>
           <p style={{ color: "var(--muted)" }}>
-            Create and manage USDC streams. Set rate, duration, and cliff from
-            the treasury.
+            {t("streams.hero.subtitle")}
           </p>
           <EmptyState
             variant="streams"
@@ -985,12 +1001,10 @@ export default function Streams() {
         <>
           <section className="streams-hero">
             <div className="streams-hero__copy">
-              <p className="streams-eyebrow">Treasury streaming</p>
-              <h1>Streams</h1>
+              <p className="streams-eyebrow">{t("streams.hero.eyebrow")}</p>
+              <h1>{t("streams.hero.title")}</h1>
               <p className="streams-subtitle">
-                Review every stream from a single operational surface, then open
-                a deeper layout when treasury context, recipient balance, or
-                audit notes need closer attention.
+                {t("streams.hero.subtitle")}
               </p>
             </div>
             <div className="streams-hero__actions">
@@ -999,14 +1013,14 @@ export default function Streams() {
                 className="streams-primary-button"
                 onClick={handleCreateStream}
               >
-                Create stream
+                {t("streams.hero.createBtn")}
               </button>
               <button
                 type="button"
                 className="streams-secondary-button"
                 onClick={() => navigate(`/app/streams/${streams[0]?.id}`)}
               >
-                Open featured deep dive
+                {t("streams.hero.featuredBtn")}
               </button>
             </div>
           </section>
@@ -1026,44 +1040,43 @@ export default function Streams() {
             </div>
           )}
 
-          <section className="streams-summary-grid" aria-label="Stream summary">
+          <section className="streams-summary-grid" aria-label={t("streams.list.cardsAriaLabel")}>
             <div className="streams-summary-card">
-              <span>Active streams</span>
+              <span>{t("streams.summary.activeStreamsLabel")}</span>
               <strong>{activeStreams.length}</strong>
-              <p>Currently accruing from treasury capital.</p>
+              <p>{t("streams.summary.activeStreamsDesc")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Monthly outflow</span>
+              <span>{t("streams.summary.monthlyOutflowLabel")}</span>
               <strong>{formatUsdc(monthlyOutflow)}</strong>
-              <p>Projected accrual across active streams each month.</p>
+              <p>{t("streams.summary.monthlyOutflowDesc")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Withdrawable now</span>
+              <span>{t("streams.summary.withdrawableNowLabel")}</span>
               <strong>{formatUsdc(withdrawableNow)}</strong>
-              <p>Available to recipients right now without a refill.</p>
+              <p>{t("streams.summary.withdrawableNowDesc")}</p>
             </div>
             <div className="streams-summary-card">
-              <span>Next unlock</span>
+              <span>{t("streams.summary.nextUnlockLabel")}</span>
               <strong>{formatDate(nextUnlock)}</strong>
-              <p>Earliest upcoming release window across active streams.</p>
+              <p>{t("streams.summary.nextUnlockDesc")}</p>
             </div>
           </section>
 
           <section className="streams-list-shell">
             <div className="streams-list-head">
               <div>
-                <h2>Deep-dive ready list</h2>
+                <h2>{t("streams.list.title")}</h2>
                 <p className="streams-subtitle">
-                  Expand a row for the operational summary or open the full
-                  stream detail route for the complete layout.
+                  {t("streams.list.subtitle")}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label="Filter and search streams">
+              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label={t("streams.list.filterAriaLabel")}>
                 <div className="flex-1 min-w-[200px]">
                   <Input
                     id="streams-search"
-                    aria-label="Search streams by name, ID or recipient"
-                    placeholder="Search streams..."
+                    aria-label={t("streams.list.searchAriaLabel")}
+                    placeholder={t("streams.list.searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -1079,21 +1092,21 @@ export default function Streams() {
                       onClick={() => setStatusFilter(filter)}
                       aria-pressed={statusFilter === filter}
                     >
-                      {filter}
+                      {filterLabels[filter]}
                     </button>
                   ))}
                 </div>
                 <div className="min-w-[160px]">
                   <Input
                     id="streams-sort"
-                    aria-label="Sort streams"
+                    aria-label={t("streams.list.sortAriaLabel")}
                     type="select"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     options={[
-                      { value: "recent", label: "Most recent" },
-                      { value: "name", label: "Name (A-Z)" },
-                      { value: "rate", label: "Highest rate" },
+                      { value: "recent", label: t("streams.list.sortRecent") },
+                      { value: "name", label: t("streams.list.sortName") },
+                      { value: "rate", label: t("streams.list.sortRate") },
                     ]}
                   />
                 </div>
@@ -1101,11 +1114,11 @@ export default function Streams() {
             </div>
 
             <VirtualList
-              ariaLabel="Stream cards"
+              ariaLabel={t("streams.list.cardsAriaLabel")}
               className="streams-list"
               emptyState={
                 <div className="streams-empty-search">
-                  <p>No streams match your search or filter.</p>
+                  <p>{t("streams.emptySearch.text")}</p>
                 </div>
               }
               estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
