@@ -3,6 +3,7 @@ import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { webcrypto, randomBytes } from 'node:crypto';
+import { en as mockEn } from '../i18n/en';
 
 // Polyfill Web Crypto API for Stellar SDK / @noble/ed25519 in test environment
 const customCrypto = {
@@ -81,5 +82,61 @@ vi.mock('../components/toast/ToastProvider', () => {
       removeToast: vi.fn(),
     }),
     ToastProvider: ({ children }: any) => children,
+  };
+});
+
+vi.mock('../i18n', () => {
+  return {
+    useI18n: () => ({
+      locale: 'en',
+      t: (key: any, params?: any) => {
+        let resolvedKey = key;
+        if (params && typeof params.count === 'number') {
+          const suffix = params.count === 1 ? '_one' : '_other';
+          const pluralKey = `${key}${suffix}`;
+          if (pluralKey in mockEn) {
+            resolvedKey = pluralKey;
+          }
+        }
+        let val = (mockEn as any)[resolvedKey];
+        if (!val) return resolvedKey;
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+          }
+        }
+        return val;
+      },
+      changeLocale: vi.fn(),
+    }),
+    I18nProvider: ({ children }: any) => children,
+  };
+});
+
+vi.mock('../i18n/index', () => {
+  return {
+    useI18n: () => ({
+      locale: 'en',
+      t: (key: any, params?: any) => {
+        let resolvedKey = key;
+        if (params && typeof params.count === 'number') {
+          const suffix = params.count === 1 ? '_one' : '_other';
+          const pluralKey = `${key}${suffix}`;
+          if (pluralKey in mockEn) {
+            resolvedKey = pluralKey;
+          }
+        }
+        let val = (mockEn as any)[resolvedKey];
+        if (!val) return resolvedKey;
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+          }
+        }
+        return val;
+      },
+      changeLocale: vi.fn(),
+    }),
+    I18nProvider: ({ children }: any) => children,
   };
 });
