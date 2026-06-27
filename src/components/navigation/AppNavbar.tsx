@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
@@ -17,6 +17,28 @@ const ANON_LINKS = [
   { to: "/#docs", label: "Docs" },
   { to: "/#pricing", label: "Pricing" },
 ];
+
+/**
+ * Static label map for known route segments.
+ * Hoisted to module scope so it is never rebuilt per render.
+ */
+const BREADCRUMB_LABEL_MAP: Record<string, string> = {
+  streams: "Streams",
+  recipient: "Recipient",
+  treasury: "Treasury",
+};
+
+/** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
+function isStellarAddressSegment(value: string): boolean {
+  return /^G[ABCDEFGHJKLMNPQRSTUVWXYZ234567]{55}$/.test(value.trim());
+}
+
+/** Masks a Stellar address segment for compact breadcrumb display. */
+function maskAddressSegment(addr: string): string {
+  const t = addr.trim();
+  if (t.length <= 12) return t || "—";
+  return `${t.slice(0, 6)}…${t.slice(-4)}`;
+}
 
 const APP_PRIMARY_LINKS = [
   { to: "/app", label: "Dashboard" },
@@ -93,30 +115,31 @@ function ConnectingSkeleton() {
  * e.g. /app/streams/STR-001 → [Streams, STR-001]
  */
 function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
-  if (!pathname.startsWith("/app")) return [];
+  // Memoized so the label map lookups and per-segment address checks only
+  // re-run when the pathname actually changes, not on every navbar render.
+  return useMemo(() => {
+    if (!pathname.startsWith("/app")) return [];
 
-  const segments = pathname.replace("/app", "").split("/").filter(Boolean);
-  if (segments.length === 0) return [];
+    const segments = pathname.replace("/app", "").split("/").filter(Boolean);
+    if (segments.length === 0) return [];
 
-  const labelMap: Record<string, string> = {
-    streams: "Streams",
-    recipient: "Recipient",
-    treasury: "Treasury",
-  };
+    const items: BreadcrumbItem[] = [];
+    let accumulatedPath = "/app";
 
-  const items: BreadcrumbItem[] = [];
-  let accumulatedPath = "/app";
-
-  segments.forEach((segment, index) => {
-    accumulatedPath += `/${segment}`;
-    const isLast = index === segments.length - 1;
-    items.push({
-      label: labelMap[segment] ?? segment,
-      to: isLast ? undefined : accumulatedPath,
+    segments.forEach((segment, index) => {
+      accumulatedPath += `/${segment}`;
+      const isLast = index === segments.length - 1;
+      const label = isStellarAddressSegment(segment)
+        ? maskAddressSegment(segment)
+        : BREADCRUMB_LABEL_MAP[segment] ?? segment;
+      items.push({
+        label,
+        to: isLast ? undefined : accumulatedPath,
+      });
     });
-  });
 
-  return items;
+    return items;
+  }, [pathname]);
 }
 
 export default function AppNavbar({
