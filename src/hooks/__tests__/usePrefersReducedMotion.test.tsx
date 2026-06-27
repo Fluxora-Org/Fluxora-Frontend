@@ -104,7 +104,7 @@ describe("usePrefersReducedMotion", () => {
   });
 
   it("returns false when matchMedia is unavailable", () => {
-    // @ts-expect-error simulate an older/non-browser test environment
+    // @ts-ignore simulate an older/non-browser test environment
     delete window.matchMedia;
 
     const { result } = renderHook(() => usePrefersReducedMotion());

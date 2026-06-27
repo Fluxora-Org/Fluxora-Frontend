@@ -3,20 +3,16 @@ import { Navigate, useLocation } from "react-router-dom";
 import GlowingDot from "../components/GlowingDot";
 import WalletIcon from "../components/WalletIcon";
 import ConnectWalletModal from "../components/ConnectWalletModal";
+import { sanitizeReturnTo } from "../components/RequireWallet";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
-
-interface ConnectWalletLocationState {
-  returnTo?: string;
-}
 
 export default function ConnectWallet() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCtaFocused, setIsCtaFocused] = useState(false);
   const wallet = useWallet();
   const location = useLocation();
-  const state = location.state as ConnectWalletLocationState | null;
-  const returnTo =
-    state?.returnTo?.startsWith("/app") ? state.returnTo : "/app";
+  const state = location.state as { returnTo?: string } | null;
+  const returnTo = sanitizeReturnTo(state?.returnTo);
 
   useEffect(() => {
     if (!wallet.connected) return;

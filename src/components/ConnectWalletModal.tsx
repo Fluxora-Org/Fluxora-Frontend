@@ -1,10 +1,28 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
-import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
+
+/** Duration (ms) before the Freighter network check is considered hung. */
+const NETWORK_TIMEOUT_MS = 5000;
+
+/**
+ * Wraps a promise with a timeout that rejects after `ms` milliseconds.
+ * The underlying timer is cleared when the promise settles, preventing
+ * unnecessary work after resolution or rejection.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("NETWORK_CHECK_TIMEOUT")), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
 
 interface ConnectWalletModalProps {
   isOpen: boolean;
@@ -13,7 +31,7 @@ interface ConnectWalletModalProps {
   onConnectAlbedo?: () => void;
   onConnectWalletConnect?: () => void;
   // Optional controlled error state to drive the modal view from a parent component
-  errorState?: "not_installed" | "rejected" | "network_mismatch" | null;
+  errorState?: "not_installed" | "rejected" | "network_mismatch" | "network_timeout" | null;
   // Handler for retrying connection
   onRetryConnection?: () => void;
   // Handler for downloading extension
@@ -57,7 +75,7 @@ export default function ConnectWalletModal({
 
   // Internal error state for uncontrolled usage/simulation
   const [internalErrorState, setInternalErrorState] = useState<
-    "not_installed" | "rejected" | "network_mismatch" | null
+    "not_installed" | "rejected" | "network_mismatch" | "network_timeout" | null
   >(null);
 
   // Determine active state (controlled prop takes priority over internal state)
@@ -82,14 +100,16 @@ export default function ConnectWalletModal({
         return;
       }
 
-      const net = await getNetwork();
+      const net = await withTimeout(getNetwork(), NETWORK_TIMEOUT_MS);
       if (net.error || !net.network) {
         setInternalErrorState("rejected");
         return;
       }
 
       const expectedNet = getExpectedStellarNetwork();
-      if (net.network.toUpperCase() !== expectedNet.toUpperCase()) {
+      const actualUpper = net.network.toUpperCase();
+      const expectedUpper = expectedNet.toUpperCase();
+      if (actualUpper !== expectedUpper) {
         setInternalErrorState("network_mismatch");
         return;
       }
@@ -100,8 +120,12 @@ export default function ConnectWalletModal({
         onConnectFreighter();
       }
       onClose();
-    } catch {
-      setInternalErrorState("rejected");
+    } catch (err) {
+      if (err instanceof Error && err.message === "NETWORK_CHECK_TIMEOUT") {
+        setInternalErrorState("network_timeout");
+      } else {
+        setInternalErrorState("rejected");
+      }
     }
   };
 
@@ -482,6 +506,46 @@ export default function ConnectWalletModal({
           </div>
         )}
 
+        {/* ERROR STATE: Network Check Timed Out */}
+        {currentErrorState === "network_timeout" && (
+          <div className={styles.errorContainer} data-testid="error-state-network-timeout">
+            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
+              <Timer size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-timeout">Timed Out</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Network Check Timed Out
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              The network check did not respond in time. This can happen if the Freighter
+              extension is hung or unresponsive. Please try again.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={handleFreighterClick}
+                aria-label="Retry network check"
+              >
+                <RefreshCw size={18} />
+                Retry Connection
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* DESIGN QA PREVIEW TOOLBAR - Rendered exclusively for Design Review & Verification */}
         {showStateSwitcher && (
           <div className={styles.previewToolbar} data-testid="design-qa-toolbar">
@@ -526,6 +590,16 @@ export default function ConnectWalletModal({
                 aria-pressed={currentErrorState === "network_mismatch"}
               >
                 Wrong Network
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "network_timeout" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => setInternalErrorState("network_timeout")}
+                aria-pressed={currentErrorState === "network_timeout"}
+              >
+                Timed Out
               </button>
             </div>
           </div>

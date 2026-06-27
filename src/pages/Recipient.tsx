@@ -1,13 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import EmptyState from "../components/EmptyState";
-import RecipientStreams from "../components/recipient/RecipientStreams";
+import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
+import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
 import { withdraw } from "../lib/stellar/tx";
 import "./Streams.css";
 import "./Recipient.css";
+
+// Demo balances used as a UI fallback when the service returns no recipient
+// streams (no live backend yet, or no seeded match for the connected address).
+const DEMO_BALANCE = 22600.0;
+const DEMO_ACTIVE = 2;
+const DEMO_TOTAL_ACCRUED = 43250.0;
+const DEMO_TOTAL_WITHDRAWN = 20650.0;
 
 export default function Recipient() {
   const wallet = useWallet();
@@ -16,16 +24,59 @@ export default function Recipient() {
   const [loading, setLoading] = useState(true);
   const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const recipientStreams = useRecipientStreams(wallet.address);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(t);
   }, []);
 
-  const balance: number = 22600.0;
-  const activeStreams = 2;
-  const totalAccrued = 43250.0;
-  const totalWithdrawn = 20650.0;
+  /**
+   * Resets transaction state when the active wallet address changes.
+   * This prevents stale errors or pending states from carrying over to a different account.
+   */
+  useEffect(() => {
+    setTxState("idle");
+    setErrorMsg(null);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [wallet.address]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const fetchIncomingStreams = async (): Promise<Stream[]> => [
+    { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+    { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+  ];
+
+  const liveStreams = recipientStreams.streams;
+  const hasLiveStreams = liveStreams.length > 0;
+
+  const balance = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.withdrawableAmount, 0)
+    : DEMO_BALANCE;
+  const activeStreams = hasLiveStreams
+    ? liveStreams.filter((stream) => stream.status === "Active").length
+    : DEMO_ACTIVE;
+  const totalAccrued = hasLiveStreams
+    ? liveStreams.reduce((sum, stream) => sum + stream.streamedAmount, 0)
+    : DEMO_TOTAL_ACCRUED;
+  const totalWithdrawn = hasLiveStreams
+    ? liveStreams.reduce(
+        (sum, stream) => sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
+        0,
+      )
+    : DEMO_TOTAL_WITHDRAWN;
 
   const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
@@ -52,7 +103,7 @@ export default function Recipient() {
       await withdraw(recipientAddr, streamId, amountStr);
       setTxState("confirmed");
       addToast("Withdrawal completed successfully on-chain!", "success");
-      setTimeout(() => setTxState("idle"), 5000);
+      timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: any) {
       setTxState("error");
       setErrorMsg(err.message || "Withdrawal failed.");
@@ -174,7 +225,7 @@ export default function Recipient() {
           </div>
         </div>
         <div className="mt-6">
-          <RecipientStreams />
+          <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
         </div>
       </section>
     </main>

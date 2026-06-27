@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ONBOARDING_DISMISSED_STORAGE_KEY } from "../lib/onboarding";
 import Dashboard from "./Dashboard";
 
 const walletState = vi.hoisted(() => ({
@@ -21,6 +22,22 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
+  useTreasury: () => ({
+    metrics: [],
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useRecipientStreams: () => ({
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 function renderDashboard() {
   render(<Dashboard />);
   act(() => {
@@ -34,7 +51,7 @@ describe("Dashboard wallet source", () => {
     walletState.connected = false;
     walletState.address = null;
     walletState.network = null;
-    localStorage.setItem("fluxora_onboarding_dismissed", "true");
+    localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, "true");
   });
 
   afterEach(() => {
