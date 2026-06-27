@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+  isMobileViewport,
+} from "../lib/breakpoints";
+import {
   LayoutDashboard,
   List,
   User,
@@ -34,10 +38,25 @@ export default function Sidebar({
   const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+
+    const syncMobileState = () => {
+      const mobile = isMobileViewport();
+      setIsMobile((prev) => (prev === mobile ? prev : mobile));
+    };
+
+    const handleResize = () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(syncMobileState, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    syncMobileState();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(debounceId);
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   // Escape key support

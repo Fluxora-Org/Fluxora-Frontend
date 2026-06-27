@@ -10,25 +10,8 @@ import ToastNotification, {
 } from "../components/ToastNotification";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { readOnboardingDismissed } from "../lib/onboarding";
 import "../design-tokens.css";
-
-const ONBOARDING_KEY = "fluxora_onboarding_dismissed";
-
-function hasSeenOnboarding(): boolean {
-  try {
-    return localStorage.getItem(ONBOARDING_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function markOnboardingSeen(): void {
-  try {
-    localStorage.setItem(ONBOARDING_KEY, "true");
-  } catch {
-    // Storage unavailable; treat as transient.
-  }
-}
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -63,7 +46,7 @@ export default function Dashboard() {
   }, [toast]);
 
   useEffect(() => {
-    if (!loading && streams.length === 0 && !hasSeenOnboarding()) {
+    if (!loading && streams.length === 0 && !readOnboardingDismissed()) {
       setShowOnboarding(true);
     }
 
@@ -89,12 +72,10 @@ export default function Dashboard() {
   }, [withdrawable, announce]);
 
   const handleDismissOnboarding = () => {
-    markOnboardingSeen();
     setShowOnboarding(false);
   };
 
   const handleOnboardingCreateStream = () => {
-    markOnboardingSeen();
     setShowOnboarding(false);
     setIsModalOpen(true);
   };

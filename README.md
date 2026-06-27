@@ -162,13 +162,22 @@ function ThemeToggle() {
 
 ## Contributing / CI
 
-Pull requests and pushes to `main` run the GitHub Actions CI workflow on Node 18
-and Node 20. The workflow installs with `npm ci`, runs `npm run build` for
-TypeScript and production build coverage, then runs `npm run test:coverage`.
+Pull requests and pushes to `main` run the GitHub Actions CI workflow
+(`.github/workflows/ci.yml`) on Node 18 and Node 20. The workflow installs with
+`npm ci`, runs `npm run build` for TypeScript and production build verification,
+and runs the full unit test suite.
 
-The coverage gate currently enforces the configured 95% thresholds on the
-tested core component/theme baseline listed in `vitest.config.ts`. Expand that
-include list when adding reliable coverage for more production modules.
+### Coverage gate
+
+A dedicated `coverage` CI job runs `npm run test:coverage` and **fails the PR
+check** when any threshold is missed. The coverage report is uploaded as a build
+artifact for every run so reviewers can inspect which lines are uncovered.
+
+Thresholds enforced (statements / branches / functions / lines): **95%**
+
+The baseline is the `include` list in `vitest.config.ts`. When adding a new
+production module that should be covered, append it to that list and add tests
+before opening the PR.
 
 ## Streams performance
 
