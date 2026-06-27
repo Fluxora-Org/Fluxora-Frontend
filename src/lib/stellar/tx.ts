@@ -60,6 +60,50 @@ function encodeAddress(addr: string): xdr.ScVal {
 }
 
 /**
+ * Timeout duration (in milliseconds) for Freighter extension API calls.
+ * If the wallet extension does not respond within this window the call is
+ * rejected to prevent the create-stream submit flow from hanging indefinitely.
+ */
+export const FREIGHTER_NETWORK_TIMEOUT_MS = 5_000;
+
+/**
+ * Wraps a promise with a timeout.  If the promise does not settle within the
+ * given duration the returned promise rejects with a {@link TransactionError}
+ * whose `type` is `"timeout"`.  The internal timer is always cleared on
+ * settlement so no dangling timers remain.
+ *
+ * @param promise - The promise to wrap.
+ * @param ms - Timeout duration in milliseconds.
+ * @param label - Short description of the timed-out operation (included in the
+ *   error message).
+ * @returns A promise that settles with the original value or rejects with a
+ *   timeout error.
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  const timeoutResult = Symbol("timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const result = await Promise.race([
+    promise,
+    new Promise<typeof timeoutResult>((resolve) => {
+      timer = setTimeout(() => resolve(timeoutResult), ms);
+    }),
+  ]);
+
+  clearTimeout(timer);
+
+  if (result === timeoutResult) {
+    throw new TransactionError("timeout", `${label} timed out after ${ms}ms.`);
+  }
+
+  return result as T;
+}
+
+/**
  * Validates that the wallet's current connected network matches the expected network.
  */
 async function validateNetwork(): Promise<void> {
@@ -67,8 +111,11 @@ async function validateNetwork(): Promise<void> {
   const expectedNet = appConfig.network;
   let connectedNetRes;
   try {
-    connectedNetRes = await getNetwork();
+    connectedNetRes = await withTimeout(getNetwork(), FREIGHTER_NETWORK_TIMEOUT_MS, "Freighter network check");
   } catch (err: any) {
+    if (err instanceof TransactionError) {
+      throw err;
+    }
     throw new TransactionError("rpc", `Freighter not connected or unavailable. Error: ${err.message || err}`);
   }
 
@@ -268,20 +315,30 @@ async function executeInvocation(
  * @param amount - The total amount to be deposited, as a string.
  * @param startTime - The unix timestamp (in seconds) when the stream starts.
  * @param endTime - The unix timestamp (in seconds) when the stream ends.
+ * @param cliffTime - The unix timestamp (in seconds) of the cliff date. Optional. If absent, defaults to startTime.
  */
 export async function createStream(
   sender: string,
   recipient: string,
   amount: string,
   startTime: number,
-  endTime: number
+  endTime: number,
+  cliffTime?: number
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  let cliff = cliffTime ?? startTime;
+  if (cliff < startTime) {
+    cliff = startTime;
+  } else if (cliff > endTime) {
+    cliff = endTime;
+  }
+
   const args = [
     encodeAddress(sender),
     encodeAddress(recipient),
     encodeU64(amount),
     encodeU64(startTime),
     encodeU64(endTime),
+    encodeU64(cliff),
   ];
   return await executeInvocation("create_stream", args);
 }
