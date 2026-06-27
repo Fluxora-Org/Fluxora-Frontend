@@ -1,4 +1,4 @@
-import React from 'react';
+import { describe, test, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import InfoTooltip from '../InfoTooltip';

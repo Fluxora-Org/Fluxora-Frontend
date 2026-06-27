@@ -2,7 +2,7 @@
  * Button Component
  * ──────────────────────────────────────
  * Implements DESIGN_SPEC.md § 4.1 Button specifications
- * 
+ *
  * Features:
  * - All interactive states (default, hover, focus, active, disabled, loading)
  * - Full keyboard accessibility (Tab, Enter, Space)
@@ -11,7 +11,7 @@
  * - Multiple sizes (sm, md, lg)
  * - Icon support with optional text
  * - Loading state with spinner animation
- * 
+ *
  * Usage:
  *   <Button onClick={handleClick}>Create Stream</Button>
  *   <Button variant="secondary" size="sm">Cancel</Button>
@@ -23,49 +23,87 @@
 import React, { ReactNode, ButtonHTMLAttributes } from 'react';
 import styles from './Button.module.css';
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Icon size */
+/**
+ * Props for the Button component.
+ */
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /**
+   * The size of the icon when an icon is provided.
+   */
   iconSize?: 'xs' | 'sm' | 'md' | 'lg';
-  /** Button content (text, icon, or both) */
+
+  /**
+   * Button content (text, icon, or both).
+   */
   children?: ReactNode;
-  
-  /** Visual variant */
+
+  /**
+   * Visual style variant for the button.
+   * - primary: Main call to action
+   * - secondary: Alternative actions
+   * - danger: Destructive actions
+   * - success: Positive actions
+   * - ghost: Transparent button for subtle actions
+   */
   variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
-  
-  /** Button size */
+
+  /**
+   * Button size.
+   */
   size?: 'sm' | 'md' | 'lg';
-  
-  /** Full width button */
+
+  /**
+   * Whether the button should span the full width of its container.
+   */
   fullWidth?: boolean;
-  
-  /** Icon element (SVG, component, etc.) */
+
+  /**
+   * Icon element to display inside the button (e.g., SVG, component).
+   */
   icon?: ReactNode;
-  
-  /** Icon-only button (no text) */
+
+  /**
+   * Whether the button contains only an icon and no text.
+   * If true, an appropriate aria-label should be provided for accessibility.
+   */
   iconOnly?: boolean;
-  
-  /** Loading state - shows spinner and disables interaction */
+
+  /**
+   * Whether the button is in a loading state.
+   * When true, shows a spinner, sets aria-busy="true", and suppresses user interactions.
+   */
   loading?: boolean;
-  
-  /** Loading spinner content (override default) */
+
+  /**
+   * Custom loading spinner or text content to display when loading is true.
+   */
   loadingContent?: ReactNode;
-  
-  /** Disabled state */
+
+  /**
+   * Whether the button is disabled.
+   * When true, the button is not interactive and suppresses user clicks.
+   */
   disabled?: boolean;
-  
-  /** Type of button */
+
+  /**
+   * Type attribute for the HTML button element. Defaults to "button".
+   */
   type?: 'button' | 'submit' | 'reset';
-  
-  /** Click handler */
+
+  /**
+   * Click handler function for the button.
+   */
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  
-  /** Additional CSS classes */
+
+  /**
+   * Additional CSS classes to apply to the button.
+   */
   className?: string;
 }
 
 /**
  * Button component with full accessibility support
- * 
+ *
  * Implements:
  * - Focus ring via :focus-visible (keyboard accessible)
  * - ARIA attributes for loading and disabled states

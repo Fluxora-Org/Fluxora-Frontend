@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import {
   treasuryDemoMetrics,
   treasuryDemoStreams,
 } from "../../fixtures/treasury";
+import type { StreamRecord } from "../../data/streamRecords";
 import type { Metric } from "./Metric";
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
@@ -19,64 +20,45 @@ export function isTreasuryDemoMode(value = import.meta.env.VITE_DEMO_MODE) {
   return value === "true" || value === "1";
 }
 
-export function useTreasuryOverviewData(): TreasuryOverviewData {
-  const { getMetrics, getStreams } = useTreasury();
-  const isDemoMode = isTreasuryDemoMode();
-  const [data, setData] = useState<TreasuryOverviewData>({
-    metrics: isDemoMode ? treasuryDemoMetrics : [],
-    streams: isDemoMode ? treasuryDemoStreams : [],
-    isDemoMode,
-    loading: !isDemoMode,
-    error: null,
-  });
+function formatMonthlyRate(record: StreamRecord): string {
+  const amount = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(record.monthlyRate);
+  return `${amount} ${record.asset}/mo`;
+}
 
-  useEffect(() => {
+function toLegacyStream(record: StreamRecord): Stream {
+  return {
+    name: record.name,
+    id: record.id,
+    recipient: record.recipientAddress || record.recipientName,
+    rate: formatMonthlyRate(record),
+    accruedAmount: record.streamedAmount,
+    status: record.status,
+  };
+}
+
+export function useTreasuryOverviewData(): TreasuryOverviewData {
+  const isDemoMode = isTreasuryDemoMode();
+  const treasury = useTreasury();
+
+  return useMemo<TreasuryOverviewData>(() => {
     if (isDemoMode) {
-      setData({
+      return {
         metrics: treasuryDemoMetrics,
         streams: treasuryDemoStreams,
         isDemoMode: true,
         loading: false,
         error: null,
-      });
-      return undefined;
+      };
     }
 
-    let cancelled = false;
-    setData({
-      metrics: [],
-      streams: [],
+    return {
+      metrics: treasury.metrics,
+      streams: treasury.streams.map(toLegacyStream),
       isDemoMode: false,
-      loading: true,
-      error: null,
-    });
-
-    Promise.all([getMetrics(), getStreams()])
-      .then(([metrics, streams]) => {
-        if (cancelled) return;
-        setData({
-          metrics,
-          streams,
-          isDemoMode: false,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setData({
-          metrics: [],
-          streams: [],
-          isDemoMode: false,
-          loading: false,
-          error: "Unable to load treasury overview data.",
-        });
-      });
-
-    return () => {
-      cancelled = true;
+      loading: treasury.loading,
+      error: treasury.error,
     };
-  }, [getMetrics, getStreams, isDemoMode]);
-
-  return data;
+  }, [isDemoMode, treasury.metrics, treasury.streams, treasury.loading, treasury.error]);
 }

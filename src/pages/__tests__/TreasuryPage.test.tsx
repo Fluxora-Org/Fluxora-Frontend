@@ -1,7 +1,6 @@
 // src/pages/__tests__/TreasuryPage.test.tsx
-import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+import { afterEach, describe, it, expect, vi, type Mock } from 'vitest';
 import TreasuryPage from '../../pages/TreasuryPage';
 
 
@@ -20,7 +19,7 @@ vi.mock('../../components/treasuryOverviewPage/useTreasuryOverviewData', () => (
   useTreasuryOverviewData: vi.fn(),
 }));
 import { useTreasuryOverviewData } from '../../components/treasuryOverviewPage/useTreasuryOverviewData';
-const mockHook = useTreasuryOverviewData as unknown as vi.Mock;
+const mockHook = useTreasuryOverviewData as unknown as Mock;
 
 describe('TreasuryPage', () => {
   afterEach(() => {
