@@ -16,7 +16,23 @@ export interface TreasuryOverviewData {
   error: string | null;
 }
 
-export function isTreasuryDemoMode(value = import.meta.env.VITE_DEMO_MODE) {
+/**
+ * Determines whether the application is running in treasury demo mode.
+ *
+ * For security reasons, demo mode is strictly disabled in production environments
+ * to prevent mock/fixture data from being accidentally exposed to users.
+ *
+ * @param value - The env flag value to check. Defaults to `import.meta.env.VITE_DEMO_MODE`.
+ * @param isProd - Whether the application is running in production. Defaults to `import.meta.env.PROD`.
+ * @returns `true` if demo mode is enabled and not in production, `false` otherwise.
+ */
+export function isTreasuryDemoMode(
+  value = import.meta.env.VITE_DEMO_MODE,
+  isProd = import.meta.env.PROD
+): boolean {
+  if (isProd) {
+    return false;
+  }
   return value === "true" || value === "1";
 }
 
@@ -38,6 +54,15 @@ function toLegacyStream(record: StreamRecord): Stream {
   };
 }
 
+/**
+ * React hook that exposes the treasury overview data, handling success, error,
+ * and demo-mode states.
+ *
+ * Under demo mode, it immediately yields mock data. Otherwise, it retrieves
+ * real metrics and streams from the `useTreasury` upstream source.
+ *
+ * @returns The current {@link TreasuryOverviewData} state.
+ */
 export function useTreasuryOverviewData(): TreasuryOverviewData {
   const isDemoMode = isTreasuryDemoMode();
   const treasury = useTreasury();
