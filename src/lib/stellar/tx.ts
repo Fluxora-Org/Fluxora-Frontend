@@ -138,12 +138,21 @@ async function validateNetwork(): Promise<void> {
 
 /**
  * Helper to wait for a transaction to be confirmed on-chain by polling the Soroban RPC.
+ *
+ * Retry budget and inter-poll delay are read from {@link transactionConfig} so
+ * they can be tuned per environment via env vars without code edits:
+ * - `VITE_TX_CONFIRMATION_MAX_RETRIES` — maximum poll attempts (default: 15, clamped 1–300)
+ * - `VITE_TX_CONFIRMATION_DELAY_MS`    — ms between attempts (default: 1500, clamped 100–30000)
+ *
+ * **Maximum total wait** ≈ `confirmationMaxRetries × confirmationDelayMs`
+ *
+ * Safe defaults are applied in case `transactionConfig` values are somehow absent.
  */
 async function waitForTransaction(
   server: SorobanRpc.Server,
   hash: string,
-  maxRetries = 15,
-  delayMs = 1500
+  maxRetries = transactionConfig.confirmationMaxRetries ?? 15,
+  delayMs = transactionConfig.confirmationDelayMs ?? 1500
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
   for (let i = 0; i < maxRetries; i++) {
     try {

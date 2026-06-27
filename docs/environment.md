@@ -97,3 +97,19 @@ These variables define the timing characteristics of the transaction-status conf
 - **Required/Optional**: Optional. Defaults to `2`.
 - **Format**: Positive integer greater than or equal to `1`.
 - **Example**: `2`
+
+### `VITE_TX_CONFIRMATION_MAX_RETRIES`
+- **Purpose**: Maximum number of poll attempts `waitForTransaction` makes before raising a timeout error. Increase this on Testnet or slow networks where block confirmation can take longer than the default window.
+- **Required/Optional**: Optional. Defaults to `15`.
+- **Clamping**: Values outside `[1, 300]` are clamped to prevent an unbounded or zero-attempt loop.
+- **Format**: Positive integer in the range `[1, 300]`.
+- **Maximum total wait**: ≈ `VITE_TX_CONFIRMATION_MAX_RETRIES × VITE_TX_CONFIRMATION_DELAY_MS`
+- **Example**: `15` (22.5 s at the default 1 500 ms delay)
+
+### `VITE_TX_CONFIRMATION_DELAY_MS`
+- **Purpose**: Milliseconds to wait between each `waitForTransaction` confirmation poll attempt. Increase to reduce RPC traffic on slow networks; decrease to confirm faster in controlled environments.
+- **Required/Optional**: Optional. Defaults to `1500`.
+- **Clamping**: Values outside `[100, 30000]` are clamped to prevent instant hammering or excessively long pauses.
+- **Format**: Positive integer in the range `[100, 30000]`.
+- **Maximum total wait**: ≈ `VITE_TX_CONFIRMATION_MAX_RETRIES × VITE_TX_CONFIRMATION_DELAY_MS`
+- **Example**: `1500`
