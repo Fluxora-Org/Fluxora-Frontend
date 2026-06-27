@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import EmptyState from "../components/EmptyState";
-import RecipientStreams from "../components/recipient/RecipientStreams";
+import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
@@ -21,6 +21,11 @@ export default function Recipient() {
     const t = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(t);
   }, []);
+
+  const fetchIncomingStreams = async (): Promise<Stream[]> => [
+    { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+    { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+  ];
 
   const balance: number = 22600.0;
   const activeStreams = 2;
@@ -174,7 +179,7 @@ export default function Recipient() {
           </div>
         </div>
         <div className="mt-6">
-          <RecipientStreams />
+          <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
         </div>
       </section>
     </main>

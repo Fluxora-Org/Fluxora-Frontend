@@ -49,9 +49,18 @@ const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
 const STREAM_CARD_ESTIMATED_HEIGHT = 420;
 
-function formatUsdc(value: number) {
+/**
+ * Formats a USDC amount with full fractional precision (2 decimal places).
+ * Returns a safe placeholder for NaN or negative inputs.
+ *
+ * @param value - The numeric USDC amount to format.
+ * @returns A locale-aware string such as "1,234.56 USDC".
+ */
+export function formatUsdc(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "— USDC";
   return `${new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)} USDC`;
 }
 

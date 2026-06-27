@@ -2,6 +2,35 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
 
+const SAFE_DEFAULT = "/app";
+
+/**
+ * Sanitizes a post-connect redirect target to prevent open-redirect attacks.
+ *
+ * Only allows same-origin, in-app relative paths starting with `/`.
+ * Rejects absolute URLs (`http://`, `https://`), protocol-relative URLs (`//`),
+ * dangerous schemes (`javascript:`), path-traversal segments (`..`), and
+ * non-string / empty values.
+ *
+ * @param returnTo - The raw redirect target from location state (untrusted).
+ * @returns A safe redirect path, defaulting to `"/app"` when validation fails.
+ */
+export function sanitizeReturnTo(returnTo: unknown): string {
+  if (typeof returnTo !== "string" || returnTo.trim() === "") {
+    return SAFE_DEFAULT;
+  }
+
+  const trimmed = returnTo.trim();
+
+  if (/^https?:\/\//i.test(trimmed)) return SAFE_DEFAULT;
+  if (/^\/\//.test(trimmed)) return SAFE_DEFAULT;
+  if (/^\w+:/i.test(trimmed)) return SAFE_DEFAULT;
+  if (!trimmed.startsWith("/")) return SAFE_DEFAULT;
+  if (trimmed.includes("..")) return SAFE_DEFAULT;
+
+  return trimmed;
+}
+
 interface RequireWalletProps {
   children: ReactNode;
 }
@@ -37,7 +66,7 @@ export default function RequireWallet({ children }: RequireWalletProps) {
       <Navigate
         to="/connect-wallet"
         replace
-        state={{ returnTo }}
+        state={{ returnTo: sanitizeReturnTo(returnTo) }}
       />
     );
   }

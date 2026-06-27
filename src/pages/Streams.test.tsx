@@ -277,3 +277,40 @@ describe("Streams card recipient copy", () => {
     );
   });
 });
+
+describe("formatUsdc", () => {
+  // Import is resolved at module level; we re-import here to keep tests self-contained.
+  let formatUsdc: (value: number) => string;
+
+  beforeEach(async () => {
+    ({ formatUsdc } = await import("./Streams"));
+  });
+
+  it("formats fractional amounts without rounding", () => {
+    expect(formatUsdc(1234.56)).toBe("1,234.56 USDC");
+  });
+
+  it("formats an integer amount with two decimal places", () => {
+    expect(formatUsdc(1000)).toBe("1,000.00 USDC");
+  });
+
+  it("formats zero", () => {
+    expect(formatUsdc(0)).toBe("0.00 USDC");
+  });
+
+  it("formats large amounts with grouping separators", () => {
+    expect(formatUsdc(1_000_000.99)).toBe("1,000,000.99 USDC");
+  });
+
+  it("returns safe placeholder for NaN", () => {
+    expect(formatUsdc(NaN)).toBe("— USDC");
+  });
+
+  it("returns safe placeholder for negative values", () => {
+    expect(formatUsdc(-50)).toBe("— USDC");
+  });
+
+  it("returns safe placeholder for Infinity", () => {
+    expect(formatUsdc(Infinity)).toBe("— USDC");
+  });
+});

@@ -1,5 +1,5 @@
 import { act, render } from "@testing-library/react";
-import { Profiler } from "react";
+import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "../Sidebar";
 import {
@@ -48,7 +48,7 @@ function getSidebar() {
   return sidebar as HTMLElement;
 }
 
-function renderSidebar(mobileOpen = false, onRender?: Profiler.OnRenderCallback) {
+function renderSidebar(mobileOpen = false, onRender?: ProfilerOnRenderCallback) {
   const sidebar = (
     <Sidebar
       collapsed={false}
