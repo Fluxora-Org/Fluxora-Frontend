@@ -67,13 +67,56 @@ export default function WalletStatus({
     return () => clearTimeout(timer);
   }, [address]);
 
-  const handleCopy = async () => {
-    try {
+ const handleCopy = async () => {
+  let success = false;
+
+  try {
+    // Try the modern Clipboard API first
+    if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
+      success = true;
+    } else {
+      // Fallback for older browsers or insecure contexts
+      const textarea = document.createElement("textarea");
+      textarea.value = address;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        success = document.execCommand("copy");
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+  } catch {
+    success = false;
+  }
+
+  if (success) {
+    setCopied(true);
+    setAnnouncement("Address copied to clipboard");
+    setTimeout(() => {
+      setCopied(false);
+      setAnnouncement("");
+    }, 2000);
+  } else {
+    // Explicit failure feedback
+    setAnnouncement("Failed to copy address. Please copy manually.");
+    // Show a visual error state briefly
+    const prevCopied = copied;
+    setCopied(false);
+    // Use a separate state or visual indicator for error
+    // We'll use the copied state with a different visual
+    // For now, we'll rely on the announcement
+    setTimeout(() => {
+      setAnnouncement("");
+    }, 3000);
+  }
+};
 
   const closeMenu = () => {
     setOpen(false);
