@@ -162,6 +162,9 @@ function ThemeToggle() {
 
 ## Contributing / CI
 
+New contributors should start with [CONTRIBUTING.md](CONTRIBUTING.md) for a full walkthrough of local setup, branch naming, commit conventions, and the test/coverage workflow.
+
+
 Pull requests and pushes to `main` run the GitHub Actions CI workflow
 (`.github/workflows/ci.yml`) on Node 18 and Node 20. The workflow installs with
 `npm ci`, runs `npm run build` for TypeScript and production build verification,

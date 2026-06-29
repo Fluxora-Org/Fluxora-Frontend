@@ -5,7 +5,7 @@ import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
-    address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN",
+    address: "GDBWW22BDP5HN3ZTG7LLID665PA72DGOLOONLUM5TKQFRAQA3EYGKIRC",
     network: "TESTNET",
     connected: true,
     connect: vi.fn(),
@@ -147,7 +147,7 @@ describe("CreateStreamModal transaction confirmation", () => {
     const expectedStart = Math.floor(new Date("2026-06-20T12:00:00").getTime() / 1000);
     const expectedCliff = Math.floor(new Date("2026-06-21T15:00").getTime() / 1000);
 
-    expect(callArgs[0]).toBe("GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN");
+    expect(callArgs[0]).toBe("GDBWW22BDP5HN3ZTG7LLID665PA72DGOLOONLUM5TKQFRAQA3EYGKIRC");
     expect(callArgs[1]).toBe(VALID_STELLAR);
     expect(callArgs[2]).toBe("1000000000"); // 100 USDC * 10^7
     expect(callArgs[3]).toBe(expectedStart);

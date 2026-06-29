@@ -206,7 +206,18 @@ export default function CreateStreamModal({
       setError(t("createStream.validation.recipientRequired"));
       return false;
     }
-    if (!isValidStellarAddress(recipient.trim())) {
+    const normalizedRecipient = recipient.trim();
+
+    /**
+     * Self-send rule: Reject streams where the recipient equals the connected wallet address.
+     * This prevents users from wasting a deposit on a no-op transfer to themselves.
+     */
+    if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
+      setError("Recipient cannot be the same as the connected wallet address.");
+      return false;
+    }
+
+    if (!isValidStellarAddress(normalizedRecipient)) {
       setError(
         t("createStream.validation.recipientInvalid"),
       );
@@ -509,6 +520,8 @@ export default function CreateStreamModal({
               const recipientError = touched.recipient
                 ? (!recipient.trim()
                     ? t("createStream.validation.recipientRequired")
+                    : (wallet.connected && wallet.address && recipient.trim().toLowerCase() === wallet.address.toLowerCase())
+                    ? 'Recipient cannot be the same as the connected wallet address.'
                     : !isValidStellarAddress(recipient.trim())
                     ? t("createStream.validation.recipientInvalid")
                     : undefined)
