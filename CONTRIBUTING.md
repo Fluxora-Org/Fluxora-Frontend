@@ -2,6 +2,21 @@
 
 Thanks for contributing to Fluxora. This guide covers everything you need to go from zero to a mergeable PR: local setup, branch naming, commit conventions, and the full test/coverage workflow.
 
+## Quick Start Checklist
+
+For first-time contributors:
+
+- [ ] Fork the repo and clone your fork
+- [ ] Run `npm install` to install dependencies
+- [ ] Copy `.env.example` to `.env.local` and fill in required values
+- [ ] Run `npm run dev` to start the local dev server
+- [ ] Create a branch: `feat/<issue>-short-description` or `fix/<issue>-short-description`
+- [ ] Make your change and write/update tests
+- [ ] Run `npm test` and `npm run lint` before pushing
+- [ ] Open a PR targeting `main` and fill out the template
+
+
+
 ---
 
 ## Table of Contents
