@@ -5,6 +5,8 @@ import {
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
 import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
+import { useClipboard } from "../../hooks/useClipboard";
+import { useOptionalToast } from "../toast/ToastProvider";
 
 interface WalletStatusProps {
   address: string;
@@ -23,9 +25,11 @@ export default function WalletStatus({
   onDisconnect,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const { copy, status: copyStatus } = useClipboard();
+  const toast = useOptionalToast();
+  const copied = copyStatus === "copied";
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const focusRingClassName =
@@ -67,13 +71,20 @@ export default function WalletStatus({
     return () => clearTimeout(timer);
   }, [address]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
+ const handleCopy = async () => {
+  // Copy via the shared hook (Clipboard API + execCommand fallback).
+  const success = await copy(address);
+
+  if (success) {
+    setAnnouncement("Address copied to clipboard");
+    setTimeout(() => setAnnouncement(""), 2000);
+  } else {
+    // Explicit failure feedback: live-region announcement + error toast.
+    setAnnouncement("Failed to copy address. Please copy manually.");
+    toast?.addToast("Failed to copy address. Please copy manually.", "error");
+    setTimeout(() => setAnnouncement(""), 3000);
+  }
+};
 
   const closeMenu = () => {
     setOpen(false);
@@ -89,7 +100,7 @@ export default function WalletStatus({
 
   return (
     <div ref={ref} className="flex items-center gap-2">
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
       {/* Network Badge */}
