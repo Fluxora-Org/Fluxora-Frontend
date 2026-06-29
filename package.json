@@ -13,7 +13,8 @@
     "format": "prettier \"src/**/*.{ts,tsx,css}\" \"*.{js,json,md}\" --write",
     "format:check": "prettier eslint.config.js .prettierrc package.json --check",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium --project=firefox",
+    "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

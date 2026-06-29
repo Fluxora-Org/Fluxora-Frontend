@@ -5,6 +5,7 @@ import {
   getNetworkPassphrase,
   parseBooleanFlag,
   validateUrl,
+  validateContractId,
 } from "../config";
 
 function env(overrides: Partial<ImportMetaEnv> = {}): ImportMetaEnv {
@@ -26,7 +27,7 @@ describe("config", () => {
         VITE_API_URL: "https://api.example.test",
         VITE_NETWORK: "PUBLIC",
         VITE_RPC_URL: " ",
-        VITE_STREAM_CONTRACT_ID: "CCONTRACT",
+        VITE_STREAM_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
         VITE_USE_MOCKS: "true",
       }),
     );
@@ -35,7 +36,7 @@ describe("config", () => {
     expect(config.network).toBe("PUBLIC");
     expect(config.networkLabel).toBe("Public Network (Mainnet)");
     expect(config.rpcUrl).toBeNull();
-    expect(config.streamContractId).toBe("CCONTRACT");
+    expect(config.streamContractId).toBe("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
     expect(config.useMocks).toBe(true);
   });
 
@@ -202,5 +203,61 @@ describe("createConfig URL validation", () => {
       env({ VITE_RPC_URL: "http://localhost:8000" }),
     );
     expect(config.rpcUrl).toBe("http://localhost:8000");
+  });
+});
+
+describe("validateContractId", () => {
+  const VALID_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
+  it("accepts a valid 56-char Stellar contract ID starting with C", () => {
+    expect(validateContractId("streamContractId", VALID_ID)).toBe(VALID_ID);
+  });
+
+  it("trims surrounding whitespace before validating", () => {
+    expect(validateContractId("streamContractId", `  ${VALID_ID}  `)).toBe(VALID_ID);
+  });
+
+  it("rejects a too-short string", () => {
+    const result = validateContractId("streamContractId", "CCONTRACT");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("rejects a string not starting with C", () => {
+    const result = validateContractId("streamContractId", "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("rejects a string with invalid base-32 characters", () => {
+    const result = validateContractId("streamContractId", "C0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("includes a helpful message with expected format", () => {
+    const result = validateContractId("streamContractId", "bad-id") as { message: string };
+    expect(result.message).toMatch(/Strkey/i);
+  });
+});
+
+describe("createConfig contract ID validation", () => {
+  it("leaves streamContractId null when unset", () => {
+    const config = createConfig(env());
+    expect(config.streamContractId).toBeNull();
+  });
+
+  it("accepts a valid contract ID", () => {
+    const config = createConfig(env({ VITE_STREAM_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" }));
+    expect(config.streamContractId).toBe("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+  });
+
+  it("throws for a malformed contract ID", () => {
+    expect(() =>
+      createConfig(env({ VITE_STREAM_CONTRACT_ID: "CCONTRACT" })),
+    ).toThrow(/streamContractId/);
+  });
+
+  it("accumulates contract ID error alongside URL errors", () => {
+    expect(() =>
+      createConfig(env({ VITE_API_URL: "bad-url", VITE_STREAM_CONTRACT_ID: "bad-id" })),
+    ).toThrow(/apiUrl.*streamContractId|streamContractId.*apiUrl/);
   });
 });
