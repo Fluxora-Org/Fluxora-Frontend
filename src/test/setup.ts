@@ -16,6 +16,8 @@ const customCrypto = {
     return array;
   },
   subtle: webcrypto.subtle,
+  randomUUID: (): `${string}-${string}-${string}-${string}-${string}` =>
+    webcrypto.randomUUID(),
 };
 
 if (typeof window !== 'undefined') {
@@ -76,11 +78,14 @@ vi.mock('../components/wallet-connect/Walletcontext', () => {
 });
 
 vi.mock('../components/toast/ToastProvider', () => {
+  const ctx = {
+    addToast: vi.fn(),
+    removeToast: vi.fn(),
+    dismiss: vi.fn(),
+  };
   return {
-    useToast: () => ({
-      addToast: vi.fn(),
-      removeToast: vi.fn(),
-    }),
+    useToast: () => ctx,
+    useOptionalToast: () => ctx,
     ToastProvider: ({ children }: any) => children,
   };
 });
