@@ -73,53 +73,168 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${trimmedBase}${trimmedPath}`;
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const { baseUrl } = readEnv();
+/** Options controlling retry behaviour of {@link fetchJson}. */
+export interface FetchJsonOptions {
+  /**
+   * Maximum number of retry attempts on transient network errors.
+   * Defaults to `VITE_FETCH_MAX_RETRIES` env var or `3`.
+   */
+  maxRetries?: number;
+  /**
+   * Initial delay in milliseconds before the first retry.
+   * Subsequent delays follow exponential backoff capped at 8 seconds.
+   * Defaults to `VITE_FETCH_INITIAL_DELAY_MS` env var or `500`.
+   */
+  initialDelayMs?: number;
+  /**
+   * Optional `AbortSignal`. When fired, any pending retry timer is cancelled
+   * and the returned promise rejects with an `AbortError`.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * Sleeps for `ms` milliseconds, but resolves immediately if the provided
+ * `AbortSignal` fires first — in which case the returned promise rejects with
+ * an `AbortError` so callers can stop the retry loop without leaking timers.
+ */
+function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * Fetches `path` relative to the configured API base URL and returns the
+ * unwrapped `data` field from the JSON envelope.
+ *
+ * Retries up to `maxRetries` times on `kind: "network"` errors using
+ * exponential backoff (capped at 8 seconds). HTTP and shape errors are
+ * propagated immediately without retrying because they are not transient.
+ *
+ * @param path - API path, e.g. `/streams`.
+ * @param init - Optional `RequestInit` merged into every fetch call.
+ * @param options - Retry and abort configuration.
+ *
+ * @throws {StreamsServiceError} On network failure after all retries, or on
+ *   HTTP / shape errors.
+ * @throws {DOMException} With `name === "AbortError"` if the signal fires.
+ */
+async function fetchJson<T>(
+  path: string,
+  init?: RequestInit,
+  options: FetchJsonOptions = {},
+): Promise<T> {
+  const { baseUrl, fetchMaxRetries, fetchInitialDelayMs } = {
+    ...readEnv(),
+    fetchMaxRetries: (import.meta.env?.VITE_FETCH_MAX_RETRIES
+      ? parseInt(import.meta.env.VITE_FETCH_MAX_RETRIES as string, 10)
+      : NaN) || 3,
+    fetchInitialDelayMs: (import.meta.env?.VITE_FETCH_INITIAL_DELAY_MS
+      ? parseInt(import.meta.env.VITE_FETCH_INITIAL_DELAY_MS as string, 10)
+      : NaN) || 500,
+  };
+
+  const maxRetries = options.maxRetries ?? fetchMaxRetries;
+  const initialDelayMs = options.initialDelayMs ?? fetchInitialDelayMs;
+  const signal = options.signal;
+
   const url = joinUrl(baseUrl, path);
+  const MAX_DELAY_MS = 8_000;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        ...(init?.headers ?? {}),
-      },
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? `Streams service request failed: ${error.message}`
-        : "Streams service request failed";
-    throw new StreamsServiceError(message, "network");
+  let attempt = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal,
+        headers: {
+          Accept: "application/json",
+          ...(init?.headers ?? {}),
+        },
+      });
+    } catch (error) {
+      // Abort errors must propagate immediately without retrying.
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+
+      const message =
+        error instanceof Error
+          ? `Streams service request failed: ${error.message}`
+          : "Streams service request failed";
+      const networkError = new StreamsServiceError(message, "network");
+
+      if (attempt >= maxRetries) {
+        throw networkError;
+      }
+
+      const delayMs = Math.min(initialDelayMs * 2 ** attempt, MAX_DELAY_MS);
+      attempt++;
+
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
+          error,
+        );
+      }
+
+      await sleepWithAbort(delayMs, signal);
+      continue;
+    }
+
+    if (!response.ok) {
+      // HTTP errors (4xx / 5xx) are not transient — propagate immediately.
+      throw new StreamsServiceError(
+        `Streams service responded with ${response.status} ${response.statusText}`.trim(),
+        "http",
+        response.status,
+      );
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      // Shape errors are not transient — propagate immediately.
+      throw new StreamsServiceError(
+        "Streams service returned a non-JSON payload",
+        "shape",
+      );
+    }
+
+    if (!payload || typeof payload !== "object" || !("data" in payload)) {
+      throw new StreamsServiceError(
+        "Streams service returned an unexpected payload shape",
+        "shape",
+      );
+    }
+
+    return (payload as { data: T }).data;
   }
-
-  if (!response.ok) {
-    throw new StreamsServiceError(
-      `Streams service responded with ${response.status} ${response.statusText}`.trim(),
-      "http",
-      response.status,
-    );
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new StreamsServiceError(
-      "Streams service returned a non-JSON payload",
-      "shape",
-    );
-  }
-
-  if (!payload || typeof payload !== "object" || !("data" in payload)) {
-    throw new StreamsServiceError(
-      "Streams service returned an unexpected payload shape",
-      "shape",
-    );
-  }
-
-  return (payload as { data: T }).data;
 }
 
 function metricIcon(src: string, alt: string) {
