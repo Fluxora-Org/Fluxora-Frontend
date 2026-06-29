@@ -3,17 +3,24 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import WalletStatus from "../WalletStatus";
 
+// jsdom defines navigator.clipboard as a getter-only property, so it must be
+// redefined (not assigned) when stubbing. `undefined` simulates an insecure
+// context where the async Clipboard API is unavailable.
+function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    writable: true,
+    value: writeText ? { writeText } : undefined,
+  });
+}
+
 describe("WalletStatus copy functionality", () => {
   const mockAddress = "GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
   const mockNetwork = "TESTNET";
 
   beforeEach(() => {
     // Mock clipboard API
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn(),
-      },
-    });
+    setClipboard(vi.fn());
   });
 
   afterEach(() => {
@@ -81,9 +88,7 @@ describe("WalletStatus copy functionality", () => {
   it("uses fallback copy when clipboard API is unavailable", async () => {
     const user = userEvent.setup();
     // Remove clipboard API
-    Object.assign(navigator, {
-      clipboard: undefined,
-    });
+    setClipboard(undefined);
 
     // Mock execCommand
     document.execCommand = vi.fn().mockReturnValue(true);
@@ -113,9 +118,7 @@ describe("WalletStatus copy functionality", () => {
   it("handles fallback copy failure", async () => {
     const user = userEvent.setup();
     // Remove clipboard API
-    Object.assign(navigator, {
-      clipboard: undefined,
-    });
+    setClipboard(undefined);
 
     // Mock execCommand failure
     document.execCommand = vi.fn().mockReturnValue(false);

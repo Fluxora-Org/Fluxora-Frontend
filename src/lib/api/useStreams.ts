@@ -1,13 +1,80 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  getStreamById,
   getStreams,
   getRecipientStreams,
   StreamsServiceError,
   type StreamsFilters,
-} from './streamsService';
-import type { StreamRecord } from '../../data/streamRecords';
+} from "./streamsService";
+import type { StreamRecord } from "../../data/streamRecords";
+
+// ---------------------------------------------------------------------------
+// useStreams
+// ---------------------------------------------------------------------------
 
 interface UseStreamsResult {
+  streams: StreamRecord[];
+  loading: boolean;
+  error: StreamsServiceError | null;
+  refetch: () => void;
+}
+
+/**
+ * React hook that fetches the list of streams, optionally filtered.
+ * Cancels in-flight requests on unmount.
+ *
+ * @param filters - Optional filters forwarded to {@link getStreams}.
+ * @returns `{ streams, loading, error, refetch }`
+ */
+export function useStreams(filters?: StreamsFilters): UseStreamsResult {
+  const [streams, setStreams] = useState<StreamRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<StreamsServiceError | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    getStreams(filtersRef.current)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setStreams(data);
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof StreamsServiceError
+              ? err
+              : new StreamsServiceError(String(err), "network"),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+
+  return { streams, loading, error, refetch };
+}
+
+// ---------------------------------------------------------------------------
+// useRecipientStreams
+// ---------------------------------------------------------------------------
+
+interface UseRecipientStreamsResult {
   data: StreamRecord[];
   loading: boolean;
   error: StreamsServiceError | null;
@@ -15,62 +82,10 @@ interface UseStreamsResult {
 }
 
 /**
- * Fetches the full stream list, re-fetching when `filters` change.
- * Uses an AbortController so in-flight requests are cancelled on unmount or
- * filter change, preventing stale state updates.
- */
-export function useStreams(filters?: StreamsFilters): UseStreamsResult {
-  const [data, setData] = useState<StreamRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<StreamsServiceError | null>(null);
-  const filtersKey = JSON.stringify(filters ?? null);
-  const triggerRef = useRef(0);
-
-  const refetch = () => {
-    triggerRef.current += 1;
-    // Force re-render to re-run the effect via a separate counter state
-    setLoading(true);
-  };
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-
-    getStreams(filters)
-      .then((records) => {
-        if (!cancelled) {
-          setData(records);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (cancelled || controller.signal.aborted) return;
-        setError(
-          err instanceof StreamsServiceError
-            ? err
-            : new StreamsServiceError(String(err), 'network'),
-        );
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtersKey, triggerRef.current]);
-
-  return { data, loading, error, refetch };
-}
-
-/**
  * Fetches streams for a specific recipient address.
  * Cancels the in-flight request on unmount or address change.
  */
-export function useRecipientStreams(address: string): UseStreamsResult {
+export function useRecipientStreams(address: string): UseRecipientStreamsResult {
   const [data, setData] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<StreamsServiceError | null>(null);
@@ -106,7 +121,7 @@ export function useRecipientStreams(address: string): UseStreamsResult {
         setError(
           err instanceof StreamsServiceError
             ? err
-            : new StreamsServiceError(String(err), 'network'),
+            : new StreamsServiceError(String(err), "network"),
         );
         setLoading(false);
       });
@@ -119,4 +134,77 @@ export function useRecipientStreams(address: string): UseStreamsResult {
   }, [address, triggerRef.current]);
 
   return { data, loading, error, refetch };
+}
+
+// ---------------------------------------------------------------------------
+// useStreamById
+// ---------------------------------------------------------------------------
+
+interface UseStreamByIdResult {
+  stream: StreamRecord | null;
+  loading: boolean;
+  error: StreamsServiceError | null;
+  refetch: () => void;
+}
+
+/**
+ * React hook that fetches a single stream by its identifier.
+ *
+ * - When `id` is `null` or an empty string the hook returns immediately with
+ *   `{ stream: null, loading: false, error: null }` and does **not** issue a
+ *   network request.
+ * - Changing `id` while a request is in-flight cancels the previous request
+ *   via `AbortController` before starting a new one.
+ * - A 404 response from the service resolves to `{ stream: null, error: null }`
+ *   rather than an error state.
+ *
+ * @param id - The stream identifier to resolve, or `null` / `""` to skip.
+ * @returns `{ stream, loading, error, refetch }`
+ */
+export function useStreamById(id: string | null): UseStreamByIdResult {
+  const [stream, setStream] = useState<StreamRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<StreamsServiceError | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    // Skip fetch when id is falsy — no network request, no loading state.
+    if (!id) {
+      setStream(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    getStreamById(id)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setStream(data);
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof StreamsServiceError
+              ? err
+              : new StreamsServiceError(String(err), "network"),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [id, tick]);
+
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
+
+  return { stream, loading, error, refetch };
 }
