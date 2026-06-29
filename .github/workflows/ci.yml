@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Lint, test & bundle budget
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle size report & budget check
+        run: node scripts/bundle-size-report.mjs
+        env:
+          # Override thresholds here or via repo/env vars.
+          # Defaults: 250 kB per chunk, 500 kB total JS (all gzip).
+          BUNDLE_MAX_CHUNK_GZIP: ${{ vars.BUNDLE_MAX_CHUNK_GZIP || '256000' }}
+          BUNDLE_MAX_TOTAL_JS_GZIP: ${{ vars.BUNDLE_MAX_TOTAL_JS_GZIP || '512000' }}
+
+      - name: Upload bundle report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size-report
+          path: dist/assets/
+          retention-days: 30
