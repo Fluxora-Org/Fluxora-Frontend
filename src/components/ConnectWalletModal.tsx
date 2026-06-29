@@ -48,6 +48,7 @@ interface WalletOption {
   description: string;
   icon: string;
   action: () => void;
+  disabled?: boolean;
 }
 
 export default function ConnectWalletModal({
@@ -236,6 +237,7 @@ export default function ConnectWalletModal({
       description: "Open in-browser wallet for quick secure approvals.",
       icon: "⭐",
       action: onConnectAlbedo ?? (() => {}),
+      disabled: !onConnectAlbedo,
     },
     {
       id: "walletconnect",
@@ -243,6 +245,7 @@ export default function ConnectWalletModal({
       description: "Pair with compatible mobile wallets via QR.",
       icon: "🔗",
       action: onConnectWalletConnect ?? (() => {}),
+      disabled: !onConnectWalletConnect,
     },
   ];
 
@@ -302,7 +305,8 @@ export default function ConnectWalletModal({
             <div className={styles.walletList} role="list" aria-label="Wallet providers">
               {walletOptions.map((wallet) => {
                 const isActive =
-                  hoveredOptionId === wallet.id || focusedOptionId === wallet.id;
+                  !wallet.disabled &&
+                  (hoveredOptionId === wallet.id || focusedOptionId === wallet.id);
 
                 return (
                   <button
@@ -311,42 +315,82 @@ export default function ConnectWalletModal({
                     role="listitem"
                     className={styles.walletOption}
                     style={{
-                      background: isActive ? "var(--surface-elevated)" : "var(--surface-neutral)",
-                      borderColor: isActive ? "var(--border-interactive)" : "var(--border-neutral)",
-                      boxShadow: isActive
-                        ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
-                        : "none",
+                      background: wallet.disabled
+                        ? "var(--surface-neutral)"
+                        : isActive
+                          ? "var(--surface-elevated)"
+                          : "var(--surface-neutral)",
+                      borderColor: wallet.disabled
+                        ? "var(--border-neutral)"
+                        : isActive
+                          ? "var(--border-interactive)"
+                          : "var(--border-neutral)",
+                      boxShadow:
+                        !wallet.disabled && isActive
+                          ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
+                          : "none",
+                      opacity: wallet.disabled ? 0.5 : 1,
+                      cursor: wallet.disabled ? "not-allowed" : "pointer",
                     }}
-                    onClick={wallet.action}
-                    onMouseEnter={() => setHoveredOptionId(wallet.id)}
+                    onClick={wallet.disabled ? undefined : wallet.action}
+                    onMouseEnter={() => !wallet.disabled && setHoveredOptionId(wallet.id)}
                     onMouseLeave={() => setHoveredOptionId(null)}
-                    onFocus={() => setFocusedOptionId(wallet.id)}
+                    onFocus={() => !wallet.disabled && setFocusedOptionId(wallet.id)}
                     onBlur={() => setFocusedOptionId(null)}
-                    aria-label={`Connect with ${wallet.name}`}
+                    aria-label={
+                      wallet.disabled
+                        ? `${wallet.name} — coming soon`
+                        : `Connect with ${wallet.name}`
+                    }
+                    aria-disabled={wallet.disabled}
+                    disabled={wallet.disabled}
                   >
                     <div className={styles.walletIcon} aria-hidden="true">
                       {wallet.icon}
                     </div>
                     <div className={styles.walletInfo}>
-                      <div className={styles.walletName}>{wallet.name}</div>
+                      <div className={styles.walletName}>
+                        {wallet.name}
+                        {wallet.disabled && (
+                          <span
+                            style={{
+                              marginLeft: "0.5rem",
+                              fontSize: "0.7em",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              color: "var(--text-tertiary, #888)",
+                              border: "1px solid currentColor",
+                              borderRadius: "4px",
+                              padding: "1px 5px",
+                              verticalAlign: "middle",
+                            }}
+                            aria-hidden="true"
+                          >
+                            coming soon
+                          </span>
+                        )}
+                      </div>
                       <div className={styles.walletDescription}>{wallet.description}</div>
                     </div>
-                    <svg
-                      className={styles.chevron}
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M6 3l5 5-5 5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    {!wallet.disabled && (
+                      <svg
+                        className={styles.chevron}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M6 3l5 5-5 5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
                   </button>
                 );
               })}

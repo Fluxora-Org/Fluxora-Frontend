@@ -851,6 +851,9 @@ export default function Streams() {
     hasStreams &&
     withdrawableNow === 0 &&
     activeStreams.length > 0;
+  // Determine the most specific reason: rate-zero takes priority over cliff
+  const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
+  const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "cliff";
   const effectiveExpandedId = visibleStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
@@ -1031,13 +1034,13 @@ export default function Streams() {
           {showZeroAccrual && (
             <div style={{ marginBottom: "2rem" }}>
               <ZeroAccrualBanner
-                reason="cliff"
-                nextEventDate={nextUnlock}
+                reason={zeroAccrualReason}
+                nextEventDate={hasZeroRateStream ? undefined : nextUnlock}
                 onAction={() => {
                   const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel="Check cliff date"
+                actionLabel={hasZeroRateStream ? "Review stream settings" : "Check cliff date"}
               />
             </div>
           )}
