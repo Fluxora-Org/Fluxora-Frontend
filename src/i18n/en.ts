@@ -157,4 +157,7 @@ export const en = {
 
   // Streams.tsx Empty Search State
   "streams.emptySearch.text": "No streams match your search or filter.",
+
+  // Streams.tsx ARIA live region filter announcement
+  "streams.announcement.showing": "Showing {count}{filter} {noun}.",
 };
