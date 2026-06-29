@@ -61,6 +61,17 @@ export default defineConfig(async () => {
               return "app-empty-state-demo";
             }
 
+            // Below-the-fold landing sections are lazy-loaded from Home and
+            // share one chunk so they download together once the user scrolls.
+            if (
+              normalizedId.includes("/src/components/landing-page/TrustSection") ||
+              normalizedId.includes("/src/components/ValuePropositionSection") ||
+              normalizedId.includes("/src/components/GetStartedCTA") ||
+              normalizedId.includes("/src/components/NewsletterSection")
+            ) {
+              return "app-landing";
+            }
+
             // Vendor splitting for bundle-size visibility.
             return vendorChunk(id);
           },

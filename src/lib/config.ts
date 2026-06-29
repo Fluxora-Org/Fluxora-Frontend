@@ -71,9 +71,35 @@ function optionalUrl(
   return validateUrl(field, trimmed);
 }
 
-function optionalString(value: string | undefined): string | null {
+/**
+ * Stellar contract IDs are Strkey-encoded contract addresses: exactly 56
+ * characters, starting with 'C', using the base-32 alphabet A–Z and 2–7.
+ *
+ * Reference: https://developers.stellar.org/docs/learn/glossary#contract-id
+ */
+const STELLAR_CONTRACT_ID_RE = /^C[A-Z2-7]{55}$/;
+
+export function validateContractId(
+  field: string,
+  value: string,
+): string | ConfigError {
+  const trimmed = value.trim();
+  if (!STELLAR_CONTRACT_ID_RE.test(trimmed)) {
+    return {
+      field,
+      message: `${field}: "${trimmed}" is not a valid Stellar contract ID (expected a 56-character Strkey starting with 'C')`,
+    };
+  }
+  return trimmed;
+}
+
+function optionalContractId(
+  field: string,
+  value: string | undefined,
+): string | null | ConfigError {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  if (!trimmed) return null;
+  return validateContractId(field, trimmed);
 }
 
 export function parseBooleanFlag(value: string | undefined): boolean {
@@ -93,12 +119,18 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
 
   const apiUrlResult = optionalUrl("apiUrl", env.VITE_API_URL);
   const rpcUrlResult = optionalUrl("rpcUrl", env.VITE_RPC_URL);
+  const contractIdResult = optionalContractId(
+    "streamContractId",
+    env.VITE_STREAM_CONTRACT_ID,
+  );
 
   const errors: ConfigError[] = [];
   if (apiUrlResult && typeof apiUrlResult === "object")
     errors.push(apiUrlResult);
   if (rpcUrlResult && typeof rpcUrlResult === "object")
     errors.push(rpcUrlResult);
+  if (contractIdResult && typeof contractIdResult === "object")
+    errors.push(contractIdResult);
 
   if (errors.length > 0) {
     throw new Error(errors.map((e) => e.message).join("; "));
@@ -110,7 +142,7 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
     networkLabel: getNetworkLabel(network),
     networkPassphrase: getNetworkPassphrase(network),
     rpcUrl: rpcUrlResult as string | null,
-    streamContractId: optionalString(env.VITE_STREAM_CONTRACT_ID),
+    streamContractId: contractIdResult as string | null,
     useMocks: parseBooleanFlag(env.VITE_USE_MOCKS),
   };
 }

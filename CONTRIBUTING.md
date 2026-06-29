@@ -2,6 +2,21 @@
 
 Thanks for contributing to Fluxora. This guide covers everything you need to go from zero to a mergeable PR: local setup, branch naming, commit conventions, and the full test/coverage workflow.
 
+## Quick Start Checklist
+
+For first-time contributors:
+
+- [ ] Fork the repo and clone your fork
+- [ ] Run `npm install` to install dependencies
+- [ ] Copy `.env.example` to `.env.local` and fill in required values
+- [ ] Run `npm run dev` to start the local dev server
+- [ ] Create a branch: `feat/<issue>-short-description` or `fix/<issue>-short-description`
+- [ ] Make your change and write/update tests
+- [ ] Run `npm test` and `npm run lint` before pushing
+- [ ] Open a PR targeting `main` and fill out the template
+
+
+
 ---
 
 ## Table of Contents
@@ -283,3 +298,28 @@ Several design and accessibility specs live at the repo root and in `docs/`. Ref
 - The `/app` route subtree is protected by `RequireWallet`. This is a **client-side UX guard only** — backend services must still enforce authorization independently.
 
 For the full contract security model see [docs/security.md](docs/security.md).
+
+---
+
+## Bundle Size Thresholds
+
+Vite is configured with a **chunk size warning limit of 650 kB** (`chunkSizeWarningLimit` in `vite.config.ts`). A CI job enforces this as a hard gate:
+
+```bash
+# Run locally before opening a PR:
+npm run size-check
+```
+
+This runs `npm run build` followed by `node scripts/bundle-size-report.mjs --fail`, which exits with code 1 if any JS chunk exceeds 650 kB, blocking the merge.
+
+### Temporarily exempting a chunk
+
+If you need to merge while a chunk is over-limit (e.g. a large vendored library with no tree-shaking support), pass `--allow <chunkName>` in the CI step and add a comment explaining the reason and a follow-up ticket:
+
+```yaml
+# .github/workflows/bundle-size-check.yml
+run: npm run build && node scripts/bundle-size-report.mjs --fail --allow vendor-heavy
+# TEMP: vendor-heavy does not support ESM tree-shaking. Tracked in #999.
+```
+
+Remove the exemption once the underlying issue is resolved.
