@@ -5,6 +5,8 @@ import {
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
 import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
+import { useClipboard } from "../../hooks/useClipboard";
+import { useOptionalToast } from "../toast/ToastProvider";
 
 interface WalletStatusProps {
   address: string;
@@ -23,9 +25,11 @@ export default function WalletStatus({
   onDisconnect,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const { copy, status: copyStatus } = useClipboard();
+  const toast = useOptionalToast();
+  const copied = copyStatus === "copied";
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const focusRingClassName =
@@ -68,52 +72,17 @@ export default function WalletStatus({
   }, [address]);
 
  const handleCopy = async () => {
-  let success = false;
-
-  try {
-    // Try the modern Clipboard API first
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(address);
-      success = true;
-    } else {
-      // Fallback for older browsers or insecure contexts
-      const textarea = document.createElement("textarea");
-      textarea.value = address;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-
-      try {
-        success = document.execCommand("copy");
-      } finally {
-        document.body.removeChild(textarea);
-      }
-    }
-  } catch {
-    success = false;
-  }
+  // Copy via the shared hook (Clipboard API + execCommand fallback).
+  const success = await copy(address);
 
   if (success) {
-    setCopied(true);
     setAnnouncement("Address copied to clipboard");
-    setTimeout(() => {
-      setCopied(false);
-      setAnnouncement("");
-    }, 2000);
+    setTimeout(() => setAnnouncement(""), 2000);
   } else {
-    // Explicit failure feedback
+    // Explicit failure feedback: live-region announcement + error toast.
     setAnnouncement("Failed to copy address. Please copy manually.");
-    // Show a visual error state briefly
-    setCopied(false);
-    // Use a separate state or visual indicator for error
-    // We'll use the copied state with a different visual
-    // For now, we'll rely on the announcement
-    setTimeout(() => {
-      setAnnouncement("");
-    }, 3000);
+    toast?.addToast("Failed to copy address. Please copy manually.", "error");
+    setTimeout(() => setAnnouncement(""), 3000);
   }
 };
 
@@ -131,7 +100,7 @@ export default function WalletStatus({
 
   return (
     <div ref={ref} className="flex items-center gap-2">
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
       {/* Network Badge */}

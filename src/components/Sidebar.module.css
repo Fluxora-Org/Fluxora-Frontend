@@ -54,10 +54,22 @@
   text-align: left;
 }
 
+/*
+ * Design-token adoption (issue #562): replaced hardcoded values with their
+ * design-tokens.css equivalents so the dark/light theme toggle applies without
+ * separate overrides.
+ *   #00b8d4 -> var(--color-accent-primary)
+ *   #0097a7 -> var(--color-accent-primary-dark)
+ *   32px    -> var(--space-2xl)
+ */
 .logoIcon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(180deg, #00b8d4 0%, #0097a7 100%);
+  width: var(--space-2xl);
+  height: var(--space-2xl);
+  background: linear-gradient(
+    180deg,
+    var(--color-accent-primary) 0%,
+    var(--color-accent-primary-dark) 100%
+  );
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;

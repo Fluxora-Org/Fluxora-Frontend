@@ -1,5 +1,6 @@
 import React from "react";
 import "./StreamTimeline.module.css";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 export interface StreamTimelineProps {
   startDate: string;
@@ -45,6 +46,8 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   const cliff = cliffDate ? new Date(cliffDate) : null;
   const current = new Date(currentDate);
   const end = new Date(endDate);
+
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Validate dates
   const totalDuration = end.getTime() - start.getTime();
@@ -129,6 +132,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label="Stream accrual progress"
+        data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       >
         {/* Cliff segment (hatched) */}
         {cliff && cliffPercent > 0 && (

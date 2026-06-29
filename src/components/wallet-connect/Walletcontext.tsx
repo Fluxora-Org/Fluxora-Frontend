@@ -17,6 +17,7 @@ import {
   isStellarNetworkMismatch,
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
+import { isValidStellarAddress } from "../../lib/stellar";
 import { getNetworkLabel } from "../../lib/config";
 
 /**
@@ -156,8 +157,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
-  const connect = (address: string, network: string) =>
+  const connect = (address: string, network: string) => {
+    if (!isValidStellarAddress(address)) return;
     setState({ address, network, connected: true, error: null, loading: false });
+  };
 
   const disconnect = () => {
     disconnectVersionRef.current += 1;
@@ -213,6 +216,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (!isValidStellarAddress(addr.address)) {
+          restoreError({ message: "Invalid Stellar address returned by Freighter" });
+          return;
+        }
+
         const net = await getNetwork();
         if (net.error) {
           restoreError(net.error);
@@ -252,6 +260,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const watcher = new WatchWalletChanges(WALLET_WATCH_INTERVAL_MS);
     watcherRef.current = watcher;
     watcher.watch(({ address, network }) => {
+      if (!isValidStellarAddress(address)) return;
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev
