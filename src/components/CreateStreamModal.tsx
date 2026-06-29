@@ -35,6 +35,7 @@ export function sanitizeDepositAmountInput(value: string): string {
 
 // Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
 export const MAX_ACCRUAL_RATE = 100_000;
+export const MIN_DURATION_DAYS = 1;
 export const MAX_DURATION_DAYS = 3_650;
 export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
@@ -92,6 +93,10 @@ function validateDuration(value: string, t: any): string | undefined {
 
   if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
     return t("createStream.validation.durationPositive");
+  }
+
+  if (numericValue < MIN_DURATION_DAYS) {
+    return t("createStream.validation.durationMin", { min: MIN_DURATION_DAYS });
   }
 
   if (numericValue > MAX_DURATION_DAYS) {

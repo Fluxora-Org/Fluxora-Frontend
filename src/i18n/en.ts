@@ -99,6 +99,7 @@ export const en = {
   "createStream.validation.ratePositive": "Stream rate must be a positive number.",
   "createStream.validation.rateMax": "Stream rate must be {max} USDC/day or less.",
   "createStream.validation.durationPositive": "Duration must be a positive number.",
+  "createStream.validation.durationMin": "Duration must be at least {min} day.",
   "createStream.validation.durationMax": "Duration must be {max} days or less.",
   "createStream.validation.recipientRequired": "Recipient is required.",
   "createStream.validation.recipientInvalid": "Please enter a valid Stellar address (starts with G, 56 characters).",
