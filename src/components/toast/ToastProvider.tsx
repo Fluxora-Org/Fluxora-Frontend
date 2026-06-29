@@ -104,3 +104,13 @@ export function useToast(): ToastContextValue {
   }
   return ctx;
 }
+
+/**
+ * useOptionalToast — like {@link useToast} but returns `null` instead of
+ * throwing when rendered outside a `ToastProvider`. Useful for shared widgets
+ * (e.g. copy buttons) that should still work in isolation/tests where no
+ * provider is mounted.
+ */
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
