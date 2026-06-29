@@ -43,6 +43,14 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+// Budget thresholds (gzip bytes). Adjust as the app grows.
+const BUDGET = {
+  /** Largest single JS chunk (gzip). */
+  maxChunkGzip: parseInt(process.env.BUNDLE_MAX_CHUNK_GZIP ?? String(250 * 1024), 10),
+  /** Total JS across all chunks (gzip). */
+  maxTotalJsGzip: parseInt(process.env.BUNDLE_MAX_TOTAL_JS_GZIP ?? String(500 * 1024), 10),
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -109,14 +117,15 @@ for (const file of files) {
 rows.sort((a, b) => b.raw - a.raw);
 
 const totals = rows.reduce(
-  (sum, row) => ({
-    raw: sum.raw + row.raw,
-    gzip: sum.gzip + row.gzip,
-  }),
+  (sum, row) => ({ raw: sum.raw + row.raw, gzip: sum.gzip + row.gzip }),
   { raw: 0, gzip: 0 },
 );
 
 const oversized = rows.filter((r) => r.overLimit);
+
+const jsRows = rows.filter((r) => r.file.endsWith(".js"));
+const totalJsGzip = jsRows.reduce((s, r) => s + r.gzip, 0);
+const maxChunkGzip = jsRows.reduce((max, r) => Math.max(max, r.gzip), 0);
 
 // ---------------------------------------------------------------------------
 // Print report
@@ -165,4 +174,36 @@ if (failOnOversize && oversized.length > 0) {
     "\nReduce the chunk size or, as a temporary measure, pass --allow <chunkName> with a rationale comment.",
   );
   process.exit(1);
+}
+
+// ── Budget check ──────────────────────────────────────────────────────────────
+console.log("");
+console.log("Budget check");
+console.log("============");
+
+const violations = [];
+
+if (maxChunkGzip > BUDGET.maxChunkGzip) {
+  violations.push(
+    `Largest JS chunk: ${formatKb(maxChunkGzip)} exceeds budget of ${formatKb(BUDGET.maxChunkGzip)}`,
+  );
+}
+
+if (totalJsGzip > BUDGET.maxTotalJsGzip) {
+  violations.push(
+    `Total JS (gzip): ${formatKb(totalJsGzip)} exceeds budget of ${formatKb(BUDGET.maxTotalJsGzip)}`,
+  );
+}
+
+if (violations.length > 0) {
+  console.error("❌ Bundle budget exceeded:");
+  for (const v of violations) {
+    console.error(`   • ${v}`);
+  }
+  process.exit(1);
+} else {
+  console.log(
+    `✅ Within budget — largest chunk: ${formatKb(maxChunkGzip)} / ${formatKb(BUDGET.maxChunkGzip)},` +
+    ` total JS: ${formatKb(totalJsGzip)} / ${formatKb(BUDGET.maxTotalJsGzip)}`,
+  );
 }
