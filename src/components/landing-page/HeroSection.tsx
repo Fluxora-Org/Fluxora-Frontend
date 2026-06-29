@@ -1,6 +1,23 @@
 import { useState, useEffect } from "react";
 import "../../design-tokens.css";
 
+export type HeroMetric = {
+  label: string;
+  value: string;
+};
+
+/**
+ * Placeholder marketing metrics displayed in the Hero section.
+ * These values are intentionally centralized as a placeholder data source
+ * and can later be replaced by live data without modifying the JSX.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const HERO_METRICS: HeroMetric[] = [
+  { value: "$2.4M+", label: "Streamed" },
+  { value: "150+", label: "Active Streams" },
+  { value: "45+", label: "Verified DAOs" },
+];
+
 interface HeroSectionProps {
   theme?: "light" | "dark";
 }
@@ -150,27 +167,25 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             </div>
 
             {/* Social Proof / Metrics */}
-            <div className={`flex flex-wrap gap-12 mt-8 pt-8 border-t ${isDark ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
-              {[
-                { value: "$2.4M+", label: "Streamed" },
-                { value: "150+", label: "Active Streams" },
-                { value: "45+", label: "Verified DAOs" },
-              ].map(({ value, label }) => (
-                <div key={label} className="flex flex-col gap-1 group">
-                  <span
-                    className={`
-                      text-3xl font-extrabold tracking-tight transition-colors duration-300
-                      ${isDark ? "text-white group-hover:text-cyan-400" : "text-slate-900 group-hover:text-cyan-600"}
-                    `}
-                  >
-                    {value}
-                  </span>
-                  <span className={`text-label-sm uppercase tracking-widest ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {HERO_METRICS.length > 0 && (
+              <div className={`flex flex-wrap gap-12 mt-8 pt-8 border-t ${isDark ? 'border-slate-800/50' : 'border-slate-200/50'}`}>
+                {HERO_METRICS.map(({ value, label }) => (
+                  <div key={label} className="flex flex-col gap-1 group">
+                    <span
+                      className={`
+                        text-3xl font-extrabold tracking-tight transition-colors duration-300
+                        ${isDark ? "text-white group-hover:text-cyan-400" : "text-slate-900 group-hover:text-cyan-600"}
+                      `}
+                    >
+                      {value}
+                    </span>
+                    <span className={`text-label-sm uppercase tracking-widest ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ─── RIGHT: Glassmorphic Stream Card ─── */}

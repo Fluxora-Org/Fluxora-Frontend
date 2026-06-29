@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './InfoTooltip.css';
 
 export interface InfoTooltipProps {
@@ -133,13 +133,12 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  // Focus close button when tooltip opens
-  useEffect(() => {
-    if (isOpen && closeButtonRef.current) {
-      // Small delay to allow positioning to settle
-      setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 50);
+  // Focus close button when tooltip opens. Using a layout effect (which runs
+  // synchronously after the DOM mutation, before paint) gives reliable focus
+  // timing without the fragility of a setTimeout/raf deferral.
+  useLayoutEffect(() => {
+    if (isOpen) {
+      closeButtonRef.current?.focus();
     }
   }, [isOpen]);
 

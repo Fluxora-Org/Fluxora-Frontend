@@ -20,12 +20,14 @@ export default function StreamCreatedModal({
 }: StreamCreatedModalProps) {
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [isPopupBlocked, setIsPopupBlocked] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setAnnouncement("Success! Your USDC stream is now live on Stellar.");
+      setIsPopupBlocked(false);
       const timer = setTimeout(() => setAnnouncement(""), 1000);
       return () => clearTimeout(timer);
     }
@@ -40,10 +42,85 @@ export default function StreamCreatedModal({
 
   if (!isOpen) return null;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(streamUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const fallbackCopy = (): boolean => {
+    const textarea = document.createElement("textarea");
+    textarea.value = streamUrl;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      return document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const writeToClipboard = async (): Promise<boolean> => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(streamUrl);
+      return true;
+    }
+
+    return fallbackCopy();
+  };
+
+  /**
+   * Copies the stream URL to the clipboard and toggles the copied visual state on success.
+   *
+   * Uses the async Clipboard API when available. In insecure contexts where
+   * `navigator.clipboard` is undefined, falls back to a temporary textarea
+   * with `document.execCommand("copy")`. The URL bar remains visible and
+   * selectable as a manual fallback.
+   *
+   * On failure (permission denied or fallback copy failure), announces an
+   * accessible error via the modal's aria-live region without logging the URL.
+   * The 2s reset timer applies only to the success checkmark state.
+   */
+  const handleCopy = async () => {
+    try {
+      const didCopy = await writeToClipboard();
+      if (!didCopy) {
+        throw new Error("Fallback copy command failed");
+      }
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setAnnouncement(
+        "Could not copy stream URL. Please select and copy the URL manually.",
+      );
+      setTimeout(() => setAnnouncement(""), 3000);
+    }
+  };
+
+  /**
+   * Opens the stream URL in a new tab.
+   * Enforces https: scheme for security (preventing javascript: or data: injection).
+   * Detects popup-blocker null return and shows an accessible inline link fallback.
+   */
+  const handleViewStream = () => {
+    try {
+      const parsedUrl = new URL(streamUrl);
+      if (parsedUrl.protocol !== "https:") {
+        console.error("Invalid URL scheme. Only https is allowed.");
+        return;
+      }
+    } catch (e) {
+      console.error("Invalid URL provided.");
+      return;
+    }
+
+    const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
+    if (!newWindow) {
+      setIsPopupBlocked(true);
+      setAnnouncement("Popup blocked. Please use the fallback link to view your stream.");
+    } else {
+      setIsPopupBlocked(false);
+    }
   };
 
   return (
@@ -109,7 +186,7 @@ export default function StreamCreatedModal({
             <div className={styles.urlBar}>{streamUrl}</div>
             <button
               className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
-              onClick={handleCopy}
+              onClick={() => void handleCopy()}
               type="button"
               aria-label="Copy stream URL"
             >
@@ -153,6 +230,20 @@ export default function StreamCreatedModal({
           </p>
         </div>
 
+        {isPopupBlocked && (
+          <div className={styles.popupBlockedMessage} role="alert">
+            Popup blocked.{" "}
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.fallbackLink}
+            >
+              Click here to view your stream
+            </a>
+          </div>
+        )}
+
         <div className={styles.actions}>
           <button
             className={`${styles.btn} ${styles.btnSecondary}`}
@@ -176,9 +267,7 @@ export default function StreamCreatedModal({
           </button>
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}
-            onClick={() =>
-              window.open(streamUrl, "_blank", "noopener,noreferrer")
-            }
+            onClick={handleViewStream}
             type="button"
           >
             View stream
