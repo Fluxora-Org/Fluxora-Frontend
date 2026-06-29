@@ -52,7 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback(
     (message: string, variant: ToastVariant, timeout = DEFAULT_TIMEOUT): string => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const id = crypto.randomUUID();
       setToasts((prev) => [...prev, { id, message, variant, timeout }]);
       const timer = setTimeout(() => dismiss(id), timeout);
       timers.current.set(id, timer);
@@ -103,4 +103,14 @@ export function useToast(): ToastContextValue {
     throw new Error("useToast must be used inside <ToastProvider>");
   }
   return ctx;
+}
+
+/**
+ * useOptionalToast — like {@link useToast} but returns `null` instead of
+ * throwing when rendered outside a `ToastProvider`. Useful for shared widgets
+ * (e.g. copy buttons) that should still work in isolation/tests where no
+ * provider is mounted.
+ */
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
 }
