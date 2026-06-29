@@ -281,3 +281,36 @@ describe("ConnectWalletModal", () => {
     });
   });
 });
+
+describe("unavailable wallet options (Albedo, WalletConnect)", () => {
+  it("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+    const albedo = screen.getByRole("button", { name: "Albedo — coming soon" });
+    const wc = screen.getByRole("button", { name: "WalletConnect — coming soon" });
+
+    expect(albedo).toBeDisabled();
+    expect(wc).toBeDisabled();
+  });
+
+  it("shows 'coming soon' label text for disabled options", () => {
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+    expect(screen.getAllByText("coming soon")).toHaveLength(2);
+  });
+
+  it("enables Albedo when a handler is provided", () => {
+    const onAlbedo = vi.fn();
+    render(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onConnectAlbedo={onAlbedo}
+        showStateSwitcher={false}
+      />
+    );
+
+    const albedo = screen.getByRole("button", { name: "Connect with Albedo" });
+    expect(albedo).not.toBeDisabled();
+    expect(screen.getAllByText("coming soon")).toHaveLength(1); // only WalletConnect
+  });
+});
