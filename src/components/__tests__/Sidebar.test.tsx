@@ -69,6 +69,27 @@ function renderSidebar(mobileOpen = false, onRender?: ProfilerOnRenderCallback) 
   return render(sidebar);
 }
 
+describe("Sidebar design-token adoption", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders the logo gradient from design-token CSS variables, not hardcoded hex", () => {
+    setViewportWidth(BREAKPOINT_MD);
+    const { container } = renderSidebar(false);
+
+    const logo = container.querySelector<HTMLElement>(".bg-gradient-to-b");
+    expect(logo).toBeTruthy();
+
+    const className = logo!.className;
+    // Token variables are referenced...
+    expect(className).toContain("from-[var(--color-accent-primary)]");
+    expect(className).toContain("to-[var(--color-accent-primary-dark)]");
+    // ...and no raw hex colors remain.
+    expect(className).not.toMatch(/#[0-9a-fA-F]{3,6}/);
+  });
+});
+
 describe("isMobileViewport", () => {
   it("treats widths below BREAKPOINT_MD as mobile", () => {
     expect(isMobileViewport(BREAKPOINT_MD - 1)).toBe(true);
