@@ -31,5 +31,22 @@ export default defineConfig({
         channel: browserChannel,
       },
     },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+      },
+    },
+    // WebKit requires macOS in most CI environments; guard with CI flag or use test:e2e:full
+    ...(process.env.CI !== "true" || process.env.PLAYWRIGHT_WEBKIT === "1"
+      ? [
+          {
+            name: "webkit",
+            use: {
+              ...devices["Desktop Safari"],
+            },
+          },
+        ]
+      : []),
   ],
 });
