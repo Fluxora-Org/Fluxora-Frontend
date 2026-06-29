@@ -6,4 +6,6 @@ export interface Metric {
   label: string;
   value: string;
   desc: string;
+  /** Optional trend data for the rate-of-change sparkline (e.g. last N data points). */
+  trend?: number[];
 }
