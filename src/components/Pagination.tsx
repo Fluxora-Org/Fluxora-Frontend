@@ -1,159 +1,69 @@
-import React from "react";
-import "./Pagination.css";
+import React from 'react';
 
-const PAGE_WINDOW_RADIUS = 2;
-const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-
-type PageToken = number | "ellipsis";
-
-/**
- * Props for the stream-list pagination control.
- *
- * Page navigation is clamped to the available range before callbacks fire, and
- * page-size changes are ignored unless the selected value is a supported
- * positive option.
- */
 interface PaginationProps {
-  currentPage: number;
   totalItems: number;
   itemsPerPage: number;
+  currentPage: number;
   onPageChange: (page: number) => void;
-  onItemsPerPageChange: (limit: number) => void;
 }
 
-function clampPage(page: number, totalPages: number): number {
-  if (!Number.isFinite(page)) return 1;
-  return Math.min(Math.max(Math.trunc(page), 1), totalPages);
-}
+export function normalizePagination(totalItems: number, itemsPerPage: number, currentPage: number) {
+  // Turn negative numbers into 0, and turn decimals into flat whole numbers
+  const safeTotalItems = Math.max(0, Math.floor(totalItems || 0));
+  const safeItemsPerPage = Math.max(1, Math.floor(itemsPerPage || 10));
 
-function getPageTokens(currentPage: number, totalPages: number): PageToken[] {
-  if (totalPages <= 1) return [1];
+  // Count how many pages we need, making sure we have at least 1 page
+  const totalPages = Math.max(1, Math.ceil(safeTotalItems / safeItemsPerPage));
 
-  const visiblePages = new Set<number>([1, totalPages]);
-  const windowStart = Math.max(1, currentPage - PAGE_WINDOW_RADIUS);
-  const windowEnd = Math.min(totalPages, currentPage + PAGE_WINDOW_RADIUS);
+  // Make sure our current page isn't zero, negative, or too big
+  const safeCurrentPage = Math.max(1, Math.min(totalPages, Math.floor(currentPage || 1)));
 
-  for (let page = windowStart; page <= windowEnd; page += 1) {
-    visiblePages.add(page);
-  }
-
-  const sortedPages = Array.from(visiblePages).sort((a, b) => a - b);
-  const tokens: PageToken[] = [];
-
-  sortedPages.forEach((page, index) => {
-    const previousPage = sortedPages[index - 1];
-    if (previousPage !== undefined && page - previousPage > 1) {
-      tokens.push("ellipsis");
-    }
-    tokens.push(page);
-  });
-
-  return tokens;
+  return {
+    totalItems: safeTotalItems,
+    totalPages,
+    currentPage: safeCurrentPage,
+  };
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
-  currentPage,
   totalItems,
   itemsPerPage,
+  currentPage,
   onPageChange,
-  onItemsPerPageChange,
 }) => {
-  if (totalItems === 0) return null;
+  const { totalPages, currentPage: normalizedPage } = normalizePagination(
+    totalItems,
+    itemsPerPage,
+    currentPage
+  );
 
-  const safeItemsPerPage =
-    Number.isFinite(itemsPerPage) && itemsPerPage > 0
-      ? Math.trunc(itemsPerPage)
-      : PAGE_SIZE_OPTIONS[0];
-  const totalPages = Math.max(1, Math.ceil(totalItems / safeItemsPerPage));
-  const safeCurrentPage = clampPage(currentPage, totalPages);
-  const startItem = (safeCurrentPage - 1) * safeItemsPerPage + 1;
-  const endItem = Math.min(safeCurrentPage * safeItemsPerPage, totalItems);
-  const pageTokens = getPageTokens(safeCurrentPage, totalPages);
-
-  const requestPageChange = (page: number) => {
-    onPageChange(clampPage(page, totalPages));
-  };
-
-  const handleItemsPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextLimit = Number(event.target.value);
-    if (PAGE_SIZE_OPTIONS.some((option) => option === nextLimit)) {
-      onItemsPerPageChange(nextLimit);
-    }
-  };
+  if (totalItems <= 0) {
+    return (
+      <nav data-testid="pagination-container" className="pagination-empty">
+        <span>No items to display</span>
+      </nav>
+    );
+  }
 
   return (
-    <nav className="fluxora-pagination" aria-label="Stream list pagination">
-      <div className="pagination-info" aria-live="polite" aria-atomic="true">
-        Showing <span className="highlight">{startItem}</span> -{" "}
-        <span className="highlight">{endItem}</span> of{" "}
-        <span className="highlight">{totalItems}</span> streams
-      </div>
+    <nav data-testid="pagination-container" className="pagination-container">
+      <button
+        onClick={() => onPageChange(normalizedPage - 1)}
+        disabled={normalizedPage <= 1}
+      >
+        Previous
+      </button>
 
-      <div className="pagination-controls">
-        <div className="limit-selector">
-          <label htmlFor="items-per-page">Per page:</label>
-          <select
-            id="items-per-page"
-            value={
-              PAGE_SIZE_OPTIONS.some((option) => option === safeItemsPerPage)
-                ? safeItemsPerPage
-                : ""
-            }
-            onChange={handleItemsPerPageChange}
-          >
-            {PAGE_SIZE_OPTIONS.map((pageSize) => (
-              <option key={pageSize} value={pageSize}>
-                {pageSize}
-              </option>
-            ))}
-          </select>
-        </div>
+      <span data-testid="pagination-info">
+        Page {normalizedPage} of {totalPages}
+      </span>
 
-        <div className="page-buttons">
-          <button
-            type="button"
-            className="page-nav-btn"
-            disabled={safeCurrentPage === 1}
-            onClick={() => requestPageChange(safeCurrentPage - 1)}
-            aria-label="Previous page"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-
-          {pageTokens.map((token, index) =>
-            token === "ellipsis" ? (
-              <span key={`ellipsis-${index}`} className="page-ellipsis" aria-hidden="true">
-                &hellip;
-              </span>
-            ) : (
-              <button
-                key={token}
-                type="button"
-                className={`page-num-btn ${safeCurrentPage === token ? "is-active" : ""}`}
-                onClick={() => requestPageChange(token)}
-                aria-current={safeCurrentPage === token ? "page" : undefined}
-                aria-label={`Page ${token}`}
-              >
-                {token}
-              </button>
-            ),
-          )}
-
-          <button
-            type="button"
-            className="page-nav-btn"
-            disabled={safeCurrentPage === totalPages}
-            onClick={() => requestPageChange(safeCurrentPage + 1)}
-            aria-label="Next page"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <button
+        onClick={() => onPageChange(normalizedPage + 1)}
+        disabled={normalizedPage >= totalPages}
+      >
+        Next
+      </button>
     </nav>
   );
 };

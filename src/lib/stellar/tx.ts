@@ -24,6 +24,31 @@ export class TransactionError extends Error {
 }
 
 /**
+ * Maps Freighter signing errors to a TransactionError of type "rejected".
+ * Checks for a structured error code (`user_rejected`) first, then falls back to
+ * case‑insensitive keyword matching (`reject`, `decline`, `cancel`, `dismiss`).
+ * This provides a robust classification without relying on localized message strings.
+ */
+function mapFreighterSigningError(err: any): TransactionError {
+  const maybeErr = err as { code?: string };
+  if (maybeErr.code && maybeErr.code === "user_rejected") {
+    return new TransactionError(
+      "rejected",
+      "Transaction signature request was declined by the user."
+    );
+  }
+  const errMsg = String(err);
+  const rejectionKeywords = ["reject", "decline", "cancel", "dismiss"];
+  if (rejectionKeywords.some((kw) => errMsg.toLowerCase().includes(kw))) {
+    return new TransactionError(
+      "rejected",
+      "Transaction signature request was declined by the user."
+    );
+  }
+  return new TransactionError("rejected", `Freighter signing failed: ${errMsg}`);
+}
+
+/**
  * Returns the appropriate network passphrase for a given network name.
  * @param networkName - The name of the network (e.g. "TESTNET", "PUBLIC").
  */
@@ -138,12 +163,21 @@ async function validateNetwork(): Promise<void> {
 
 /**
  * Helper to wait for a transaction to be confirmed on-chain by polling the Soroban RPC.
+ *
+ * Retry budget and inter-poll delay are read from {@link transactionConfig} so
+ * they can be tuned per environment via env vars without code edits:
+ * - `VITE_TX_CONFIRMATION_MAX_RETRIES` — maximum poll attempts (default: 15, clamped 1–300)
+ * - `VITE_TX_CONFIRMATION_DELAY_MS`    — ms between attempts (default: 1500, clamped 100–30000)
+ *
+ * **Maximum total wait** ≈ `confirmationMaxRetries × confirmationDelayMs`
+ *
+ * Safe defaults are applied in case `transactionConfig` values are somehow absent.
  */
 async function waitForTransaction(
   server: SorobanRpc.Server,
   hash: string,
-  maxRetries = 15,
-  delayMs = 1500
+  maxRetries = transactionConfig.confirmationMaxRetries ?? 15,
+  delayMs = transactionConfig.confirmationDelayMs ?? 1500
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -278,16 +312,7 @@ async function executeInvocation(
     });
     signedXdr = signResult.signedTxXdr;
   } catch (err: any) {
-    const errMsg = String(err);
-    if (
-      errMsg.toLowerCase().includes("reject") ||
-      errMsg.toLowerCase().includes("decline") ||
-      errMsg.toLowerCase().includes("cancel") ||
-      errMsg.toLowerCase().includes("dismiss")
-    ) {
-      throw new TransactionError("rejected", "Transaction signature request was declined by the user.");
-    }
-    throw new TransactionError("rejected", `Freighter signing failed: ${errMsg}`);
+    throw mapFreighterSigningError(err);
   }
 
   // 6. Submit transaction to RPC
