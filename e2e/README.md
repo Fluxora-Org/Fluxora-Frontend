@@ -14,6 +14,63 @@ call deploy credentials.
 Set `PLAYWRIGHT_BASE_URL` to target an already-running app, or
 `PLAYWRIGHT_PORT` to change the managed dev-server port.
 
+## Cross-Browser Matrix
+
+Fluxora Frontend e2e tests run across multiple browser engines to catch
+CSS and Web Crypto API differences that Chromium-only CI may miss.
+
+| Browser | Engine | Default CI | Full Matrix |
+|---------|--------|------------|-------------|
+| Chrome  | Chromium | Yes | Yes |
+| Firefox | Gecko    | Yes | Yes |
+| Safari  | WebKit   | No (macOS only) | Yes (set `PLAYWRIGHT_WEBKIT=1`) |
+
+### Running individual projects
+
+```bash
+# Chromium only
+npx playwright test --project=chromium
+
+# Firefox only
+npx playwright test --project=firefox
+
+# WebKit only (requires macOS or PLAYWRIGHT_WEBKIT=1)
+npx playwright test --project=webkit
+```
+
+### Running the full matrix (all browsers)
+
+On macOS or a WebKit-capable runner:
+
+```bash
+npm run test:e2e:full
+# equivalent to: PLAYWRIGHT_WEBKIT=1 playwright test
+```
+
+### CI configuration
+
+The default `test:e2e` script runs Chromium and Firefox. WebKit is opt-in via
+`PLAYWRIGHT_WEBKIT=1` because most Linux CI runners do not support WebKit.
+
+To enable WebKit on a macOS CI runner:
+
+```yaml
+- name: Run full cross-browser e2e
+  run: npm run test:e2e:full
+  env:
+    CI: true
+    PLAYWRIGHT_WEBKIT: "1"
+```
+
+### Browser-specific notes
+
+- **Chromium**: Baseline browser; all features expected to work.
+- **Firefox**: `backdrop-filter` support and CSS variable behaviour differ
+  slightly; ensure wallet modal overlays render correctly.
+- **WebKit**: Web Crypto API (`crypto.subtle`) is available but some
+  algorithms behave differently. All e2e flows use mock wallet state — no
+  real wallet extensions or elevated browser permissions are required.
+
 ## Accessibility (axe) scans
 
 Automated axe-core accessibility scans cover all primary Fluxora Frontend routes.

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TruncatedAddress from "../common/TruncatedAddress";
+import { useOptionalToast } from "../toast/ToastProvider";
 
 const ADDRESS = "GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234567890123456789";
 
@@ -76,6 +77,26 @@ describe("TruncatedAddress", () => {
     await waitFor(() => expect(onCopyStateChange).toHaveBeenCalledWith("error"));
     expect(onCopy).not.toHaveBeenCalled();
     expect(screen.getByText("Address could not be copied")).toBeInTheDocument();
+  });
+
+  it("fires an error toast when copying fails", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    setClipboard(writeText);
+    const addToast = (
+      useOptionalToast() as unknown as { addToast: ReturnType<typeof vi.fn> }
+    ).addToast;
+    addToast.mockClear();
+
+    render(<TruncatedAddress address={ADDRESS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /copy address/i }));
+
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith(
+        expect.stringMatching(/failed to copy/i),
+        "error",
+      ),
+    );
   });
 
   it("announces an error when the fallback copy command fails", async () => {
