@@ -1,7 +1,29 @@
 import MetricCard from "./MetricCard";
 import { Metric } from "./Metric";
 
-export default function Metrics({ metrics }: { metrics: Metric[] }) {
+interface MetricsProps {
+  metrics: Metric[];
+  loading?: boolean;
+  error?: string | null;
+}
+
+export default function Metrics({ metrics, loading, error }: MetricsProps) {
+  if (loading) {
+    return (
+      <p role="status" className="text-sm text-gray-500">
+        Loading treasury metrics...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-red-600">
+        {error}
+      </p>
+    );
+  }
+
   return (
     <section
       aria-label="Treasury metrics"

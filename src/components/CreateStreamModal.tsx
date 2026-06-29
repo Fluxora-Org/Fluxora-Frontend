@@ -35,6 +35,7 @@ export function sanitizeDepositAmountInput(value: string): string {
 
 // Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
 export const MAX_ACCRUAL_RATE = 100_000;
+export const MIN_DURATION_DAYS = 1;
 export const MAX_DURATION_DAYS = 3_650;
 export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
@@ -92,6 +93,10 @@ function validateDuration(value: string, t: any): string | undefined {
 
   if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
     return t("createStream.validation.durationPositive");
+  }
+
+  if (numericValue < MIN_DURATION_DAYS) {
+    return t("createStream.validation.durationMin", { min: MIN_DURATION_DAYS });
   }
 
   if (numericValue > MAX_DURATION_DAYS) {
@@ -206,7 +211,18 @@ export default function CreateStreamModal({
       setError(t("createStream.validation.recipientRequired"));
       return false;
     }
-    if (!isValidStellarAddress(recipient.trim())) {
+    const normalizedRecipient = recipient.trim();
+
+    /**
+     * Self-send rule: Reject streams where the recipient equals the connected wallet address.
+     * This prevents users from wasting a deposit on a no-op transfer to themselves.
+     */
+    if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
+      setError("Recipient cannot be the same as the connected wallet address.");
+      return false;
+    }
+
+    if (!isValidStellarAddress(normalizedRecipient)) {
       setError(
         t("createStream.validation.recipientInvalid"),
       );
@@ -509,6 +525,8 @@ export default function CreateStreamModal({
               const recipientError = touched.recipient
                 ? (!recipient.trim()
                     ? t("createStream.validation.recipientRequired")
+                    : (wallet.connected && wallet.address && recipient.trim().toLowerCase() === wallet.address.toLowerCase())
+                    ? 'Recipient cannot be the same as the connected wallet address.'
                     : !isValidStellarAddress(recipient.trim())
                     ? t("createStream.validation.recipientInvalid")
                     : undefined)

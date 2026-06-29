@@ -142,19 +142,21 @@ describe("StreamCreatedModal", () => {
     render(<StreamCreatedModal {...defaultProps} />);
     const copyBtn = screen.getByRole("button", { name: /copy stream url/i });
 
-    // Click copy button
     await act(async () => {
       fireEvent.click(copyBtn);
+      await Promise.resolve();
     });
 
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       "https://fluxora.io/stream/STR-123",
     );
+    expect(copyBtn).toHaveClass("copied");
 
-    // Timer should transition back after 2000ms
     act(() => {
       vi.advanceTimersByTime(2000);
     });
+
+    expect(copyBtn).not.toHaveClass("copied");
   });
 
   it("opens streamUrl in a new tab when 'View stream' button is clicked", () => {
