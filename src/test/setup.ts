@@ -16,6 +16,8 @@ const customCrypto = {
     return array;
   },
   subtle: webcrypto.subtle,
+  randomUUID: (): `${string}-${string}-${string}-${string}-${string}` =>
+    webcrypto.randomUUID(),
 };
 
 if (typeof window !== 'undefined') {
