@@ -20,4 +20,25 @@ describe("Metrics", () => {
       screen.getByText("No treasury metrics available."),
     ).toBeInTheDocument();
   });
+
+  it("renders a loading status when loading=true", () => {
+    render(<Metrics metrics={[]} loading={true} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Loading treasury metrics...",
+    );
+  });
+
+  it("renders an error alert when error is set", () => {
+    render(<Metrics metrics={[]} error="Something went wrong" />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong");
+  });
+
+  it("loading takes precedence over error", () => {
+    render(<Metrics metrics={[]} loading={true} error="oops" />);
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

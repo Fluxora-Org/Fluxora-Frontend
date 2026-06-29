@@ -55,7 +55,7 @@ describe('StreamCreatedModal View Stream', () => {
     await user.click(screen.getByRole('button', { name: /view stream/i }));
 
     expect(openSpy).toHaveBeenCalled();
-    expect(screen.getByText(/popup blocked/i)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/popup blocked/i);
     
     const fallbackLink = screen.getByRole('link', { name: /click here to view your stream/i });
     expect(fallbackLink).toHaveAttribute('href', 'https://stellar.expert/explorer/public/account/G123');

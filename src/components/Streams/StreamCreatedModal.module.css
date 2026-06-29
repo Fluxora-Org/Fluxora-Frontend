@@ -131,6 +131,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
+  user-select: all;
 }
 
 .copyButton {

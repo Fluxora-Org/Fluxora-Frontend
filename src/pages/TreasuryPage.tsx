@@ -34,13 +34,13 @@ export default function TreasuryPage() {
         <p role="status" className="text-sm text-gray-500">
           Loading treasury overview...
         </p>
-      ) : (!metrics || !streams) ? (
+      ) : error ? null : (!metrics || !streams) ? (
         <p role="status" className="text-sm text-gray-500">
           No treasury data available.
         </p>
       ) : (
         <>
-          <Metrics metrics={metrics} />
+          <Metrics metrics={metrics} loading={loading} error={error} />
           <RecentStreams streams={streams} />
         </>
       )}

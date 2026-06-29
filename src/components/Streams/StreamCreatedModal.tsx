@@ -42,10 +42,59 @@ export default function StreamCreatedModal({
 
   if (!isOpen) return null;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(streamUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const fallbackCopy = (): boolean => {
+    const textarea = document.createElement("textarea");
+    textarea.value = streamUrl;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      return document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const writeToClipboard = async (): Promise<boolean> => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(streamUrl);
+      return true;
+    }
+
+    return fallbackCopy();
+  };
+
+  /**
+   * Copies the stream URL to the clipboard and toggles the copied visual state on success.
+   *
+   * Uses the async Clipboard API when available. In insecure contexts where
+   * `navigator.clipboard` is undefined, falls back to a temporary textarea
+   * with `document.execCommand("copy")`. The URL bar remains visible and
+   * selectable as a manual fallback.
+   *
+   * On failure (permission denied or fallback copy failure), announces an
+   * accessible error via the modal's aria-live region without logging the URL.
+   * The 2s reset timer applies only to the success checkmark state.
+   */
+  const handleCopy = async () => {
+    try {
+      const didCopy = await writeToClipboard();
+      if (!didCopy) {
+        throw new Error("Fallback copy command failed");
+      }
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setAnnouncement(
+        "Could not copy stream URL. Please select and copy the URL manually.",
+      );
+      setTimeout(() => setAnnouncement(""), 3000);
+    }
   };
 
   /**
@@ -137,7 +186,7 @@ export default function StreamCreatedModal({
             <div className={styles.urlBar}>{streamUrl}</div>
             <button
               className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
-              onClick={handleCopy}
+              onClick={() => void handleCopy()}
               type="button"
               aria-label="Copy stream URL"
             >
