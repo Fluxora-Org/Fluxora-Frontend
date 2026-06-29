@@ -16,6 +16,7 @@ export default function WalletButton() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const connectTriggerRef = useRef<HTMLButtonElement>(null);
 
   // The canonical ConnectWalletModal performs the Freighter connection and
   // error handling internally; WalletButton just closes once it succeeds.
@@ -43,6 +44,8 @@ export default function WalletButton() {
   function handleDisconnect() {
     disconnect();
     setDropdownOpen(false);
+    // Defer focus until the connected UI is replaced by the "Connect wallet" button
+    requestAnimationFrame(() => connectTriggerRef.current?.focus());
   }
 
   function handleDropdownKey(e: React.KeyboardEvent) {
@@ -54,6 +57,7 @@ export default function WalletButton() {
     return (
       <>
         <button
+          ref={connectTriggerRef}
           onClick={handleOpenModal}
           className="px-4 py-3 text-base font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
           style={{
