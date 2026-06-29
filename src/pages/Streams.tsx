@@ -830,11 +830,11 @@ export default function Streams() {
     }
 
     const timer = window.setTimeout(() => {
-      announce(
-        `Showing ${visibleStreams.length} ${
-          visibleStreams.length === 1 ? "stream" : "streams"
-        }.`,
-      );
+      const count = visibleStreams.length;
+      const noun = count === 1 ? "stream" : "streams";
+      const filterLabel =
+        statusFilter !== "All" ? ` ${statusFilter.toLowerCase()}` : "";
+      announce(`Showing ${count}${filterLabel} ${noun}.`);
     }, FILTER_ANNOUNCEMENT_DELAY_MS);
 
     return () => window.clearTimeout(timer);

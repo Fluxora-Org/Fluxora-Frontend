@@ -106,8 +106,8 @@ export default function Sidebar({
   ];
 
   const utilityItems = [
-    { href: "#", label: "Documentation", icon: FileText },
-    { href: "#", label: "Legal", icon: Scale },
+    { href: "https://docs.fluxora.xyz", label: "Documentation", icon: FileText, external: true },
+    { href: "https://fluxora.xyz/legal", label: "Legal", icon: Scale, external: true },
   ];
 
   return (
@@ -150,7 +150,7 @@ export default function Sidebar({
               className="flex items-center gap-3 group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
               aria-label="Fluxora home"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-[#00B8D4] to-[#0097A7] flex items-center justify-center text-white font-bold shadow-lg shadow-[#00B8D4]/20 group-hover:scale-105 transition-transform">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-[var(--color-accent-primary)] to-[var(--color-accent-primary-dark)] flex items-center justify-center text-white font-bold shadow-lg shadow-[var(--color-accent-primary)]/20 group-hover:scale-105 transition-transform">
                 F
               </div>
               <span
@@ -231,6 +231,7 @@ export default function Sidebar({
               <a
                 key={item.label}
                 href={item.href}
+                {...(item.external && { target: "_blank", rel: "noopener noreferrer" })}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
                 <item.icon size={20} className="flex-shrink-0 group-hover:text-[var(--text)]" />
