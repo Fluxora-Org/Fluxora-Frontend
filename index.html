@@ -11,6 +11,24 @@
     <meta name="theme-color" content="#06B6D4" />
     <link rel="canonical" href="https://fluxora.app/" />
 
+    <!--
+      Content Security Policy
+      Allowed sources:
+        default-src 'self'          — only same-origin resources by default
+        script-src  'self'          — scripts from same origin only (no inline scripts)
+        style-src   'self' 'unsafe-inline' — same-origin styles + inline styles (React/Tailwind)
+        img-src     'self' data: https: — same-origin, data URIs, and HTTPS images
+        connect-src 'self' https:   — XHR/fetch to same-origin and HTTPS APIs (Horizon, Soroban RPC)
+        font-src    'self'          — fonts from same origin only
+        object-src  'none'          — block plugins (Flash, etc.)
+        frame-ancestors 'none'      — prevent clickjacking (equivalent to X-Frame-Options: DENY)
+        base-uri    'self'          — prevent base-tag hijacking
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
+    />
+
     <!-- Open Graph link previews -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Fluxora" />
