@@ -37,6 +37,7 @@ import {
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
+import { formatUsdc } from "../lib/formatters";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 
@@ -53,16 +54,13 @@ const STREAM_CARD_ESTIMATED_HEIGHT = 420;
  * Formats a USDC amount with full fractional precision (2 decimal places).
  * Returns a safe placeholder for NaN or negative inputs.
  *
+ * Re-exported from src/lib/formatters so callers that import directly from
+ * this page module keep working without changes (issue #388).
+ *
  * @param value - The numeric USDC amount to format.
  * @returns A locale-aware string such as "1,234.56 USDC".
  */
-export function formatUsdc(value: number): string {
-  if (!Number.isFinite(value) || value < 0) return "— USDC";
-  return `${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)} USDC`;
-}
+export { formatUsdc } from "../lib/formatters";
 
 function formatMonthlyRate(value: number) {
   return `${formatUsdc(value)} / mo`;

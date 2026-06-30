@@ -7,6 +7,7 @@ import type { StreamRecord } from "../../data/streamRecords";
 import type { Metric } from "./Metric";
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
+import { formatAssetAmount } from "../../lib/formatters";
 
 export interface TreasuryOverviewData {
   metrics: Metric[];
@@ -37,10 +38,8 @@ export function isTreasuryDemoMode(
 }
 
 function formatMonthlyRate(record: StreamRecord): string {
-  const amount = new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
-  }).format(record.monthlyRate);
-  return `${amount} ${record.asset}/mo`;
+  // Use `formatAssetAmount` (locale-aware, no hardcoded "en-US") — issue #388
+  return formatAssetAmount(record.monthlyRate, record.asset, "/mo");
 }
 
 function toLegacyStream(record: StreamRecord): Stream {

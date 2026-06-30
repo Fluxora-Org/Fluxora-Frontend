@@ -30,6 +30,7 @@ export default defineConfig({
         "src/components/treasuryOverviewPage/Metrics.tsx",
         "src/components/treasuryOverviewPage/RecentStreams.tsx",
         "src/components/treasuryOverviewPage/useTreasury.ts",
+        "src/lib/formatters.ts",
         "src/theme/ThemeProvider.tsx",
       ],
       exclude: ["src/components/**/*.test.tsx", "src/theme/**/__tests__/**"],
