@@ -42,7 +42,7 @@ function formatMonthlyRate(record: StreamRecord): string {
   return formatAssetAmount(record.monthlyRate, record.asset, "/mo");
 }
 
-function toLegacyStream(record: StreamRecord): Stream {
+export function toLegacyStream(record: StreamRecord): Stream {
   return {
     name: record.name,
     id: record.id,
