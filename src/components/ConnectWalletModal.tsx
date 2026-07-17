@@ -5,6 +5,7 @@ import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
+import WalletIcon from "./WalletIcon";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -47,6 +48,7 @@ interface WalletOption {
   name: string;
   description: string;
   icon: string;
+  iconSrc?: string;
   action: () => void;
   disabled?: boolean;
 }
@@ -229,6 +231,7 @@ export default function ConnectWalletModal({
       name: "Freighter",
       description: "Recommended browser extension for Stellar wallets.",
       icon: "🚀",
+      iconSrc: "/src/assets/images/freighter.svg",
       action: handleFreighterClick,
     },
     {
@@ -236,6 +239,7 @@ export default function ConnectWalletModal({
       name: "Albedo",
       description: "Open in-browser wallet for quick secure approvals.",
       icon: "⭐",
+      iconSrc: "/src/assets/images/albedo.svg",
       action: onConnectAlbedo ?? (() => {}),
       disabled: !onConnectAlbedo,
     },
@@ -244,6 +248,7 @@ export default function ConnectWalletModal({
       name: "WalletConnect",
       description: "Pair with compatible mobile wallets via QR.",
       icon: "🔗",
+      iconSrc: "/src/assets/images/walletconnect.svg",
       action: onConnectWalletConnect ?? (() => {}),
       disabled: !onConnectWalletConnect,
     },
@@ -346,7 +351,7 @@ export default function ConnectWalletModal({
                     disabled={wallet.disabled}
                   >
                     <div className={styles.walletIcon} aria-hidden="true">
-                      {wallet.icon}
+                      <WalletIcon name={wallet.name} iconSrc={wallet.iconSrc} />
                     </div>
                     <div className={styles.walletInfo}>
                       <div className={styles.walletName}>

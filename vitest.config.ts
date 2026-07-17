@@ -25,6 +25,7 @@ export default defineConfig({
         "src/components/StreamsLoading.tsx",
         "src/components/ToastNotification.tsx",
         "src/components/TreasuryOverviewLoading.tsx",
+        "src/components/WalletIcon.tsx",
         "src/components/treasuryOverviewPage/MetricCard.tsx",
         "src/components/treasuryOverviewPage/StatusPill.tsx",
         "src/components/treasuryOverviewPage/Metrics.tsx",
