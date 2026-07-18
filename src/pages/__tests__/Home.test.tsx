@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Home from "./Home";
-import { ThemeProvider } from "../theme/ThemeProvider";
+import Home from "../Home";
+import { ThemeProvider } from "../../theme/ThemeProvider";
 
 function renderHome() {
   return render(
@@ -106,5 +107,68 @@ describe("Home lazy sections with IntersectionObserver", () => {
         name: /treasury streaming infrastructure/i,
       }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Home page accessibility - landmarks and heading hierarchy", () => {
+  it("has exactly one main landmark", () => {
+    renderHome();
+    const mainLandmarks = screen.getAllByRole("main");
+    expect(mainLandmarks).toHaveLength(1);
+  });
+
+  it("has exactly one h1 heading", () => {
+    renderHome();
+    const h1Headings = screen.getAllByRole("heading", { level: 1 });
+    expect(h1Headings).toHaveLength(1);
+    expect(h1Headings[0]).toHaveTextContent(/treasury streaming/i);
+  });
+
+  it("maintains correct heading hierarchy without skipped levels", async () => {
+    renderHome();
+
+    // Wait for all lazy sections to load
+    await screen.findByRole("heading", {
+      level: 2,
+      name: /treasury streaming infrastructure/i,
+    });
+
+    // Get all headings in document order
+    const allHeadings = Array.from(
+      document.querySelectorAll("h1, h2, h3, h4, h5, h6"),
+    );
+
+    // Extract heading levels as numbers
+    const headingLevels = allHeadings.map((heading) =>
+      parseInt(heading.tagName.substring(1), 10),
+    );
+
+    // Verify we start with h1
+    expect(headingLevels[0]).toBe(1);
+
+    // Check that no level is skipped (e.g., h1 → h3 without h2)
+    for (let i = 1; i < headingLevels.length; i++) {
+      const currentLevel = headingLevels[i];
+      const previousLevel = headingLevels[i - 1];
+
+      // A heading can be the same level, one level deeper, or any number of levels shallower
+      // But it should never skip levels when going deeper
+      if (currentLevel > previousLevel) {
+        expect(currentLevel - previousLevel).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("passes automated accessibility checks", async () => {
+    const { container } = renderHome();
+
+    // Wait for lazy sections to load
+    await screen.findByRole("heading", {
+      level: 2,
+      name: /treasury streaming infrastructure/i,
+    });
+
+    const results = await axe(container);
+    expect(results.violations).toEqual([]);
   });
 });

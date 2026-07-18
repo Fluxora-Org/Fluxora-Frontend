@@ -128,7 +128,7 @@ export default function Dashboard() {
   const hasError = !!error;
 
   return (
-    <div>
+    <main id="main-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
@@ -278,7 +278,7 @@ export default function Dashboard() {
           onClose={() => setToast(null)}
         />
       ) : null}
-    </div>
+    </main>
   );
 }
 
