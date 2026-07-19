@@ -8,7 +8,7 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import MetricCard from "./MetricCard";
 
 describe("MetricCard", () => {
@@ -35,5 +35,39 @@ describe("MetricCard", () => {
     const inlineStyle = card.getAttribute("style") || "";
     expect(inlineStyle).toContain("var(--color-surface-default)");
     expect(inlineStyle).toContain("var(--color-border-default)");
+  });
+
+  describe("locale resilience", () => {
+    afterEach(() => {
+      Object.defineProperty(navigator, "language", {
+        value: "en-US",
+        configurable: true,
+      });
+    });
+
+    function setMockLocale(locale: string) {
+      Object.defineProperty(navigator, "language", {
+        value: locale,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    const localeCases = [
+      { name: "ar-EG", locale: "ar-EG" },
+      { name: "zh-Hans-CN", locale: "zh-Hans-CN" },
+      { name: "malformed locale", locale: "not-a-valid-locale!" },
+    ];
+
+    for (const { name, locale } of localeCases) {
+      it(`renders without crashing when navigator.language is ${name}`, () => {
+        setMockLocale(locale);
+        render(<MetricCard {...mockMetric} />);
+        expect(screen.getByText("💰")).toBeInTheDocument();
+        expect(screen.getByText("Total Balance")).toBeInTheDocument();
+        expect(screen.getByText("$100,000")).toBeInTheDocument();
+        expect(screen.getByText("Available in treasury")).toBeInTheDocument();
+      });
+    }
   });
 });

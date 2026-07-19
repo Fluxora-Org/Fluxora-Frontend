@@ -11,26 +11,9 @@ import ToastNotification, {
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
-import type { StreamRecord } from "../data/streamRecords";
 import { readOnboardingDismissed } from "../lib/onboarding";
+import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
 import "../design-tokens.css";
-
-function formatUsdc(amount: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    amount,
-  )} USDC`;
-}
-
-function toRecentStream(record: StreamRecord): Stream {
-  return {
-    name: record.name,
-    id: record.id,
-    recipient: record.recipientAddress || record.recipientName,
-    rate: `${formatUsdc(record.monthlyRate)} / mo`,
-    status: record.status,
-  };
-}
-
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);

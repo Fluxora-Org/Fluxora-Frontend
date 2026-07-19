@@ -62,6 +62,17 @@ describe("treasury overview demo mode", () => {
     expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
   });
 
+  it("explicitly pairs DemoBanner with fixture data — never sample data without banner", () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+
+    renderTreasuryPage();
+
+    // Invariant: DemoBanner must always be visible whenever fixture data is rendered
+    expect(screen.getByText("Demo state:")).toBeInTheDocument();
+    expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
+    expect(screen.getByText("Active Streams")).toBeInTheDocument();
+  });
+
   it("defaults to live data and does not render fixture streams", async () => {
     useTreasuryMock.mockReturnValue({
       metrics: [],
