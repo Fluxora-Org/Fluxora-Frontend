@@ -34,7 +34,7 @@ describe('TreasuryPage', () => {
     expect(screen.queryByTestId('streams')).toBeNull();
   });
 
-  it('renders error message and hides content', () => {
+  it('renders error message and hides content — no fallback to demo data', () => {
     const errorMsg = 'Failed to load data';
     mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: errorMsg });
     render(<TreasuryPage />);
@@ -42,6 +42,8 @@ describe('TreasuryPage', () => {
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByTestId('metrics')).toBeNull();
     expect(screen.queryByTestId('streams')).toBeNull();
+    // DemoBanner must NOT render on fetch failure — no silent demo-data fallback
+    expect(screen.queryByTestId('demo-banner')).toBeNull();
   });
 
   it('renders content when data is present', () => {
@@ -53,6 +55,17 @@ describe('TreasuryPage', () => {
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByTestId('demo-banner')).toBeNull();
+  });
+
+  it('renders DemoBanner alongside content in demo mode', () => {
+    const fakeMetrics = { total: 100 };
+    const fakeStreams = [{ id: 1, name: 'stream' }];
+    mockHook.mockReturnValue({ metrics: fakeMetrics, streams: fakeStreams, isDemoMode: true, loading: false, error: null });
+    render(<TreasuryPage />);
+    expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('metrics')).toHaveTextContent(JSON.stringify(fakeMetrics));
+    expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
   });
 
   it('shows empty‑state fallback when data is undefined and not loading/error', () => {

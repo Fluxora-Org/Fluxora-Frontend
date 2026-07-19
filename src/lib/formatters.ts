@@ -3,13 +3,57 @@
  * ──────────────────────────────────
  * Shared helpers for number, currency, and date formatting.
  *
- * All functions use `undefined` as the locale argument to Intl APIs so that
- * the browser's (or runtime's) default locale drives the output. This resolves
- * issue #388: values now render correctly for international users instead of
- * always using the hardcoded "en-US" locale.
+ * All functions resolve the user's locale via `navigator.language` at call time
+ * with a safe fallback to `"en-US"` if the locale is unavailable or if the Intl
+ * constructor throws. This resolves issue #388: values now render correctly for
+ * international users instead of always using the hardcoded "en-US" locale.
  *
  * Issue: #388 Localize number, currency, and date formatting via the browser locale
  */
+
+// ─── Locale Resolution ───────────────────────────────────────────────────────
+
+/**
+ * Resolve the user's preferred locale with a safe fallback.
+ *
+ * Reads `navigator.language` and validates it by attempting to construct an
+ * `Intl.NumberFormat`. If the locale is unavailable in the runtime's ICU data
+ * or is malformed, returns `"en-US"` instead.
+ */
+export function resolveLocale(): string {
+  try {
+    const locale = navigator.language;
+    // Quick validation: try constructing a formatter with the locale
+    new Intl.NumberFormat(locale);
+    return locale;
+  } catch {
+    return "en-US";
+  }
+}
+
+/**
+ * Create an `Intl.NumberFormat` using the resolved locale.
+ * Falls back to `"en-US"` if the locale causes an error.
+ */
+function createNumberFormat(options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  try {
+    return new Intl.NumberFormat(resolveLocale(), options);
+  } catch {
+    return new Intl.NumberFormat("en-US", options);
+  }
+}
+
+/**
+ * Create an `Intl.DateTimeFormat` using the resolved locale.
+ * Falls back to `"en-US"` if the locale causes an error.
+ */
+function createDateTimeFormat(options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  try {
+    return new Intl.DateTimeFormat(resolveLocale(), options);
+  } catch {
+    return new Intl.DateTimeFormat("en-US", options);
+  }
+}
 
 // ─── Number / Currency ───────────────────────────────────────────────────────
 
@@ -24,7 +68,7 @@
  */
 export function formatUsdc(value: number): string {
   if (!Number.isFinite(value) || value < 0) return "— USDC";
-  return `${new Intl.NumberFormat(undefined, {
+  return `${createNumberFormat({
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value)} USDC`;
@@ -52,7 +96,7 @@ export function formatUsdcPerMonth(value: number): string {
  * formatNumber(1234.5, 2) // → "1,234.5" (en-US)
  */
 export function formatNumber(value: number, maxFractionDigits = 0): string {
-  return new Intl.NumberFormat(undefined, {
+  return createNumberFormat({
     maximumFractionDigits: maxFractionDigits,
   }).format(value);
 }
@@ -95,7 +139,5 @@ export function formatLocalDate(
   fallback = "Not set",
 ): string {
   if (!dateString) return fallback;
-  return new Intl.DateTimeFormat(undefined, options).format(
-    new Date(dateString),
-  );
+  return createDateTimeFormat(options).format(new Date(dateString));
 }
