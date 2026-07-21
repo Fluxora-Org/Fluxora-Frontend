@@ -49,7 +49,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Calculate tooltip position based on available space
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current || !tooltipRef.current) return;
 
     const trigger = triggerRef.current.getBoundingClientRect();
