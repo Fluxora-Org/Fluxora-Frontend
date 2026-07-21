@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import Breadcrumb from "../Breadcrumb";
 
@@ -71,6 +71,33 @@ describe("Breadcrumb", () => {
     expect(currentPage).toHaveAttribute("title", address);
     expect(currentPage).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: /GATDOSCZ/ })).toBeNull();
+  });
+
+  it("renders items with duplicate labels without key collision warnings and with independent attributes", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderBreadcrumb([
+      { label: "Settings", to: "/account/settings" },
+      { label: "Settings", to: "/organization/settings" },
+      { label: "Settings" },
+    ]);
+
+    const links = screen.getAllByRole("link", { name: "Settings" });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute("href", "/account/settings");
+    expect(links[1]).toHaveAttribute("href", "/organization/settings");
+
+    const currentPage = screen.getByText((content, element) => {
+      return element?.tagName.toLowerCase() === "span" && content === "Settings";
+    });
+    expect(currentPage).toHaveAttribute("aria-current", "page");
+
+    const keyWarning = consoleSpy.mock.calls.some(([msg]) =>
+      typeof msg === "string" && msg.includes("Encountered two children with the same key")
+    );
+    expect(keyWarning).toBe(false);
+
+    consoleSpy.mockRestore();
   });
 
   it("has no automated accessibility violations", async () => {
