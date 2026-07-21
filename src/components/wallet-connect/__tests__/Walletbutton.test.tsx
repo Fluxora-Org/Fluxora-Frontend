@@ -104,5 +104,42 @@ describe("WalletButton canonical modal", () => {
     expect(screen.getByText("Connection Rejected")).toBeInTheDocument();
     expect(wallet.connect).not.toHaveBeenCalled();
   });
+
+  it("prevents duplicate connection requests on rapid double-clicks", async () => {
+    const user = userEvent.setup();
+    
+    // Delay requestAccess so we can simulate in-flight state
+    let resolveAccess: any;
+    const accessPromise = new Promise((resolve) => {
+      resolveAccess = resolve;
+    });
+    freighter.requestAccess.mockReturnValue(accessPromise);
+
+    render(<WalletButton />);
+
+    await user.click(screen.getByRole("button", { name: "Connect wallet" }));
+    const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+
+    // Click multiple times without waiting for promises to resolve
+    await user.click(freighterBtn);
+    // Since it's disabled after first click, user.click might throw or ignore, 
+    // so we just verify it's disabled or try clicking it anyway.
+    // If we click it twice rapidly before React rerenders, we'd use fireEvent.
+    // userEvent is closer to real user: it'll see it disabled after rerender.
+    // But let's verify the first click set it to Connecting and disabled it.
+    
+    expect(screen.getByText("Connecting...")).toBeInTheDocument();
+    expect(freighterBtn).toBeDisabled();
+
+    // Try clicking again
+    await user.click(freighterBtn);
+
+    // Verify only one connection request was initiated
+    expect(freighter.isConnected).toHaveBeenCalledTimes(1);
+
+    // Cleanup
+    resolveAccess({ address: "GCONNECTED", error: null });
+  });
 });
+
 

@@ -1,5 +1,5 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
-import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer } from "lucide-react";
+import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2 } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
@@ -73,6 +73,8 @@ export default function ConnectWalletModal({
   // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
   const [focusedOptionId, setFocusedOptionId] = useState<string | null>(null);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const isRequestInFlight = useRef(false);
   
   const { connect } = useWallet();
 
@@ -86,6 +88,9 @@ export default function ConnectWalletModal({
 
   // Handle Freighter selection: perform actual connection and network verification
   const handleFreighterClick = async () => {
+    if (isRequestInFlight.current) return;
+    isRequestInFlight.current = true;
+    setConnectingId("freighter");
     setInternalErrorState(null);
     try {
       const ready = await isConnected();
@@ -129,6 +134,9 @@ export default function ConnectWalletModal({
       } else {
         setInternalErrorState("rejected");
       }
+    } finally {
+      isRequestInFlight.current = false;
+      setConnectingId(null);
     }
   };
 
@@ -312,6 +320,8 @@ export default function ConnectWalletModal({
                 const isActive =
                   !wallet.disabled &&
                   (hoveredOptionId === wallet.id || focusedOptionId === wallet.id);
+                const isConnectingThis = connectingId === wallet.id;
+                const isDisabled = wallet.disabled || connectingId !== null;
 
                 return (
                   <button
@@ -335,9 +345,9 @@ export default function ConnectWalletModal({
                           ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
                           : "none",
                       opacity: wallet.disabled ? 0.5 : 1,
-                      cursor: wallet.disabled ? "not-allowed" : "pointer",
+                      cursor: isDisabled ? "not-allowed" : "pointer",
                     }}
-                    onClick={wallet.disabled ? undefined : wallet.action}
+                    onClick={isDisabled ? undefined : wallet.action}
                     onMouseEnter={() => !wallet.disabled && setHoveredOptionId(wallet.id)}
                     onMouseLeave={() => setHoveredOptionId(null)}
                     onFocus={() => !wallet.disabled && setFocusedOptionId(wallet.id)}
@@ -347,11 +357,15 @@ export default function ConnectWalletModal({
                         ? `${wallet.name} — coming soon`
                         : `Connect with ${wallet.name}`
                     }
-                    aria-disabled={wallet.disabled}
-                    disabled={wallet.disabled}
+                    aria-disabled={isDisabled}
+                    disabled={isDisabled}
                   >
                     <div className={styles.walletIcon} aria-hidden="true">
-                      <WalletIcon name={wallet.name} iconSrc={wallet.iconSrc} />
+                      {isConnectingThis ? (
+                        <Loader2 size={24} className={styles.spinning} />
+                      ) : (
+                        <WalletIcon name={wallet.name} iconSrc={wallet.iconSrc} />
+                      )}
                     </div>
                     <div className={styles.walletInfo}>
                       <div className={styles.walletName}>
@@ -376,9 +390,11 @@ export default function ConnectWalletModal({
                           </span>
                         )}
                       </div>
-                      <div className={styles.walletDescription}>{wallet.description}</div>
+                      <div className={styles.walletDescription}>
+                        {isConnectingThis ? "Connecting..." : wallet.description}
+                      </div>
                     </div>
-                    {!wallet.disabled && (
+                    {!wallet.disabled && !isConnectingThis && (
                       <svg
                         className={styles.chevron}
                         width="16"
