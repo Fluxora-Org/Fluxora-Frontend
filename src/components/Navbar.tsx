@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import WalletButton from "./wallet-connect/Walletbutton";
 
@@ -12,6 +12,7 @@ export default function Navbar({
   onThemeToggle,
   theme = "light",
 }: NavbarProps) {
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -39,6 +40,7 @@ export default function Navbar({
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
   };
+    
 
   return (
     <>
