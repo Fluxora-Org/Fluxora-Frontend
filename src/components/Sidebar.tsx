@@ -248,9 +248,12 @@ export default function Sidebar({
 
             {/* Desktop Collapse Toggle */}
             <button
+              type="button"
               onClick={onToggleCollapse}
               className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              aria-controls="app-sidebar"
             >
               <ChevronLeft
                 size={20}
