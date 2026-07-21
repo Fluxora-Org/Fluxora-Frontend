@@ -169,4 +169,37 @@ describe('CreateStreamModal submit failure handling', () => {
 
     expect(mockedCreateStream).toHaveBeenCalledTimes(1);
   });
+
+  it('does not call onStreamCreated or close modal when transaction status polling fails on-chain', async () => {
+    mockedCreateStream.mockResolvedValue({
+      status: 'SUCCESS',
+      txHash: 'tx-failed-hash-123',
+    } as any);
+    mockedGetTransactionStatus.mockResolvedValue('failed');
+
+    const onClose = vi.fn();
+    const onStreamCreated = vi.fn();
+
+    const { container } = render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={onClose}
+        onStreamCreated={onStreamCreated}
+      />,
+    );
+
+    advanceToStep3(container);
+    fireEvent.click(
+      within(container).getByRole('button', { name: /^create stream$/i }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Transaction failed before confirmation.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(onStreamCreated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
