@@ -140,6 +140,29 @@ describe("ToastProvider / useToast", () => {
     expect(screen.getByText(/\+1 more notification/i)).toBeInTheDocument();
   });
 
+  it("generates unique IDs for toasts added in the same tick", () => {
+    const ids: string[] = [];
+    function IdCapture() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            // Add multiple toasts synchronously — IDs must all be unique
+            for (let i = 0; i < 5; i++) {
+              ids.push(addToast(`msg${i}`, "info", 99999));
+            }
+          }}
+        >
+          burst
+        </button>
+      );
+    }
+    renderWithProvider(<IdCapture />);
+    fireEvent.click(screen.getByRole("button", { name: /burst/i }));
+    expect(ids).toHaveLength(5);
+    expect(new Set(ids).size).toBe(5);
+  });
+
   it("rapid additions don't clobber each other's timers", () => {
     function RapidAdder() {
       const { addToast } = useToast();

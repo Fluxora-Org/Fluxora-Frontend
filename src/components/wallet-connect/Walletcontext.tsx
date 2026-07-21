@@ -17,6 +17,7 @@ import {
   isStellarNetworkMismatch,
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
+import { isValidStellarAddress } from "../../lib/stellar";
 import { getNetworkLabel } from "../../lib/config";
 
 /**
@@ -47,6 +48,37 @@ interface WalletContextType extends WalletState {
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
+
+/**
+ * Minimum allowed polling interval (ms) for {@link WatchWalletChanges}.
+ *
+ * Values below this floor would hammer the Freighter extension and the RPC
+ * endpoint it queries. Any configured or default value is clamped up to this
+ * minimum before being passed to the constructor.
+ */
+export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
+
+/**
+ * How often {@link WatchWalletChanges} polls the Freighter extension for
+ * account and network changes, in milliseconds.
+ *
+ * - Default: `2000 ms`
+ * - Override: set `VITE_WALLET_WATCH_INTERVAL_MS` in your `.env` file.
+ * - The value is clamped to a minimum of {@link WALLET_WATCH_MIN_INTERVAL_MS}
+ *   to prevent tight polling loops against the wallet extension.
+ *
+ * @example
+ * // .env
+ * VITE_WALLET_WATCH_INTERVAL_MS=5000   // slow network / CI
+ * VITE_WALLET_WATCH_INTERVAL_MS=2000   // default (can be omitted)
+ */
+export const WALLET_WATCH_INTERVAL_MS: number = (() => {
+  const DEFAULT = 2000;
+  const raw = import.meta.env.VITE_WALLET_WATCH_INTERVAL_MS;
+  const parsed = raw !== undefined && raw !== "" ? Number(raw) : NaN;
+  const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT;
+  return Math.max(resolved, WALLET_WATCH_MIN_INTERVAL_MS);
+})();
 
 const INITIAL: WalletState = {
   address: null,
@@ -125,8 +157,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
-  const connect = (address: string, network: string) =>
+  const connect = (address: string, network: string) => {
+    if (!isValidStellarAddress(address)) return;
     setState({ address, network, connected: true, error: null, loading: false });
+  };
 
   const disconnect = () => {
     disconnectVersionRef.current += 1;
@@ -182,6 +216,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (!isValidStellarAddress(addr.address)) {
+          restoreError({ message: "Invalid Stellar address returned by Freighter" });
+          return;
+        }
+
         const net = await getNetwork();
         if (net.error) {
           restoreError(net.error);
@@ -218,9 +257,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     clearWatcher();
     if (!state.connected) return undefined;
 
-    const watcher = new WatchWalletChanges(2000);
+    const watcher = new WatchWalletChanges(WALLET_WATCH_INTERVAL_MS);
     watcherRef.current = watcher;
     watcher.watch(({ address, network }) => {
+      if (!isValidStellarAddress(address)) {
+        setState((prev) => (prev.connected ? DISCONNECTED : prev));
+        return;
+      }
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev

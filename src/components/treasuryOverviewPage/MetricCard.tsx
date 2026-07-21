@@ -7,8 +7,10 @@
  */
 
 import { Metric } from "./Metric";
+import Sparkline from "./Sparkline";
+import { formatAssetAmount } from "../../lib/formatters";
 
-export default function MetricCard({ icon, label, value, desc }: Metric) {
+export default function MetricCard({ icon, label, value, desc, trend, tokens }: Metric) {
   return (
     <div
       className="flex flex-col rounded-xl p-6 h-full"
@@ -32,9 +34,23 @@ export default function MetricCard({ icon, label, value, desc }: Metric) {
         {label}
       </div>
 
-      <div className="text-2xl font-semibold leading-8 mb-2" style={{ color: "var(--color-text-vivid)" }}>
-        {value}
+      <div className="text-2xl font-semibold leading-8 mb-2 flex flex-col gap-1" style={{ color: "var(--color-text-vivid)" }}>
+        {tokens && tokens.length > 0 ? (
+          tokens.map((t, i) => (
+            <div key={t.asset} className={i === 0 ? "" : "text-base font-medium"} style={i === 0 ? {} : { color: "var(--color-text-secondary)" }}>
+              {formatAssetAmount(t.amount, t.asset)}
+            </div>
+          ))
+        ) : (
+          <div>{value}</div>
+        )}
       </div>
+
+      {trend && trend.length >= 2 && (
+        <div style={{ marginBottom: "var(--space-sm)" }} aria-label="Rate of change sparkline">
+          <Sparkline data={trend} />
+        </div>
+      )}
 
       <p className="text-sm leading-5 mt-auto" style={{ color: "var(--color-text-secondary)" }}>
         {desc}

@@ -49,7 +49,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Calculate tooltip position based on available space
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current || !tooltipRef.current) return;
 
     const trigger = triggerRef.current.getBoundingClientRect();
@@ -133,13 +133,12 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  // Focus close button when tooltip opens using layout effect for reliable timing
+  // Focus close button when tooltip opens. Using a layout effect (which runs
+  // synchronously after the DOM mutation, before paint) gives reliable focus
+  // timing without the fragility of a setTimeout/raf deferral.
   useLayoutEffect(() => {
-    if (isOpen && closeButtonRef.current) {
-      const raf = requestAnimationFrame(() => {
-        closeButtonRef.current?.focus();
-      });
-      return () => cancelAnimationFrame(raf);
+    if (isOpen) {
+      closeButtonRef.current?.focus();
     }
   }, [isOpen]);
 

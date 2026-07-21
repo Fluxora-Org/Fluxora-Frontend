@@ -22,6 +22,12 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // Drive the suite from the seeded demo dataset (src/data/streamRecords.ts)
+    // so routes like /app/streams/:streamId resolve real records without a live
+    // backend. Existing values from the shell env take precedence.
+    env: {
+      VITE_USE_MOCKS: process.env.VITE_USE_MOCKS ?? "true",
+    },
   },
   projects: [
     {
@@ -31,5 +37,22 @@ export default defineConfig({
         channel: browserChannel,
       },
     },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+      },
+    },
+    // WebKit requires macOS in most CI environments; guard with CI flag or use test:e2e:full
+    ...(process.env.CI !== "true" || process.env.PLAYWRIGHT_WEBKIT === "1"
+      ? [
+          {
+            name: "webkit",
+            use: {
+              ...devices["Desktop Safari"],
+            },
+          },
+        ]
+      : []),
   ],
 });

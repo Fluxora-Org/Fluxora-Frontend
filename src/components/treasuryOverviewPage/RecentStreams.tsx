@@ -1,9 +1,64 @@
 import { useNavigate } from "react-router-dom";
 import StreamsTable from "./StreamsTable";
 import type { Stream } from "./Stream";
+import StreamsLoading from "../StreamsLoading";
+import EmptyState from "../EmptyState";
 
-export default function RecentStreams({ streams }: { streams: Stream[] }) {
+interface RecentStreamsProps {
+  streams: Stream[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+}
+
+export default function RecentStreams({
+  streams,
+  loading = false,
+  error = null,
+  onRetry,
+}: RecentStreamsProps) {
   const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-6 border">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-black">Recent streams</h2>
+        </div>
+        <StreamsLoading />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-6 border">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-black">Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="error"
+          errorMessage={error}
+          onRetry={onRetry}
+          walletConnected={true}
+        />
+      </div>
+    );
+  }
+
+  if (streams.length === 0) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-6 border">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-black">Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="treasury"
+          walletConnected={true}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 rounded-xl p-6 border">

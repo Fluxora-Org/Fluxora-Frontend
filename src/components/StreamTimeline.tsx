@@ -1,5 +1,6 @@
 import React from "react";
 import "./StreamTimeline.module.css";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 export interface StreamTimelineProps {
   startDate: string;
@@ -19,6 +20,9 @@ export interface StreamTimelineProps {
  * - Cliff period (hatched pattern)
  * - Accrual phase (progress fill)
  * - Remaining period (empty)
+ *
+ * Preconditions:
+ * - The end date must be strictly after the start date (`totalDuration > 0`).
  *
  * Accessible to screen readers via:
  * - ARIA labels and descriptions
@@ -43,11 +47,15 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   const current = new Date(currentDate);
   const end = new Date(endDate);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   // Validate dates
+  const totalDuration = end.getTime() - start.getTime();
   if (
     isNaN(start.getTime()) ||
     isNaN(current.getTime()) ||
-    isNaN(end.getTime())
+    isNaN(end.getTime()) ||
+    totalDuration <= 0
   ) {
     return (
       <div
@@ -61,7 +69,6 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   }
 
   // Calculate segments
-  const totalDuration = end.getTime() - start.getTime();
   const cliffEnd = cliff ? cliff.getTime() : start.getTime();
   const currentTime = Math.min(current.getTime(), end.getTime());
 
@@ -125,6 +132,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label="Stream accrual progress"
+        data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       >
         {/* Cliff segment (hatched) */}
         {cliff && cliffPercent > 0 && (

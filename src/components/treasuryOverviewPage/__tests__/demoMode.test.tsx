@@ -4,13 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import TreasuryPage from "../../../pages/TreasuryPage";
 import { isTreasuryDemoMode } from "../useTreasuryOverviewData";
 
-const getMetrics = vi.fn();
-const getStreams = vi.fn();
+const useTreasuryMock = vi.fn();
 
 vi.mock("../useTreasury", () => ({
-  useTreasury: () => ({
-    getMetrics,
-    getStreams,
+  useTreasury: () => useTreasuryMock(),
+  useRecipientStreams: () => ({
+    streams: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
   }),
 }));
 
@@ -33,10 +35,14 @@ function renderTreasuryPage() {
 describe("treasury overview demo mode", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
-    getMetrics.mockReset();
-    getStreams.mockReset();
-    getMetrics.mockResolvedValue([]);
-    getStreams.mockResolvedValue([]);
+    useTreasuryMock.mockReset();
+    useTreasuryMock.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   it("parses the demo mode flag explicitly", () => {
@@ -54,16 +60,47 @@ describe("treasury overview demo mode", () => {
     expect(screen.getByText("Demo state:")).toBeInTheDocument();
     expect(screen.getByText("Active Streams")).toBeInTheDocument();
     expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
-    expect(getMetrics).not.toHaveBeenCalled();
-    expect(getStreams).not.toHaveBeenCalled();
+  });
+
+  it("explicitly pairs DemoBanner with fixture data — never sample data without banner", () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+
+    renderTreasuryPage();
+
+    // Invariant: DemoBanner must always be visible whenever fixture data is rendered
+    expect(screen.getByText("Demo state:")).toBeInTheDocument();
+    expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
+    expect(screen.getByText("Active Streams")).toBeInTheDocument();
   });
 
   it("defaults to live data and does not render fixture streams", async () => {
-    renderTreasuryPage();
+    useTreasuryMock.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = renderTreasuryPage();
 
     expect(screen.queryByText("Demo state:")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Loading treasury overview...",
+    );
+
+    useTreasuryMock.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    rerender(
+      <MemoryRouter>
+        <TreasuryPage />
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -73,8 +110,6 @@ describe("treasury overview demo mode", () => {
     });
 
     expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
-    expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
-    expect(getMetrics).toHaveBeenCalledTimes(1);
-    expect(getStreams).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("No streams yet")).toBeInTheDocument();
   });
 });

@@ -4,6 +4,8 @@ import {
   getNetworkLabel,
   getNetworkPassphrase,
   parseBooleanFlag,
+  validateUrl,
+  validateContractId,
 } from "../config";
 
 function env(overrides: Partial<ImportMetaEnv> = {}): ImportMetaEnv {
@@ -25,7 +27,7 @@ describe("config", () => {
         VITE_API_URL: "https://api.example.test",
         VITE_NETWORK: "PUBLIC",
         VITE_RPC_URL: " ",
-        VITE_STREAM_CONTRACT_ID: "CCONTRACT",
+        VITE_STREAM_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
         VITE_USE_MOCKS: "true",
       }),
     );
@@ -34,7 +36,7 @@ describe("config", () => {
     expect(config.network).toBe("PUBLIC");
     expect(config.networkLabel).toBe("Public Network (Mainnet)");
     expect(config.rpcUrl).toBeNull();
-    expect(config.streamContractId).toBe("CCONTRACT");
+    expect(config.streamContractId).toBe("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
     expect(config.useMocks).toBe(true);
   });
 
@@ -52,5 +54,210 @@ describe("config", () => {
     );
     expect(parseBooleanFlag("1")).toBe(true);
     expect(parseBooleanFlag("false")).toBe(false);
+  });
+});
+
+describe("validateUrl", () => {
+  it("accepts https URLs", () => {
+    expect(validateUrl("apiUrl", "https://api.example.com")).toBe(
+      "https://api.example.com",
+    );
+  });
+
+  it("accepts https URLs with paths and query strings", () => {
+    expect(
+      validateUrl("rpcUrl", "https://rpc.example.com/v1?key=abc"),
+    ).toBe("https://rpc.example.com/v1?key=abc");
+  });
+
+  it("accepts http://localhost", () => {
+    expect(validateUrl("rpcUrl", "http://localhost:8000")).toBe(
+      "http://localhost:8000",
+    );
+  });
+
+  it("accepts http://127.0.0.1", () => {
+    expect(validateUrl("apiUrl", "http://127.0.0.1:3000/api")).toBe(
+      "http://127.0.0.1:3000/api",
+    );
+  });
+
+  it("trims surrounding whitespace before validating", () => {
+    expect(validateUrl("apiUrl", "  https://api.example.com  ")).toBe(
+      "https://api.example.com",
+    );
+  });
+
+  it("rejects a plain non-URL string", () => {
+    const result = validateUrl("apiUrl", "not-a-url");
+    expect(result).toMatchObject({
+      field: "apiUrl",
+      message: expect.stringContaining("not a valid URL"),
+    });
+  });
+
+  it("rejects an empty-looking string (spaces only via trim)", () => {
+    const result = validateUrl("apiUrl", "   ");
+    expect(result).toMatchObject({ field: "apiUrl" });
+  });
+
+  it("rejects ftp:// protocol", () => {
+    const result = validateUrl("rpcUrl", "ftp://files.example.com");
+    expect(result).toMatchObject({
+      field: "rpcUrl",
+      message: expect.stringContaining("ftp:"),
+    });
+  });
+
+  it("rejects javascript: protocol", () => {
+    const result = validateUrl("apiUrl", "javascript:alert(1)");
+    expect(result).toMatchObject({
+      field: "apiUrl",
+      message: expect.stringContaining("javascript:"),
+    });
+  });
+
+  it("rejects data: protocol", () => {
+    const result = validateUrl("rpcUrl", "data:text/html,<h1>hi</h1>");
+    expect(result).toMatchObject({
+      field: "rpcUrl",
+      message: expect.stringContaining("data:"),
+    });
+  });
+
+  it("rejects http:// for non-local hosts", () => {
+    const result = validateUrl("apiUrl", "http://api.example.com");
+    expect(result).toMatchObject({
+      field: "apiUrl",
+      message: expect.stringContaining("http:"),
+    });
+  });
+
+  it("includes the field name in the error message", () => {
+    const result = validateUrl("rpcUrl", "garbage");
+    expect(result).toMatchObject({
+      field: "rpcUrl",
+      message: expect.stringContaining("rpcUrl"),
+    });
+  });
+});
+
+describe("createConfig URL validation", () => {
+  it("leaves apiUrl and rpcUrl null when unset", () => {
+    const config = createConfig(env());
+    expect(config.apiUrl).toBeNull();
+    expect(config.rpcUrl).toBeNull();
+  });
+
+  it("throws for a malformed apiUrl", () => {
+    expect(() =>
+      createConfig(env({ VITE_API_URL: "not-a-url" })),
+    ).toThrow(/apiUrl/);
+  });
+
+  it("throws for a malformed rpcUrl", () => {
+    expect(() =>
+      createConfig(env({ VITE_RPC_URL: "garbage" })),
+    ).toThrow(/rpcUrl/);
+  });
+
+  it("throws for a disallowed protocol on apiUrl", () => {
+    expect(() =>
+      createConfig(env({ VITE_API_URL: "ftp://files.example.com" })),
+    ).toThrow(/apiUrl/);
+  });
+
+  it("throws for http:// rpcUrl on a non-local host", () => {
+    expect(() =>
+      createConfig(env({ VITE_RPC_URL: "http://rpc.example.com" })),
+    ).toThrow(/rpcUrl/);
+  });
+
+  it("throws for javascript: injection in apiUrl", () => {
+    expect(() =>
+      createConfig(env({ VITE_API_URL: "javascript:alert(1)" })),
+    ).toThrow(/apiUrl/);
+  });
+
+  it("accumulates errors from both fields in one throw", () => {
+    expect(() =>
+      createConfig(
+        env({ VITE_API_URL: "bad-api", VITE_RPC_URL: "bad-rpc" }),
+      ),
+    ).toThrow(/apiUrl.*rpcUrl|rpcUrl.*apiUrl/);
+  });
+
+  it("accepts https apiUrl and rpcUrl", () => {
+    const config = createConfig(
+      env({
+        VITE_API_URL: "https://api.example.com",
+        VITE_RPC_URL: "https://rpc.example.com",
+      }),
+    );
+    expect(config.apiUrl).toBe("https://api.example.com");
+    expect(config.rpcUrl).toBe("https://rpc.example.com");
+  });
+
+  it("accepts http localhost for rpcUrl", () => {
+    const config = createConfig(
+      env({ VITE_RPC_URL: "http://localhost:8000" }),
+    );
+    expect(config.rpcUrl).toBe("http://localhost:8000");
+  });
+});
+
+describe("validateContractId", () => {
+  const VALID_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
+  it("accepts a valid 56-char Stellar contract ID starting with C", () => {
+    expect(validateContractId("streamContractId", VALID_ID)).toBe(VALID_ID);
+  });
+
+  it("trims surrounding whitespace before validating", () => {
+    expect(validateContractId("streamContractId", `  ${VALID_ID}  `)).toBe(VALID_ID);
+  });
+
+  it("rejects a too-short string", () => {
+    const result = validateContractId("streamContractId", "CCONTRACT");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("rejects a string not starting with C", () => {
+    const result = validateContractId("streamContractId", "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("rejects a string with invalid base-32 characters", () => {
+    const result = validateContractId("streamContractId", "C0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+    expect(result).toMatchObject({ field: "streamContractId" });
+  });
+
+  it("includes a helpful message with expected format", () => {
+    const result = validateContractId("streamContractId", "bad-id") as { message: string };
+    expect(result.message).toMatch(/Strkey/i);
+  });
+});
+
+describe("createConfig contract ID validation", () => {
+  it("leaves streamContractId null when unset", () => {
+    const config = createConfig(env());
+    expect(config.streamContractId).toBeNull();
+  });
+
+  it("accepts a valid contract ID", () => {
+    const config = createConfig(env({ VITE_STREAM_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4" }));
+    expect(config.streamContractId).toBe("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+  });
+
+  it("throws for a malformed contract ID", () => {
+    expect(() =>
+      createConfig(env({ VITE_STREAM_CONTRACT_ID: "CCONTRACT" })),
+    ).toThrow(/streamContractId/);
+  });
+
+  it("accumulates contract ID error alongside URL errors", () => {
+    expect(() =>
+      createConfig(env({ VITE_API_URL: "bad-url", VITE_STREAM_CONTRACT_ID: "bad-id" })),
+    ).toThrow(/apiUrl.*streamContractId|streamContractId.*apiUrl/);
   });
 });

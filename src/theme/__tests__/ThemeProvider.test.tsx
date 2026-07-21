@@ -122,7 +122,7 @@ describe("resolveInitialTheme", () => {
   });
 
   it("returns light when matchMedia is unavailable", () => {
-    // @ts-expect-error simulate an environment without matchMedia
+    // @ts-ignore simulate an environment without matchMedia
     delete window.matchMedia;
     expect(resolveInitialTheme()).toBe("light");
   });
@@ -322,7 +322,7 @@ describe("ThemeProvider", () => {
   });
 
   it("does not subscribe when matchMedia is unavailable", () => {
-    // @ts-expect-error simulate an environment without matchMedia
+    // @ts-ignore simulate an environment without matchMedia
     delete window.matchMedia;
     expect(() =>
       render(

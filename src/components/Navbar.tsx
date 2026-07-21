@@ -669,62 +669,66 @@ const styles: Record<string, React.CSSProperties> = {
 
 // Add keyframe animation via style tag
 if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
+  const styleId = "navbar-animation-styles";
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+
+      nav > div:nth-of-type(1) a {
+        transition: transform 0.2s ease;
       }
-    }
 
-    nav > div:nth-of-type(1) a {
-      transition: transform 0.2s ease;
-    }
+      nav > div:nth-of-type(1) a:hover {
+        transform: scale(1.05);
+      }
 
-    nav > div:nth-of-type(1) a:hover {
-      transform: scale(1.05);
-    }
+      nav > div:nth-of-type(2) a,
+      nav > div:nth-of-type(2) > div > a {
+        transition: color 0.2s ease;
+      }
 
-    nav > div:nth-of-type(2) a,
-    nav > div:nth-of-type(2) > div > a {
-      transition: color 0.2s ease;
-    }
-
-    nav > div:nth-of-type(2) a:hover,
-    nav > div:nth-of-type(2) > div > a:hover {
-      opacity: 0.8;
-    }
-    
-    @media (max-width: 768px) {
-      nav {
-        padding: 0 1rem;
+      nav > div:nth-of-type(2) a:hover,
+      nav > div:nth-of-type(2) > div > a:hover {
+        opacity: 0.8;
       }
       
-      nav a:focus {
-        outline: 2px solid var(--accent);
-        outline-offset: -4px;
+      @media (max-width: 768px) {
+        nav {
+          padding: 0 1rem;
+        }
+        
+        nav a:focus {
+          outline: 2px solid var(--accent);
+          outline-offset: -4px;
+        }
+        
+        /* Show hamburger on mobile */
+        button[aria-label*="Toggle navigation"] {
+          display: flex !important;
+        }
+        
+        /* Keep logo visible on mobile */
+        nav > div:nth-of-type(1) {
+          display: flex !important;
+        }
+        
+        /* Hide right container (theme toggle and connect wallet) on mobile - 3rd div is rightContainer */
+        nav > div:nth-of-type(3) {
+          display: none !important;
+        }
       }
-      
-      /* Show hamburger on mobile */
-      button[aria-label*="Toggle navigation"] {
-        display: flex !important;
-      }
-      
-      /* Keep logo visible on mobile */
-      nav > div:nth-of-type(1) {
-        display: flex !important;
-      }
-      
-      /* Hide right container (theme toggle and connect wallet) on mobile - 3rd div is rightContainer */
-      nav > div:nth-of-type(3) {
-        display: none !important;
-      }
-    }
-  `;
-  document.head.appendChild(style);
+    `;
+    document.head.appendChild(style);
+  }
 }
