@@ -50,7 +50,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false
         }));
       });
-    } catch (err) {
+    } catch {
       // Secure abstraction of raw error logs to avoid leak exposures
       setError("Failed to sync latest stream data. Please try again.");
     } finally {
