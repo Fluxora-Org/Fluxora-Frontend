@@ -22,6 +22,7 @@ export default defineConfig({
         "src/components/GlowingDot.tsx",
         "src/components/InputField.tsx",
         "src/components/InputWithUnit.tsx",
+        "src/components/useModalAccessibility.ts",
         "src/components/navigation/NavLink.tsx",
         "src/components/RecentStreams.tsx",
         "src/components/StreamsLoading.tsx",
