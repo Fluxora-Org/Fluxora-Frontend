@@ -3,6 +3,7 @@ import Header from "../components/treasuryOverviewPage/Header"
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -20,6 +21,7 @@ import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useT
 export default function TreasuryPage() {
   const { metrics, streams, isDemoMode, loading, error, refetch } =
     useTreasuryOverviewData();
+  const { connected: walletConnected } = useWallet();
 
   if (loading) {
     return (
@@ -55,6 +57,7 @@ export default function TreasuryPage() {
         loading={loading}
         error={error}
         onRetry={refetch}
+        walletConnected={walletConnected}
       />
     </div>
   );

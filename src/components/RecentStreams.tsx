@@ -21,6 +21,13 @@ interface RecentStreamsProps {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  /**
+   * Whether a Stellar wallet is connected. Drives the empty/error copy:
+   * connected users see "Create stream", disconnected users see
+   * "Connect your wallet". Defaults to `false` so unconnected consumers
+   * never see misleading "Create stream" call-to-action copy.
+   */
+  walletConnected?: boolean;
 }
 
 export default function RecentStreams({
@@ -28,7 +35,8 @@ export default function RecentStreams({
   viewAllUrl = '/app/streams',
   loading = false,
   error = null,
-  onRetry
+  onRetry,
+  walletConnected = false
 }: RecentStreamsProps) {
   const [announcement, setAnnouncement] = useState('');
 
@@ -70,7 +78,7 @@ export default function RecentStreams({
           variant="error"
           errorMessage={error}
           onRetry={onRetry}
-          walletConnected={true}
+          walletConnected={walletConnected}
         />
       </section>
     );
@@ -87,7 +95,7 @@ export default function RecentStreams({
         </div>
         <EmptyState
           variant="streams"
-          walletConnected={true}
+          walletConnected={walletConnected}
         />
       </section>
     );

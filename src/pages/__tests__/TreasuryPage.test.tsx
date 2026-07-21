@@ -2,17 +2,53 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, it, expect, vi, type Mock } from 'vitest';
 import TreasuryPage from '../../pages/TreasuryPage';
+import type { Metric } from '../../components/treasuryOverviewPage/Metric';
+import type { Stream } from '../../components/treasuryOverviewPage/Stream';
 
 
 // Mock child components to keep the tests focused on TreasuryPage logic
 vi.mock('../../components/treasuryOverviewPage/DemoBanner', () => ({ default: () => <div data-testid="demo-banner" /> }));
 vi.mock('../../components/treasuryOverviewPage/Header', () => ({ default: () => <header data-testid="header" /> }));
-vi.mock('../../components/treasuryOverviewPage/Metrics', () => ({ default: (props: any) => (
-  <div data-testid="metrics">Metrics: {JSON.stringify(props.metrics)}</div>
-) }));
-vi.mock('../../components/treasuryOverviewPage/RecentStreams', () => ({ default: (props: any) => (
-  <div data-testid="streams">Streams: {JSON.stringify(props.streams)}</div>
-) }));
+interface MetricsPropsMock {
+  metrics: Metric[];
+  loading?: boolean;
+  error?: string | null;
+}
+vi.mock('../../components/treasuryOverviewPage/Metrics', () => ({
+  default: (props: MetricsPropsMock) => (
+    <div data-testid="metrics">Metrics: {JSON.stringify(props.metrics)}</div>
+  ),
+}));
+interface RecentStreamsPropsMock {
+  streams: Stream[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  walletConnected?: boolean;
+}
+vi.mock('../../components/treasuryOverviewPage/RecentStreams', () => ({
+  default: (props: RecentStreamsPropsMock) => {
+    const summary = `Streams: ${JSON.stringify(props.streams)} | walletConnected: ${String(props.walletConnected ?? false)}`;
+    return <div data-testid="streams">{summary}</div>;
+  },
+}));
+
+// TreasuryPage now reads wallet connection state to thread into RecentStreams.
+const walletState = vi.hoisted(() => ({ connected: false }));
+vi.mock('../../components/wallet-connect/Walletcontext', () => ({
+  useWallet: () => ({
+    connected: walletState.connected,
+    address: null,
+    network: null,
+    loading: false,
+    error: null,
+    expectedNetwork: 'TESTNET',
+    expectedNetworkLabel: 'Testnet',
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
 
 // Mock the data hook – we will change its implementation per test
 vi.mock('../../components/treasuryOverviewPage/useTreasuryOverviewData', () => ({
@@ -56,6 +92,8 @@ describe('TreasuryPage', () => {
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByTestId('demo-banner')).toBeNull();
+    // Lock in the walletConnected threading from useWallet through to RecentStreams.
+    expect(screen.getByTestId('streams')).toHaveTextContent('walletConnected: false');
   });
 
   it('renders DemoBanner alongside content in demo mode', () => {

@@ -216,6 +216,7 @@ export default function Dashboard() {
             loading={loading}
             error={error}
             onRetry={refetch}
+            walletConnected={walletConnected}
           />
           {!loading && !error && (
             <button
