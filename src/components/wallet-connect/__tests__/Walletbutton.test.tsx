@@ -141,5 +141,3 @@ describe("WalletButton canonical modal", () => {
     resolveAccess({ address: "GCONNECTED", error: null });
   });
 });
-
-
