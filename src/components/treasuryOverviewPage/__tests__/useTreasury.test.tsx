@@ -151,6 +151,34 @@ describe("useTreasury", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(getStreams).toHaveBeenLastCalledWith({ status: "Active" });
   });
+
+  it("groups metrics by token and avoids indiscriminate summing", async () => {
+    getTreasuryMetrics.mockResolvedValue([
+      { icon: null, label: "Total Streaming", value: "0", desc: "" },
+      { icon: null, label: "Withdrawable", value: "0", desc: "" },
+    ]);
+    const mixedRecords = [
+      { ...FIRST_RECORD, id: "1", status: "Active", asset: "USDC", depositAmount: 100, withdrawableAmount: 20 },
+      { ...FIRST_RECORD, id: "2", status: "Active", asset: "EURC", depositAmount: 50, withdrawableAmount: 10 },
+      { ...FIRST_RECORD, id: "3", status: "Active", asset: "USDC", depositAmount: 200, withdrawableAmount: 40 },
+    ] as any;
+    getStreams.mockResolvedValue(mixedRecords);
+
+    const { result } = renderHook(() => useTreasury());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const totalStreaming = result.current.metrics.find(m => m.label === "Total Streaming");
+    expect(totalStreaming?.tokens).toEqual([
+      { asset: "USDC", amount: 300 },
+      { asset: "EURC", amount: 50 },
+    ]);
+
+    const withdrawable = result.current.metrics.find(m => m.label === "Withdrawable");
+    expect(withdrawable?.tokens).toEqual([
+      { asset: "USDC", amount: 60 },
+      { asset: "EURC", amount: 10 },
+    ]);
+  });
 });
 
 describe("useRecipientStreams", () => {
