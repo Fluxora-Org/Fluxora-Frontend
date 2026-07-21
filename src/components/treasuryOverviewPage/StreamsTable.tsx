@@ -1,10 +1,75 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import StreamRow from "./StreamRow";
 import { Stream } from "./Stream";
 
+export type SortColumn = "stream" | "recipient" | "rate" | "status";
+export type SortDirection = "asc" | "desc";
+
 export default function StreamsTable({ streams }: { streams: Stream[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
+
+  function handleHeaderClick(column: SortColumn) {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }
+
+  const sortedStreams = useMemo(() => {
+    if (!sortColumn) return streams;
+
+    return streams
+      .map((stream, originalIndex) => ({ stream, originalIndex }))
+      .sort((a, b) => {
+        let valA: string | number;
+        let valB: string | number;
+
+        switch (sortColumn) {
+          case "stream":
+            valA = a.stream.name;
+            valB = b.stream.name;
+            break;
+          case "recipient":
+            valA = a.stream.recipient;
+            valB = b.stream.recipient;
+            break;
+          case "rate":
+            valA =
+              typeof a.stream.accruedAmount === "number"
+                ? a.stream.accruedAmount
+                : a.stream.rate;
+            valB =
+              typeof b.stream.accruedAmount === "number"
+                ? b.stream.accruedAmount
+                : b.stream.rate;
+            break;
+          case "status":
+            valA = a.stream.status;
+            valB = b.stream.status;
+            break;
+        }
+
+        let comp = 0;
+        if (typeof valA === "number" && typeof valB === "number") {
+          comp = valA - valB;
+        } else {
+          comp = String(valA).localeCompare(String(valB));
+        }
+
+        if (comp !== 0) {
+          return sortDirection === "asc" ? comp : -comp;
+        }
+
+        // Stable sort: preserve original relative order for equal sort keys
+        return a.originalIndex - b.originalIndex;
+      })
+      .map((entry) => entry.stream);
+  }, [streams, sortColumn, sortDirection]);
 
   /**
    * Arrow-key navigation within the table body.
@@ -33,6 +98,11 @@ export default function StreamsTable({ streams }: { streams: Stream[] }) {
     }
   }
 
+  function getAriaSort(column: SortColumn): "ascending" | "descending" | "none" {
+    if (sortColumn !== column) return "none";
+    return sortDirection === "asc" ? "ascending" : "descending";
+  }
+
   return (
     <div
       className="overflow-x-auto rounded-lg"
@@ -42,7 +112,7 @@ export default function StreamsTable({ streams }: { streams: Stream[] }) {
         className="w-full text-left border-collapse"
         role="grid"
         aria-label="Active streams"
-        aria-rowcount={streams.length}
+        aria-rowcount={sortedStreams.length}
       >
         <thead>
           <tr
@@ -54,17 +124,63 @@ export default function StreamsTable({ streams }: { streams: Stream[] }) {
               letterSpacing: "0.05em",
             }}
           >
-            <th scope="col" className="py-4 px-3">STREAM</th>
-            <th scope="col" className="py-4 px-3">RECIPIENT</th>
-            <th scope="col" className="py-4 px-3">RATE</th>
-            <th scope="col" className="py-4 px-3">STATUS</th>
-            <th scope="col" className="py-4 px-3">ACTION</th>
+            <th scope="col" className="py-4 px-3" aria-sort={getAriaSort("stream")}>
+              <button
+                type="button"
+                onClick={() => handleHeaderClick("stream")}
+                className="flex items-center gap-1 font-semibold focus:outline-none hover:underline"
+              >
+                STREAM
+                {sortColumn === "stream" && (
+                  <span aria-hidden="true">{sortDirection === "asc" ? " ▲" : " ▼"}</span>
+                )}
+              </button>
+            </th>
+            <th scope="col" className="py-4 px-3" aria-sort={getAriaSort("recipient")}>
+              <button
+                type="button"
+                onClick={() => handleHeaderClick("recipient")}
+                className="flex items-center gap-1 font-semibold focus:outline-none hover:underline"
+              >
+                RECIPIENT
+                {sortColumn === "recipient" && (
+                  <span aria-hidden="true">{sortDirection === "asc" ? " ▲" : " ▼"}</span>
+                )}
+              </button>
+            </th>
+            <th scope="col" className="py-4 px-3" aria-sort={getAriaSort("rate")}>
+              <button
+                type="button"
+                onClick={() => handleHeaderClick("rate")}
+                className="flex items-center gap-1 font-semibold focus:outline-none hover:underline"
+              >
+                RATE
+                {sortColumn === "rate" && (
+                  <span aria-hidden="true">{sortDirection === "asc" ? " ▲" : " ▼"}</span>
+                )}
+              </button>
+            </th>
+            <th scope="col" className="py-4 px-3" aria-sort={getAriaSort("status")}>
+              <button
+                type="button"
+                onClick={() => handleHeaderClick("status")}
+                className="flex items-center gap-1 font-semibold focus:outline-none hover:underline"
+              >
+                STATUS
+                {sortColumn === "status" && (
+                  <span aria-hidden="true">{sortDirection === "asc" ? " ▲" : " ▼"}</span>
+                )}
+              </button>
+            </th>
+            <th scope="col" className="py-4 px-3">
+              ACTION
+            </th>
           </tr>
         </thead>
 
         <tbody ref={tbodyRef} onKeyDown={handleKeyDown}>
-          {streams.length > 0 ? (
-            streams.map((s: Stream) => (
+          {sortedStreams.length > 0 ? (
+            sortedStreams.map((s: Stream) => (
               <StreamRow
                 key={s.id}
                 stream={s}
