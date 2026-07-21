@@ -19,28 +19,6 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ['Escape'], description: 'Close modal / dismiss overlay' },
     ],
   },
-  {
-    heading: 'Navigation',
-    shortcuts: [
-      { keys: ['Alt', 'D'], description: 'Go to Dashboard' },
-      { keys: ['Alt', 'S'], description: 'Go to Streams' },
-      { keys: ['Alt', 'R'], description: 'Go to Recipient' },
-    ],
-  },
-  {
-    heading: 'Streams',
-    shortcuts: [
-      { keys: ['/'], description: 'Focus search / filter input' },
-      { keys: ['Alt', 'N'], description: 'Open Create Stream modal' },
-    ],
-  },
-  {
-    heading: 'Recipient',
-    shortcuts: [
-      { keys: ['Alt', 'W'], description: 'Open withdraw dialog' },
-      { keys: ['Alt', 'C'], description: 'Copy recipient address' },
-    ],
-  },
 ];
 
 export function KeyboardShortcutsModal() {
