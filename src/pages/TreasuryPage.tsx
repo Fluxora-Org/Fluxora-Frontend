@@ -25,12 +25,11 @@ export default function TreasuryPage() {
     <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
       {isDemoMode && <DemoBanner />}
       <Header />
-      {error && (
+      {error ? (
         <p role="alert" className="text-sm text-red-600">
           {error}
         </p>
-      )}
-      {loading ? (
+      ) : loading ? (
         <p role="status" className="text-sm text-gray-500">
           Loading treasury overview...
         </p>
