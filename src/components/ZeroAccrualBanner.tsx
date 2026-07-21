@@ -74,12 +74,16 @@ const REASON_CONFIG: Record<
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function formatEventDate(iso: string): string {
+function formatEventDate(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(iso));
+  }).format(d);
 }
 
 function nextEventLabel(reason: ZeroAccrualReason): string {
@@ -159,6 +163,7 @@ export default function ZeroAccrualBanner({
 }: ZeroAccrualBannerProps) {
   const cfg = REASON_CONFIG[reason];
   const label = actionLabel ?? cfg.defaultActionLabel;
+  const formattedEventDate = nextEventDate ? formatEventDate(nextEventDate) : null;
 
   return (
     <div
@@ -178,10 +183,10 @@ export default function ZeroAccrualBanner({
         <p className="zero-accrual-banner__description">{cfg.description}</p>
 
         {/* Next event date chip */}
-        {nextEventDate && (
+        {formattedEventDate && (
           <span className="zero-accrual-banner__next-event">
             <CalendarIcon />
-            {nextEventLabel(reason)}: {formatEventDate(nextEventDate)}
+            {nextEventLabel(reason)}: {formattedEventDate}
           </span>
         )}
       </div>
