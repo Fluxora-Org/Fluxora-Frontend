@@ -105,3 +105,4 @@ describe("WalletButton canonical modal", () => {
     expect(wallet.connect).not.toHaveBeenCalled();
   });
 });
+

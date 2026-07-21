@@ -260,7 +260,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const watcher = new WatchWalletChanges(WALLET_WATCH_INTERVAL_MS);
     watcherRef.current = watcher;
     watcher.watch(({ address, network }) => {
-      if (!isValidStellarAddress(address)) return;
+      if (!isValidStellarAddress(address)) {
+        setState((prev) => (prev.connected ? DISCONNECTED : prev));
+        return;
+      }
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev
