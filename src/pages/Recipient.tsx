@@ -9,7 +9,6 @@ import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreas
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
 import "./Streams.css";
-import "./Recipient.css";
 
 // Demo balances used as a UI fallback when the service returns no recipient
 // streams (no live backend yet, or no seeded match for the connected address).

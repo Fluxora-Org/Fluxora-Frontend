@@ -51,7 +51,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
 
           return (
             <li
-              key={item.label}
+              key={`${item.to ?? item.label}-${index}`}
               style={{ display: "flex", alignItems: "center", gap: "var(--breadcrumb-gap)" }}
             >
               {isLast || !item.to ? (

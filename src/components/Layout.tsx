@@ -55,9 +55,10 @@ export default function Layout() {
             </div>
 
             <button
+              type="button"
               className="app-sidebar-toggle"
               onClick={() => setIsSidebarCollapsed((p) => !p)}
-              aria-label="Toggle sidebar"
+              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!isSidebarCollapsed}
               aria-controls="app-sidebar"
             >

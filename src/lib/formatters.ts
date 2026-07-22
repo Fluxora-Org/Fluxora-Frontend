@@ -139,5 +139,7 @@ export function formatLocalDate(
   fallback = "Not set",
 ): string {
   if (!dateString) return fallback;
-  return createDateTimeFormat(options).format(new Date(dateString));
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return createDateTimeFormat(options).format(date);
 }

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
-import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
@@ -105,8 +104,6 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) return <TreasuryOverviewLoading />;
-
   const hasStreams = streams.length > 0;
   const hasError = !!error;
 
@@ -194,9 +191,7 @@ export default function Dashboard() {
             Withdrawable
           </div>
           <div className="text-heading-2">
-            {withdrawable !== null
-              ? `${withdrawable.toLocaleString()} USDC`
-              : "-- USDC"}
+            {withdrawable !== null ? formatUsdc(withdrawable) : "-- USDC"}
           </div>
         </div>
       </div>
@@ -214,17 +209,25 @@ export default function Dashboard() {
         </div>
       )}
 
-      {hasStreams ? (
+      {loading || hasError || hasStreams ? (
         <>
-          <RecentStreams streams={streams} />
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => setIsModalOpen(true)}
-            aria-label="Create stream"
-          >
-            Create stream
-          </button>
+          <RecentStreams
+            streams={streams}
+            loading={loading}
+            error={error}
+            onRetry={refetch}
+            walletConnected={walletConnected}
+          />
+          {!loading && !error && (
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => setIsModalOpen(true)}
+              aria-label="Create stream"
+            >
+              Create stream
+            </button>
+          )}
         </>
       ) : showOnboarding ? (
         <TreasuryOnboarding
