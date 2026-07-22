@@ -82,7 +82,9 @@ describe("HeroSection CTAs — no placeholder alert()/confirm() dialogs", () => 
 
   it('does not render a "Watch Demo" button', () => {
     render(<HeroSection />);
-    expect(screen.queryByRole("button", { name: /watch demo/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /watch demo/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("never calls window.alert or window.confirm when every button in the hero is clicked", async () => {
