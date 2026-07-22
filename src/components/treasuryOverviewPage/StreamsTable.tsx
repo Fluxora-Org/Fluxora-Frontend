@@ -76,7 +76,7 @@ export default function StreamsTable({ streams }: { streams: Stream[] }) {
             ))
           ) : (
             <tr>
-              <td colSpan={5} className="py-4 px-3 text-gray-500">
+              <td colSpan={5} className="py-4 px-3" style={{ color: "var(--color-text-muted)" }}>
                 No recent streams available.
               </td>
             </tr>

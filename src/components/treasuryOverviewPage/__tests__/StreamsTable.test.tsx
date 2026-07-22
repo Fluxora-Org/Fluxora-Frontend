@@ -30,4 +30,12 @@ describe("StreamsTable", () => {
       "0"
     );
   });
+
+  it("uses design token for empty-state text color instead of hardcoded Tailwind class", () => {
+    renderTable(<StreamsTable streams={[]} />);
+
+    const emptyStateCell = screen.getByText("No recent streams available.");
+    expect(emptyStateCell).not.toHaveClass("text-gray-500");
+    expect(emptyStateCell).toHaveStyle({ color: "var(--color-text-muted)" });
+  });
 });
