@@ -41,6 +41,7 @@ export default defineConfig({
         "src/lib/formatters.ts",
         "src/lib/api/newsletterService.ts",
         "src/lib/recentStreamMapper.ts",
+        "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
       ],
       exclude: ["src/components/**/*.test.tsx", "src/theme/**/__tests__/**"],
