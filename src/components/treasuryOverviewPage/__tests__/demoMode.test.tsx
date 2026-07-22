@@ -91,6 +91,11 @@ describe("treasury overview demo mode", () => {
     expect(screen.getByText("Demo state:")).toBeInTheDocument();
     expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
     expect(screen.getByText("Active Streams")).toBeInTheDocument();
+
+    // In demo mode with loaded fixture data, loaded badge must be highlighted exclusively
+    expect(screen.getByTestId("badge-loaded")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("badge-empty")).toHaveAttribute("data-active", "false");
+    expect(screen.getByTestId("badge-loading")).toHaveAttribute("data-active", "false");
   });
 
   it("defaults to live data and does not render fixture streams", async () => {

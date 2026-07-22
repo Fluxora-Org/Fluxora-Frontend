@@ -106,6 +106,20 @@ describe('TreasuryPage', () => {
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
   });
 
+  it('renders DemoBanner when isDemoMode is true during loading', () => {
+    mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: true, loading: true, error: null });
+    render(<TreasuryPage />);
+    expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading treasury overview...');
+  });
+
+  it('renders DemoBanner when isDemoMode is true during error', () => {
+    mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: true, loading: false, error: 'Error' });
+    render(<TreasuryPage />);
+    expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Error');
+  });
+
   it('renders Metrics/RecentStreams with empty data when undefined and not loading/error', () => {
     // The empty/loading/error states for "no data yet" now live inside
     // Metrics/RecentStreams themselves (see their own test coverage), not as
