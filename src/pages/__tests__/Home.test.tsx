@@ -94,11 +94,15 @@ describe("Home lazy sections with IntersectionObserver", () => {
 
     expect(observers.length).toBeGreaterThan(0);
     // Fire every observer as if each placeholder scrolled into view.
-    observers.forEach((obs) => {
-      obs.callback(
-        [{ isIntersecting: true } as IntersectionObserverEntry],
-        obs as unknown as IntersectionObserver,
-      );
+    await import('@testing-library/react').then(async ({ act }) => {
+      await act(async () => {
+        observers.forEach((obs) => {
+          obs.callback(
+            [{ isIntersecting: true } as IntersectionObserverEntry],
+            obs as unknown as IntersectionObserver,
+          );
+        });
+      });
     });
 
     expect(

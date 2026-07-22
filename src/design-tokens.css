@@ -177,8 +177,8 @@
   --color-cta-secondary-text: var(--color-text-secondary);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.1);
-  --color-warning-bg: rgba(255, 167, 38, 0.1);
+  --color-success-bg: rgba(30, 201, 142, 0.3);
+  --color-warning-bg: rgba(255, 167, 38, 0.3);
   --color-danger-bg: rgba(255, 107, 107, 0.1);
   --color-info-bg: rgba(0, 184, 212, 0.1);
 
@@ -324,10 +324,10 @@
   --muted: var(--text-muted);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.15);
-  --color-warning-bg: rgba(255, 167, 38, 0.15);
+  --color-success-bg: rgba(30, 201, 142, 0.30);
+  --color-warning-bg: rgba(255, 167, 38, 0.30);
   --color-danger-bg: rgba(255, 107, 107, 0.15);
-  --color-info-bg: rgba(0, 184, 212, 0.15);
+  --color-info-bg: rgba(0, 184, 212, 0.30);
 
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
