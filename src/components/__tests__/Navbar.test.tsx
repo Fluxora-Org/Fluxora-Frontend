@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, render } from "@testing-library/react";
+import {
+  BREAKPOINT_MD,
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+} from "../../lib/breakpoints";
 
 // Mock react-router-dom
 vi.mock("react-router-dom", () => ({
@@ -14,6 +18,16 @@ vi.mock("react-router-dom", () => ({
   ),
   useLocation: () => ({ pathname: "/" }),
 }));
+
+let viewportWidth = BREAKPOINT_MD;
+
+function setViewportWidth(width: number) {
+  viewportWidth = width;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    get: () => viewportWidth,
+  });
+}
 
 describe("Navbar style injection", () => {
   beforeEach(() => {
@@ -74,5 +88,104 @@ describe("Navbar style injection", () => {
       unmount();
     }
     expect(document.querySelectorAll("style[id='navbar-animation-styles']")).toHaveLength(1);
+  });
+});
+
+describe("Navbar resize handling", () => {
+  beforeEach(() => {
+    const existing = document.getElementById("navbar-animation-styles");
+    if (existing) {
+      existing.remove();
+    }
+    vi.resetModules();
+    vi.useFakeTimers();
+    setViewportWidth(BREAKPOINT_MD);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function getHamburger(container: HTMLElement) {
+    const button = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Toggle navigation menu"]',
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  it("updates the mobile hamburger only after the debounce delay elapses", async () => {
+    setViewportWidth(BREAKPOINT_MD);
+    const { default: Navbar } = await import("../Navbar");
+    const { container } = render(<Navbar />);
+
+    // Desktop width => hamburger hidden.
+    expect(getHamburger(container).style.display).toBe("none");
+
+    setViewportWidth(BREAKPOINT_MD - 1);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS - 1);
+    });
+
+    // Debounce still pending -> no state update yet.
+    expect(getHamburger(container).style.display).toBe("none");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    // Debounce elapsed -> mobile state applied.
+    expect(getHamburger(container).style.display).toBe("flex");
+  });
+
+  it("collapses rapid resize events into a single debounced update", async () => {
+    setViewportWidth(BREAKPOINT_MD - 1);
+    const { default: Navbar } = await import("../Navbar");
+    const { container } = render(<Navbar />);
+
+    // Mobile at mount => hamburger visible.
+    expect(getHamburger(container).style.display).toBe("flex");
+
+    act(() => {
+      for (let width = BREAKPOINT_MD; width <= BREAKPOINT_MD + 50; width += 5) {
+        setViewportWidth(width);
+        window.dispatchEvent(new Event("resize"));
+      }
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS - 1);
+    });
+
+    // Every intermediate event reset the timer; nothing has committed yet.
+    expect(getHamburger(container).style.display).toBe("flex");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    // Only the final width (desktop) is reflected, once.
+    expect(getHamburger(container).style.display).toBe("none");
+  });
+
+  it("clears the pending debounce timer on unmount", async () => {
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    setViewportWidth(BREAKPOINT_MD);
+    const { default: Navbar } = await import("../Navbar");
+    const { unmount } = render(<Navbar />);
+
+    setViewportWidth(BREAKPOINT_MD - 1);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    // A trailing flush after unmount must not throw or update anything.
+    act(() => {
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
+    });
   });
 });
