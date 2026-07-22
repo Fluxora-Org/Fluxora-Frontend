@@ -21,7 +21,7 @@
  *   • All interactive elements expose focus-visible ring.
  */
 
-import "./state-display.css";
+import "./zero-accrual-banner.css";
 
 export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
