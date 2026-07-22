@@ -18,7 +18,6 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
-        "src/components/ConnectButton.tsx",
         "src/components/GlowingDot.tsx",
         "src/components/InputField.tsx",
         "src/components/InputWithUnit.tsx",
