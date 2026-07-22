@@ -32,7 +32,8 @@ export default function Layout() {
   };
 
   return (
-    <div
+    <div>
+      <a href="#main-content" className="skip-link">Skip to main content</a
       className={[
         "app-layout",
         isSidebarCollapsed && "is-collapsed",
@@ -127,7 +128,7 @@ export default function Layout() {
             <div className="app-mobile-title">Fluxora</div>
           </header>
 
-          <main className="app-main">
+          <main id="main-content" className="app-main">
             <Outlet />
           </main>
 
