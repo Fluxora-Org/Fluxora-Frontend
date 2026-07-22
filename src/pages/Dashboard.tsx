@@ -12,6 +12,7 @@ import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
+import Button from "../components/Button";
 import "../design-tokens.css";
 
 export default function Dashboard() {
@@ -151,14 +152,14 @@ export default function Dashboard() {
               streams.
             </span>
           </div>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
             aria-label="Connect Stellar wallet"
           >
             Connect wallet
-          </button>
+          </Button>
         </div>
       )}
 
@@ -199,13 +200,13 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={refetch}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -218,14 +219,14 @@ export default function Dashboard() {
             onRetry={refetch}
           />
           {!loading && !error && (
-            <button
+            <Button
               type="button"
-              className="button button--primary"
+              variant="primary"
               onClick={() => setIsModalOpen(true)}
               aria-label="Create stream"
             >
               Create stream
-            </button>
+            </Button>
           )}
         </>
       ) : showOnboarding ? (
