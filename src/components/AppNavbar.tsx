@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { stellarExplorerUrl } from "../lib/stellar";
+import { copyToClipboard } from "../hooks/useClipboard";
 
 interface AppNavbarProps {
   onThemeToggle?: () => void;
@@ -156,6 +157,7 @@ interface WalletDropdownProps {
 function WalletDropdown({ address, network, onDisconnect }: WalletDropdownProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,9 +175,16 @@ function WalletDropdown({ address, network, onDisconnect }: WalletDropdownProps)
   }, []);
 
   const handleCopy = async () => {
-    try { await navigator.clipboard.writeText(address); } catch { /* noop */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const success = await copyToClipboard(address);
+    if (success) {
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 1500);
+    } else {
+      setCopyFailed(true);
+      setCopied(false);
+      setTimeout(() => setCopyFailed(false), 1500);
+    }
   };
 
   const handleViewExplorer = () => {
@@ -208,7 +217,7 @@ function WalletDropdown({ address, network, onDisconnect }: WalletDropdownProps)
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
             <CopyIcon />
-            {copied ? "Copied!" : "Copy address"}
+            {copied ? "Copied!" : copyFailed ? "Failed to copy!" : "Copy address"}
           </button>
           <button role="menuitem" onClick={handleViewExplorer} style={styles.dropdownItem}
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}

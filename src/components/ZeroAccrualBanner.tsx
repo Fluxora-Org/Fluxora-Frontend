@@ -22,6 +22,7 @@
  */
 
 import "./state-display.css";
+import { formatLocalDate } from "../lib/formatters";
 
 export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
@@ -73,14 +74,6 @@ const REASON_CONFIG: Record<
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function formatEventDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(iso));
-}
 
 function nextEventLabel(reason: ZeroAccrualReason): string {
   switch (reason) {
@@ -181,7 +174,12 @@ export default function ZeroAccrualBanner({
         {nextEventDate && (
           <span className="zero-accrual-banner__next-event">
             <CalendarIcon />
-            {nextEventLabel(reason)}: {formatEventDate(nextEventDate)}
+            {nextEventLabel(reason)}:{" "}
+            {formatLocalDate(nextEventDate, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
           </span>
         )}
       </div>

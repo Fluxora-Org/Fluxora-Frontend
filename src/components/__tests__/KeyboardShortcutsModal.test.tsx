@@ -82,4 +82,61 @@ describe("KeyboardShortcutsModal", () => {
     await user.type(textarea, "?");
     expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
   });
+
+  it("does not open when '?' is pressed while another modal (aria-modal='true') is active", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <div role="dialog" aria-modal="true" aria-label="Create Stream Modal">
+          <button type="button">Action Button</button>
+        </div>
+        <KeyboardShortcutsModal />
+      </div>
+    );
+
+    expect(screen.getByRole("dialog", { name: "Create Stream Modal" })).toBeInTheDocument();
+
+    const button = screen.getByRole("button", { name: "Action Button" });
+    button.focus();
+
+    await user.keyboard("?");
+    expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
+  });
+
+  it("opens when '?' is pressed while a non-modal element (aria-modal='false') is present", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <div role="dialog" aria-modal="false" aria-label="Tooltip">
+          Tooltip content
+        </div>
+        <KeyboardShortcutsModal />
+      </div>
+    );
+
+    await user.keyboard("?");
+    expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+  });
+
+  it("closes KeyboardShortcutsModal when '?' is pressed while it is open and another modal is active", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<KeyboardShortcutsModal />);
+
+    // Open KeyboardShortcutsModal
+    await user.keyboard("?");
+    expect(screen.getByRole("dialog", { name: /keyboard shortcuts/i })).toBeInTheDocument();
+
+    // Rerender with another active modal present
+    rerender(
+      <div>
+        <div role="dialog" aria-modal="true" aria-label="Other Modal">
+          Content
+        </div>
+        <KeyboardShortcutsModal />
+      </div>
+    );
+
+    await user.keyboard("?");
+    expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
+  });
 });
