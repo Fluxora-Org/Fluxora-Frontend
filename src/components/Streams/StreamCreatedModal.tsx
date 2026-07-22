@@ -109,7 +109,7 @@ export default function StreamCreatedModal({
         console.error("Invalid URL scheme. Only https is allowed.");
         return;
       }
-    } catch (e) {
+    } catch {
       console.error("Invalid URL provided.");
       return;
     }

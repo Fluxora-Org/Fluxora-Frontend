@@ -120,4 +120,16 @@ describe('Button component', () => {
       expect(iconContainer).not.toHaveAttribute('aria-hidden', 'true');
     });
   });
+
+  describe('Focus visible state', () => {
+    it('receives focus when tabbed to (keyboard accessibility)', async () => {
+      const user = userEvent.setup();
+      render(<Button>Focus target</Button>);
+      
+      const button = screen.getByRole('button', { name: /focus target/i });
+      
+      await user.tab();
+      expect(button).toHaveFocus();
+    });
+  });
 });
