@@ -40,6 +40,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
+import { copyToClipboard } from "../hooks/useClipboard";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -874,13 +875,13 @@ export default function Streams() {
   }, [refetch, streams.length]);
 
   const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
-    try {
-      await navigator.clipboard.writeText(stream.recipientAddress);
+    const success = await copyToClipboard(stream.recipientAddress);
+    if (success) {
       addToast(
         `Recipient for ${stream.name} copied to your clipboard.`,
         "success",
       );
-    } catch {
+    } else {
       addToast(
         "Clipboard access is unavailable in this browser. Copy the address manually instead.",
         "error",

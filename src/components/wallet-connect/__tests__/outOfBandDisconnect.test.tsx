@@ -92,6 +92,8 @@ describe("Out-of-band disconnect handling", () => {
       expect(screen.queryByRole("button", { name: "Connect wallet" })).not.toBeInTheDocument();
       // "Start action" should be present
       expect(screen.getByText("Start action")).toBeInTheDocument();
+      // Wait until the watcher has been instantiated and registered
+      expect(mockedWatchWalletChanges).toHaveBeenCalled();
     });
 
     // Simulate an out-of-band disconnect (e.g. extension locked)

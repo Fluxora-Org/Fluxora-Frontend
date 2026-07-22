@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "../Sidebar";
@@ -20,15 +20,18 @@ vi.mock("react-router-dom", () => ({
     className?: string | ((props: { isActive: boolean }) => string);
     onClick?: () => void;
     end?: boolean;
-  }) => (
-    <a
-      href={to}
-      className={typeof className === "function" ? className({ isActive: false }) : className}
-      onClick={onClick}
-    >
-      {typeof children === "function" ? children({ isActive: false }) : children}
-    </a>
-  ),
+  }) => {
+    const isActive = to === "/app";
+    return (
+      <a
+        href={to}
+        className={typeof className === "function" ? className({ isActive }) : className}
+        onClick={onClick}
+      >
+        {typeof children === "function" ? children({ isActive }) : children}
+      </a>
+    );
+  },
   useNavigate: () => vi.fn(),
 }));
 
@@ -216,3 +219,207 @@ describe("Sidebar resize handling", () => {
     expect(getSidebar()).toHaveAttribute("aria-hidden", "false");
   });
 });
+
+describe("Sidebar collapse toggle accessibility & keyboard interaction", () => {
+  beforeEach(() => {
+    setViewportWidth(BREAKPOINT_MD);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders a real button with correct aria-expanded state and dynamic accessible name", () => {
+    const onToggleCollapse = vi.fn();
+    const { rerender } = render(
+      <Sidebar
+        collapsed={false}
+        onToggleCollapse={onToggleCollapse}
+        mobileOpen={false}
+        onMobileClose={vi.fn()}
+      />
+    );
+
+    const toggleButton = document.querySelector('button[aria-controls="app-sidebar"]');
+    expect(toggleButton).toBeTruthy();
+    expect(toggleButton?.tagName).toBe("BUTTON");
+    expect(toggleButton).toHaveAttribute("aria-expanded", "true");
+    expect(toggleButton).toHaveAttribute("aria-label", "Collapse sidebar");
+
+    rerender(
+      <Sidebar
+        collapsed={true}
+        onToggleCollapse={onToggleCollapse}
+        mobileOpen={false}
+        onMobileClose={vi.fn()}
+      />
+    );
+
+    expect(toggleButton).toHaveAttribute("aria-expanded", "false");
+    expect(toggleButton).toHaveAttribute("aria-label", "Expand sidebar");
+  });
+
+  it("toggles sidebar on mouse click and keyboard activation (Enter/Space)", () => {
+    const onToggleCollapse = vi.fn();
+    render(
+      <Sidebar
+        collapsed={false}
+        onToggleCollapse={onToggleCollapse}
+        mobileOpen={false}
+        onMobileClose={vi.fn()}
+      />
+    );
+
+    const toggleButton = document.querySelector('button[aria-controls="app-sidebar"]') as HTMLButtonElement;
+    expect(toggleButton).toBeTruthy();
+
+    // Mouse click
+    fireEvent.click(toggleButton);
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+
+    // Keyboard Enter
+    fireEvent.keyDown(toggleButton, { key: "Enter", code: "Enter" });
+    fireEvent.click(toggleButton);
+    expect(onToggleCollapse).toHaveBeenCalledTimes(2);
+
+    // Keyboard Space
+    fireEvent.keyDown(toggleButton, { key: " ", code: "Space" });
+    fireEvent.click(toggleButton);
+    expect(onToggleCollapse).toHaveBeenCalledTimes(3);
+  });
+
+  it("maintains sane tab order in both expanded and collapsed states", () => {
+    const { rerender } = render(
+      <Sidebar
+        collapsed={false}
+        onToggleCollapse={vi.fn()}
+        mobileOpen={false}
+        onMobileClose={vi.fn()}
+      />
+    );
+
+    const sidebar = getSidebar();
+    const getFocusableItems = () =>
+      Array.from(
+        sidebar.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true");
+
+    const expandedFocusables = getFocusableItems();
+    expect(expandedFocusables.length).toBeGreaterThan(0);
+
+    // Check expected sequence of focusable elements when expanded
+    const expandedLabels = expandedFocusables.map(
+      (el) => el.getAttribute("aria-label") || el.textContent?.trim()
+    );
+    expect(expandedLabels).toContain("Fluxora home");
+    expect(expandedLabels).toContain("Collapse sidebar");
+
+    // Rerender collapsed
+    rerender(
+      <Sidebar
+        collapsed={true}
+        onToggleCollapse={vi.fn()}
+        mobileOpen={false}
+        onMobileClose={vi.fn()}
+      />
+    );
+
+    const collapsedFocusables = getFocusableItems();
+    // In desktop view (hidden md:flex toggle button), all nav links, external links, logo and toggle button remain focusable in DOM
+    expect(collapsedFocusables.length).toEqual(expandedFocusables.length);
+
+    const collapsedLabels = collapsedFocusables.map(
+      (el) => el.getAttribute("aria-label") || el.textContent?.trim()
+    );
+    expect(collapsedLabels).toContain("Fluxora home");
+    expect(collapsedLabels).toContain("Expand sidebar");
+
+    // Verify focus can move through each item without focus traps
+    collapsedFocusables.forEach((el) => {
+      el.focus();
+      expect(document.activeElement).toBe(el);
+    });
+  });
+
+  it("handles mobile drawer Escape key and focus trapping", () => {
+    const onMobileClose = vi.fn();
+    render(
+      <Sidebar
+        collapsed={false}
+        onToggleCollapse={vi.fn()}
+        mobileOpen={true}
+        onMobileClose={onMobileClose}
+      />
+    );
+
+    // Press Escape key
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onMobileClose).toHaveBeenCalledTimes(1);
+
+    const sidebar = getSidebar();
+    const focusables = sidebar.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstEl = focusables[0];
+    const middleEl = focusables[1];
+    const lastEl = focusables[focusables.length - 1];
+
+    // Non-Tab key does not interfere
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    // Shift + Tab on middle element does not redirect focus to last element
+    middleEl.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+
+    // Shift + Tab on first element focuses last element
+    firstEl.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(lastEl);
+
+    // Tab on middle element does not redirect focus to first element
+    middleEl.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: false });
+
+    // Tab on last element focuses first element
+    lastEl.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: false });
+    expect(document.activeElement).toBe(firstEl);
+  });
+
+  it("triggers onMobileClose when logo, close button, backdrop, or nav links are clicked", () => {
+    const onMobileClose = vi.fn();
+    const { container } = render(
+      <Sidebar
+        collapsed={false}
+        onToggleCollapse={vi.fn()}
+        mobileOpen={true}
+        onMobileClose={onMobileClose}
+      />
+    );
+
+    // Logo click
+    const logoButton = screen.getByRole("button", { name: "Fluxora home" });
+    fireEvent.click(logoButton);
+    expect(onMobileClose).toHaveBeenCalledTimes(1);
+
+    // Mobile close button click
+    const closeButton = screen.getByRole("button", { name: "Close sidebar" });
+    fireEvent.click(closeButton);
+    expect(onMobileClose).toHaveBeenCalledTimes(2);
+
+    // Backdrop click
+    const backdrop = container.querySelector(".fixed.inset-0") as HTMLElement;
+    expect(backdrop).toBeTruthy();
+    fireEvent.click(backdrop);
+    expect(onMobileClose).toHaveBeenCalledTimes(3);
+
+    // NavLink click
+    const navLink = screen.getByRole("link", { name: /Dashboard/i });
+    fireEvent.click(navLink);
+    expect(onMobileClose).toHaveBeenCalledTimes(4);
+  });
+});
+
+

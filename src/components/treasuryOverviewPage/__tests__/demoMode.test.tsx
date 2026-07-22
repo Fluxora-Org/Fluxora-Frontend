@@ -110,6 +110,6 @@ describe("treasury overview demo mode", () => {
     });
 
     expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
-    expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
+    expect(screen.getByText("No streams yet")).toBeInTheDocument();
   });
 });

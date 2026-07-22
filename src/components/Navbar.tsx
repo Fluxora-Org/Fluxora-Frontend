@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import WalletButton from "./wallet-connect/Walletbutton";
+import {
+  isMobileViewport,
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+} from "../lib/breakpoints";
 
 interface NavbarProps {
   onThemeToggle?: () => void;
@@ -13,19 +17,30 @@ export default function Navbar({
   theme = "light",
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(() => isMobileViewport());
 
   useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+
+    const syncMobileState = () => {
+      const mobile = isMobileViewport();
+      setIsMobile((prev) => (prev === mobile ? prev : mobile));
       if (!mobile) {
         setMobileMenuOpen(false);
       }
     };
 
+    const handleResize = () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(syncMobileState, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(debounceId);
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   const handleThemeToggle = () => {
