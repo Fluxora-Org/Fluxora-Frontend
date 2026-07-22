@@ -84,14 +84,14 @@ describe('RecentStreams', () => {
   // -------------------------------------------------------------------------
 
   it('renders "View all" link with default href /app/streams when viewAllUrl is omitted', () => {
-    renderWithRouter(<RecentStreams streams={[]} />);
+    renderWithRouter(<RecentStreams streams={[makeStream()]} />);
 
     const link = screen.getByRole('link', { name: /view all/i });
     expect(link).toHaveAttribute('href', '/app/streams');
   });
 
   it('uses a custom viewAllUrl for the "View all" link', () => {
-    renderWithRouter(<RecentStreams streams={[]} viewAllUrl="/custom/streams" />);
+    renderWithRouter(<RecentStreams streams={[makeStream()]} viewAllUrl="/custom/streams" />);
 
     const link = screen.getByRole('link', { name: /view all/i });
     expect(link).toHaveAttribute('href', '/custom/streams');
@@ -132,11 +132,34 @@ describe('RecentStreams', () => {
     expect(tbody.querySelectorAll('tr')).toHaveLength(3);
   });
 
-  it('renders no rows in tbody when streams is an empty array', () => {
+  it('renders an empty state UI when streams is an empty array', () => {
     renderWithRouter(<RecentStreams streams={[]} />);
 
-    const tbody = document.querySelector('tbody') as HTMLTableSectionElement;
-    expect(tbody.querySelectorAll('tr')).toHaveLength(0);
+    expect(screen.getByRole('region', { name: /streams empty state/i })).toBeInTheDocument();
+  });
+
+  it('renders a loading skeleton when loading is true', () => {
+    renderWithRouter(<RecentStreams streams={[]} loading={true} />);
+
+    expect(screen.getByRole('status', { name: /loading streams/i })).toBeInTheDocument();
+  });
+
+  it('renders an error UI with retry action when error is present', () => {
+    const onRetry = vi.fn();
+    renderWithRouter(
+      <RecentStreams
+        streams={[]}
+        error="Network Failure"
+        onRetry={onRetry}
+      />
+    );
+
+    expect(screen.getByRole('region', { name: /error state/i })).toBeInTheDocument();
+    expect(screen.getByText('Network Failure')).toBeInTheDocument();
+
+    const retryBtn = screen.getByRole('button', { name: /try again/i });
+    retryBtn.click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------

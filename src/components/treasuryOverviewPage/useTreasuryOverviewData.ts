@@ -15,6 +15,7 @@ export interface TreasuryOverviewData {
   isDemoMode: boolean;
   loading: boolean;
   error: string | null;
+  refetch: () => void;
 }
 
 /**
@@ -74,6 +75,7 @@ export function useTreasuryOverviewData(): TreasuryOverviewData {
         isDemoMode: true,
         loading: false,
         error: null,
+        refetch: () => {},
       };
     }
 
@@ -83,6 +85,7 @@ export function useTreasuryOverviewData(): TreasuryOverviewData {
       isDemoMode: false,
       loading: treasury.loading,
       error: treasury.error,
+      refetch: treasury.refetch,
     };
-  }, [isDemoMode, treasury.metrics, treasury.streams, treasury.loading, treasury.error]);
+  }, [isDemoMode, treasury.metrics, treasury.streams, treasury.loading, treasury.error, treasury.refetch]);
 }

@@ -173,6 +173,14 @@ describe("formatLocalDate", () => {
     expect(result).toMatch(/\d/);
     expect(typeof result).toBe("string");
   });
+
+  it('returns fallback for a malformed date string instead of throwing', () => {
+    expect(formatLocalDate("not-a-date")).toBe("Not set");
+  });
+
+  it("returns custom fallback for a malformed date string when provided", () => {
+    expect(formatLocalDate("not-a-date", {}, "N/A")).toBe("N/A");
+  });
 });
 
 // ─── Locale Resilience ────────────────────────────────────────────────────────

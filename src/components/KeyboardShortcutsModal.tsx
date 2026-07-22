@@ -21,6 +21,14 @@ const SECTIONS: ShortcutSection[] = [
   },
 ];
 
+function isAnotherModalOpen(currentModalRef?: React.RefObject<HTMLElement | null>): boolean {
+  const modals = document.querySelectorAll('[aria-modal="true"]');
+  if (modals.length === 0) return false;
+
+  const currentContainer = currentModalRef?.current?.closest('[aria-modal="true"]');
+  return Array.from(modals).some((modal) => modal !== currentContainer);
+}
+
 export function KeyboardShortcutsModal() {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -40,6 +48,10 @@ export function KeyboardShortcutsModal() {
         (e.target as HTMLElement).isContentEditable;
 
       if (e.key === '?' && !isEditable) {
+        if (isAnotherModalOpen(dialogRef)) {
+          setOpen(false);
+          return;
+        }
         e.preventDefault();
         setOpen((prev) => !prev);
       }

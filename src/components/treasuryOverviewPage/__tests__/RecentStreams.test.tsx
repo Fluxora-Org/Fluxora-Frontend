@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import RecentStreams from "../RecentStreams";
 import { treasuryDemoStreams } from "../../../fixtures/treasury";
 
@@ -23,7 +23,31 @@ describe("treasuryOverviewPage RecentStreams", () => {
   it("passes empty treasury streams through to the table empty state", () => {
     renderRecentStreams(<RecentStreams streams={[]} />);
 
-    expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /treasury empty state/i })).toBeInTheDocument();
+  });
+
+  it("renders a loading skeleton when loading is true", () => {
+    renderRecentStreams(<RecentStreams streams={[]} loading={true} />);
+
+    expect(screen.getByRole("status", { name: /loading streams/i })).toBeInTheDocument();
+  });
+
+  it("renders an error UI with a retry action when error is present", () => {
+    const onRetry = vi.fn();
+    renderRecentStreams(
+      <RecentStreams
+        streams={[]}
+        error="Treasury Fetch Failed"
+        onRetry={onRetry}
+      />
+    );
+
+    expect(screen.getByRole("region", { name: /error state/i })).toBeInTheDocument();
+    expect(screen.getByText("Treasury Fetch Failed")).toBeInTheDocument();
+
+    const retryBtn = screen.getByRole("button", { name: /try again/i });
+    retryBtn.click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it("navigates to /app/streams when View all is clicked", async () => {

@@ -68,11 +68,15 @@ describe('TreasuryPage', () => {
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
   });
 
-  it('shows empty‑state fallback when data is undefined and not loading/error', () => {
+  it('renders Metrics/RecentStreams with empty data when undefined and not loading/error', () => {
+    // The empty/loading/error states for "no data yet" now live inside
+    // Metrics/RecentStreams themselves (see their own test coverage), not as
+    // a page-level fallback — the page always renders them once past its own
+    // loading/error states, passing an empty array when data is undefined.
     mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: null });
     render(<TreasuryPage />);
-    expect(screen.getByRole('status')).toHaveTextContent('No treasury data available.');
-    expect(screen.queryByTestId('metrics')).toBeNull();
-    expect(screen.queryByTestId('streams')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByTestId('metrics')).toHaveTextContent(JSON.stringify([]));
+    expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify([]));
   });
 });

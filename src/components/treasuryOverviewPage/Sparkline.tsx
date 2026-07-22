@@ -24,7 +24,7 @@ export default function Sparkline({ data, width = 80, height = 32, color = "var(
     <svg
       width={width}
       height={height}
-      aria-hidden="true"
+      role="img"
       aria-label={`Trend: ${trend >= 0 ? "up" : "down"}`}
       style={{ display: "block" }}
     >
