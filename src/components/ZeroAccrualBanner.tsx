@@ -24,6 +24,22 @@
 import "./zero-accrual-banner.css";
 import { formatLocalDate } from "../lib/formatters";
 
+// ── Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Format an ISO date string using the user's resolved locale. Wraps
+ * {@link formatLocalDate} so callers can interrogate the formatted output
+ * (e.g. to decide whether to render the next-event chip at all) without
+ * duplicating the formatter invocation.
+ */
+function formatEventDate(isoDate: string): string {
+  return formatLocalDate(isoDate, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 
 export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
@@ -177,11 +193,7 @@ export default function ZeroAccrualBanner({
           <span className="zero-accrual-banner__next-event">
             <CalendarIcon />
             {nextEventLabel(reason)}:{" "}
-            {formatLocalDate(nextEventDate, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {formattedEventDate}
           </span>
         )}
       </div>

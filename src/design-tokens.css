@@ -194,6 +194,69 @@
   --tooltip-text-color: var(--text-secondary);
   --tooltip-z-index: 1100;
 
+  /* ─── Connect Wallet Onboarding (theme-aware) ───
+     Issue #737: replaces previously hardcoded rgba/hex literals in
+     src/pages/ConnectWallet.tsx with theme-aware tokens so the page
+     adapts to the active `data-theme` automatically. */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    var(--surface-elevated) 0%,
+    var(--surface-sunken) 35%,
+    var(--surface-base) 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-raised) 92%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 96%, transparent) 100%
+  );
+  --connect-card-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 22%, transparent);
+  --connect-card-shadow: 0 20px 55px
+    color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+
+  --connect-eyebrow-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 32%, transparent);
+  --connect-eyebrow-bg: color-mix(
+    in srgb,
+    var(--border-interactive) 10%,
+    transparent
+  );
+  --connect-eyebrow-text: var(--status-info);
+
+  --connect-description-text: color-mix(
+    in srgb,
+    var(--text-secondary) 82%,
+    transparent
+  );
+
+  --connect-step-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-step-bg: color-mix(
+    in srgb,
+    var(--surface-raised) 82%,
+    transparent
+  );
+  --connect-step-text: color-mix(
+    in srgb,
+    var(--text-vivid) 92%,
+    transparent
+  );
+
+  --connect-helper-text: color-mix(
+    in srgb,
+    var(--text-muted) 74%,
+    transparent
+  );
+
+  --connect-cta-text: var(--color-text-inverse);
+  --connect-cta-shadow: 0 10px 25px
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px
+      color-mix(in srgb, var(--border-interactive) 26%, transparent);
+
   /* ─── Inline Unit Badge (for input suffixes) ─── */
   --input-badge-bg: var(--surface-neutral);
   --input-badge-color: var(--text-muted);
@@ -328,6 +391,40 @@
   --color-warning-bg: rgba(255, 167, 38, 0.30);
   --color-danger-bg: rgba(255, 107, 107, 0.15);
   --color-info-bg: rgba(0, 184, 212, 0.30);
+
+  /* ─── Connect Wallet Onboarding (dark) ─── */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    #12375b 0%,
+    #071426 35%,
+    #06111f 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    rgba(20, 30, 48, 0.88) 0%,
+    rgba(10, 16, 28, 0.94) 100%
+  );
+  --connect-card-border: 1px solid rgba(34, 211, 238, 0.22);
+  --connect-card-shadow: 0 20px 55px rgba(0, 0, 0, 0.4);
+
+  --connect-eyebrow-border: 1px solid rgba(34, 211, 238, 0.32);
+  --connect-eyebrow-bg: rgba(34, 211, 238, 0.12);
+  --connect-eyebrow-text: #22d3ee;
+
+  --connect-description-text: rgba(231, 242, 255, 0.78);
+
+  --connect-step-border: 1px solid rgba(148, 195, 255, 0.2);
+  --connect-step-bg: rgba(16, 27, 44, 0.82);
+  --connect-step-text: rgba(231, 242, 255, 0.9);
+
+  --connect-helper-text: rgba(199, 220, 244, 0.68);
+
+  --connect-cta-text: #04131a;
+  --connect-cta-shadow: 0 10px 25px rgba(0, 184, 212, 0.26);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px rgba(0, 184, 212, 0.26);
 
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
