@@ -32,8 +32,7 @@ export default function Layout() {
   };
 
   return (
-    <div>
-      <a href="#main-content" className="skip-link">Skip to main content</a
+    <div
       className={[
         "app-layout",
         isSidebarCollapsed && "is-collapsed",
@@ -42,6 +41,7 @@ export default function Layout() {
         .filter(Boolean)
         .join(" ")}
     >
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <div className="app-layout__body">
         {/* SIDEBAR */}
         <aside
