@@ -179,6 +179,88 @@
   line-height: 1.5;
 }
 
+.shareSection {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.shareSectionTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.75rem;
+}
+
+.shareGroup {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.shareButton {
+  flex: 1;
+  padding: 0.75rem 0.875rem;
+  border-radius: 10px;
+  border: 1px solid #2a3d58;
+  background: #141e30;
+  color: #e8ecf4;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shareButton:hover,
+.shareButton:focus-visible {
+  border-color: #00b8d4;
+  outline: none;
+}
+
+.shareButtonActive {
+  background: rgba(0, 184, 212, 0.18);
+  border-color: #00b8d4;
+}
+
+.sharePreviewCard {
+  border: 1px solid #1e2d42;
+  border-radius: 12px;
+  background: #0d1421;
+  padding: 0.9rem;
+}
+
+.sharePreviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sharePreviewLabel {
+  color: #6b7a94;
+  font-size: 0.825rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shareStatusBadge {
+  color: #8ec5ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sharePreviewBody {
+  color: #e8ecf4;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.shareConnectState {
+  margin-top: 0.75rem;
+  color: #99a1af;
+  font-size: 0.8125rem;
+}
+
 .actions {
   display: flex;
   gap: 1rem;
@@ -222,6 +304,9 @@
   .modal {
     padding: 1.5rem;
   }
+  .shareGroup {
+    flex-direction: column;
+  }
   .actions {
     flex-direction: column;
   }
@@ -251,4 +336,3 @@
 .fallbackLink:hover {
   color: #93c5fd;
 }
-
