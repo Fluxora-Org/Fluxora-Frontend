@@ -34,11 +34,13 @@ import {
   formatDetailTime,
   getUrgencyLevel,
 } from "../lib/timePresentation";
+import { formatUsdc } from "../lib/formatters";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
+import { copyToClipboard } from "../hooks/useClipboard";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -53,16 +55,13 @@ const STREAM_CARD_ESTIMATED_HEIGHT = 420;
  * Formats a USDC amount with full fractional precision (2 decimal places).
  * Returns a safe placeholder for NaN or negative inputs.
  *
+ * Re-exported from src/lib/formatters so callers that import directly from
+ * this page module keep working without changes (issue #388).
+ *
  * @param value - The numeric USDC amount to format.
  * @returns A locale-aware string such as "1,234.56 USDC".
  */
-export function formatUsdc(value: number): string {
-  if (!Number.isFinite(value) || value < 0) return "— USDC";
-  return `${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)} USDC`;
-}
+export { formatUsdc } from "../lib/formatters";
 
 function formatMonthlyRate(value: number) {
   return `${formatUsdc(value)} / mo`;
@@ -830,11 +829,11 @@ export default function Streams() {
     }
 
     const timer = window.setTimeout(() => {
-      announce(
-        `Showing ${visibleStreams.length} ${
-          visibleStreams.length === 1 ? "stream" : "streams"
-        }.`,
-      );
+      const count = visibleStreams.length;
+      const noun = count === 1 ? "stream" : "streams";
+      const filterLabel =
+        statusFilter !== "All" ? ` ${statusFilter.toLowerCase()}` : "";
+      announce(`Showing ${count}${filterLabel} ${noun}.`);
     }, FILTER_ANNOUNCEMENT_DELAY_MS);
 
     return () => window.clearTimeout(timer);
@@ -851,6 +850,9 @@ export default function Streams() {
     hasStreams &&
     withdrawableNow === 0 &&
     activeStreams.length > 0;
+  // Determine the most specific reason: rate-zero takes priority over cliff
+  const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
+  const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "cliff";
   const effectiveExpandedId = visibleStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
@@ -873,13 +875,13 @@ export default function Streams() {
   }, [refetch, streams.length]);
 
   const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
-    try {
-      await navigator.clipboard.writeText(stream.recipientAddress);
+    const success = await copyToClipboard(stream.recipientAddress);
+    if (success) {
       addToast(
         `Recipient for ${stream.name} copied to your clipboard.`,
         "success",
       );
-    } catch {
+    } else {
       addToast(
         "Clipboard access is unavailable in this browser. Copy the address manually instead.",
         "error",
@@ -1031,13 +1033,13 @@ export default function Streams() {
           {showZeroAccrual && (
             <div style={{ marginBottom: "2rem" }}>
               <ZeroAccrualBanner
-                reason="cliff"
-                nextEventDate={nextUnlock}
+                reason={zeroAccrualReason}
+                nextEventDate={hasZeroRateStream ? undefined : nextUnlock}
                 onAction={() => {
                   const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel="Check cliff date"
+                actionLabel={hasZeroRateStream ? "Review stream settings" : "Check cliff date"}
               />
             </div>
           )}
@@ -1150,7 +1152,7 @@ export default function Streams() {
                 setCurrentPage(page);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              onItemsPerPageChange={(limit) => {
+              onItemsPerPageChange={(limit: number) => {
                 setItemsPerPage(limit);
                 setCurrentPage(1);
               }}

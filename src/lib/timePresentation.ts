@@ -80,7 +80,10 @@ export function formatDateWithTimezone(
     formatOptions.minute = "2-digit";
   }
 
-  let formatted = new Intl.DateTimeFormat("en-US", formatOptions).format(date);
+  // Pass `undefined` so the browser's (or runtime's) default locale is used.
+  // This resolves issue #388: dates now render in the user's own locale instead
+  // of always using the hardcoded "en-US" format.
+  let formatted = new Intl.DateTimeFormat(undefined, formatOptions).format(date);
 
   if (showTimezone) {
     formatted += " UTC";

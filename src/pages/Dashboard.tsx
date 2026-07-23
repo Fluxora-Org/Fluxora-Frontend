@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
-import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
@@ -11,26 +10,10 @@ import ToastNotification, {
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
-import type { StreamRecord } from "../data/streamRecords";
 import { readOnboardingDismissed } from "../lib/onboarding";
+import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
+import Button from "../components/Button";
 import "../design-tokens.css";
-
-function formatUsdc(amount: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    amount,
-  )} USDC`;
-}
-
-function toRecentStream(record: StreamRecord): Stream {
-  return {
-    name: record.name,
-    id: record.id,
-    recipient: record.recipientAddress || record.recipientName,
-    rate: `${formatUsdc(record.monthlyRate)} / mo`,
-    status: record.status,
-  };
-}
-
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,13 +105,11 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) return <TreasuryOverviewLoading />;
-
   const hasStreams = streams.length > 0;
   const hasError = !!error;
 
   return (
-    <div>
+    <main id="main-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
@@ -171,14 +152,14 @@ export default function Dashboard() {
               streams.
             </span>
           </div>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
             aria-label="Connect Stellar wallet"
           >
             Connect wallet
-          </button>
+          </Button>
         </div>
       )}
 
@@ -211,9 +192,7 @@ export default function Dashboard() {
             Withdrawable
           </div>
           <div className="text-heading-2">
-            {withdrawable !== null
-              ? `${withdrawable.toLocaleString()} USDC`
-              : "-- USDC"}
+            {withdrawable !== null ? formatUsdc(withdrawable) : "-- USDC"}
           </div>
         </div>
       </div>
@@ -221,27 +200,35 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={refetch}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
-      {hasStreams ? (
+      {loading || hasError || hasStreams ? (
         <>
-          <RecentStreams streams={streams} />
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => setIsModalOpen(true)}
-            aria-label="Create stream"
-          >
-            Create stream
-          </button>
+          <RecentStreams
+            streams={streams}
+            loading={loading}
+            error={error}
+            onRetry={refetch}
+            walletConnected={walletConnected}
+          />
+          {!loading && !error && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => setIsModalOpen(true)}
+              aria-label="Create stream"
+            >
+              Create stream
+            </Button>
+          )}
         </>
       ) : showOnboarding ? (
         <TreasuryOnboarding
@@ -278,7 +265,7 @@ export default function Dashboard() {
           onClose={() => setToast(null)}
         />
       ) : null}
-    </div>
+    </main>
   );
 }
 

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import "./Layout.css";
 
 type NavItem = { to: string; label: string; shortLabel: string };
@@ -31,7 +32,8 @@ export default function Layout() {
   };
 
   return (
-    <div
+    <div>
+      <a href="#main-content" className="skip-link">Skip to main content</a
       className={[
         "app-layout",
         isSidebarCollapsed && "is-collapsed",
@@ -54,9 +56,10 @@ export default function Layout() {
             </div>
 
             <button
+              type="button"
               className="app-sidebar-toggle"
               onClick={() => setIsSidebarCollapsed((p) => !p)}
-              aria-label="Toggle sidebar"
+              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!isSidebarCollapsed}
               aria-controls="app-sidebar"
             >
@@ -126,7 +129,7 @@ export default function Layout() {
             <div className="app-mobile-title">Fluxora</div>
           </header>
 
-          <main className="app-main">
+          <main id="main-content" className="app-main">
             <Outlet />
           </main>
 
@@ -150,6 +153,7 @@ export default function Layout() {
         onConnectAlbedo={handleCloseModal}
         onConnectWalletConnect={handleCloseModal}
       />
+      <KeyboardShortcutsModal />
     </div>
   );
 }

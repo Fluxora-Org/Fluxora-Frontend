@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
+const StreamDetail = lazy(() => import("./pages/StreamDetail"));
 const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
 const EmptyStateDemo = lazy(() => import("./pages/EmptyStateDemo"));
@@ -120,7 +121,7 @@ export default function App() {
                   >
                     <Route index element={lazyAppRoute(<Dashboard />)} />
                     <Route path="streams" element={lazyAppRoute(<Streams />)} />
-                    <Route path="streams/:streamId" element={lazyAppRoute(<Streams />)} />
+                    <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
                     <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
                     <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
                     <Route path="error" element={<ErrorPage />} />

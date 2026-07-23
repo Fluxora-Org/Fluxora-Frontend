@@ -50,7 +50,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false
         }));
       });
-    } catch (err) {
+    } catch {
       // Secure abstraction of raw error logs to avoid leak exposures
       setError("Failed to sync latest stream data. Please try again.");
     } finally {
@@ -85,11 +85,11 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-white dark:bg-gray-900 rounded-2xl shadow-sm">
+    <div className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm" style={{ backgroundColor: "var(--color-bg-primary)" }}>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Incoming Streams</h2>
-          <p className="text-sm text-gray-500">Real-time contract payment records</p>
+          <h2 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>Incoming Streams</h2>
+          <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Real-time contract payment records</p>
         </div>
         <button
           onClick={handleRefresh}
@@ -101,30 +101,34 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
       </div>
 
       {error && (
-        <div role="status" aria-live="polite" className="p-3 mb-4 text-sm text-red-800 bg-red-50 rounded-xl">
+        <div role="status" aria-live="polite" className="p-3 mb-4 text-sm rounded-xl" style={{ color: "var(--color-error-text)", backgroundColor: "var(--color-error-bg)" }}>
           {error}
         </div>
       )}
 
       {sortedStreams.length === 0 && !isRefreshing ? (
-        <p className="text-center text-gray-500 my-8">No incoming streams detected.</p>
+        <p className="text-center my-8" style={{ color: "var(--color-text-tertiary)" }}>No incoming streams detected.</p>
       ) : (
         <div className="space-y-3">
           {sortedStreams.map((stream) => (
-            <div key={stream.id} className="p-4 border rounded-xl flex justify-between items-center">
+            <div key={stream.id} className="p-4 rounded-xl flex justify-between items-center" style={{ border: "1px solid var(--color-border-default)" }}>
               <div>
-                <p className="font-medium text-sm text-gray-600">From: {stream.sender}</p>
+                <p className="font-medium text-sm" style={{ color: "var(--color-text-secondary)" }}>From: {stream.sender}</p>
                 <p className="text-lg font-bold">{stream.amount} XLM</p>
               </div>
               <div className="flex items-center gap-4">
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  stream.status === "active" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                }`}>
+                  stream.status === "active" ? "status-badge--active" : "status-badge--paused"
+                }`} style={{
+                  backgroundColor: stream.status === "active" ? "var(--color-success-bg)" : "var(--color-warning-bg)",
+                  color: stream.status === "active" ? "var(--color-success)" : "var(--color-warning)",
+                }}>
                   {stream.status}
                 </span>
                 <button 
                   onClick={() => togglePin(stream.id)}
-                  className="text-gray-400 hover:text-yellow-500"
+                  className="hover:text-yellow-500"
+                  style={{ color: "var(--color-text-tertiary)" }}
                   aria-label="Pin stream"
                 >
                   {stream.isPinned ? "★" : "☆"}

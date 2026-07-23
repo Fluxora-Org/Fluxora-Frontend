@@ -62,7 +62,39 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
     Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
       .then(([nextMetrics, nextStreams]) => {
         if (cancelled) return;
-        setMetrics(nextMetrics);
+
+        const activeStreams = nextStreams.filter(s => s.status === "Active");
+        
+        const totalStreamingByAsset = activeStreams.reduce((acc, s) => {
+          acc[s.asset] = (acc[s.asset] || 0) + s.depositAmount;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const withdrawableByAsset = nextStreams.reduce((acc, s) => {
+          acc[s.asset] = (acc[s.asset] || 0) + s.withdrawableAmount;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const toTokens = (amounts: Record<string, number>) => {
+          return Object.entries(amounts)
+            .map(([asset, amount]) => ({ asset, amount }))
+            .sort((a, b) => b.amount - a.amount);
+        };
+
+        const updatedMetrics = nextMetrics.map(m => {
+          if (m.label === "Active Streams") {
+            return { ...m, value: String(activeStreams.length) };
+          }
+          if (m.label === "Total Streaming") {
+            return { ...m, tokens: toTokens(totalStreamingByAsset) };
+          }
+          if (m.label === "Withdrawable") {
+            return { ...m, tokens: toTokens(withdrawableByAsset) };
+          }
+          return m;
+        });
+
+        setMetrics(updatedMetrics);
         setStreams(nextStreams);
         setLoading(false);
       })

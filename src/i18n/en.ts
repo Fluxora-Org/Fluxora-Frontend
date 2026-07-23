@@ -99,6 +99,7 @@ export const en = {
   "createStream.validation.ratePositive": "Stream rate must be a positive number.",
   "createStream.validation.rateMax": "Stream rate must be {max} USDC/day or less.",
   "createStream.validation.durationPositive": "Duration must be a positive number.",
+  "createStream.validation.durationMin": "Duration must be at least {min} day.",
   "createStream.validation.durationMax": "Duration must be {max} days or less.",
   "createStream.validation.recipientRequired": "Recipient is required.",
   "createStream.validation.recipientInvalid": "Please enter a valid Stellar address (starts with G, 56 characters).",
@@ -156,4 +157,25 @@ export const en = {
 
   // Streams.tsx Empty Search State
   "streams.emptySearch.text": "No streams match your search or filter.",
+
+  // Recipient page — src/pages/Recipient.tsx
+  "recipient.balance.demo": "Demo balance",
+  "recipient.balance.live": "Live balance",
+  "recipient.streams.heading": "Your streams",
+  "recipient.streams.empty": "No streams found for this address.",
+  "recipient.address.label": "Recipient address",
+
+  // ZeroAccrualBanner — src/components/ZeroAccrualBanner.tsx
+  "zeroAccrual.paused.title": "All streams are currently paused",
+  "zeroAccrual.paused.description": "Accrual has been suspended by the treasury administrator. No USDC is accumulating while streams are paused. Contact your treasury manager for a status update.",
+  "zeroAccrual.paused.nextEvent": "Pending admin action",
+  "zeroAccrual.scheduled.title": "Streams scheduled — not started yet",
+  "zeroAccrual.scheduled.description": "Your streams are configured and funded, but the start date is in the future. Accrual will begin automatically on the scheduled start date.",
+  "zeroAccrual.scheduled.nextEvent": "Start date",
+  "zeroAccrual.cliff.title": "Cliff period active",
+  "zeroAccrual.cliff.description": "Your stream is funded and running, but tokens are locked during the cliff period. Accrual will become withdrawable after the cliff date.",
+  "zeroAccrual.cliff.nextEvent": "Cliff ends",
+  "zeroAccrual.rateZero.title": "Stream rate is zero",
+  "zeroAccrual.rateZero.description": "The stream is active but the accrual rate is set to zero. No USDC is accumulating. Contact your treasury manager to update the rate.",
+  "zeroAccrual.rateZero.nextEvent": "Pending rate update",
 };

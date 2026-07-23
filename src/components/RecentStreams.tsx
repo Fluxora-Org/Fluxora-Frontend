@@ -12,12 +12,32 @@ export interface Stream {
   detailUrl?: string;
 }
 
+import StreamsLoading from './StreamsLoading';
+import EmptyState from './EmptyState';
+
 interface RecentStreamsProps {
   streams: Stream[];
   viewAllUrl?: string;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  /**
+   * Whether a Stellar wallet is connected. Drives the empty/error copy:
+   * connected users see "Create stream", disconnected users see
+   * "Connect your wallet". Defaults to `false` so unconnected consumers
+   * never see misleading "Create stream" call-to-action copy.
+   */
+  walletConnected?: boolean;
 }
 
-export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: RecentStreamsProps) {
+export default function RecentStreams({
+  streams,
+  viewAllUrl = '/app/streams',
+  loading = false,
+  error = null,
+  onRetry,
+  walletConnected = false
+}: RecentStreamsProps) {
   const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
@@ -30,6 +50,56 @@ export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: 
     const timer = setTimeout(() => setAnnouncement(''), 1000);
     return () => clearTimeout(timer);
   }, [streams.length]);
+
+  if (loading) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <StreamsLoading />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="error"
+          errorMessage={error}
+          onRetry={onRetry}
+          walletConnected={walletConnected}
+        />
+      </section>
+    );
+  }
+
+  if (streams.length === 0) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="streams"
+          walletConnected={walletConnected}
+        />
+      </section>
+    );
+  }
 
   return (
     <section style={sectionContainer}>
