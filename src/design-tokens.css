@@ -79,8 +79,8 @@
   /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
-  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
-  --focus-ring-halo: rgba(14, 165, 233, 0.1);
+  --focus-ring-color: #0284c7; /* Sky Blue - >= 3:1 contrast vs all light surfaces (including surface-highest at #dfe5ed) */
+  --focus-ring-halo: rgba(2, 132, 199, 0.1);
   
   /* Dual-layer focus ring (outline + box-shadow for visibility) */
   --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
