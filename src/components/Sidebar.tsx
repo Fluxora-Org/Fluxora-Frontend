@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { VoiceMicButton } from "./voice/VoiceMicButton";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -266,6 +267,11 @@ export default function Sidebar({
                 </span>
               </a>
             ))}
+
+            {/* Voice Control Motor Accessibility Button */}
+            <div className="pt-2">
+              <VoiceMicButton variant="sidebar" />
+            </div>
 
             {/* Desktop Collapse Toggle */}
             <button

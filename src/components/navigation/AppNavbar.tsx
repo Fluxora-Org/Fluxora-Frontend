@@ -6,6 +6,7 @@ import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
+import { VoiceMicButton } from "../voice/VoiceMicButton";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -241,6 +242,9 @@ const location = useLocation();
 
         {/* Right: Actions (desktop) */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Voice Control Mic Activation */}
+          <VoiceMicButton variant="navbar" />
+
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
