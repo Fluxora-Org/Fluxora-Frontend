@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X, Moon, Sun, Search, Command } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
@@ -242,6 +242,23 @@ const location = useLocation();
 
         {/* Right: Actions (desktop) */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Command Palette / Search Trigger Button */}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("open-command-palette"));
+            }}
+            aria-label="Open command palette and help search (Cmd+K)"
+            className="flex items-center gap-2.5 px-3.5 py-1.5 h-10 rounded-full border border-[var(--navbar-icon-border)] bg-[var(--surface-sunken)] hover:border-[var(--accent)]/50 text-[var(--text-muted)] hover:text-[var(--text)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-xs font-medium"
+          >
+            <Search size={15} aria-hidden="true" />
+            <span className="hidden lg:inline">Search commands & help...</span>
+            <span className="lg:hidden">Search...</span>
+            <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[10px] font-mono font-semibold text-[var(--text-muted)]">
+              <Command size={10} />K
+            </kbd>
+          </button>
+
           {/* Voice Control Mic Activation */}
           <VoiceMicButton variant="navbar" />
 
