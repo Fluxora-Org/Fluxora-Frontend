@@ -4,13 +4,22 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
-import { streamRecords } from "../data/streamRecords";
+import { streamRecords, type StreamRecord } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
+
+/**
+ * Mutable ref that the `useTreasury` mock reads. Defaults to the real
+ * `streamRecords` fixture. Individual tests can assign a custom array
+ * before rendering when they need a different dataset size.
+ */
+const mockStreamsRef = { current: streamRecords };
 
 vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
   useTreasury: () => ({
     metrics: [],
-    streams: streamRecords,
+    get streams() {
+      return mockStreamsRef.current;
+    },
     loading: false,
     error: null,
     refetch: vi.fn(),
@@ -340,6 +349,96 @@ describe("ZeroAccrualBanner reason", () => {
     renderStreams();
     await finishLoading();
     expect(screen.queryByText(/zero rate/i)).toBeNull();
+  });
+});
+
+describe("Streams pagination", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+    mockStreamsRef.current = streamRecords;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    mockStreamsRef.current = streamRecords;
+  });
+
+  it("renders a different set of stream cards on page 2 than page 1", async () => {
+    // Create 12 streams so that with default itemsPerPage=10 we get 2 pages.
+    mockStreamsRef.current = Array.from({ length: 12 }, (_, i) => ({
+      ...streamRecords[0]!,
+      id: `STR-${String(i + 1).padStart(3, "0")}`,
+      name: `Stream ${i + 1}`,
+      recipientName: `Recipient ${i + 1}`,
+    }));
+
+    renderStreams();
+    await finishLoading();
+
+    // 10 items on page 1.
+    expect(screen.getAllByRole("article")).toHaveLength(10);
+
+    const page1Names = screen
+      .getAllByRole("article")
+      .map(
+        (card) =>
+          within(card).getByRole("heading", { level: 3 }).textContent,
+      );
+    expect(page1Names).toEqual(
+      Array.from({ length: 10 }, (_, i) => `Stream ${12 - i}`),
+    );
+
+    // Navigate to page 2.
+    const nextButton = screen.getByRole("button", { name: "Next" });
+    fireEvent.click(nextButton);
+
+    // Page 2 should show the remaining 2 items.
+    const page2Cards = screen.getAllByRole("article");
+    expect(page2Cards).toHaveLength(2);
+    expect(page2Cards[0]).toHaveTextContent("Stream 2");
+    expect(page2Cards[1]).toHaveTextContent("Stream 1");
+
+    expect(screen.getByTestId("pagination-info")).toHaveTextContent(
+      "Page 2 of 2",
+    );
+  });
+
+  it("resets to page 1 when filtering reduces results below the current page", async () => {
+    // Create 12 streams: the first 10 are "Active", the last 2 "Completed".
+    mockStreamsRef.current = Array.from({ length: 12 }, (_, i) => ({
+      ...streamRecords[0]!,
+      id: `STR-${String(i + 1).padStart(3, "0")}`,
+      name: `Stream ${i + 1}`,
+      recipientName: `Recipient ${i + 1}`,
+      status: (i < 10 ? "Active" : "Completed") as StreamRecord["status"],
+    }));
+
+    renderStreams();
+    await finishLoading();
+
+    // Navigate to page 2.
+    const nextButton = screen.getByRole("button", { name: "Next" });
+    fireEvent.click(nextButton);
+    expect(screen.getByTestId("pagination-info")).toHaveTextContent(
+      "Page 2 of 2",
+    );
+
+    // Filter to "Completed" which has only 2 streams.
+    // Since 2 <= 10 (itemsPerPage), there's now only 1 page,
+    // so currentPage should reset to 1.
+    fireEvent.click(screen.getByRole("button", { name: "Completed" }));
+
+    expect(screen.getByTestId("pagination-info")).toHaveTextContent(
+      "Page 1 of 1",
+    );
+
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveTextContent("Stream 12");
+    expect(cards[1]).toHaveTextContent("Stream 11");
   });
 });
 

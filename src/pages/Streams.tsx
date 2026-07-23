@@ -822,6 +822,21 @@ export default function Streams() {
       });
   }, [searchQuery, sortBy, statusFilter, streams]);
 
+  // Reset currentPage when the total pages shrink below the current page.
+  // This mirrors the clamping logic in Pagination's normalizePagination.
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(visibleStreams.length / itemsPerPage));
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [visibleStreams.length, itemsPerPage, currentPage]);
+
+  // Paginate the visible streams for the current page.
+  const paginatedStreams = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return visibleStreams.slice(startIndex, startIndex + itemsPerPage);
+  }, [visibleStreams, currentPage, itemsPerPage]);
+
   useEffect(() => {
     if (!hasMountedFilterAnnouncer.current) {
       hasMountedFilterAnnouncer.current = true;
@@ -853,11 +868,11 @@ export default function Streams() {
   // Determine the most specific reason: rate-zero takes priority over cliff
   const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
   const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "cliff";
-  const effectiveExpandedId = visibleStreams.some(
+  const effectiveExpandedId = paginatedStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
     ? expandedStreamId
-    : visibleStreams[0]?.id;
+    : paginatedStreams[0]?.id;
 
   const handleCreateStream = useCallback(() => {
     setIsCreateModalOpen(true);
@@ -1127,7 +1142,7 @@ export default function Streams() {
               }
               estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
               getKey={(stream) => stream.id}
-              items={visibleStreams}
+              items={paginatedStreams}
               renderItem={(stream) => (
                 <StreamCard
                   stream={stream}
