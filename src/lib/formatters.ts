@@ -102,22 +102,32 @@ export function formatNumber(value: number, maxFractionDigits = 0): string {
 }
 
 /**
- * Format an amount with an arbitrary asset ticker suffix and no fraction digits.
+ * Format an amount with an arbitrary asset ticker suffix.
  * Useful for treasury-level stream rates such as "5,000 USDC/mo".
  *
- * @param amount - The numeric amount.
- * @param asset  - The asset ticker (e.g. "USDC").
- * @param suffix - Optional suffix appended after the asset (e.g. "/mo").
+ * By default no fraction digits are shown. Pass `maxFractionDigits` to
+ * preserve fractional precision; without it, fractional amounts are silently
+ * rounded to whole numbers.
+ *
+ * @param amount            - The numeric amount.
+ * @param asset             - The asset ticker (e.g. "USDC").
+ * @param suffix            - Optional suffix appended after the asset (e.g. "/mo").
+ * @param maxFractionDigits - Maximum decimal places forwarded to `formatNumber`
+ *                            (default 0). Pass a positive value when displaying
+ *                            fractional token amounts such as accrual balances.
  *
  * @example
- * formatAssetAmount(5000, "USDC", "/mo") // → "5,000 USDC/mo"  (en-US)
+ * formatAssetAmount(5000, "USDC", "/mo")       // → "5,000 USDC/mo"     (en-US)
+ * formatAssetAmount(1234.567, "XLM", "", 2)    // → "1,234.57 XLM"      (en-US)
+ * formatAssetAmount(0.005, "USDC", "", 4)      // → "0.005 USDC"        (en-US)
  */
 export function formatAssetAmount(
   amount: number,
   asset: string,
   suffix = "",
+  maxFractionDigits = 0,
 ): string {
-  return `${formatNumber(amount)}${asset ? ` ${asset}` : ""}${suffix}`;
+  return `${formatNumber(amount, maxFractionDigits)}${asset ? ` ${asset}` : ""}${suffix}`;
 }
 
 // ─── Date / Time ─────────────────────────────────────────────────────────────
