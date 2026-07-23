@@ -132,7 +132,15 @@ export default function Layout() {
             <div className="app-mobile-title">Fluxora</div>
           </header>
 
-          <main id="main-content" className="app-main">
+          <main
+            id="main-content"
+            className="app-main"
+            // tabIndex={-1} makes the skip-link target programmatically focusable
+            // (activated by `Tab` and by clicking the `#main-content` fragment
+            // link) — required for the WCAG 2.4.1 bypass-block pattern that
+            // /connect-wallet and /app/* relies on.
+            tabIndex={-1}
+          >
             <Outlet />
           </main>
 

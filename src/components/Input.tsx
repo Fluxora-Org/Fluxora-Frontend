@@ -88,10 +88,15 @@ export default function Input({
   // Determine if input has error
   const hasError = Boolean(error);
 
+  // `aria-describedby` must only point at elements that actually exist in the
+  // DOM. The helper-text element is suppressed when an error is shown (to keep
+  // the visual hierarchy focused on the error), so we drop the helper id from
+  // the described-by string in that case as well — otherwise the id would be
+  // a dangling reference that screen readers announce as missing.
   const describedBy =
     [
       hasError ? `${inputId}-error` : null,
-      helperText ? `${inputId}-helper` : null,
+      !hasError && helperText ? `${inputId}-helper` : null,
     ]
       .filter(Boolean)
       .join(" ") || undefined;

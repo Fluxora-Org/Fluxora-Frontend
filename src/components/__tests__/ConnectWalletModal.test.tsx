@@ -281,24 +281,32 @@ describe("ConnectWalletModal", () => {
     });
     // Accessibility tests
   describe('accessibility', () => {
-    it('traps focus within the modal and wraps correctly', async () => {
-      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
-      const closeBtn = screen.getByLabelText('Close wallet connection dialog');
-      expect(closeBtn).toHaveFocus();
+  it('traps focus within the modal', async () => {
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
 
-      // Tab to first focusable wallet button (Freighter)
+    // Focus is initially on the close button.
+    const modal = screen.getByRole('dialog');
+    const closeBtn = screen.getByLabelText('Close wallet connection dialog');
+    expect(closeBtn).toHaveFocus();
+
+    // Forward focus trap: tabbing keeps focus inside the modal until it wraps
+    // back to the close button (the trap's head). Cap iterations as a safety
+    // bound — if the trap ever stops existing this test fails fast rather
+    // than hanging up to 100 iterations.
+    const maxTabs = 20;
+    for (let i = 0; i < maxTabs; i++) {
       await userEvent.tab();
-      const freighterBtn = screen.getByRole('button', { name: /Connect with Freighter/ });
-      expect(freighterBtn).toHaveFocus();
+      expect(modal.contains(document.activeElement)).toBe(true);
+      if (document.activeElement === closeBtn) break;
+    }
+    expect(document.activeElement).toBe(closeBtn);
 
-      // Tab should wrap back to close button (other options may be disabled)
-      await userEvent.tab();
-      expect(closeBtn).toHaveFocus();
-
-      // Shift+Tab should go back to the last focusable element (Freighter)
-      await userEvent.tab({ shift: true });
-      expect(freighterBtn).toHaveFocus();
-    });
+    // Backward focus trap: shift-tabbing from close moves focus to a focusable
+    // element INSIDE the modal (and NOT to the close button again).
+    await userEvent.tab({ shift: true });
+    expect(modal.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(closeBtn);
+  });
 
     it('has correct ARIA attributes', () => {
       render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);

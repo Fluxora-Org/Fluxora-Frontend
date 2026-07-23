@@ -1,3 +1,11 @@
+// @vitest-environment jsdom
+//
+// This audit only reads files from disk and never touches the DOM, so vitest
+// can heuristically pick the lighter node environment for `.test.ts` (which
+// would skip loading `setup.ts` under jsdom). Forcing jsdom here keeps the
+// shared setup file consistent across the whole suite — it ships the
+// `localStorage`/`matchMedia` mocks and global i18n mocks that other tests
+// rely on.
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
