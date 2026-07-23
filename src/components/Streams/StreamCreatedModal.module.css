@@ -10,6 +10,68 @@
   padding: 1rem;
 }
 
+.cyberpunkSkin {
+  --cyber-bg: #070b12;
+  --cyber-panel: #101827;
+  --cyber-panel-raised: #152238;
+  --cyber-border: #31506b;
+  --cyber-text: #f4f7ff;
+  --cyber-text-secondary: #b4bfd1;
+  --cyber-cyan: #65f6ff;
+  --cyber-green: #62ffc9;
+  --cyber-yellow: #ffe66d;
+  background: rgba(3, 6, 11, 0.88);
+}
+
+.cyberpunkSkin::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(101, 246, 255, 0.045) 4px);
+}
+
+.cyberpunkSkin .modal {
+  background: var(--cyber-bg);
+  border-color: var(--cyber-border);
+  box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 28px rgba(101, 246, 255, 0.2), 0 20px 40px rgba(0, 0, 0, 0.55);
+}
+
+.cyberpunkSkin .title { color: var(--cyber-text); text-shadow: 0 0 16px rgba(101, 246, 255, 0.35); }
+.cyberpunkSkin .description { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .streamInfoCard { background: var(--cyber-panel); border-color: var(--cyber-border); }
+.cyberpunkSkin .streamIdLabel, .cyberpunkSkin .urlBar { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .streamIdValue { color: var(--cyber-cyan); text-shadow: 0 0 12px rgba(101, 246, 255, 0.4); }
+.cyberpunkSkin .urlBar { background: var(--cyber-bg); border-color: var(--cyber-border); }
+.cyberpunkSkin .copyButton { background: var(--cyber-panel-raised); color: var(--cyber-cyan); }
+.cyberpunkSkin .copyButton:hover { background: var(--cyber-border); }
+.cyberpunkSkin .copyButton.copied { background: var(--cyber-green); color: var(--cyber-bg); }
+.cyberpunkSkin .nextStepsBox { background: var(--cyber-panel); border: 1px solid var(--cyber-border); }
+.cyberpunkSkin .nextStepsTitle { color: var(--cyber-yellow); }
+.cyberpunkSkin .nextStepsText { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .btnSecondary { background: var(--cyber-panel-raised); color: var(--cyber-text); border: 1px solid var(--cyber-border); }
+.cyberpunkSkin .btnSecondary:hover { background: var(--cyber-border); }
+.cyberpunkSkin .btnPrimary { background: var(--cyber-cyan); color: var(--cyber-bg); box-shadow: 0 0 16px rgba(101, 246, 255, 0.35); }
+.cyberpunkSkin .btnPrimary:hover { background: var(--cyber-green); }
+.cyberpunkSkin .closeButton { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .closeButton:hover { color: var(--cyber-text); background: rgba(101, 246, 255, 0.1); }
+.cyberpunkSkin .fallbackLink { color: var(--cyber-cyan); }
+.cyberpunkSkin .fallbackLink:hover { color: var(--cyber-green); }
+
+.cyberpunkSkin :is(button, a):focus-visible {
+  outline-color: var(--cyber-yellow);
+  box-shadow: 0 0 0 2px var(--cyber-bg), 0 0 0 4px var(--cyber-yellow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cyberpunkSkin .modal { animation: cyberpunkGlow 4s ease-in-out infinite alternate; }
+}
+
+@keyframes cyberpunkGlow {
+  from { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 22px rgba(101, 246, 255, 0.16), 0 20px 40px rgba(0, 0, 0, 0.55); }
+  to { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.28), 0 0 34px rgba(255, 117, 216, 0.22), 0 20px 40px rgba(0, 0, 0, 0.55); }
+}
+
 .modal {
   background: #0d1421;
   border: 1px solid #1e2d42;

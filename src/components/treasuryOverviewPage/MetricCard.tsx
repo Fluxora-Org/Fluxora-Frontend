@@ -9,11 +9,15 @@
 import { Metric } from "./Metric";
 import Sparkline from "./Sparkline";
 import { formatAssetAmount } from "../../lib/formatters";
+import { useOptionalTheme } from "../../theme/ThemeProvider";
 
 export default function MetricCard({ icon, label, value, desc, trend, tokens }: Metric) {
+  const { theme } = useOptionalTheme();
+
   return (
     <div
-      className="flex flex-col rounded-xl p-6 h-full"
+      className={`flex flex-col rounded-xl p-6 h-full${theme === "cyberpunk" ? " cyberpunk-skin" : ""}`}
+      data-skin={theme === "cyberpunk" ? "cyberpunk" : undefined}
       role="group"
       aria-label={label}
       style={{
@@ -26,7 +30,7 @@ export default function MetricCard({ icon, label, value, desc, trend, tokens }: 
         height: "100%",
       }}
     >
-      <div className="flex items-center justify-center w-10 h-10 text-3xl leading-none mb-4 shrink-0" style={{ color: "var(--color-text-secondary)" }}>
+      <div className="cyberpunk-scanlines flex items-center justify-center w-10 h-10 text-3xl leading-none mb-4 shrink-0" style={{ color: "var(--color-text-secondary)" }}>
         {icon}
       </div>
 

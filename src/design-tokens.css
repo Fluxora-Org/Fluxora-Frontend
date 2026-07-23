@@ -366,6 +366,47 @@
   --recipient-body-text: var(--text-secondary);
 }
 
+/* Strictly opt-in Cyberpunk layer; target components opt in with data-skin. */
+[data-skin="cyberpunk"] {
+  --color-surface-default: #101827;
+  --color-border-default: #31506b;
+  --color-text-primary: #f4f7ff;
+  --color-text-vivid: #f4f7ff;
+  --color-text-secondary: #b4bfd1;
+  --color-focus: #ffe66d;
+  --cyber-accent-cyan: #65f6ff;
+  --cyber-accent-green: #62ffc9;
+  --cyber-accent-magenta: #ff75d8;
+  --cyber-accent-yellow: #ffe66d;
+  --cyber-surface: #070b12;
+  --cyber-panel: #101827;
+  --cyber-panel-raised: #152238;
+  --cyber-border: #31506b;
+}
+
+.cyberpunk-skin {
+  box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 24px rgba(101, 246, 255, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyberpunk-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(101, 246, 255, 0.06) 4px);
+}
+
+@keyframes cyberpunkGlow {
+  from { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 22px rgba(101, 246, 255, 0.16); }
+  to { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.28), 0 0 34px rgba(255, 117, 216, 0.22); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cyberpunk-skin { animation: cyberpunkGlow 4s ease-in-out infinite alternate; }
+}
+
 /* ═══════════════════════════════════════════════════════════
    3. TYPOGRAPHY TOKENS
    ═══════════════════════════════════════════════════════════ */
