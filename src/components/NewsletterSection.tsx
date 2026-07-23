@@ -1,13 +1,42 @@
 import { FormEvent, useState } from "react";
+import {
+  subscribeNewsletter,
+  type NewsletterResult,
+} from "../lib/api/newsletterService";
+import { ValidationMessage } from "./ValidationMessage";
 
 const EMAIL_MAX_LENGTH = 254;
 const LOCAL_PART_MAX_LENGTH = 64;
+const LOCAL_PART_PATTERN =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const DOMAIN_LABEL_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 const TLD_PATTERN = /^[A-Za-z]{2,63}$/;
 
+type Feedback = {
+  inputInvalid?: boolean;
+  message: string;
+  type: "error" | "success";
+} | null;
+
+const FEEDBACK_BY_RESULT: Record<NewsletterResult, NonNullable<Feedback>> = {
+  success: { message: "Thanks for subscribing!", type: "success" },
+  "already-subscribed": {
+    message: "This email is already subscribed.",
+    type: "success",
+  },
+  "rate-limited": {
+    message: "Too many attempts. Please try again later.",
+    type: "error",
+  },
+};
+
 export function validateNewsletterEmail(rawValue: string): boolean {
   const value = rawValue.trim();
-  if (value !== rawValue || value.length === 0 || value.length > EMAIL_MAX_LENGTH) {
+  if (
+    value !== rawValue ||
+    value.length === 0 ||
+    value.length > EMAIL_MAX_LENGTH
+  ) {
     return false;
   }
 
@@ -15,12 +44,20 @@ export function validateNewsletterEmail(rawValue: string): boolean {
   if (parts.length !== 2) return false;
 
   const [localPart, domain] = parts;
-  if (!localPart || localPart.length > LOCAL_PART_MAX_LENGTH || !domain) {
+  if (
+    !localPart ||
+    localPart.length > LOCAL_PART_MAX_LENGTH ||
+    !LOCAL_PART_PATTERN.test(localPart) ||
+    !domain
+  ) {
     return false;
   }
 
   const domainLabels = domain.split(".");
-  if (domainLabels.length < 2 || !TLD_PATTERN.test(domainLabels[domainLabels.length - 1])) {
+  if (
+    domainLabels.length < 2 ||
+    !TLD_PATTERN.test(domainLabels[domainLabels.length - 1])
+  ) {
     return false;
   }
 
@@ -29,11 +66,14 @@ export function validateNewsletterEmail(rawValue: string): boolean {
 
 export default function NewsletterSection() {
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  const messageId = error ? "newsletter-error" : success ? "newsletter-success" : undefined;
+  const messageId = feedback
+    ? feedback.type === "error"
+      ? "newsletter-error"
+      : "newsletter-success"
+    : undefined;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,20 +81,32 @@ export default function NewsletterSection() {
     if (submitting) return;
 
     if (!validateNewsletterEmail(email)) {
-      setSuccess(false);
-      setError("Please enter a valid email address without leading or trailing spaces.");
+      setFeedback({
+        inputInvalid: true,
+        message:
+          "Please enter a valid email address without leading or trailing spaces.",
+        type: "error",
+      });
       return;
     }
 
-    setError("");
-    setSuccess(false);
+    setFeedback(null);
     setSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setSubmitting(false);
-    setSuccess(true);
-    setEmail("");
+    try {
+      const result = await subscribeNewsletter(email);
+      setFeedback(FEEDBACK_BY_RESULT[result]);
+      if (result === "success") {
+        setEmail("");
+      }
+    } catch {
+      setFeedback({
+        message: "We couldn't subscribe you right now. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -83,11 +135,10 @@ export default function NewsletterSection() {
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
-              setError("");
-              setSuccess(false);
+              setFeedback(null);
             }}
             style={styles.input}
-            aria-invalid={!!error}
+            aria-invalid={feedback?.inputInvalid === true}
             aria-describedby={messageId}
             maxLength={EMAIL_MAX_LENGTH}
           />
@@ -106,15 +157,14 @@ export default function NewsletterSection() {
           </button>
         </form>
 
-        {error && (
-          <p id="newsletter-error" role="alert" style={styles.error}>
-            {error}
-          </p>
-        )}
-        {success && (
-          <p id="newsletter-success" aria-live="polite" style={styles.success}>
-            Thanks for subscribing!
-          </p>
+        {feedback && (
+          <div style={styles.feedback}>
+            <ValidationMessage
+              id={messageId!}
+              message={feedback.message}
+              type={feedback.type}
+            />
+          </div>
         )}
       </div>
     </section>
@@ -170,15 +220,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     boxShadow: "0 4px 12px rgba(6, 182, 212, 0.3)",
     transition: "all 0.2s ease",
   },
-  error: {
+  feedback: {
+    display: "flex",
+    justifyContent: "center",
     marginTop: "12px",
-    color: "#DC2626",
-    fontSize: "14px",
-  },
-  success: {
-    marginTop: "12px",
-    color: "#16A34A",
-    fontSize: "14px",
   },
   srOnly: {
     position: "absolute",

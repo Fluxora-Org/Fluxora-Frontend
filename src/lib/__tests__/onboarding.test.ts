@@ -1,23 +1,125 @@
-import { describe, expect, it, vi } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   ONBOARDING_DISMISSED_STORAGE_KEY,
   readOnboardingDismissed,
   writeOnboardingDismissed,
 } from "../onboarding";
 
+// A minimal memory-backed implementation of Storage
+class MemoryStorage implements Storage {
+  private store: Record<string, string> = {};
+
+  get length(): number {
+    return Object.keys(this.store).length;
+  }
+
+  clear(): void {
+    this.store = {};
+  }
+
+  getItem(key: string): string | null {
+    return key in this.store ? this.store[key] : null;
+  }
+
+  key(index: number): string | null {
+    const keys = Object.keys(this.store);
+    return index >= 0 && index < keys.length ? keys[index] : null;
+  }
+
+  removeItem(key: string): void {
+    delete this.store[key];
+  }
+
+  setItem(key: string, value: string): void {
+    this.store[key] = String(value);
+  }
+}
+
 describe("onboarding storage helpers", () => {
-  it("uses browser localStorage by default", () => {
-    localStorage.clear();
+  let originalLocalStorage: any;
+  let originalWindowLocalStorage: any;
 
-    writeOnboardingDismissed(true);
+  beforeAll(() => {
+    // Save original descriptors/values
+    originalLocalStorage = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "localStorage",
+    );
+    if (typeof window !== "undefined") {
+      originalWindowLocalStorage = Object.getOwnPropertyDescriptor(
+        window,
+        "localStorage",
+      );
+    }
 
-    expect(readOnboardingDismissed()).toBe(true);
-    expect(localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe("true");
+    // Redefine localStorage to use MemoryStorage to avoid Node.js native localStorage warnings/errors
+    const mockStorage = new MemoryStorage();
+
+    delete (globalThis as any).localStorage;
+    Object.defineProperty(globalThis, "localStorage", {
+      value: mockStorage,
+      writable: true,
+      configurable: true,
+    });
+
+    if (typeof window !== "undefined") {
+      delete (window as any).localStorage;
+      Object.defineProperty(window, "localStorage", {
+        value: mockStorage,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 
-  it("returns false when the dismissal key is absent", () => {
+  afterAll(() => {
+    // Restore original descriptors
+    if (originalLocalStorage) {
+      Object.defineProperty(globalThis, "localStorage", originalLocalStorage);
+    } else {
+      delete (globalThis as any).localStorage;
+    }
+
+    if (typeof window !== "undefined") {
+      if (originalWindowLocalStorage) {
+        Object.defineProperty(
+          window,
+          "localStorage",
+          originalWindowLocalStorage,
+        );
+      } else {
+        delete (window as any).localStorage;
+      }
+    }
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("uses the global/window localStorage by default", () => {
+    writeOnboardingDismissed(true);
+    expect(readOnboardingDismissed()).toBe(true);
+    expect(localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe("true");
+
+    writeOnboardingDismissed(false);
+    expect(readOnboardingDismissed()).toBe(false);
+    expect(localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBeNull();
+  });
+
+  it("returns false rather than propagating when injected storage's getItem throws", () => {
     const storage = {
-      getItem: vi.fn(() => null),
+      getItem: vi.fn(() => {
+        throw new Error("storage getItem error");
+      }),
     };
 
     expect(readOnboardingDismissed(storage)).toBe(false);
@@ -26,80 +128,70 @@ describe("onboarding storage helpers", () => {
     );
   });
 
-  it("returns true when the dismissal key is present", () => {
+  it("does not throw when injected storage's setItem throws", () => {
     const storage = {
-      getItem: vi.fn(() => "true"),
+      setItem: vi.fn(() => {
+        throw new Error("storage setItem error");
+      }),
+      removeItem: vi.fn(),
     };
 
-    expect(readOnboardingDismissed(storage)).toBe(true);
+    expect(() => writeOnboardingDismissed(true, storage)).not.toThrow();
+    expect(storage.setItem).toHaveBeenCalledWith(
+      ONBOARDING_DISMISSED_STORAGE_KEY,
+      "true",
+    );
   });
 
-  it("returns false when storage access throws", () => {
+  it("does not throw when injected storage's removeItem throws", () => {
     const storage = {
-      getItem: vi.fn(() => {
-        throw new DOMException("Blocked", "SecurityError");
+      setItem: vi.fn(),
+      removeItem: vi.fn(() => {
+        throw new Error("storage removeItem error");
       }),
     };
 
+    expect(() => writeOnboardingDismissed(false, storage)).not.toThrow();
+    expect(storage.removeItem).toHaveBeenCalledWith(
+      ONBOARDING_DISMISSED_STORAGE_KEY,
+    );
+  });
+
+  it("handles storage === null branch (SSR/no-window) for both read and write functions", () => {
+    expect(readOnboardingDismissed(null)).toBe(false);
+    expect(() => writeOnboardingDismissed(true, null)).not.toThrow();
+    expect(() => writeOnboardingDismissed(false, null)).not.toThrow();
+  });
+
+  it("performs normal round-trip: write true, read back true; write false, read back false", () => {
+    const storage = new MemoryStorage();
+
+    writeOnboardingDismissed(true, storage);
+    expect(readOnboardingDismissed(storage)).toBe(true);
+
+    writeOnboardingDismissed(false); // test write default storage
+    writeOnboardingDismissed(false, storage);
     expect(readOnboardingDismissed(storage)).toBe(false);
   });
 
-  it("returns false and skips writes when storage is unavailable", () => {
+  it("falls back to null and does not crash when window is undefined", () => {
     const originalWindow = globalThis.window;
 
-    try {
-      Object.defineProperty(globalThis, "window", {
-        value: undefined,
-        configurable: true,
-      });
+    // Temporarily set window to undefined
+    Object.defineProperty(globalThis, "window", {
+      value: undefined,
+      configurable: true,
+    });
 
+    try {
       expect(readOnboardingDismissed()).toBe(false);
       expect(() => writeOnboardingDismissed(true)).not.toThrow();
     } finally {
+      // Restore window
       Object.defineProperty(globalThis, "window", {
         value: originalWindow,
         configurable: true,
       });
     }
-  });
-
-  it("writes the shared dismissal key when onboarding is dismissed", () => {
-    const storage = {
-      removeItem: vi.fn(),
-      setItem: vi.fn(),
-    };
-
-    writeOnboardingDismissed(true, storage);
-
-    expect(storage.setItem).toHaveBeenCalledWith(
-      ONBOARDING_DISMISSED_STORAGE_KEY,
-      "true",
-    );
-    expect(storage.removeItem).not.toHaveBeenCalled();
-  });
-
-  it("removes the shared dismissal key when onboarding is reset", () => {
-    const storage = {
-      removeItem: vi.fn(),
-      setItem: vi.fn(),
-    };
-
-    writeOnboardingDismissed(false, storage);
-
-    expect(storage.removeItem).toHaveBeenCalledWith(
-      ONBOARDING_DISMISSED_STORAGE_KEY,
-    );
-    expect(storage.setItem).not.toHaveBeenCalled();
-  });
-
-  it("swallows storage write errors", () => {
-    const storage = {
-      removeItem: vi.fn(),
-      setItem: vi.fn(() => {
-        throw new DOMException("Blocked", "QuotaExceededError");
-      }),
-    };
-
-    expect(() => writeOnboardingDismissed(true, storage)).not.toThrow();
   });
 });

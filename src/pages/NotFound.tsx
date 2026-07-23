@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import Button from '../components/Button';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -35,11 +36,10 @@ export default function NotFound() {
         <p className="nf-desc">This page doesn't exist or was moved. Check the URL or return to the dashboard.</p>
 
         <div className="nf-actions" role="group" aria-label="404 actions">
-          <button
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => navigate('/', { replace: true })}
-          >
-            <span className="btn-icon">
+            icon={
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clipPath="url(#clip0_1_7424)">
                   <path d="M9.99861 13.9984V8.66562C9.99861 8.48883 9.92838 8.31928 9.80337 8.19427C9.67836 8.06925 9.5088 7.99902 9.33201 7.99902H6.66562C6.48883 7.99902 6.31928 8.06925 6.19427 8.19427C6.06925 8.31928 5.99902 8.48883 5.99902 8.66562V13.9984" stroke="white" strokeWidth="1.3332" strokeLinecap="round" strokeLinejoin="round" />
@@ -51,16 +51,17 @@ export default function NotFound() {
                   </clipPath>
                 </defs>
               </svg>
-            </span>
+            }
+          >
             Go to dashboard
-          </button>
+          </Button>
 
-          <button
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={() => window.location.href = '/'}
           >
             Back to home
-          </button>
+          </Button>
         </div>
       </div>
     </main>

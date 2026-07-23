@@ -55,6 +55,21 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
+// Mock localStorage and sessionStorage for jsdom tests
+const createStorageMock = () => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value.toString(); }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+    key: vi.fn((index: number) => Object.keys(store)[index] || null),
+    length: 0,
+  } as unknown as Storage;
+};
+Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+
 afterEach(() => {
   cleanup();
 });

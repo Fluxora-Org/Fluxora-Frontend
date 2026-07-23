@@ -279,6 +279,36 @@ describe("ConnectWalletModal", () => {
 
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
     });
+    // Accessibility tests
+  describe('accessibility', () => {
+    it('traps focus within the modal and wraps correctly', async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
+      const closeBtn = screen.getByLabelText('Close wallet connection dialog');
+      expect(closeBtn).toHaveFocus();
+
+      // Tab to first focusable wallet button (Freighter)
+      await userEvent.tab();
+      const freighterBtn = screen.getByRole('button', { name: /Connect with Freighter/ });
+      expect(freighterBtn).toHaveFocus();
+
+      // Tab should wrap back to close button (other options may be disabled)
+      await userEvent.tab();
+      expect(closeBtn).toHaveFocus();
+
+      // Shift+Tab should go back to the last focusable element (Freighter)
+      await userEvent.tab({ shift: true });
+      expect(freighterBtn).toHaveFocus();
+    });
+
+    it('has correct ARIA attributes', () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
+      const modal = screen.getByRole('dialog');
+      expect(modal).toHaveAttribute('aria-modal', 'true');
+      expect(modal).toHaveAttribute('aria-labelledby', 'connect-wallet-modal-title');
+      const title = screen.getByText('Choose your wallet');
+      expect(title).toHaveAttribute('id', 'connect-wallet-modal-title');
+    });
+  });
   });
 });
 

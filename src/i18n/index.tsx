@@ -103,7 +103,7 @@ export function translate(
   }
 
   // Get value from current catalog, fallback to English catalog, and finally to the key itself
-  let value: string = (catalog as any)[resolvedKey] || (fallbackCatalog as any)[resolvedKey];
+  const value: string = (catalog as any)[resolvedKey] || (fallbackCatalog as any)[resolvedKey];
   if (!value) {
     return resolvedKey;
   }
