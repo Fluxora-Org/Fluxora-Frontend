@@ -19,6 +19,7 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       include: [
         "src/components/GlowingDot.tsx",
+        "src/components/GetStartedCTA.tsx",
         "src/components/InputField.tsx",
         "src/components/InputWithUnit.tsx",
         "src/components/NewsletterSection.tsx",
