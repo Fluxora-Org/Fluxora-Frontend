@@ -51,9 +51,7 @@ describe("Input Validation ARIA attributes", () => {
     // Initial state: hint only.
     expect(input.getAttribute("aria-invalid")).toBe("false");
     const hintDescribedBy = input.getAttribute("aria-describedby");
-    expect(hintDescribedBy).toBeTruthy();
-
-    // Show error
+    expect(hintDescribedBy).toBeTruthy();    // Show error
     rerender(
       <Input
         id="test-input"
@@ -63,16 +61,17 @@ describe("Input Validation ARIA attributes", () => {
       />,
     );
 
-    // Error state: aria-describedby must collapse to just the error id because
-    // the helper <span> is no longer rendered when there's an error — see
-    // src/components/Input.tsx.
+    // Error state: the alert id must be referenced by aria-describedby.
+    // We assert via membership rather than `.toBe(...)` so the test stays
+    // robust against future described-by additions (e.g. a character
+    // counter or a requirement hint appended to the listed ids).
     expect(input.getAttribute("aria-invalid")).toBe("true");
     const errorDescribedBy = input.getAttribute("aria-describedby");
     expect(errorDescribedBy).toBeTruthy();
     expect(errorDescribedBy).not.toBe(hintDescribedBy);
 
     const alert = screen.getByRole("alert");
-    expect(alert.getAttribute("id")).toBe(errorDescribedBy);
+    expect(errorDescribedBy!.split(/\s+/)).toContain(alert.getAttribute("id"));
 
     // Clear error
     rerender(

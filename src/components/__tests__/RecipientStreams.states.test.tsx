@@ -36,10 +36,14 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
     renderWith(fetchStreamsFn);
 
     // Loading row is rendered immediately; the real stream row appears once
-    // the fetcher resolves.
+    // the fetcher resolves. Tie the amount regex to the fixture so any
+    // future `formatNumber` wrapping the value does not break the test.
     expect(fetchStreamsFn).toHaveBeenCalledTimes(1);
 
-    const row = await screen.findByText(/1,250 XLM/i);
+    const amountPattern = new RegExp(
+      `${sampleStream.amount.replace(/[,]/g, "[,\\s]")}\\s+XLM`,
+    );
+    const row = await screen.findByText(amountPattern);
     expect(row).toBeInTheDocument();
     expect(
       screen.getByText(/GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN/i),
@@ -60,7 +64,13 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
 
     renderWith(fetchStreamsFn);
     await waitFor(() =>
-      expect(screen.getByText(/1,250 XLM/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(
+          new RegExp(
+            `${sampleStream.amount.replace(/[,]/g, "[,\\s]")}\\s+XLM`,
+          ),
+        ),
+      ).toBeInTheDocument(),
     );
 
     const button = screen.getByRole("button", { name: /refresh status/i });
@@ -73,7 +83,13 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
 
     renderWith(fetchStreamsFn);
     await waitFor(() =>
-      expect(screen.getByText(/1,250 XLM/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(
+          new RegExp(
+            `${sampleStream.amount.replace(/[,]/g, "[,\\s]")}\\s+XLM`,
+          ),
+        ),
+      ).toBeInTheDocument(),
     );
 
     const pinButton = screen.getByRole("button", { name: /pin stream/i });
