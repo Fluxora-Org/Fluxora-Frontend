@@ -1,4 +1,5 @@
 vi.unmock("../ToastProvider");
+import { useState } from "react";
 import {
   act,
   fireEvent,
@@ -250,5 +251,137 @@ describe("ToastProvider / useToast", () => {
       "useToast must be used inside <ToastProvider>",
     );
     spy.mockRestore();
+  });
+
+  it("does not count down queued toasts beyond MAX_VISIBLE until they become visible", () => {
+    function MultiAdder() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            addToast("T1", "info", 2000);
+            addToast("T2", "info", 2000);
+            addToast("T3", "info", 2000);
+            addToast("T4", "info", 2000);
+          }}
+        >
+          Add 4
+        </button>
+      );
+    }
+    renderWithProvider(<MultiAdder />);
+    fireEvent.click(screen.getByRole("button", { name: /add 4/i }));
+
+    // T2, T3, T4 are visible (MAX_VISIBLE=3). T1 is hidden in overflow queue.
+    expect(screen.getByText("T2")).toBeInTheDocument();
+    expect(screen.getByText("T3")).toBeInTheDocument();
+    expect(screen.getByText("T4")).toBeInTheDocument();
+    expect(screen.queryByText("T1")).not.toBeInTheDocument();
+
+    // Advance fake timers by 2000ms (timeout of visible toasts)
+    act(() => vi.advanceTimersByTime(2000));
+
+    // Visible toasts auto-dismiss, rotating T1 into visible slice
+    expect(screen.queryByText("T2")).not.toBeInTheDocument();
+    expect(screen.queryByText("T3")).not.toBeInTheDocument();
+    expect(screen.queryByText("T4")).not.toBeInTheDocument();
+    expect(screen.getByText("T1")).toBeInTheDocument();
+
+    // T1 should still be visible after 1000ms because timer started upon becoming visible
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByText("T1")).toBeInTheDocument();
+
+    // After full 2000ms of visibility, T1 auto-dismisses
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryByText("T1")).not.toBeInTheDocument();
+  });
+
+  it("clears active timer when a visible toast is pushed into overflow", () => {
+    function SequentialAdder() {
+      const { addToast } = useToast();
+      return (
+        <>
+          <button onClick={() => addToast("T1", "success", 2000)}>Add T1</button>
+          <button onClick={() => addToast("T2", "success", 2000)}>Add T2</button>
+          <button onClick={() => addToast("T3", "success", 2000)}>Add T3</button>
+          <button onClick={() => addToast("T4", "success", 2000)}>Add T4</button>
+        </>
+      );
+    }
+    renderWithProvider(<SequentialAdder />);
+
+    // Add T1, T2, T3 sequentially so T1 becomes visible and gets an active timer
+    fireEvent.click(screen.getByRole("button", { name: "Add T1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add T2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add T3" }));
+
+    // Now T1, T2, T3 are visible
+    expect(screen.getByText("T1")).toBeInTheDocument();
+
+    // Adding T4 pushes T1 into overflow, triggering cleanup of T1's active timer
+    fireEvent.click(screen.getByRole("button", { name: "Add T4" }));
+    expect(screen.queryByText("T1")).not.toBeInTheDocument();
+    expect(screen.getByText(/\+1 more notification$/i)).toBeInTheDocument();
+  });
+
+  it("formats overflow text for multiple overflow items", () => {
+    function Adder5() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            for (let i = 1; i <= 5; i++) {
+              addToast(`Item ${i}`, "info", 5000);
+            }
+          }}
+        >
+          Add 5
+        </button>
+      );
+    }
+    renderWithProvider(<Adder5 />);
+    fireEvent.click(screen.getByRole("button", { name: /add 5/i }));
+    expect(screen.getByText(/\+2 more notifications/i)).toBeInTheDocument();
+  });
+
+  it("handles dismissing a toast or id without an active timer", () => {
+    function DismissAdder() {
+      const { addToast, dismiss } = useToast();
+      const [id, setId] = useState<string>("");
+      return (
+        <>
+          <button onClick={() => setId(addToast("Hidden", "info", 5000))}>
+            Add Hidden
+          </button>
+          <button onClick={() => addToast("V1", "info", 5000)}>Add V1</button>
+          <button onClick={() => addToast("V2", "info", 5000)}>Add V2</button>
+          <button onClick={() => addToast("V3", "info", 5000)}>Add V3</button>
+          <button onClick={() => dismiss(id)}>Dismiss Hidden</button>
+          <button onClick={() => dismiss("non-existent-id")}>
+            Dismiss Non-existent
+          </button>
+        </>
+      );
+    }
+    renderWithProvider(<DismissAdder />);
+    fireEvent.click(screen.getByRole("button", { name: "Add Hidden" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add V1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add V2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add V3" }));
+
+    // Hidden toast was pushed to overflow so it has no active timer
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Hidden" }));
+
+    // Dismiss non-existent id
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Non-existent" }));
+  });
+
+  it("clears timers when ToastProvider unmounts", () => {
+    const { unmount } = renderWithProvider(<AddButton timeout={5000} />);
+    fireEvent.click(screen.getByRole("button", { name: /add success/i }));
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+
+    unmount();
+    act(() => vi.advanceTimersByTime(5000));
   });
 });

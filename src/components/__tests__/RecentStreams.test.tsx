@@ -84,14 +84,14 @@ describe('RecentStreams', () => {
   // -------------------------------------------------------------------------
 
   it('renders "View all" link with default href /app/streams when viewAllUrl is omitted', () => {
-    renderWithRouter(<RecentStreams streams={[]} />);
+    renderWithRouter(<RecentStreams streams={[makeStream()]} />);
 
     const link = screen.getByRole('link', { name: /view all/i });
     expect(link).toHaveAttribute('href', '/app/streams');
   });
 
   it('uses a custom viewAllUrl for the "View all" link', () => {
-    renderWithRouter(<RecentStreams streams={[]} viewAllUrl="/custom/streams" />);
+    renderWithRouter(<RecentStreams streams={[makeStream()]} viewAllUrl="/custom/streams" />);
 
     const link = screen.getByRole('link', { name: /view all/i });
     expect(link).toHaveAttribute('href', '/custom/streams');
@@ -132,11 +132,34 @@ describe('RecentStreams', () => {
     expect(tbody.querySelectorAll('tr')).toHaveLength(3);
   });
 
-  it('renders no rows in tbody when streams is an empty array', () => {
+  it('renders an empty state UI when streams is an empty array', () => {
     renderWithRouter(<RecentStreams streams={[]} />);
 
-    const tbody = document.querySelector('tbody') as HTMLTableSectionElement;
-    expect(tbody.querySelectorAll('tr')).toHaveLength(0);
+    expect(screen.getByRole('region', { name: /streams empty state/i })).toBeInTheDocument();
+  });
+
+  it('renders a loading skeleton when loading is true', () => {
+    renderWithRouter(<RecentStreams streams={[]} loading={true} />);
+
+    expect(screen.getByRole('status', { name: /loading streams/i })).toBeInTheDocument();
+  });
+
+  it('renders an error UI with retry action when error is present', () => {
+    const onRetry = vi.fn();
+    renderWithRouter(
+      <RecentStreams
+        streams={[]}
+        error="Network Failure"
+        onRetry={onRetry}
+      />
+    );
+
+    expect(screen.getByRole('region', { name: /error state/i })).toBeInTheDocument();
+    expect(screen.getByText('Network Failure')).toBeInTheDocument();
+
+    const retryBtn = screen.getByRole('button', { name: /try again/i });
+    retryBtn.click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------
@@ -156,5 +179,49 @@ describe('RecentStreams', () => {
 
     // The text content should still be present (escaped as text)
     expect(screen.getByText('<script>alert(1)</script>')).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // walletConnected drives the empty/error copy
+  // -------------------------------------------------------------------------
+
+  it('shows the anonymous "Connect your wallet" CTA in the empty state when walletConnected is false (default)', () => {
+    renderWithRouter(<RecentStreams streams={[]} />);
+
+    expect(
+      screen.getByRole('heading', { name: /connect your wallet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /connect wallet/i }),
+    ).toBeInTheDocument();
+    // "Create stream" copy MUST NOT appear when the wallet is disconnected.
+    expect(
+      screen.queryByRole('button', { name: /create stream/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the connected "Create stream" CTA in the empty state when walletConnected is true', () => {
+    renderWithRouter(
+      <RecentStreams streams={[]} walletConnected={true} />,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: /no streams yet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /create stream/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('still renders streams in the table when present regardless of walletConnected', () => {
+    renderWithRouter(
+      <RecentStreams streams={[makeStream()]} walletConnected={false} />,
+    );
+
+    // walletConnected only affects the empty / error fallback branches; when
+    // streams are present the table still renders the StatusPill rows.
+    expect(
+      screen.getByRole('status', { name: /Status: Active/i }),
+    ).toBeInTheDocument();
   });
 });

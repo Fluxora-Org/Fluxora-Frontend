@@ -11,6 +11,12 @@ import {
 } from "@stellar/freighter-api";
 import React from "react";
 
+// src/test/setup.ts globally mocks this module (with a stub WalletProvider
+// that just renders children, and connected: false) so most tests don't need
+// a real wallet context. This suite tests the real provider's out-of-band
+// disconnect handling, so it needs the genuine implementation.
+vi.unmock("../Walletcontext");
+
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: vi.fn(),
   getAddress: vi.fn(),
@@ -57,7 +63,7 @@ describe("Out-of-band disconnect handling", () => {
 
   it("updates dependent components when wallet disconnects out-of-band", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN" });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
       networkPassphrase: "Test SDF Network ; September 2015",
@@ -81,11 +87,13 @@ describe("Out-of-band disconnect handling", () => {
 
     // Initial state: Wallet Status should render the address
     await waitFor(() => {
-      // The masked address logic in WalletStatus is e.g. GAPPRO...RESS
+      // The masked address logic in WalletStatus is e.g. GATDO...LOWN
       // But we can just check if "Connect wallet" button is not there
       expect(screen.queryByRole("button", { name: "Connect wallet" })).not.toBeInTheDocument();
       // "Start action" should be present
       expect(screen.getByText("Start action")).toBeInTheDocument();
+      // Wait until the watcher has been instantiated and registered
+      expect(mockedWatchWalletChanges).toHaveBeenCalled();
     });
 
     // Simulate an out-of-band disconnect (e.g. extension locked)
