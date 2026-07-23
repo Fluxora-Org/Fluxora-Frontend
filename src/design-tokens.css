@@ -749,3 +749,82 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM / BRANDED THEME
+   ───────────────────────────────────────────────────────────
+   Applied when ThemeProvider calls
+     document.documentElement.setAttribute("data-theme", "custom")
+   after writing --custom-* inline style properties via applyCustomTokens().
+
+   Each token falls back to the matching light-theme default so a partial
+   override (e.g. only accent colours) still renders a coherent UI.
+
+   Locked tokens (--focus-ring-*, status colours) are intentionally absent
+   from this block – they are never overridable via the registration API.
+
+   How slots work:
+     1. applyCustomTokens() writes  --custom-color-accent-primary: #RRGGBB
+        onto <html style="...">.
+     2. This block reads   var(--custom-color-accent-primary, <fallback>).
+     3. If the custom slot is unset, the fallback (Fluxora default) applies.
+   ═══════════════════════════════════════════════════════════ */
+
+:root[data-theme="custom"] {
+  /* ── Brand / accent ──────────────────────────────────────── */
+  --color-accent-primary:         var(--custom-color-accent-primary,         #00b8d4);
+  --color-accent-secondary:       var(--custom-color-accent-secondary,       #00d4aa);
+  --color-accent-primary-dark:    var(--custom-color-accent-primary-dark,    #0097a7);
+  --color-accent-secondary-dark:  var(--custom-color-accent-secondary-dark,  #00a884);
+  --color-accent-primary-darkest: var(--custom-color-accent-primary-darkest, #006f7a);
+
+  /* ── CTA ─────────────────────────────────────────────────── */
+  --color-cta-primary-bg:         var(--custom-color-cta-primary-bg,         var(--color-accent-primary));
+  --color-cta-primary-bg-hover:   var(--custom-color-cta-primary-bg-hover,   var(--color-accent-primary-dark));
+  --color-cta-primary-bg-active:  var(--custom-color-cta-primary-bg-active,  var(--color-accent-primary-darkest));
+  --color-cta-primary-text:       var(--custom-color-cta-primary-text,       #04131a);
+
+  /* ── Navbar ──────────────────────────────────────────────── */
+  --navbar-bg:          var(--custom-navbar-bg,          #ffffff);
+  --navbar-border:      var(--custom-navbar-border,      #e0e6ed);
+  --navbar-logo-color:  var(--custom-navbar-logo-color,  #1a1f36);
+  --navbar-link-color:  var(--custom-navbar-link-color,  #4a5565);
+  --navbar-icon-color:  var(--custom-navbar-icon-color,  #6b7a94);
+  --navbar-icon-border: var(--custom-navbar-icon-border, #d0d7e0);
+
+  /* ── Legacy CTA aliases ──────────────────────────────────── */
+  --cta-bg:     var(--custom-cta-bg,     var(--color-accent-secondary));
+  --cta-shadow: var(--custom-cta-shadow, 0 4px 12px rgba(0, 212, 170, 0.2));
+
+  /* ── Surfaces (optional org override) ───────────────────── */
+  --surface-base:     var(--custom-surface-base,     #ffffff);
+  --surface-sunken:   var(--custom-surface-sunken,   #f5f7fa);
+  --surface-neutral:  var(--custom-surface-neutral,  #fafbfc);
+  --surface-elevated: var(--custom-surface-elevated, #f0f3f7);
+
+  /* ── Text (optional org override) ───────────────────────── */
+  --text-vivid:     var(--custom-text-vivid,     #1a1f36);
+  --text-secondary: var(--custom-text-secondary, #4a5565);
+  --text-muted:     var(--custom-text-muted,     #6b7a94);
+
+  /* ── Re-derive semantic tokens from possibly-overridden primitives ── */
+  --color-bg-primary:       var(--surface-base);
+  --color-bg-secondary:     var(--surface-sunken);
+  --color-bg-tertiary:      var(--surface-elevated);
+  --color-surface-default:  var(--surface-neutral);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-text-primary:     var(--text-vivid);
+  --color-text-secondary:   var(--text-secondary);
+  --color-text-tertiary:    var(--text-muted);
+  --color-text-muted:       var(--text-muted);
+
+  /* ── accent legacy alias ─────────────────────────────────── */
+  --accent:     var(--color-accent-secondary);
+  --accent-dim: var(--color-accent-secondary-dark);
+  --primary:    var(--color-accent-primary);
+
+  /* ── Navigation tokens derived from custom navbar values ─── */
+  --nav-primary-color:        var(--navbar-link-color);
+  --nav-primary-color-active: var(--color-accent-secondary);
+  --nav-primary-bg-active:    color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+}
