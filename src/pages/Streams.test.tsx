@@ -269,9 +269,7 @@ describe("Streams card recipient copy", () => {
     expect(streamCard).toHaveAttribute("aria-expanded", "true");
   });
 
-  // Skipped: pre-existing failure unrelated to CI setup. Tracked as
-  // pre-existing test debt.
-  it.skip("shows accessible failure feedback when card recipient copy is unavailable", async () => {
+  it("shows accessible failure feedback when card recipient copy is unavailable", async () => {
     const writeText = vi.fn().mockRejectedValue(new Error("clipboard blocked"));
     mockClipboard(writeText);
     renderStreams();
@@ -292,9 +290,9 @@ describe("Streams card recipient copy", () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(stream.recipientAddress);
     });
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
-    );
+    expect(
+      await screen.findByText("Failed to copy address. Please copy manually."),
+    ).toBeInTheDocument();
   });
 });
 

@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
+import { copyToClipboard } from "../../hooks/useClipboard";
 
-import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
+import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
 
@@ -16,6 +17,7 @@ export default function WalletButton() {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const connectTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -29,11 +31,18 @@ export default function WalletButton() {
     setModalOpen(true);
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!address) return;
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(address);
+    if (success) {
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setCopyFailed(true);
+      setCopied(false);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   }
 
   function handleExplorer() {
@@ -150,7 +159,9 @@ export default function WalletButton() {
                   className="shrink-0 mt-0.5 p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--interactive-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)]"
                 >
                   {copied ? (
-                    <Check size={15} className="text-[var(--status-success)]" />
+                    <Check size={15} className="text-emerald-400" />
+                  ) : copyFailed ? (
+                    <AlertCircle size={15} className="text-rose-400" />
                   ) : (
                     <Copy size={15} />
                   )}
@@ -168,11 +179,13 @@ export default function WalletButton() {
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--interactive-bg-hover)] transition-colors focus:outline-none focus:bg-[var(--interactive-bg-active)]"
               >
                 {copied ? (
-                  <Check size={15} className="text-[var(--status-success)]" />
+                  <Check size={15} className="text-emerald-400" />
+                ) : copyFailed ? (
+                  <AlertCircle size={15} className="text-rose-400" />
                 ) : (
                   <Copy size={15} className="text-[var(--color-text-muted)]" />
                 )}
-                {copied ? "Copied!" : "Copy address"}
+                {copied ? "Copied!" : copyFailed ? "Failed to copy!" : "Copy address"}
               </button>
 
               <button

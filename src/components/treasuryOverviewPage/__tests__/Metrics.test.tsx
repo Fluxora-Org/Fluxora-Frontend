@@ -76,4 +76,30 @@ describe("Metrics", () => {
       });
     }
   });
+
+  describe("design token styling (no hardcoded Tailwind color classes)", () => {
+    it("uses var(--color-text-secondary) for loading state and does not use hardcoded color classes", () => {
+      render(<Metrics metrics={[]} loading={true} />);
+      const statusEl = screen.getByRole("status");
+
+      expect(statusEl).toHaveStyle({ color: "var(--color-text-secondary)" });
+      expect(statusEl.className).not.toMatch(/text-gray-500|text-red-600/);
+    });
+
+    it("uses var(--color-danger) for error state and does not use hardcoded color classes", () => {
+      render(<Metrics metrics={[]} error="Failed to fetch metrics" />);
+      const alertEl = screen.getByRole("alert");
+
+      expect(alertEl).toHaveStyle({ color: "var(--color-danger)" });
+      expect(alertEl.className).not.toMatch(/text-gray-500|text-red-600/);
+    });
+
+    it("uses var(--color-text-secondary) for empty state and does not use hardcoded color classes", () => {
+      render(<Metrics metrics={[]} />);
+      const emptyEl = screen.getByText("No treasury metrics available.");
+
+      expect(emptyEl).toHaveStyle({ color: "var(--color-text-secondary)" });
+      expect(emptyEl.className).not.toMatch(/text-gray-500|text-red-600/);
+    });
+  });
 });
