@@ -30,14 +30,17 @@ const VARIANT_SEMANTICS: Record<
   ToastVariant,
   { role: "alert" | "status"; "aria-live": "assertive" | "polite" }
 > = {
-  error:   { role: "alert",  "aria-live": "assertive" },
-  warning: { role: "alert",  "aria-live": "assertive" },
+  error: { role: "alert", "aria-live": "assertive" },
+  warning: { role: "alert", "aria-live": "assertive" },
   success: { role: "status", "aria-live": "polite" },
-  info:    { role: "status", "aria-live": "polite" },
+  info: { role: "status", "aria-live": "polite" },
 };
 
 /** Fail-safe semantics used when a variant is not in {@link VARIANT_SEMANTICS}. */
-const FALLBACK_SEMANTICS = { role: "alert" as const, "aria-live": "assertive" as const };
+const FALLBACK_SEMANTICS = {
+  role: "alert" as const,
+  "aria-live": "assertive" as const,
+};
 
 const FALLBACK_COPY = { label: "Alert", icon: "!" };
 
@@ -54,6 +57,8 @@ export default function ToastNotification({
     <div
       className={`toast-notification toast-notification--${variant}`}
       aria-atomic="true"
+      aria-label={`${label} notification`}
+      data-variant={variant}
       {...semantics}
     >
       <div className="toast-notification__icon" aria-hidden="true">
