@@ -9,10 +9,6 @@ import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreas
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
 import "./Streams.css";
-import { TRANSACTION_RESET_DELAY_MS } from "../lib/transactionConfig";
-import { useRef } from "react";
-
-// (Removed top-level timeoutRef and useEffect; will be added inside component)
 
 // Demo balances used as a UI fallback when the service returns no recipient
 // streams (no live backend yet, or no seeded match for the connected address).

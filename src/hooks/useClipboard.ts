@@ -19,7 +19,7 @@ export interface UseClipboardResult {
 }
 
 /** Legacy `execCommand` copy path for insecure contexts / old browsers. */
-function fallbackCopy(text: string): boolean {
+export function fallbackCopy(text: string): boolean {
   if (typeof document === "undefined") return false;
 
   const textarea = document.createElement("textarea");
@@ -38,6 +38,25 @@ function fallbackCopy(text: string): boolean {
   } finally {
     document.body.removeChild(textarea);
   }
+}
+
+/**
+ * Universal copy helper that uses navigator.clipboard if available,
+ * falling back to document.execCommand in older/insecure environments.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // The Clipboard API can reject with NotAllowedError (e.g. permission
+      // denied / insecure context). Treat that as a failure rather than
+      // silently retrying a fallback that would likely also be blocked.
+      return false;
+    }
+  }
+  return fallbackCopy(text);
 }
 
 /**
@@ -74,22 +93,7 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
   const copy = useCallback(
     async (text: string): Promise<boolean> => {
       clearTimer();
-      let success = false;
-
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          success = true;
-        } catch {
-          // The Clipboard API can reject with NotAllowedError (e.g. permission
-          // denied / insecure context). Treat that as a failure rather than
-          // silently retrying a fallback that would likely also be blocked.
-          success = false;
-        }
-      } else {
-        // No async Clipboard API available: use the legacy execCommand path.
-        success = fallbackCopy(text);
-      }
+      const success = await copyToClipboard(text);
 
       setStatus(success ? "copied" : "failed");
       timer.current = setTimeout(() => setStatus("idle"), resetDelay);
@@ -103,3 +107,4 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
 
   return { copy, status, reset };
 }
+

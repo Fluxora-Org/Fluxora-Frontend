@@ -1,8 +1,9 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
+import { copyToClipboard } from "../../hooks/useClipboard";
 
-import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
+import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
 
@@ -15,6 +16,7 @@ export default function WalletButton() {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const connectTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -28,11 +30,18 @@ export default function WalletButton() {
     setModalOpen(true);
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!address) return;
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(address);
+    if (success) {
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setCopyFailed(true);
+      setCopied(false);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   }
 
   function handleExplorer() {
@@ -150,6 +159,8 @@ export default function WalletButton() {
                 >
                   {copied ? (
                     <Check size={15} className="text-emerald-400" />
+                  ) : copyFailed ? (
+                    <AlertCircle size={15} className="text-rose-400" />
                   ) : (
                     <Copy size={15} />
                   )}
@@ -168,10 +179,12 @@ export default function WalletButton() {
               >
                 {copied ? (
                   <Check size={15} className="text-emerald-400" />
+                ) : copyFailed ? (
+                  <AlertCircle size={15} className="text-rose-400" />
                 ) : (
                   <Copy size={15} className="text-gray-400" />
                 )}
-                {copied ? "Copied!" : "Copy address"}
+                {copied ? "Copied!" : copyFailed ? "Failed to copy!" : "Copy address"}
               </button>
 
               <button

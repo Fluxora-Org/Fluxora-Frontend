@@ -159,7 +159,6 @@ async function fetchJson<T>(
 
   let attempt = 0;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
@@ -195,7 +194,6 @@ async function fetchJson<T>(
       attempt++;
 
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
           error,
