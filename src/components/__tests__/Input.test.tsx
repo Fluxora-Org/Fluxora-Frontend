@@ -12,7 +12,8 @@ describe('Input Validation ARIA attributes', () => {
     
     // Initial state: no error
     expect(input.getAttribute('aria-invalid')).toBe('false');
-    expect(input.getAttribute('aria-describedby')).toBeUndefined();
+    // DOM getAttribute returns null (not undefined) when an attribute is absent.
+    expect(input.getAttribute('aria-describedby')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
 
     // Show error
@@ -37,7 +38,8 @@ describe('Input Validation ARIA attributes', () => {
 
     // Cleared state
     expect(input.getAttribute('aria-invalid')).toBe('false');
-    expect(input.getAttribute('aria-describedby')).toBeUndefined();
+    // DOM getAttribute returns null (not undefined) when an attribute is absent.
+    expect(input.getAttribute('aria-describedby')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -63,9 +65,10 @@ describe('Input Validation ARIA attributes', () => {
     const errorDescribedBy = input.getAttribute('aria-describedby');
     expect(errorDescribedBy).toBeTruthy();
     expect(errorDescribedBy).not.toBe(hintDescribedBy); // Should point to error now, or both
-    
+
     const alert = screen.getByRole('alert');
-    expect(alert.getAttribute('id')).toContain(errorDescribedBy);
+    // The error alert's id must be one of the ids referenced by aria-describedby.
+    expect(errorDescribedBy).toContain(alert.getAttribute('id') ?? '');
 
     // Clear error
     rerender(
