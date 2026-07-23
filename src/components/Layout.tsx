@@ -5,6 +5,23 @@ import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import "./Layout.css";
 
+/**
+ * Handle clicks on the skip-link. JSDOM (used by Vitest) does not implement
+ * the browser's native fragment-navigation focus behaviour, so we explicitly
+ * move focus to <main> here. In real browsers this also makes focus work for
+ * users who keyboard-navigate via Enter on a fragment link, which some
+ * browsers skip for non-form targets.
+ */
+function handleSkipLinkClick(event: React.MouseEvent<HTMLAnchorElement>) {
+  const main = document.getElementById("main-content");
+  if (!main) return;
+  event.preventDefault();
+  main.focus();
+  if (typeof main.scrollIntoView === "function") {
+    main.scrollIntoView();
+  }
+}
+
 type NavItem = { to: string; label: string; shortLabel: string };
 
 const NAV_ITEMS: NavItem[] = [
@@ -33,15 +50,16 @@ export default function Layout() {
 
   return (
     <div>
-      <a href="#main-content" className="skip-link">Skip to main content</a
-      className={[
-        "app-layout",
-        isSidebarCollapsed && "is-collapsed",
-        isMobileSidebarOpen && "is-mobile-open",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+      <a href="#main-content" className="skip-link" onClick={handleSkipLinkClick}>Skip to main content</a>
+      <div
+        className={[
+          "app-layout",
+          isSidebarCollapsed && "is-collapsed",
+          isMobileSidebarOpen && "is-mobile-open",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
       <div className="app-layout__body">
         {/* SIDEBAR */}
         <aside
@@ -129,12 +147,13 @@ export default function Layout() {
             <div className="app-mobile-title">Fluxora</div>
           </header>
 
-          <main id="main-content" className="app-main">
+          <main id="main-content" className="app-main" tabIndex={-1}>
             <Outlet />
           </main>
 
           {showFooter && <Footer />}
         </div>
+      </div>
       </div>
 
       {/* BACKDROP */}

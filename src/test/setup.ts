@@ -67,8 +67,10 @@ const createStorageMock = () => {
     length: 0,
   } as unknown as Storage;
 };
-Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+}
 
 afterEach(() => {
   cleanup();
