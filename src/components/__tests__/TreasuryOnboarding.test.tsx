@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import TreasuryOnboarding from "../TreasuryOnboarding";
 import { writeOnboardingDismissed } from "../../lib/onboarding";
+import { useWallet } from "../wallet-connect/Walletcontext";
+
+vi.mock("../wallet-connect/Walletcontext", () => ({
+  useWallet: vi.fn(),
+}));
 
 vi.mock("../../lib/onboarding", () => ({
   writeOnboardingDismissed: vi.fn(),
@@ -45,6 +50,18 @@ async function goToStep(user: ReturnType<typeof userEvent.setup>, step: number) 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(useWallet).mockReturnValue({
+    address: null,
+    network: null,
+    connected: false,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  });
 });
 
 // ── Step content ──────────────────────────────────────────────────────────────
@@ -93,6 +110,39 @@ describe("TreasuryOnboarding — step content", () => {
     expect(walletOptions).toHaveTextContent("Recommended · Stellar browser extension");
     expect(screen.getByRole("button", { name: "Connect Freighter" })).toBeInTheDocument();
     expect(screen.getByText("Step 3 of 3")).toBeInTheDocument();
+  });
+
+  it("shows testnet reassurance only when the expected network is TESTNET", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+    await goToStep(user, 2);
+
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Fluxora is configured for Testnet. No real funds are used during exploration.",
+    );
+  });
+
+  it("warns that real funds are used when the expected network is PUBLIC", async () => {
+    vi.mocked(useWallet).mockReturnValue({
+      address: null,
+      network: null,
+      connected: false,
+      loading: false,
+      error: null,
+      expectedNetwork: "PUBLIC",
+      expectedNetworkLabel: "Public Network (Mainnet)",
+      isNetworkMismatch: false,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+    const user = userEvent.setup();
+    renderOnboarding();
+    await goToStep(user, 2);
+
+    const networkNotice = screen.getByRole("note");
+    expect(networkNotice).toHaveTextContent("Public Network (Mainnet)");
+    expect(networkNotice).toHaveTextContent(/uses real funds/i);
+    expect(networkNotice).not.toHaveTextContent(/no real funds are used/i);
   });
 
   it("renders the connected Get-started step content with truncated address", async () => {
