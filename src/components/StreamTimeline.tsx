@@ -1,6 +1,7 @@
 import React from "react";
 import "./StreamTimeline.module.css";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { createDateTimeFormat } from "../lib/formatters";
 
 export interface StreamTimelineProps {
   startDate: string;
@@ -86,18 +87,21 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
     Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100),
   );
 
-  // Format date for display (handle long Stellar addresses)
+  // Format date for display. Resolves user locale via navigator.language
+  // (with a validated "en-US" fallback) consistent with src/lib/formatters.ts.
+  // This mirrors the fix for issue #388 applied elsewhere in the app.
   const formatDate = (date: Date): string => {
-    return new Intl.DateTimeFormat("en-US", {
+    return createDateTimeFormat({
       month: "short",
       day: "numeric",
       year: "2-digit",
     }).format(date);
   };
 
-  // Format long dates with ellipsis for overflow
+  // Format short numeric month/day for the inline segment labels.
+  // Locale-aware so ordering and separators match the visitor's locale.
   const formatShortDate = (date: Date): string => {
-    return new Intl.DateTimeFormat("en-US", {
+    return createDateTimeFormat({
       month: "numeric",
       day: "numeric",
     }).format(date);

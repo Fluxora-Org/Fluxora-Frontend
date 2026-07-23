@@ -46,8 +46,11 @@ function createNumberFormat(options?: Intl.NumberFormatOptions): Intl.NumberForm
 /**
  * Create an `Intl.DateTimeFormat` using the resolved locale.
  * Falls back to `"en-US"` if the locale causes an error.
+ *
+ * Exported so components (e.g. StreamTimeline) can reuse the same locale
+ * resolution / fallback logic instead of hardcoding `"en-US"`.
  */
-function createDateTimeFormat(options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+export function createDateTimeFormat(options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   try {
     return new Intl.DateTimeFormat(resolveLocale(), options);
   } catch {
