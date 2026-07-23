@@ -1,3 +1,9 @@
+import {
+  getExpectedStellarNetwork,
+  getNetworkExplorerPath,
+  normalizeStellarNetwork,
+} from "./stellarNetwork";
+
 const STELLAR_ADDRESS_REGEX = /^G[ABCDEFGHIJKLMNOPQRSTUVWXYZ234567]{55}$/;
 const STRKEY_BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
@@ -76,11 +82,12 @@ export function maskAddress(value: string, prefix = 8, suffix = 4): string {
 }
 
 export function stellarExplorerUrl(address: string, network?: string | null) {
-  const normalizedNetwork = network?.toUpperCase();
-  const explorerNetwork =
-    normalizedNetwork === "PUBLIC" || normalizedNetwork === "MAINNET"
+  const normalizedNetwork = network ? normalizeStellarNetwork(network) : null;
+  const explorerNetwork = normalizedNetwork
+    ? getNetworkExplorerPath(normalizedNetwork)
+    : network?.toUpperCase() === "MAINNET"
       ? "public"
-      : "testnet";
+      : getNetworkExplorerPath(getExpectedStellarNetwork());
 
   return `https://stellar.expert/explorer/${explorerNetwork}/account/${encodeURIComponent(
     address,

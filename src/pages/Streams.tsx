@@ -41,6 +41,8 @@ import { useTickingNow } from "../hooks/useTickingNow";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 import { copyToClipboard } from "../hooks/useClipboard";
+import { stellarExplorerUrl } from "../lib/stellar";
+import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -530,7 +532,10 @@ function StreamDetail({
           </button>
           <a
             className="streams-link-button"
-            href={`https://stellar.expert/explorer/testnet/account/${stream.recipientAddress}`}
+            href={stellarExplorerUrl(
+              stream.recipientAddress,
+              getExpectedStellarNetwork(),
+            )}
             target="_blank"
             rel="noreferrer"
           >

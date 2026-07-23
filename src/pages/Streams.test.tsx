@@ -379,3 +379,55 @@ describe("formatUsdc", () => {
     expect(formatUsdc(Infinity)).toBe("— USDC");
   });
 });
+
+describe("StreamDetail block explorer URL network configuration", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  function renderStreamDetail(
+    initialEntry = `/app/streams/${streamRecords[0]!.id}`,
+  ) {
+    return render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<Streams />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+  }
+
+  it("generates a public block explorer URL when configured for PUBLIC / mainnet", async () => {
+    vi.stubEnv("VITE_NETWORK", "PUBLIC");
+    renderStreamDetail();
+    await finishLoading();
+
+    const link = screen.getByRole("link", { name: /view in explorer/i });
+    expect(link).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/public/account/${streamRecords[0]!.recipientAddress}`,
+    );
+  });
+
+  it("generates a testnet block explorer URL when configured for TESTNET", async () => {
+    vi.stubEnv("VITE_NETWORK", "TESTNET");
+    renderStreamDetail();
+    await finishLoading();
+
+    const link = screen.getByRole("link", { name: /view in explorer/i });
+    expect(link).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/testnet/account/${streamRecords[0]!.recipientAddress}`,
+    );
+  });
+});
