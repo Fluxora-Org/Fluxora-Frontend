@@ -8,7 +8,9 @@ import { useToast } from "../components/toast/ToastProvider";
 import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
+import { getStreamStatusNotificationContent } from "../components/ToastNotification";
 import "./Streams.css";
+import "./Recipient.css";
 
 // Demo balances used as a UI fallback when the service returns no recipient
 // streams (no live backend yet, or no seeded match for the connected address).
@@ -18,6 +20,14 @@ const DEMO_TOTAL_ACCRUED = 43250.0;
 const DEMO_TOTAL_WITHDRAWN = 20650.0;
 const USDC_SCALE = 10_000_000;
 const MAX_U64 = 18_446_744_073_709_551_615n;
+const ALERTS_STORAGE_KEY = "fluxora.stream-alerts.enabled";
+
+export type NotificationPermissionState = "default" | "granted" | "denied" | "unsupported";
+
+function getBrowserNotificationPermission(): NotificationPermissionState {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return window.Notification.permission;
+}
 
 type WithdrawStreamCandidate = Pick<
   StreamRecord,
@@ -76,6 +86,17 @@ export default function Recipient() {
   const [loading, setLoading] = useState(true);
   const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(getBrowserNotificationPermission);
+  const [alertsEnabled, setAlertsEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isPrimingNotifications, setIsPrimingNotifications] = useState(false);
+  const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
@@ -143,6 +164,44 @@ export default function Recipient() {
   const hasStreams = activeStreams > 0;
 
   const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
+
+  const setStoredAlertsEnabled = (enabled: boolean) => {
+    setAlertsEnabled(enabled);
+    try {
+      window.localStorage.setItem(ALERTS_STORAGE_KEY, String(enabled));
+    } catch {
+      // The visual preference remains available for this session.
+    }
+  };
+
+  const openNotificationPriming = () => {
+    setNotificationState("priming-shown");
+    setIsPrimingNotifications(true);
+  };
+
+  const enableNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      setNotificationState("permission-denied-recovery-hint");
+      setIsPrimingNotifications(false);
+      addToast("Browser notifications are not available here. Stream updates remain in Fluxora.", "info");
+      return;
+    }
+
+    const permission = await window.Notification.requestPermission();
+    setNotificationPermission(permission);
+    setIsPrimingNotifications(false);
+    if (permission === "granted") {
+      setNotificationState("permission-granted");
+      setStoredAlertsEnabled(true);
+      addToast("Stream alerts are enabled.", "success");
+    } else {
+      setNotificationState(permission === "denied" ? "permission-denied-recovery-hint" : "permission-denied");
+      addToast("No browser permission was granted. You can try again from stream settings.", "info");
+    }
+  };
+
+  const notificationPreview = getStreamStatusNotificationContent("new-stream", "a new USDC stream");
 
   // Zero-accrual: connected + streams exist + no withdrawable balance yet
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
@@ -290,6 +349,54 @@ export default function Recipient() {
           <p>Available for immediate withdrawal.</p>
         </div>
       </section>
+
+      <section className="recipient-alerts-panel" aria-labelledby="stream-alerts-title">
+        <div>
+          <p className="recipient-alerts-eyebrow">Optional alerts</p>
+          <h2 id="stream-alerts-title">Know when your stream changes</h2>
+          <p>Get a browser notification when a cliff passes, a stream is fully accrued, or a new stream arrives.</p>
+        </div>
+        {alertsEnabled && notificationPermission === "granted" ? (
+          <button type="button" className="recipient-alerts-toggle" onClick={() => setStoredAlertsEnabled(false)} aria-pressed="true">
+            Alerts on · Turn off
+          </button>
+        ) : (
+          <button type="button" className="recipient-alerts-toggle" onClick={openNotificationPriming}>
+            Notify me
+          </button>
+        )}
+        {notificationState === "permission-denied-recovery-hint" && (
+          <p className="recipient-alerts-recovery" role="status">
+            Permission is blocked by your browser. Allow notifications for Fluxora in site settings, then choose Notify me again.
+          </p>
+        )}
+      </section>
+
+      {isPrimingNotifications && (
+        <div className="recipient-alerts-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setIsPrimingNotifications(false);
+        }}>
+          <section className="recipient-alerts-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-priming-title" aria-describedby="notification-priming-description">
+            <p className="recipient-alerts-eyebrow">Before browser permission</p>
+            <h2 id="notification-priming-title">Keep stream milestones in view</h2>
+            <p id="notification-priming-description">Fluxora will notify you only when one of these happens:</p>
+            <ul>
+              <li>A stream cliff passes</li>
+              <li>A stream becomes fully accrued</li>
+              <li>You receive a new stream</li>
+            </ul>
+            <div className="recipient-alerts-preview" aria-label="Example notification">
+              <img src={notificationPreview.icon} alt="" width="24" height="24" />
+              <span><strong>{notificationPreview.title}</strong><small>{notificationPreview.body}</small></span>
+            </div>
+            <p className="recipient-alerts-note">You can turn Fluxora alerts off here later. Browser permission can be changed in your site settings.</p>
+            <div className="recipient-alerts-actions">
+              <button type="button" className="recipient-alerts-secondary" onClick={() => setIsPrimingNotifications(false)}>Not now</button>
+              <button type="button" className="recipient-alerts-primary" onClick={() => void enableNotifications()}>Allow stream alerts</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* ── Streams List ── */}
       <section className="streams-list-shell">
