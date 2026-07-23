@@ -21,7 +21,9 @@ import type {
   InputHTMLAttributes,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
+  CompositionEventHandler,
 } from "react";
+import { useState } from "react";
 import styles from "./Input.module.css";
 import { ValidationMessage } from "./ValidationMessage";
 
@@ -52,6 +54,9 @@ export interface InputProps extends Omit<
 
   /** ID for label association */
   id?: string;
+
+  /** Defers error styling and announcements until compositionend for text input. */
+  compositionAware?: boolean;
 }
 
 type SharedInputProps = Omit<
@@ -80,13 +85,29 @@ export default function Input({
   id,
   disabled = false,
   placeholder,
+  compositionAware = type === "text" || type === "textarea" || type === "email" || type === "search",
+  onCompositionStart,
+  onCompositionEnd,
   ...props
 }: InputProps) {
+  const [isComposing, setIsComposing] = useState(false);
+
   // Generate ID if not provided
   const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
 
   // Determine if input has error
-  const hasError = Boolean(error);
+  const hasError = Boolean(error) && !(compositionAware && isComposing);
+  const composingClass = compositionAware && isComposing ? styles.composing : "";
+
+  const handleCompositionStart: CompositionEventHandler<HTMLInputElement> = (event) => {
+    onCompositionStart?.(event);
+    if (compositionAware) setIsComposing(true);
+  };
+
+  const handleCompositionEnd: CompositionEventHandler<HTMLInputElement> = (event) => {
+    onCompositionEnd?.(event);
+    if (compositionAware) setIsComposing(false);
+  };
 
   const describedBy =
     [
@@ -118,14 +139,17 @@ export default function Input({
           id={inputId}
           className={`${styles.input} ${styles.textarea} ${
             hasError ? styles.error : ""
-          } ${className}`.trim()}
+          } ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
+          data-composing={compositionAware && isComposing ? "true" : undefined}
           disabled={disabled}
           placeholder={placeholder}
           required={required}
           {...(sharedProps as TextareaHTMLAttributes<HTMLTextAreaElement>)}
+          onCompositionStart={handleCompositionStart as CompositionEventHandler<HTMLTextAreaElement>}
+          onCompositionEnd={handleCompositionEnd as CompositionEventHandler<HTMLTextAreaElement>}
         />
       ) : type === "select" && options ? (
         /* Select */
@@ -133,10 +157,11 @@ export default function Input({
           id={inputId}
           className={`${styles.input} ${styles.select} ${
             hasError ? styles.error : ""
-          } ${className}`.trim()}
+          } ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
+          data-composing={compositionAware && isComposing ? "true" : undefined}
           disabled={disabled}
           required={required}
           {...(sharedProps as SelectHTMLAttributes<HTMLSelectElement>)}
@@ -155,13 +180,16 @@ export default function Input({
           type={type}
           className={`${styles.input} ${
             hasError ? styles.error : ""
-          } ${className}`.trim()}
+          } ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
+          data-composing={compositionAware && isComposing ? "true" : undefined}
           disabled={disabled}
           placeholder={placeholder}
           required={required}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           {...props}
         />
       )}
