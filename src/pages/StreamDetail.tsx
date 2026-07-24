@@ -7,6 +7,7 @@ import { Skeleton } from "../components/Skeleton";
 import StreamTimeline from "../components/StreamTimeline";
 import StreamComparePane from "../components/StreamComparePane";
 import { useTickingNow } from "../hooks/useTickingNow";
+import { MetaTags } from "../components/MetaTags";
 
 /**
  * StreamDetail page
@@ -63,7 +64,7 @@ export default function StreamDetail() {
     setLoading(true);
     setError(null);
 
-    getStreamById(decodeURIComponent(streamId))
+    getStreamById(decodeURIComponent(streamId), controller.signal)
       .then((result) => {
         if (!cancelled) {
           setStream(result);
@@ -217,6 +218,7 @@ export default function StreamDetail() {
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
       <Breadcrumb items={breadcrumbItems} />
+      <MetaTags stream={stream} />
 
       {/* Header */}
       <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>

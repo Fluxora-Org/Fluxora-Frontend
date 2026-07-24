@@ -4,6 +4,8 @@ import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Recipient gates the withdraw flow on a connected wallet on the matching
+
+// Recipient gates the withdraw flow on a connected wallet on the matching
 // network. The global test setup stubs the wallet as disconnected, so provide a
 // connected stub here to exercise the loaded recipient portal.
 const mockWalletState = {
@@ -159,3 +161,37 @@ describe("Recipient page accessibility", () => {
     expect(within(summary).getByText(/22,600 usdc/i)).toBeInTheDocument();
   });
 });
+
+describe("Recipient page empty state", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders RecipientEmptyState component when wallet is disconnected", async () => {
+    mockWalletState.connected = false;
+    render(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Connect wallet" })
+    ).toBeInTheDocument();
+
+    // Reset back for other test blocks
+    mockWalletState.connected = true;
+  });
+});
+

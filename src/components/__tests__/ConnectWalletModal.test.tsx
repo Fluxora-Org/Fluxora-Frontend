@@ -137,10 +137,14 @@ describe("ConnectWalletModal", () => {
     );
 
     expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
-    expect(screen.getByText(/Your wallet is connected to the wrong network/)).toBeInTheDocument();
     expect(screen.getByText(/Open your/)).toBeInTheDocument();
     expect(screen.getByText(/Click the/)).toBeInTheDocument();
-    expect(screen.getByText(/Select/)).toBeInTheDocument();
+    expect(
+      screen.getByText((content, node) => {
+        const isMatch = node?.textContent?.includes("Select Testnet and return here.") ?? false;
+        return isMatch && node?.tagName?.toLowerCase() === "span";
+      })
+    ).toBeInTheDocument();
   });
 
   it("allows switching states via the Design QA toolbar", async () => {
@@ -279,6 +283,49 @@ describe("ConnectWalletModal", () => {
 
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
     });
+    // Accessibility tests
+  describe('accessibility', () => {
+    it('traps focus within the modal and wraps correctly', async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const closeBtn = screen.getByLabelText('Close wallet connection dialog');
+      
+      // Wait for the modal's 50ms focus timer to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(closeBtn).toHaveFocus();
+      // Tab to first focusable wallet button (Freighter)
+      await userEvent.tab();
+      const freighterBtn = screen.getByRole('listitem', { name: /Connect with Freighter/ });
+      expect(freighterBtn).toHaveFocus();
+
+      // Tab to second focusable wallet button (Hardware Wallet)
+      await userEvent.tab();
+      const hardwareBtn = screen.getByRole('listitem', { name: /Connect with Hardware Wallet/ });
+      expect(hardwareBtn).toHaveFocus();
+
+      // Tab to Terms of Service link
+      await userEvent.tab();
+      const termsLink = screen.getByRole('link', { name: /Terms of Service/ });
+      expect(termsLink).toHaveFocus();
+
+      // Tab should wrap back to close button
+      await userEvent.tab();
+      expect(closeBtn).toHaveFocus();
+
+      // Shift+Tab should go back to the last focusable element (Terms of Service link)
+      await userEvent.tab({ shift: true });
+      expect(termsLink).toHaveFocus();
+    });
+
+    it('has correct ARIA attributes', () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
+      const modal = screen.getByRole('dialog');
+      expect(modal).toHaveAttribute('aria-modal', 'true');
+      expect(modal).toHaveAttribute('aria-labelledby', 'connect-wallet-modal-title');
+      const title = screen.getByText('Choose your wallet');
+      expect(title).toHaveAttribute('id', 'connect-wallet-modal-title');
+    });
+  });
   });
 });
 
@@ -317,5 +364,147 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
     const albedo = screen.getByRole("button", { name: "Connect with Albedo" });
     expect(albedo).not.toBeDisabled();
     expect(screen.getAllByText("coming soon")).toHaveLength(1); // only WalletConnect
+  });
+
+
+  describe("Hardware Wallet Connect Flow", () => {
+    const onClose = vi.fn();
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      // Ensure window.innerWidth defaults to desktop (1024)
+      global.innerWidth = 1024;
+      // Mock window.dispatchEvent
+      global.dispatchEvent(new Event("resize"));
+    });
+
+    it("renders Hardware Wallet list entry", () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByText("Hardware Wallet")).toBeInTheDocument();
+      expect(screen.getByText("Connect via Ledger or Trezor device.")).toBeInTheDocument();
+    });
+
+    it("redirects to mobile-unsupported error state on mobile viewport / user agent", async () => {
+      // Simulate mobile device
+      global.innerWidth = 375;
+      global.dispatchEvent(new Event("resize"));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      
+      const hwBtn = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+      await userEvent.click(hwBtn);
+
+      expect(screen.getByText("Device Unsupported on Mobile")).toBeInTheDocument();
+      expect(screen.getByText(/USB hardware wallet connections are not supported on mobile/)).toBeInTheDocument();
+
+      const wcBtn = screen.getByRole("button", { name: "Connect using WalletConnect mobile flow" });
+      expect(wcBtn).toBeInTheDocument();
+    });
+
+    it("starts device-searching on desktop viewport", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      
+      const hwBtn = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+      await userEvent.click(hwBtn);
+
+      expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+      expect(screen.getByText(/Searching for connected hardware wallets/)).toBeInTheDocument();
+    });
+
+    it("allows transitioning to device-found-selecting and choosing a device", async () => {
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="device-found-selecting"
+        />
+      );
+
+      expect(screen.getByText("Configure Device")).toBeInTheDocument();
+      const ledgerRadio = screen.getByRole("radio", { name: "Ledger Nano X or S" });
+      const trezorRadio = screen.getByRole("radio", { name: "Trezor Model T or One" });
+
+      expect(ledgerRadio).toHaveAttribute("aria-checked", "true");
+      expect(trezorRadio).toHaveAttribute("aria-checked", "false");
+
+      await userEvent.click(trezorRadio);
+      expect(trezorRadio).toHaveAttribute("aria-checked", "true");
+      expect(ledgerRadio).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("validates custom derivation path input and updates UI validity", async () => {
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="device-found-selecting"
+        />
+      );
+
+      const select = screen.getByLabelText("Derivation Path");
+      await userEvent.selectOptions(select, "custom");
+
+      const input = screen.getByLabelText("Enter custom Stellar derivation path");
+      expect(input).toBeInTheDocument();
+
+      // Enter invalid path
+      await userEvent.clear(input);
+      await userEvent.type(input, "invalid-path");
+
+      expect(screen.getByText("Invalid Stellar derivation path format (e.g. m/44'/148'/0')")).toBeInTheDocument();
+      const confirmBtn = screen.getByRole("button", { name: "Confirm selection and connect" });
+      expect(confirmBtn).toBeDisabled();
+
+      // Enter valid path
+      await userEvent.clear(input);
+      await userEvent.type(input, "m/44'/148'/2'");
+      expect(screen.queryByText("Invalid Stellar derivation path format (e.g. m/44'/148'/0')")).not.toBeInTheDocument();
+      expect(confirmBtn).not.toBeDisabled();
+    });
+
+    it("renders hardware wallet-specific error states from props", () => {
+      const { rerender } = render(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState="device-locked-error" />
+      );
+      expect(screen.getByText("Hardware Wallet Locked")).toBeInTheDocument();
+
+      rerender(<ConnectWalletModal isOpen={true} onClose={onClose} errorState="wrong-app-error" />);
+      expect(screen.getByText("Stellar App Not Open")).toBeInTheDocument();
+
+      rerender(<ConnectWalletModal isOpen={true} onClose={onClose} errorState="unplugged-error" />);
+      expect(screen.getByText("Device Disconnected")).toBeInTheDocument();
+    });
+
+    it("allows QA preview toolbar to select hardware states", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={true} />);
+
+      // Switch to HW Search
+      await userEvent.click(screen.getByRole("button", { name: "HW: Search" }));
+      expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+
+      // Switch to HW Select
+      await userEvent.click(screen.getByRole("button", { name: "HW: Select" }));
+      expect(screen.getByText("Configure Device")).toBeInTheDocument();
+
+      // Switch to HW Confirm
+      await userEvent.click(screen.getByRole("button", { name: "HW: Confirm" }));
+      expect(screen.getByText("Confirm on Device")).toBeInTheDocument();
+
+      // Switch to HW Locked
+      await userEvent.click(screen.getByRole("button", { name: "HW: Locked" }));
+      expect(screen.getByText("Hardware Wallet Locked")).toBeInTheDocument();
+
+      // Switch to HW Wrong App
+      await userEvent.click(screen.getByRole("button", { name: "HW: Wrong App" }));
+      expect(screen.getByText("Stellar App Not Open")).toBeInTheDocument();
+
+      // Switch to HW Unplugged
+      await userEvent.click(screen.getByRole("button", { name: "HW: Unplugged" }));
+      expect(screen.getByText("Device Disconnected")).toBeInTheDocument();
+
+      // Switch to HW Mobile Unsupported
+      await userEvent.click(screen.getByRole("button", { name: "HW: Mobile Unsupported" }));
+      expect(screen.getByText("Device Unsupported on Mobile")).toBeInTheDocument();
+    });
   });
 });

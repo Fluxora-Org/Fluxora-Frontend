@@ -358,14 +358,14 @@ function iconBox(variant: EmptyStateVariant): React.CSSProperties {
 const titleStyle: React.CSSProperties = {
   fontSize: "clamp(18px, 2.5vw, 22px)",
   fontWeight: 700,
-  color: "#FFFFFF",
+  color: "var(--color-text-primary, #FFFFFF)",
   margin: "0 0 12px 0",
 };
 
 const descStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: 1.65,
-  color: "#99A1AF",
+  color: "var(--color-text-secondary, #99A1AF)",
   margin: "0 0 28px 0",
   maxWidth: 400,
 };

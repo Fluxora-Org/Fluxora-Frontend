@@ -342,7 +342,7 @@ export default function StreamsTable({ streams, onCompare }: Props) {
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="py-4 px-3 text-gray-500">
+                <td colSpan={6} className="py-4 px-3" style={{ color: "var(--color-text-muted)" }}>
                   No recent streams available.
                 </td>
               </tr>

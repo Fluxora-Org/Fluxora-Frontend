@@ -159,7 +159,6 @@ async function fetchJson<T>(
 
   let attempt = 0;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
@@ -195,7 +194,6 @@ async function fetchJson<T>(
       attempt++;
 
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
           error,
@@ -390,14 +388,24 @@ export async function getStreams(
  * Fetch a single stream by its identifier. Returns `null` when the upstream
  * service reports the stream does not exist (HTTP 404). The identifier is
  * URL-encoded before being interpolated into the path.
+ *
+ * @param id - Stream identifier.
+ * @param signal - Optional AbortSignal to cancel the request.
  */
-export async function getStreamById(id: string): Promise<StreamRecord | null> {
+export async function getStreamById(
+  id: string,
+  signal?: AbortSignal,
+): Promise<StreamRecord | null> {
   if (typeof id !== "string" || id.length === 0) return null;
   if (isMockMode()) {
     return seededStreamRecords.find((record) => record.id === id) ?? null;
   }
   try {
-    const raw = await fetchJson<unknown>(`/streams/${encodeURIComponent(id)}`);
+    const raw = await fetchJson<unknown>(
+      `/streams/${encodeURIComponent(id)}`,
+      undefined,
+      { signal },
+    );
     return normalizeStreamRecord(raw);
   } catch (error) {
     if (error instanceof StreamsServiceError && error.status === 404) {

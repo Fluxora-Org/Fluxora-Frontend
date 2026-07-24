@@ -1,8 +1,11 @@
-import DemoBanner from "../components/treasuryOverviewPage/DemoBanner";
-import Header from "../components/treasuryOverviewPage/Header"
+import { useState } from "react";
+import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
+import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
+import ReportBuilderPanel from "../components/treasuryOverviewPage/ReportBuilderPanel";
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -20,11 +23,19 @@ import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useT
 export default function TreasuryPage() {
   const { metrics, streams, isDemoMode, loading, error, refetch } =
     useTreasuryOverviewData();
+  const { connected: walletConnected } = useWallet();
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+
+  const demoState: DemoState = loading
+    ? "loading"
+    : (metrics && metrics.length > 0) || (streams && streams.length > 0)
+    ? "loaded"
+    : "empty";
 
   if (loading) {
     return (
       <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-        {isDemoMode && <DemoBanner />}
+        {isDemoMode && <DemoBanner state={demoState} />}
         <Header />
         <div role="status" className="text-sm text-gray-500">
           Loading treasury overview...
@@ -36,7 +47,7 @@ export default function TreasuryPage() {
   if (error) {
     return (
       <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-        {isDemoMode && <DemoBanner />}
+        {isDemoMode && <DemoBanner state={demoState} />}
         <Header />
         <div role="alert" className="text-sm text-red-600">
           {error}
@@ -47,14 +58,21 @@ export default function TreasuryPage() {
 
   return (
     <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-      {isDemoMode && <DemoBanner />}
-      <Header />
+      {isDemoMode && <DemoBanner state={demoState} />}
+      <Header onExportClick={() => setShowReportBuilder(true)} />
+      {showReportBuilder && (
+        <ReportBuilderPanel
+          streams={streams || []}
+          onClose={() => setShowReportBuilder(false)}
+        />
+      )}
       <Metrics metrics={metrics || []} loading={loading} error={error} />
       <RecentStreams
         streams={streams || []}
         loading={loading}
         error={error}
         onRetry={refetch}
+        walletConnected={walletConnected}
       />
     </div>
   );

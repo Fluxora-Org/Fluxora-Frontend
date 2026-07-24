@@ -198,6 +198,25 @@
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
   z-index: 10;
   animation: marker-pulse 2s ease-in-out infinite;
+
+  transition: left var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
+              background-color var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
+              filter var(--motion-duration-stream-disclosure, 200ms) ease-in-out;
+}
+
+.stream-timeline-bar__marker.is-active {
+  background: var(--timeline-status-active, var(--color-text-primary, #1a1f36));
+}
+
+.stream-timeline-bar__marker.is-completed {
+  background: var(--timeline-status-completed, var(--color-success, #10b981));
+  animation: none;
+}
+
+.stream-timeline-bar__marker.is-paused {
+  background: var(--color-text-primary, #1a1f36);
+  filter: var(--timeline-status-paused, grayscale(50%));
+  animation: none;
 }
 
 @keyframes marker-pulse {
@@ -209,6 +228,12 @@
     opacity: 0.6;
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
   }
+}
+
+@keyframes highlight-ring-pulse-marker {
+  0% { box-shadow: 0 0 0 0 var(--interactive-focus-ring, #007acc); }
+  50% { box-shadow: 0 0 0 4px var(--interactive-focus-ring, #007acc); }
+  100% { box-shadow: 0 0 4px rgba(0, 0, 0, 0.3); }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -493,6 +518,11 @@
 
   .stream-timeline-bar__marker {
     animation: none;
+    transition: none !important;
+  }
+
+  .stream-timeline-bar__marker.timeline-marker-animate {
+    animation: highlight-ring-pulse-marker 500ms ease-out forwards;
   }
 
   .stream-timeline__loading-spinner {

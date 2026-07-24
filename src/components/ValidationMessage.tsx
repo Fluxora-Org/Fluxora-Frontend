@@ -64,6 +64,7 @@ export const ValidationMessage: React.FC<ValidationMessageProps> = ({
       id={id}
       className={`validation-message validation-message--${type}`}
       {...(role ? { role } : {})}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
       style={{ 
         display: 'flex',
         alignItems: 'flex-start',

@@ -1,6 +1,7 @@
 import React from "react";
 import "./StreamTimeline.module.css";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { createDateTimeFormat } from "../lib/formatters";
 
 export interface StreamTimelineProps {
   startDate: string;
@@ -49,6 +50,19 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   isLoading = false,
   compareMode = false,
 }) => {
+  const [animateClass, setAnimateClass] = React.useState("");
+  const prevStatusRef = React.useRef(status);
+
+  React.useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      prevStatusRef.current = status;
+      setAnimateClass("");
+      const req = requestAnimationFrame(() => {
+        setAnimateClass("timeline-marker-animate");
+      });
+      return () => cancelAnimationFrame(req);
+    }
+  }, [status]);
   // Parse dates
   const start = new Date(startDate);
   const cliff = cliffDate ? new Date(cliffDate) : null;
@@ -95,18 +109,21 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
     Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100),
   );
 
-  // Format date for display (handle long Stellar addresses)
+  // Format date for display. Resolves user locale via navigator.language
+  // (with a validated "en-US" fallback) consistent with src/lib/formatters.ts.
+  // This mirrors the fix for issue #388 applied elsewhere in the app.
   const formatDate = (date: Date): string => {
-    return new Intl.DateTimeFormat("en-US", {
+    return createDateTimeFormat({
       month: "short",
       day: "numeric",
       year: "2-digit",
     }).format(date);
   };
 
-  // Format long dates with ellipsis for overflow
+  // Format short numeric month/day for the inline segment labels.
+  // Locale-aware so ordering and separators match the visitor's locale.
   const formatShortDate = (date: Date): string => {
-    return new Intl.DateTimeFormat("en-US", {
+    return createDateTimeFormat({
       month: "numeric",
       day: "numeric",
     }).format(date);
@@ -144,6 +161,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         aria-label="Stream accrual progress"
         data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       >
+        <span aria-live="polite" className="sr-only">
+          {`Timeline status updated to ${status}`}
+        </span>
         {/* Cliff segment (hatched) */}
         {cliff && cliffPercent > 0 && (
           <div
@@ -189,7 +209,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         {/* Current date marker */}
         {current < end && current > start && (
           <div
-            className="stream-timeline-bar__marker"
+            className={`stream-timeline-bar__marker is-${status} ${animateClass}`}
             style={{ left: `${accrualPercent}%` }}
             role="img"
             aria-label={`Current date: ${formatDate(current)}`}

@@ -62,7 +62,6 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
       });
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
@@ -130,7 +129,6 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
       cancelled = true;
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, triggerRef.current]);
 
   return { data, loading, error, refetch };
@@ -180,7 +178,7 @@ export function useStreamById(id: string | null): UseStreamByIdResult {
     setLoading(true);
     setError(null);
 
-    getStreamById(id)
+    getStreamById(id, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
           setStream(data);
