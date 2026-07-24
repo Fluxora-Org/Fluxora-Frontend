@@ -985,6 +985,84 @@
 }
 
 /* ==============================================
+   MODE SELECTION (step 0)
+   ============================================== */
+
+.mode-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.mode-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.mode-card:hover {
+  border-color: var(--accent);
+  background: rgba(0, 212, 170, 0.05);
+}
+
+.mode-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 2px var(--surface-elevated),
+    0 0 0 4px var(--accent),
+    0 0 0 6px rgba(0, 212, 170, 0.35);
+}
+
+.mode-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(0, 184, 212, 0.12);
+  color: var(--primary);
+}
+
+.mode-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.mode-card__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+}
+
+.mode-card__desc {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  display: block;
+  line-height: 1.4;
+}
+
+.mode-card__chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* ==============================================
    RESPONSIVE STYLES
    ============================================== */
 
@@ -1386,7 +1464,9 @@
   border: 2px solid var(--color-danger);
   background: rgba(239, 68, 68, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Success state: 1px success border + subtle green tint */
@@ -1394,7 +1474,9 @@
   border: 1px solid var(--color-success);
   background: rgba(16, 185, 129, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Validation message: base */
@@ -1414,6 +1496,12 @@
 /* Hint message modifier */
 .validation-message--hint {
   color: var(--color-text-muted);
+}
+
+.unit-cycle-hint {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
 }
 
 /* Success message modifier */

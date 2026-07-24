@@ -25,10 +25,20 @@ import {
   isDateTimeInPast,
 } from '../lib/createStreamDates';
 import { useI18n } from '../i18n';
+// ── Bulk CSV imports ──────────────────────────────────────────────────────────
+import CsvDropZone from './csv-upload/CsvDropZone';
+import ColumnMappingStep from './csv-upload/ColumnMappingStep';
+import PreviewValidateStep from './csv-upload/PreviewValidateStep';
+import { parseAndValidateCsv } from './csv-upload/csvParser';
+import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
+import type { StreamDraftSnapshot } from '../lib/streamsSessionRecovery';
 import {
   evaluateContrast,
   THEME_BACKGROUNDS,
 } from '../utils/contrastUtils';
+
+/** Top-level flow mode: choose between single-stream or bulk-CSV. */
+type FlowMode = 'choose' | 'single' | 'bulk';
 
 export const LABEL_COLOR_SWATCHES = [
   { hex: '#3b82f6', label: 'Blue' },
@@ -156,6 +166,18 @@ interface CreateStreamModalProps {
   onStreamCreated?: () => void | Promise<void>;
   /** Called when stream creation fails after the user confirms the review step. */
   onStreamError?: (err: unknown) => void;
+  /**
+   * Restores step 1/2 field values when the modal opens — used by the Streams
+   * session-recovery banner to resume an unsubmitted draft. Never applied past
+   * step 2 (see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2).
+   */
+  initialDraft?: StreamDraftSnapshot | null;
+  /**
+   * Fires with the current safe-to-persist draft fields while the modal is
+   * open on step 1/2, and with `null` the instant the modal closes (any path)
+   * so a completed or abandoned draft is never left resumable.
+   */
+  onDraftChange?: (draft: StreamDraftSnapshot | null) => void;
 }
 
 export default function CreateStreamModal({
@@ -163,11 +185,25 @@ export default function CreateStreamModal({
   onClose,
   onStreamCreated,
   onStreamError,
+  initialDraft,
+  onDraftChange,
 }: CreateStreamModalProps) {
   const wallet = useWallet();
   const { addToast } = useToast();
   const { t } = useI18n();
 
+  // ── Flow mode ─────────────────────────────────────────────────────────────
+  const [flowMode, setFlowMode] = useState<FlowMode>('choose');
+
+  // ── Bulk CSV state ────────────────────────────────────────────────────────
+  const [bulkStep, setBulkStep] = useState<BulkStep>('upload');
+  const [bulkParseResult, setBulkParseResult] = useState<ParseResult | null>(null);
+  const [bulkRawText, setBulkRawText] = useState('');
+  const [bulkRows, setBulkRows] = useState<CsvRow[]>([]);
+  const [bulkMapping, setBulkMapping] = useState<Partial<ColumnMapping>>({});
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+
+  // ── Single-stream state ───────────────────────────────────────────────────
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [accrualRate, setAccrualRate] = useState("38.62");
@@ -297,6 +333,56 @@ export default function CreateStreamModal({
     modalRef,
     initialFocusRef: recipientInputRef,
   });
+
+  // Apply a restored draft when the modal is opened for it. Capped at step 2 —
+  // never resume directly into step 3 (review/create); see spec §2.
+  useEffect(() => {
+    if (!isOpen || !initialDraft) return;
+
+    setRecipient(initialDraft.recipient);
+    setDepositAmount(initialDraft.depositAmount);
+    setAccrualRate(initialDraft.accrualRate);
+    setDuration(initialDraft.duration);
+    setStartTimeOption(initialDraft.startTimeOption);
+    setCustomStartDate(initialDraft.customStartDate);
+    setCliffEnabled(initialDraft.cliffEnabled);
+    setCliffDate(initialDraft.cliffDate);
+    setCurrentStep(initialDraft.step);
+    // Only re-apply when the modal transitions open; initialDraft is a one-shot
+    // seed, not a controlled value the modal should keep resyncing to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Report the safe-to-persist draft fields upward while unsubmitted (step 1/2
+  // only). The parent clears this to null on every close path and on success —
+  // see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2.
+  useEffect(() => {
+    if (!isOpen || currentStep > 2 || !onDraftChange) return;
+
+    onDraftChange({
+      step: currentStep === 2 ? 2 : 1,
+      recipient,
+      depositAmount,
+      accrualRate,
+      duration,
+      startTimeOption,
+      customStartDate,
+      cliffEnabled,
+      cliffDate,
+    });
+  }, [
+    isOpen,
+    currentStep,
+    recipient,
+    depositAmount,
+    accrualRate,
+    duration,
+    startTimeOption,
+    customStartDate,
+    cliffEnabled,
+    cliffDate,
+    onDraftChange,
+  ]);
 
   const getStreamErrorMessage = (err: unknown): string => {
     if (err instanceof Error && err.message.trim()) {
@@ -664,6 +750,108 @@ export default function CreateStreamModal({
     onClose();
   };
 
+  // ── Bulk CSV handlers ─────────────────────────────────────────────────────
+
+  const resetBulkState = () => {
+    setBulkStep('upload');
+    setBulkParseResult(null);
+    setBulkRawText('');
+    setBulkRows([]);
+    setBulkMapping({});
+    setIsBulkSubmitting(false);
+  };
+
+  const handleBulkParsed = (result: ParseResult, _fileName: string, rawText: string) => {
+    setBulkParseResult(result);
+    setBulkRawText(rawText);
+    setBulkMapping(result.autoMapping);
+    if (result.headersMatch) {
+      setBulkRows(result.rows);
+      setBulkStep('preview');
+    } else {
+      setBulkStep('mapping');
+    }
+  };
+
+  const handleBulkMappingConfirmed = (mapping: ColumnMapping) => {
+    setBulkMapping(mapping);
+    if (bulkRawText) {
+      const result = parseAndValidateCsv(bulkRawText, mapping);
+      setBulkRows(result.rows);
+    }
+    setBulkStep('preview');
+  };
+
+  const handleBulkReplaceFile = () => {
+    resetBulkState();
+  };
+
+  const handleBulkBack = () => {
+    if (bulkStep === 'preview') {
+      if (bulkParseResult && !bulkParseResult.headersMatch) {
+        setBulkStep('mapping');
+      } else {
+        setBulkStep('upload');
+      }
+    } else if (bulkStep === 'mapping') {
+      setBulkStep('upload');
+    } else {
+      resetBulkState();
+      setFlowMode('choose');
+    }
+  };
+
+  const handleBulkSubmit = async (rows: CsvRow[]) => {
+    const validRows = rows.filter(
+      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
+    );
+    if (validRows.length === 0) return;
+    if (!wallet.connected) {
+      addToast(t('createStream.validation.walletNotConnected'), 'error');
+      return;
+    }
+    if (wallet.isNetworkMismatch) {
+      addToast(
+        t('createStream.validation.networkMismatch', {
+          expected: wallet.expectedNetwork,
+          actual: wallet.network?.toUpperCase() || '',
+        }),
+        'error',
+      );
+      return;
+    }
+    setIsBulkSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      addToast(`Submitting stream ${i + 1} of ${validRows.length}…`, 'info');
+      try {
+        const sender = wallet.address!;
+        const amountStr = Math.floor(
+          (parseFloat(row.depositAmount.replace(/,/g, '')) || 0) * 10_000_000,
+        ).toString();
+        const start = Math.floor(Date.now() / 1000);
+        const end = start + Math.floor(parseFloat(row.durationDays) * 86_400);
+        await createStream(sender, row.recipient.trim(), amountStr, start, end);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    setIsBulkSubmitting(false);
+    if (failCount === 0) {
+      addToast(`${successCount} of ${validRows.length} streams created successfully.`, 'success');
+      onStreamCreated?.();
+      onClose();
+    } else {
+      addToast(
+        `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
+        'error',
+      );
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -682,14 +870,20 @@ export default function CreateStreamModal({
           <div>
             <h2 id="create-stream-title">{t("createStream.title")}</h2>
             <p id="create-stream-description" className="modal-description">
-              {t("createStream.description")}
+              {flowMode === 'bulk'
+                ? (bulkStep === 'upload'
+                    ? 'Upload a CSV file with recipient addresses and stream details.'
+                    : bulkStep === 'mapping'
+                      ? "We couldn't auto-detect all required columns. Map each required field to a column in your file."
+                      : `Reviewing ${bulkRows.length} stream${bulkRows.length !== 1 ? 's' : ''}`)
+                : t("createStream.description")}
             </p>
           </div>
           <button
             type="button"
             className="close-button"
             onClick={handleClose}
-            disabled={isActivelySubmitting}
+            disabled={isBusyCreating || isBulkSubmitting}
             aria-label={t("createStream.accessibility.closeLabel")}
           >
             <svg
@@ -709,6 +903,166 @@ export default function CreateStreamModal({
           </button>
         </div>
 
+        {/* ── Mode: choose ─────────────────────────────────────────────── */}
+        {flowMode === 'choose' && (
+          <>
+            <hr className="divider" />
+            <div className="section-header">
+              <h3>How would you like to create streams?</h3>
+            </div>
+            <div className="mode-selection">
+              <button
+                type="button"
+                className="mode-card"
+                onClick={() => setFlowMode('single')}
+                aria-label="Create a single stream: step through recipient, rate, and schedule"
+              >
+                <span className="mode-card__icon" aria-hidden="true">
+                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </span>
+                <div className="mode-card__body">
+                  <span className="mode-card__title">Create a single stream</span>
+                  <span className="mode-card__desc">Step through recipient, rate, and schedule for one stream.</span>
+                </div>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="mode-card__chevron">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                className="mode-card"
+                onClick={() => setFlowMode('bulk')}
+                aria-label="Bulk create from CSV: upload a CSV file to create multiple streams at once"
+              >
+                <span className="mode-card__icon" aria-hidden="true">
+                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </span>
+                <div className="mode-card__body">
+                  <span className="mode-card__title">Bulk create from CSV</span>
+                  <span className="mode-card__desc">Upload a CSV file to create multiple streams at once.</span>
+                </div>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="mode-card__chevron">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-cancel" onClick={handleCancel}>
+                {t("createStream.button.cancel")}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── Mode: bulk ───────────────────────────────────────────────── */}
+        {flowMode === 'bulk' && (
+          <>
+            {/* Bulk progress tracker */}
+            <div className="progress-tracker">
+              <div className="progress-line">
+                <div
+                  className="progress-line-fill"
+                  style={{
+                    width: bulkStep === 'upload' ? '0%' : bulkStep === 'mapping' ? '50%' : '100%',
+                  }}
+                />
+              </div>
+              {(['upload', 'mapping', 'preview'] as BulkStep[]).map((step, idx) => {
+                const labels = ['Upload', 'Map columns', 'Review'];
+                const isActive = bulkStep === step;
+                const isPast =
+                  (step === 'upload' && (bulkStep === 'mapping' || bulkStep === 'preview')) ||
+                  (step === 'mapping' && bulkStep === 'preview');
+                return (
+                  <div key={step} className={`step-item ${isActive ? 'active' : ''} ${isPast ? 'completed' : ''}`}>
+                    <div className="step-circle">
+                      {isPast ? (
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : idx + 1}
+                    </div>
+                    <div className="step-label">{labels[idx]}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="modal-body-scroll">
+              <hr className="divider" />
+              <div className="section-header">
+                <h3>
+                  {bulkStep === 'upload' ? 'Upload recipient CSV'
+                    : bulkStep === 'mapping' ? 'Map your columns'
+                    : `Review ${bulkRows.length} stream${bulkRows.length !== 1 ? 's' : ''}`}
+                </h3>
+              </div>
+
+              {bulkStep === 'upload' && (
+                <CsvDropZone onParsed={handleBulkParsed} />
+              )}
+
+              {bulkStep === 'mapping' && bulkParseResult && (
+                <ColumnMappingStep
+                  detectedHeaders={bulkParseResult.detectedHeaders}
+                  initialMapping={bulkMapping}
+                  onMappingConfirmed={handleBulkMappingConfirmed}
+                />
+              )}
+
+              {bulkStep === 'preview' && (
+                <PreviewValidateStep
+                  rows={bulkRows}
+                  onRowsChange={setBulkRows}
+                  onSubmit={handleBulkSubmit}
+                  onReplaceFile={handleBulkReplaceFile}
+                />
+              )}
+            </div>
+
+            {/* Bulk footer — hidden on preview step (PreviewValidateStep has its own) */}
+            {bulkStep !== 'preview' && (
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-back"
+                  onClick={handleBulkBack}
+                  disabled={isBulkSubmitting}
+                >
+                  {t("createStream.button.back")}
+                </button>
+                {bulkStep === 'upload' && (
+                  <button
+                    type="button"
+                    className="btn btn-next"
+                    disabled={!bulkParseResult || Boolean(bulkParseResult.parseError)}
+                    onClick={() => {
+                      if (!bulkParseResult) return;
+                      if (bulkParseResult.headersMatch) {
+                        setBulkRows(bulkParseResult.rows);
+                        setBulkStep('preview');
+                      } else {
+                        setBulkStep('mapping');
+                      }
+                    }}
+                  >
+                    {t("createStream.button.next")}
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Mode: single (existing 3-step flow) ──────────────────────── */}
+        {flowMode === 'single' && (
+          <>
         {(() => {
           const stepLabels = STEPPER_LABEL_KEYS.map((key) => t(key));
           const currentLabel = stepLabels[currentStep - 1];
@@ -1825,6 +2179,8 @@ export default function CreateStreamModal({
             </>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );

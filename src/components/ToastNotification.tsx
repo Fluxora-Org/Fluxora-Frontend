@@ -2,6 +2,40 @@ import "./ToastNotification.css";
 
 export type ToastVariant = "success" | "error" | "info" | "warning";
 
+export type StreamStatusMilestone = "cliff-passed" | "fully-accrued" | "new-stream";
+
+export interface StreamStatusNotificationContent {
+  title: string;
+  body: string;
+  icon: string;
+}
+
+/** Shared content contract for future browser notifications and in-app copy. */
+export function getStreamStatusNotificationContent(
+  milestone: StreamStatusMilestone,
+  streamLabel = "your stream",
+): StreamStatusNotificationContent {
+  const copy: Record<StreamStatusMilestone, Omit<StreamStatusNotificationContent, "body"> & { body: string }> = {
+    "cliff-passed": {
+      title: "Cliff passed",
+      body: `The cliff for ${streamLabel} has passed. Accrual is now available.`,
+      icon: "/fluxora-notification-icon.svg",
+    },
+    "fully-accrued": {
+      title: "Stream fully accrued",
+      body: `${streamLabel} is fully accrued and ready to withdraw.`,
+      icon: "/fluxora-notification-icon.svg",
+    },
+    "new-stream": {
+      title: "New stream received",
+      body: `You have received ${streamLabel} in Fluxora.`,
+      icon: "/fluxora-notification-icon.svg",
+    },
+  };
+
+  return copy[milestone];
+}
+
 interface ToastNotificationProps {
   message: string;
   variant: ToastVariant;

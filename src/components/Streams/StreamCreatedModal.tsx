@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
+import { useOptionalTheme } from "../../theme/ThemeProvider";
 import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview";
 
 interface StreamCreatedModalProps {
@@ -29,6 +30,7 @@ export default function StreamCreatedModal({
   sender = "GAB...TREASURY",
   recipient = "GCD...RECIPIENT",
 }: StreamCreatedModalProps) {
+  const { theme } = useOptionalTheme();
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [isPopupBlocked, setIsPopupBlocked] = useState(false);
@@ -135,7 +137,7 @@ export default function StreamCreatedModal({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={`${styles.overlay}${theme === "cyberpunk" ? ` ${styles.cyberpunkSkin}` : ""}`} onClick={onClose} data-skin={theme === "cyberpunk" ? "cyberpunk" : undefined}>
       <div
         className={styles.modal}
         ref={modalRef}
