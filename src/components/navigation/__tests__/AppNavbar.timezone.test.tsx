@@ -18,6 +18,10 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => <div data-testid="mock-voice-mic-button" />,
+}));
+
 // Mock react-router-dom
 vi.mock("react-router-dom", () => ({
   Link: ({

@@ -13,6 +13,7 @@ import {
   getBrowserTimezone,
 } from "../../lib/timePresentation";
 import { VoiceMicButton } from "../voice/VoiceMicButton";
+import ThemeSegmentedControl from "./ThemeSegmentedControl";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -423,17 +424,7 @@ const location = useLocation();
             </button>
 
             {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              {theme === "light" ? (
-                <Moon className="icon-xs" aria-hidden="true" />
-              ) : (
-                <Sun className="icon-xs" aria-hidden="true" />
-              )}
-            </button>
+            <ThemeSegmentedControl />
 
             {/* Wallet area */}
             {connecting ? (
@@ -523,17 +514,7 @@ const location = useLocation();
             </button>
 
             {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              {theme === "light" ? (
-                <Moon className="icon-xs" aria-hidden="true" />
-              ) : (
-                <Sun className="icon-xs" aria-hidden="true" />
-              )}
-            </button>
+            <ThemeSegmentedControl />
 
             {connecting ? (
               <ConnectingSkeleton />

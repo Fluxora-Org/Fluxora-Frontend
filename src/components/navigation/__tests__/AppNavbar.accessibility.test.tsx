@@ -22,6 +22,10 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => <div data-testid="mock-voice-mic-button" />,
+}));
+
 // Mock useTickingNow to avoid infinite loops in vi.runAllTimers()
 vi.mock("../../../hooks/useTickingNow", () => ({
   useTickingNow: () => "2026-07-24T05:07:26.000Z",
@@ -83,13 +87,13 @@ describe("Property 3: Icon-only buttons have non-empty aria-labels", () => {
             expect(hamburgerLabel).toBeTruthy();
             expect(hamburgerLabel!.length).toBeGreaterThan(0);
 
-            // Theme toggle (desktop; may be multiple when mobile menu open)
-            const themeToggles = screen.getAllByRole("button", {
-              name: /switch to (dark|light) mode/i,
+            // Theme preference segmented control
+            const themeControls = screen.getAllByRole("radiogroup", {
+              name: /theme preference/i,
             });
-            expect(themeToggles.length).toBeGreaterThanOrEqual(1);
-            themeToggles.forEach((btn) => {
-              const label = btn.getAttribute("aria-label");
+            expect(themeControls.length).toBeGreaterThanOrEqual(1);
+            themeControls.forEach((group) => {
+              const label = group.getAttribute("aria-label");
               expect(label).toBeTruthy();
               expect(label!.length).toBeGreaterThan(0);
             });
