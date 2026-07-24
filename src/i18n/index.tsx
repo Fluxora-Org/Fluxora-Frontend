@@ -48,6 +48,17 @@ export interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 /**
+ * Escapes all regex-special characters in a string so it can be used safely
+ * as a literal pattern inside `new RegExp(...)`.
+ *
+ * @param value The raw string to escape.
+ * @returns The regex-escaped string.
+ */
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Helper function to escape HTML characters in user-provided values
  * to prevent XSS vulnerabilities if translations are rendered unsafely.
  *
@@ -113,7 +124,10 @@ export function translate(
     let result = value;
     for (const [paramKey, paramValue] of Object.entries(params)) {
       const escapedValue = escapeHtml(String(paramValue));
-      result = result.replace(new RegExp(`\\{${paramKey}\\}`, "g"), escapedValue);
+      // Escape regex-metacharacters in the param key so a caller-controlled key
+      // such as "amount.usd" cannot widen the match or throw an invalid-pattern error.
+      const escapedKey = escapeRegExp(paramKey);
+      result = result.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), escapedValue);
     }
     return result;
   }

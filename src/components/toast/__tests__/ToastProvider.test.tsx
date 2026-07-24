@@ -1,11 +1,6 @@
 vi.unmock("../ToastProvider");
 import { useState } from "react";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider, useToast } from "../ToastProvider";
 
@@ -32,10 +27,48 @@ function renderWithProvider(ui: React.ReactNode) {
 }
 
 describe("ToastProvider / useToast", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    window.localStorage.clear();
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("renders a sound-alert toggle in the muted-by-default state", () => {
+    renderWithProvider(<AddButton />);
+
+    expect(
+      screen.getByRole("button", { name: /enable sound alerts/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/sound alerts are off by default/i),
+    ).toBeInTheDocument();
+  });
+
+  it("persists sound-alert preference changes through the validated storage key", () => {
+    renderWithProvider(<AddButton />);
+
+    const toggle = screen.getByRole("button", {
+      name: /enable sound alerts/i,
+    });
+    fireEvent.click(toggle);
+
+    expect(
+      screen.getByRole("button", { name: /mute sound alerts/i }),
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem("toast-sound")).toBe("enabled");
+  });
+
+  it("ignores tampered toast-sound storage values and falls back to the muted default", () => {
+    window.localStorage.setItem("toast-sound", "not-valid");
+
+    renderWithProvider(<AddButton />);
+
+    expect(
+      screen.getByRole("button", { name: /enable sound alerts/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders a toast when addToast is called", () => {
@@ -301,10 +334,18 @@ describe("ToastProvider / useToast", () => {
       const { addToast } = useToast();
       return (
         <>
-          <button onClick={() => addToast("T1", "success", 2000)}>Add T1</button>
-          <button onClick={() => addToast("T2", "success", 2000)}>Add T2</button>
-          <button onClick={() => addToast("T3", "success", 2000)}>Add T3</button>
-          <button onClick={() => addToast("T4", "success", 2000)}>Add T4</button>
+          <button onClick={() => addToast("T1", "success", 2000)}>
+            Add T1
+          </button>
+          <button onClick={() => addToast("T2", "success", 2000)}>
+            Add T2
+          </button>
+          <button onClick={() => addToast("T3", "success", 2000)}>
+            Add T3
+          </button>
+          <button onClick={() => addToast("T4", "success", 2000)}>
+            Add T4
+          </button>
         </>
       );
     }
@@ -373,7 +414,9 @@ describe("ToastProvider / useToast", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss Hidden" }));
 
     // Dismiss non-existent id
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss Non-existent" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Dismiss Non-existent" }),
+    );
   });
 
   it("clears timers when ToastProvider unmounts", () => {
