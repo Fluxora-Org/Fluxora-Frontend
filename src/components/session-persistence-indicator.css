@@ -1,0 +1,32 @@
+/* ══════════════════════════════════
+   Session Persistence Indicator
+   See docs/STREAMS_SESSION_RECOVERY_SPEC.md §5
+   ══════════════════════════════════ */
+
+.session-persistence-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: default;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.session-persistence-indicator[data-recently-saved="true"] {
+  color: var(--color-accent-secondary);
+  transform: scale(1.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-persistence-indicator {
+    transition: none;
+  }
+
+  .session-persistence-indicator[data-recently-saved="true"] {
+    transform: none;
+  }
+}

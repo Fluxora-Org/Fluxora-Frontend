@@ -164,12 +164,53 @@ describe("TruncatedAddress", () => {
   });
 
   it("renders short addresses without truncation", () => {
-    render(<TruncatedAddress address="GSHORT" />);
+    const { container } = render(<TruncatedAddress address="GSHORT" />);
 
-    expect(screen.getByText("GSHORT")).toBeInTheDocument();
+    // The address appears in the code chip, sr-only span, and reveal chip.
+    // Use the code element specifically to assert the visible representation.
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toHaveTextContent("GSHORT");
     expect(screen.getByRole("button")).toHaveAttribute(
       "aria-label",
       expect.stringContaining("Copy address"),
     );
+  });
+
+  // ── sr-only reveal pattern (TruncatedReveal integration) ─────────────────
+
+  it("always renders an sr-only span with the full address in the DOM", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const srSpan = container.querySelector(".truncateReveal__srValue.srOnly");
+    expect(srSpan).not.toBeNull();
+    expect(srSpan).toHaveTextContent(ADDRESS);
+  });
+
+  it("sr-only span is present before any user interaction", () => {
+    // Render and immediately query — no click/hover/focus events fired.
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const srSpan = container.querySelector(".truncateReveal__srValue.srOnly");
+    expect(srSpan).toHaveTextContent(ADDRESS);
+  });
+
+  it("reveal chip is aria-hidden so ATs do not read the address twice", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const chip = container.querySelector(".truncateReveal__chip");
+    expect(chip).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("reveal chip contains the full address", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const chip = container.querySelector(".truncateReveal__chip");
+    expect(chip).toHaveTextContent(ADDRESS);
+  });
+
+  it("wrapper has the truncateReveal class required for CSS-driven reveal", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    expect(container.querySelector(".truncateReveal")).not.toBeNull();
   });
 });

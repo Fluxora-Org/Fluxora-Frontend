@@ -22,6 +22,10 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../../../hooks/useTickingNow", () => ({
+  useTickingNow: () => "2026-07-24T05:07:26.000Z",
+}));
+
 vi.mock("react-router-dom", () => ({
   Link: ({
     children,

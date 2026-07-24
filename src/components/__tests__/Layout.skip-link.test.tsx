@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { test, expect } from 'vitest';
 import Layout from '../Layout';
 
 test('skip link is first focusable element and moves focus to main', async () => {

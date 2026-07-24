@@ -1,4 +1,5 @@
-import { getContrastRatio } from '../../utils/contrastUtils';
+import { describe, test, expect } from 'vitest';
+import { getContrastRatio } from '../../../utils/contrastUtils';
 
 type Variant = {
   name: string;

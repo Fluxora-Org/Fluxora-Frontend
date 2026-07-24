@@ -155,8 +155,8 @@ describe("useStreamById", () => {
     await waitFor(() => expect(result.current.stream).toEqual(stream2));
 
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy).toHaveBeenNthCalledWith(1, "id-1");
-    expect(spy).toHaveBeenNthCalledWith(2, "id-2");
+    expect(spy).toHaveBeenNthCalledWith(1, "id-1", expect.any(AbortSignal));
+    expect(spy).toHaveBeenNthCalledWith(2, "id-2", expect.any(AbortSignal));
   });
 
   it("refetch triggers another request with the same id", async () => {

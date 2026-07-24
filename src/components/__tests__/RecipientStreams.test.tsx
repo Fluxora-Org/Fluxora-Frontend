@@ -24,7 +24,7 @@ describe("RecipientStreams Testing Engine", () => {
       .mockRejectedValue(new Error("Database crash dump info"));
 
     render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
-    const errorAlert = await screen.findByRole("status");
+    const errorAlert = await screen.findByRole("alert");
 
     expect(errorAlert).toBeInTheDocument();
     expect(
@@ -72,7 +72,7 @@ describe("RecipientStreams Testing Engine", () => {
       expect(card?.getAttribute("style")).toContain("var(--color-bg-primary)");
 
       // Verify heading uses theme token
-      const heading = screen.getByText("Incoming Streams");
+      const heading = screen.getByText(/Incoming Streams/i);
       expect(heading.getAttribute("style")).toContain("var(--color-text-primary)");
     });
 
@@ -108,7 +108,7 @@ describe("RecipientStreams Testing Engine", () => {
       const errorFetchMock = vi.fn().mockRejectedValue(new Error("fail"));
       document.documentElement.setAttribute("data-theme", "dark");
       render(<RecipientStreams fetchStreamsFn={errorFetchMock} pollIntervalMs={0} />);
-      const errorAlert = await screen.findByRole("status");
+      const errorAlert = await screen.findByRole("alert");
       expect(errorAlert.getAttribute("style")).toContain("var(--color-error-text)");
       expect(errorAlert.getAttribute("style")).toContain("var(--color-error-bg)");
     });

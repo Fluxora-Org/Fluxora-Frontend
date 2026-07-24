@@ -6,13 +6,24 @@ import { transactionPollingConfig } from "../lib/transactionConfig";
  *
  * `confirmed` and `failed` must come from the status source, not optimistic
  * client-side time.
+ *
+ * `queued`, `flushing`, and `queue-failed` extend the lifecycle for
+ * submissions captured by the offline action queue (see
+ * `src/lib/offlineActionQueue.ts` and docs/OFFLINE_ACTION_QUEUE_SPEC.md).
+ * This hook never sets them itself — it only polls once a real tx hash
+ * exists — callers (e.g. CreateStreamModal) set them before that hash is
+ * available: `queued` while offline, `flushing` while auto-resubmitting on
+ * reconnect, and `queue-failed` if that resubmission is rejected.
  */
 export type TxStatus =
   | "idle"
+  | "queued"
   | "submitting"
+  | "flushing"
   | "pending"
   | "confirmed"
-  | "failed";
+  | "failed"
+  | "queue-failed";
 
 export type PolledTxStatus = Extract<TxStatus, "pending" | "confirmed" | "failed">;
 

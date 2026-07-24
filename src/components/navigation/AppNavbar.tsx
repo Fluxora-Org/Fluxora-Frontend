@@ -1,11 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X, Moon, Sun, Type, Search, Command } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
+import { useTickingNow } from "../../hooks/useTickingNow";
+import {
+  formatNavbarTime,
+  formatLocalISOWithOffset,
+  getBrowserTimezone,
+} from "../../lib/timePresentation";
+import { VoiceMicButton } from "../voice/VoiceMicButton";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -142,11 +149,146 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   }, [pathname]);
 }
 
+function getFormattedUTCOffset(date: Date, tz: string): string {
+  if (tz === "UTC") return "UTC+00:00";
+  try {
+    const offsetMin = date.getTimezoneOffset();
+    const absOffsetMin = Math.abs(offsetMin);
+    const offsetHours = Math.floor(absOffsetMin / 60);
+    const offsetMinutes = absOffsetMin % 60;
+    const sign = offsetMin <= 0 ? "+" : "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
+  } catch (e) {
+    return "UTC+00:00";
+  }
+}
+
+function NavbarTimeIndicator() {
+  const [manualTime, setManualTime] = useState<Date | null>(null);
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  const tickingNow = useTickingNow();
+
+  useEffect(() => {
+    setManualTime(null);
+  }, [tickingNow]);
+
+  const displayTimeDate = manualTime || new Date(tickingNow);
+  const tz = getBrowserTimezone();
+  const isUTCFallback = tz === "UTC";
+
+  const desktopText = isUTCFallback
+    ? `UTC: ${formatNavbarTime(displayTimeDate, { compact: true, timezone: "UTC" })}`
+    : `Local: ${formatNavbarTime(displayTimeDate, { compact: false, timezone: tz })}`;
+
+  const mobileText = formatNavbarTime(displayTimeDate, { compact: true, timezone: tz });
+
+  const handleFocus = () => {
+    setManualTime(new Date());
+    setIsTooltipOpen(true);
+  };
+
+  const handleBlur = () => {
+    setIsTooltipOpen(false);
+    setManualTime(null);
+  };
+
+  const handleMouseEnter = () => {
+    setIsTooltipOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsTooltipOpen(false);
+  };
+
+  const handleClick = () => {
+    setManualTime(new Date());
+    setIsTooltipOpen((p) => !p);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsTooltipOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        aria-label={`Current time: ${desktopText}. Click or focus for details.`}
+        aria-expanded={isTooltipOpen}
+        aria-describedby="navbar-time-tooltip"
+        className="px-3 min-h-[44px] rounded-full border border-[var(--navbar-icon-border)] hover:border-[var(--accent)]/50 text-[var(--color-text-secondary)] hover:text-[var(--accent)] bg-transparent hover:bg-[var(--surface-elevated)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center justify-center cursor-pointer select-none"
+      >
+        <span aria-live="off" className="hidden md:inline font-sans text-xs font-semibold">
+          {desktopText}
+        </span>
+        <span aria-live="off" className="md:hidden font-sans text-xs font-semibold">
+          {mobileText}
+        </span>
+      </button>
+
+      {isTooltipOpen && (
+        <div
+          id="navbar-time-tooltip"
+          role="tooltip"
+          className="absolute right-0 mt-2 p-4 w-72 rounded-xl bg-[var(--tooltip-bg,var(--surface-elevated))] border border-[var(--tooltip-border,var(--border-neutral))] shadow-[var(--tooltip-shadow)] text-[var(--tooltip-text-color,var(--text-secondary))] font-mono text-xs z-[1100] flex flex-col gap-2.5 pointer-events-none"
+        >
+          <div className="font-semibold text-[var(--tooltip-title-color,var(--text-vivid))] border-b border-[var(--navbar-border)] pb-1.5 flex items-center justify-between">
+            <span>Time Details</span>
+            {isUTCFallback && (
+              <span className="text-[10px] text-amber-400 font-sans px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
+                Fallback
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                ISO Timestamp
+              </span>
+              <span className="text-[var(--text-vivid)] select-all break-all">
+                {formatLocalISOWithOffset(displayTimeDate)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                Resolved Timezone
+              </span>
+              <span className="text-[var(--text-vivid)]">{tz}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                UTC Offset
+              </span>
+              <span className="text-[var(--text-vivid)]">
+                {getFormattedUTCOffset(displayTimeDate, tz)}
+              </span>
+            </div>
+            {isUTCFallback && (
+              <div className="mt-1 pt-1.5 border-t border-[var(--navbar-border)] text-[10px] text-amber-400 font-sans italic">
+                Timezone detection unavailable. Using UTC fallback.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AppNavbar({
   onSidebarToggle,
   isSidebarOpen = false,
 }: AppNavbarProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, easyReadFont, toggleEasyReadFont } = useTheme();
   const {
     connected,
     address,
@@ -199,7 +341,7 @@ const location = useLocation();
               aria-expanded={isSidebarOpen}
               aria-controls="app-sidebar"
             >
-              {isSidebarOpen ? <X size={26} aria-hidden="true" /> : <Menu size={26} aria-hidden="true" />}
+              {isSidebarOpen ? <X className="icon-md" aria-hidden="true" /> : <Menu className="icon-md" aria-hidden="true" />}
             </button>
           )}
           <FluxoraLogo connected={connected} />
@@ -239,61 +381,101 @@ const location = useLocation();
   )}
 </nav>
 
-        {/* Right: Actions (desktop) */}
-        <div className="hidden md:flex items-center gap-3">
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
-            {theme === "light" ? (
-              <Moon size={16} aria-hidden="true" />
-            ) : (
-              <Sun size={16} aria-hidden="true" />
-            )}
-          </button>
+        {/* Right Actions & Time Indicator */}
+        <div className="flex items-center gap-3">
+          <NavbarTimeIndicator />
 
-          {/* Wallet area */}
-          {connecting ? (
-            <ConnectingSkeleton />
-          ) : connected && address ? (
-            <WalletStatus
-              address={address}
-              network={network ?? "TESTNET"}
-              expectedNetwork={expectedNetwork}
-              isNetworkMismatch={isNetworkMismatch}
-              onDisconnect={disconnect}
-            />
-          ) : (
-            <Link
-              to="/connect-wallet"
-              aria-label="Connect your Stellar wallet"
-              className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+          {/* Right: Actions (desktop) */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Command Palette / Search Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-command-palette"));
+              }}
+              aria-label="Open command palette and help search (Cmd+K)"
+              className="flex items-center gap-2.5 px-3.5 py-1.5 h-10 rounded-full border border-[var(--navbar-icon-border)] bg-[var(--surface-sunken)] hover:border-[var(--accent)]/50 text-[var(--text-muted)] hover:text-[var(--text)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-xs font-medium"
             >
-              Connect Wallet
-            </Link>
+              <Search size={15} aria-hidden="true" />
+              <span className="hidden lg:inline">Search commands & help...</span>
+              <span className="lg:hidden">Search...</span>
+              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[10px] font-mono font-semibold text-[var(--text-muted)]">
+                <Command size={10} />K
+              </kbd>
+            </button>
+
+            {/* Voice Control Mic Activation */}
+            <VoiceMicButton variant="navbar" />
+
+            {/* Easy-read font toggle */}
+            <button
+              onClick={toggleEasyReadFont}
+              aria-label="Toggle easy-read font"
+              aria-pressed={easyReadFont}
+              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                easyReadFont
+                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
+                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
+              }`}
+            >
+              <Type size={16} aria-hidden="true" />
+            </button>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            >
+              {theme === "light" ? (
+                <Moon className="icon-xs" aria-hidden="true" />
+              ) : (
+                <Sun className="icon-xs" aria-hidden="true" />
+              )}
+            </button>
+
+            {/* Wallet area */}
+            {connecting ? (
+              <ConnectingSkeleton />
+            ) : connected && address ? (
+              <WalletStatus
+                address={address}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={disconnect}
+              />
+            ) : (
+              <Link
+                to="/connect-wallet"
+                aria-label="Connect your Stellar wallet"
+                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+              >
+                Connect Wallet
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile: hamburger (only in Marketing View or if not using sidebar) */}
+          {!isAppView && (
+            <button
+              className="md:hidden flex items-center justify-center w-[44px] h-[44px] rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={handleMobileToggle}
+              aria-label={
+                mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
+              }
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
+            >
+              {mobileMenuOpen ? (
+                <X size={22} aria-hidden="true" />
+              ) : (
+                <Menu size={22} aria-hidden="true" />
+              )}
+            </button>
           )}
         </div>
-
-        {/* Mobile: hamburger (only in Marketing View or if not using sidebar) */}
-        {!isAppView && (
-          <button
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            onClick={handleMobileToggle}
-            aria-label={
-              mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
-            }
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-nav"
-          >
-            {mobileMenuOpen ? (
-              <X size={22} aria-hidden="true" />
-            ) : (
-              <Menu size={22} aria-hidden="true" />
-            )}
-          </button>
-        )}
       </div>
       {/* Breadcrumb — shown on deep pages (e.g. Streams / STR-001) */}
 {showBreadcrumb && (
@@ -325,15 +507,31 @@ const location = useLocation();
           ))}
 
           <div className="mt-3 pt-3 border-t border-[var(--navbar-border)] flex items-center gap-3 flex-wrap">
+            {/* Easy-read font toggle */}
+            <button
+              onClick={toggleEasyReadFont}
+              aria-label="Toggle easy-read font"
+              aria-pressed={easyReadFont}
+              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                easyReadFont
+                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
+                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
+              }`}
+            >
+              <Type size={16} aria-hidden="true" />
+            </button>
+
+            {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
               className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               {theme === "light" ? (
-                <Moon size={16} aria-hidden="true" />
+                <Moon className="icon-xs" aria-hidden="true" />
               ) : (
-                <Sun size={16} aria-hidden="true" />
+                <Sun className="icon-xs" aria-hidden="true" />
               )}
             </button>
 

@@ -231,3 +231,51 @@ describe("EmptyState — error variant", () => {
     expect(screen.getByRole("region", { name: "Error state" })).toBeInTheDocument();
   });
 });
+
+// ── theme-aware text colors ─────────────────────────────────────────
+
+describe("EmptyState — theme-aware text colors", () => {
+  it("title uses the color-text-primary token, not a hardcoded hex value", () => {
+    render(<EmptyState variant="treasury" walletConnected={false} />);
+    const heading = screen.getByRole("heading", { name: /connect your wallet/i });
+    const color = heading.style.color;
+    expect(color).toContain("var(--color-text-primary");
+    expect(color).not.toMatch(/^#/);
+    
+  });
+
+  it("description uses the color-text-secondary token, not a hardcoded hex value", () => {
+    render(<EmptyState variant="treasury" walletConnected={false} />);
+    const description = screen.getByText(
+      /connect a stellar wallet to view your treasury/i
+    );
+    const color = description.style.color;
+    expect(color).toContain("var(--color-text-secondary");
+    expect(color).not.toMatch(/^#/);
+
+  });
+
+  it("title and description remain token-based across every variant", () => {
+    const variants = [
+      "treasury",
+      "streams",
+      "recipient",
+      "zero-accrual",
+      "search-no-results",
+      "error",
+    ] as const;
+
+    variants.forEach((variant) => {
+      const { container, unmount } = render(
+        <EmptyState variant={variant} walletConnected={true} />
+      );
+      const heading = container.querySelector("h2");
+      const description = container.querySelector("p");
+
+      expect(heading?.style.color).toContain("var(--color-text-primary");
+      expect(description?.style.color).toContain("var(--color-text-secondary");
+
+      unmount();
+    });
+  });
+});

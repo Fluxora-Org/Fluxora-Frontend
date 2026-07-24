@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createConfig,
+  getNetworkExplorerPath,
   getNetworkLabel,
   getNetworkPassphrase,
   parseBooleanFlag,
@@ -52,6 +53,8 @@ describe("config", () => {
     expect(getNetworkPassphrase("PUBLIC")).toBe(
       "Public Global Stellar Network ; September 2015",
     );
+    expect(getNetworkExplorerPath("PUBLIC")).toBe("public");
+    expect(getNetworkExplorerPath("TESTNET")).toBe("testnet");
     expect(parseBooleanFlag("1")).toBe(true);
     expect(parseBooleanFlag("false")).toBe(false);
   });

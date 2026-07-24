@@ -50,9 +50,9 @@ describe('CreateStreamModal: Self-send validation', () => {
 
     // Verify error is shown
     expect(container.textContent).toContain('Recipient cannot be the same as the connected wallet address.');
-    
-    // Cannot advance to step 2
-    expect(container.querySelector('.step-item.active')?.textContent).toContain('1');
+
+    // Cannot advance to step 2 — stepper still marks step 1 as current
+    expect(container.querySelector('[aria-current="step"]')?.textContent).toContain('1');
   });
 
   it('rejects recipient when it matches connected wallet address with different casing', () => {
@@ -140,7 +140,7 @@ describe('CreateStreamModal: Self-send validation', () => {
     fireEvent.click(nextBtn);
 
     expect(container.textContent).not.toContain('Recipient cannot be the same as the connected wallet address.');
-    // Should advance to step 2 (nth-child(3))
-    expect(container.querySelector('.step-item:nth-child(3)')?.classList.contains('active')).toBe(true);
+    // Should advance to step 2 — the stepper's current item is now step 2
+    expect(container.querySelector('[aria-current="step"]')?.textContent).toContain('2');
   });
 });
