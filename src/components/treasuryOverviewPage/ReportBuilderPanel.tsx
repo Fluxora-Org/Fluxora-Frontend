@@ -1,0 +1,253 @@
+import React, { useState, useMemo, useEffect } from "react";
+import { Stream } from "./Stream";
+import { useToast } from "../toast/ToastProvider";
+
+export interface ReportBuilderPanelProps {
+  streams: Stream[];
+  onClose: () => void;
+}
+
+export type Field = "name" | "recipient" | "rate" | "accruedAmount" | "status";
+export type Grouping = "None" | "Recipient" | "Status";
+export type ExportFormat = "CSV" | "PDF";
+
+export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPanelProps) {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedFields, setSelectedFields] = useState<Set<Field>>(
+    new Set(["name", "recipient", "rate", "status"])
+  );
+  const [grouping, setGrouping] = useState<Grouping>("None");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("CSV");
+  const [isExporting, setIsExporting] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const { addToast } = useToast();
+
+  const handleFieldToggle = (field: Field) => {
+    setSelectedFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+  };
+
+  // Simulate preview loading
+  useEffect(() => {
+    setIsPreviewLoading(true);
+    const timer = setTimeout(() => setIsPreviewLoading(false), 400);
+    return () => clearTimeout(timer);
+  }, [startDate, endDate, selectedFields, grouping]);
+
+  const canExport = selectedFields.size > 0;
+
+  const handleExport = () => {
+    if (!canExport) return;
+    setIsExporting(true);
+    // Simulate export delay
+    setTimeout(() => {
+      setIsExporting(false);
+      addToast(`Successfully exported report as ${exportFormat}`, "success");
+      onClose();
+    }, 1500);
+  };
+
+  const filteredStreams = useMemo(() => {
+    // In a real app we'd filter by dateRange and group by `grouping` here.
+    return streams.slice(0, 5); // Just show a few for preview
+  }, [streams, grouping]);
+
+  const allFields: { key: Field; label: string }[] = [
+    { key: "name", label: "Name" },
+    { key: "recipient", label: "Recipient" },
+    { key: "rate", label: "Rate" },
+    { key: "accruedAmount", label: "Accrued Amount" },
+    { key: "status", label: "Status" },
+  ];
+
+  return (
+    <div
+      className="p-6 bg-white rounded-lg mb-8"
+      style={{
+        border: "1px solid var(--color-border-default)",
+        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+      }}
+    >
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          Export Treasury Report
+        </h2>
+        <button
+          onClick={onClose}
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          aria-label="Close report builder"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="startDate">
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+              style={{ borderColor: "var(--color-border-default)" }}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="endDate">
+              End Date
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+              style={{ borderColor: "var(--color-border-default)" }}
+            />
+          </div>
+        </div>
+
+        <fieldset className="border p-4 rounded-md" style={{ borderColor: "var(--color-border-default)" }}>
+          <legend className="text-sm font-medium text-[var(--color-text-primary)] px-2">Fields</legend>
+          <div className="space-y-2 mt-2">
+            {allFields.map((f) => (
+              <label key={f.key} className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedFields.has(f.key)}
+                  onChange={() => handleFieldToggle(f.key)}
+                  className="rounded border-gray-300 text-[var(--color-accent-primary)] focus:ring-[var(--color-accent-primary)]"
+                />
+                {f.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="grouping">
+              Grouping
+            </label>
+            <select
+              id="grouping"
+              value={grouping}
+              onChange={(e) => setGrouping(e.target.value as Grouping)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)] bg-white"
+              style={{ borderColor: "var(--color-border-default)" }}
+            >
+              <option value="None">None</option>
+              <option value="Recipient">By Recipient</option>
+              <option value="Status">By Status</option>
+            </select>
+          </div>
+          
+          <div>
+            <span className="block text-sm font-medium text-[var(--color-text-primary)] mb-1">Export Format</span>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <input
+                  type="radio"
+                  name="format"
+                  value="CSV"
+                  checked={exportFormat === "CSV"}
+                  onChange={() => setExportFormat("CSV")}
+                  className="text-[var(--color-accent-primary)] focus:ring-[var(--color-accent-primary)]"
+                />
+                CSV
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <input
+                  type="radio"
+                  name="format"
+                  value="PDF"
+                  checked={exportFormat === "PDF"}
+                  onChange={() => setExportFormat("PDF")}
+                  className="text-[var(--color-accent-primary)] focus:ring-[var(--color-accent-primary)]"
+                />
+                PDF
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4">Live Preview</h3>
+        <div
+          className="overflow-x-auto rounded-lg relative"
+          style={{ border: "1px solid var(--color-border-default)" }}
+        >
+          {isPreviewLoading && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+              <span className="text-sm font-medium text-[var(--color-text-secondary)]">Updating preview...</span>
+            </div>
+          )}
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr
+                style={{
+                  backgroundColor: "var(--color-surface-raised)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {allFields.map((f) => (
+                  selectedFields.has(f.key) && (
+                    <th key={f.key} scope="col" className="py-4 px-3 uppercase">
+                      {f.label}
+                    </th>
+                  )
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStreams.length > 0 ? (
+                filteredStreams.map((s, i) => (
+                  <tr key={s.id || i} className="border-t" style={{ borderColor: "var(--color-border-default)" }}>
+                    {selectedFields.has("name") && <td className="py-3 px-3 text-sm">{s.name}</td>}
+                    {selectedFields.has("recipient") && <td className="py-3 px-3 text-sm font-mono">{s.recipient.substring(0,6)}...</td>}
+                    {selectedFields.has("rate") && <td className="py-3 px-3 text-sm">{s.rate}</td>}
+                    {selectedFields.has("accruedAmount") && <td className="py-3 px-3 text-sm">{s.accruedAmount || "-"}</td>}
+                    {selectedFields.has("status") && <td className="py-3 px-3 text-sm">{s.status}</td>}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={selectedFields.size} className="py-4 px-3 text-center" style={{ color: "var(--color-text-muted)" }}>
+                    No data to preview.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleExport}
+          disabled={!canExport || isExporting}
+          className="px-6 py-2 text-white rounded-lg font-semibold disabled:opacity-50 transition-opacity"
+          style={{
+            backgroundColor: "var(--color-accent-primary)",
+            boxShadow: "var(--shadow-accent-primary)",
+          }}
+        >
+          {isExporting ? "Exporting..." : `Export ${exportFormat}`}
+        </button>
+      </div>
+    </div>
+  );
+}

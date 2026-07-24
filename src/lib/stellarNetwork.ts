@@ -4,6 +4,21 @@ export type StellarNetwork = (typeof SUPPORTED_STELLAR_NETWORKS)[number];
 
 export const DEFAULT_EXPECTED_NETWORK: StellarNetwork = "TESTNET";
 
+export const NETWORK_EXPLORER_PATHS: Record<StellarNetwork, string> = {
+  PUBLIC: "public",
+  TESTNET: "testnet",
+};
+
+/**
+ * Returns the stellar.expert explorer network path segment ("public" | "testnet")
+ * for a given StellarNetwork.
+ */
+export function getNetworkExplorerPath(
+  network: StellarNetwork = getExpectedStellarNetwork(),
+): string {
+  return NETWORK_EXPLORER_PATHS[network] ?? "testnet";
+}
+
 /** Normalizes Freighter/import.meta network values to the app-supported set. */
 export function normalizeStellarNetwork(
   value: string | null | undefined,
