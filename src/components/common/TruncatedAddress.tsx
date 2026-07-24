@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { AlertCircle, Check, Copy } from "lucide-react";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
+import TruncatedReveal from "./TruncatedReveal";
 
 type CopyState = "idle" | "copied" | "error";
 
@@ -22,6 +23,10 @@ function toCopyState(status: "idle" | "copied" | "failed"): CopyState {
  * TruncatedAddress component provides a consistent way to display Stellar addresses
  * with truncation (ABCD...WXYZ), optional labeling, and copy-to-clipboard functionality.
  * It uses standard design tokens for typography and colors.
+ *
+ * Accessibility: The full address is always present in the accessibility tree via an
+ * sr-only span inside TruncatedReveal (see docs/SR_ONLY_REVEAL_PATTERN_SPEC.md).
+ * A visual reveal chip also appears on hover/focus for sighted keyboard users.
  *
  * Copy behavior is delegated to the shared `useClipboard` hook, which uses the
  * async Clipboard API with an `execCommand` fallback for insecure contexts.
@@ -93,19 +98,28 @@ export default function TruncatedAddress({
         }}
         aria-label={`${copyState === "copied" ? "Copied" : "Copy"} ${label || "address"}: ${address}`}
       >
-        <code
-          className="text-mono-sm truncate"
-          style={{
-            background: "var(--surface-raised)",
-            padding: "2px 8px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--color-border-default)",
-            color: "var(--color-text-primary)",
-            transition: "border-color var(--transition-fast)"
-          }}
-        >
-          {truncated}
-        </code>
+        {/*
+         * TruncatedReveal: full address always in accessibility tree (sr-only span)
+         * plus a visual chip that slides in on hover/focus of the copy button.
+         * The copy button's own aria-label already carries the full address for
+         * the AT "copy" action; TruncatedReveal adds a standalone readable span
+         * so ATs can encounter the full value without activating the button.
+         */}
+        <TruncatedReveal fullValue={address} mono>
+          <code
+            className="text-mono-sm truncate"
+            style={{
+              background: "var(--surface-raised)",
+              padding: "2px 8px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--color-border-default)",
+              color: "var(--color-text-primary)",
+              transition: "border-color var(--transition-fast)",
+            }}
+          >
+            {truncated}
+          </code>
+        </TruncatedReveal>
         <div
           className="flex items-center justify-center transition-colors"
           style={{

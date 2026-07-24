@@ -341,3 +341,118 @@ textarea:disabled:focus-visible {
   outline: var(--focus-outline);
   outline-offset: var(--focus-outline-offset);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SR-ONLY REVEAL PATTERN
+   ─────────────────────────────────────────────────────────────────────────
+   A progressive-enhancement pattern for truncated content.
+
+   AT path  : .truncateReveal__srValue  — always in the accessibility tree,
+              always readable by screen readers, never painted.
+   Visual   : .truncateReveal__chip     — visible only on hover/focus of the
+              parent wrapper; aria-hidden="true", purely decorative.
+
+   States
+   ──────
+   (1) truncated-default   – chip opacity 0, translateX(-4px)
+   (2) hover-revealed      – parent:hover .chip → opacity 1, translateX(0)
+   (3) focus-revealed      – parent:focus-within .chip → same as hover
+   (4) sr-only-always-present – .truncateReveal__srValue painted as 1×1px clip
+
+   Usage
+   ──────
+   <span class="truncateReveal">
+     <span class="truncatedContent">…</span>
+     <span class="truncateReveal__srValue srOnly">full value</span>
+     <span class="truncateReveal__chip" aria-hidden="true">full value</span>
+   </span>
+
+   See: docs/SR_ONLY_REVEAL_PATTERN_SPEC.md for full redlines.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens for the reveal chip (override per theme in design-tokens.css) ── */
+:root {
+  --reveal-chip-bg: var(--surface-raised);
+  --reveal-chip-border: var(--color-border-default);
+  --reveal-chip-color: var(--color-text-primary);
+  --reveal-chip-radius: var(--radius-sm);
+  --reveal-chip-transition: var(--transition-fast);
+  /* Slide distance (small, respects reduced-motion override below) */
+  --reveal-chip-translate: -4px;
+}
+
+/* ── Wrapper ── */
+.truncateReveal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* Do not overflow clip so the chip can emerge from the right edge */
+  overflow: visible;
+}
+
+/* ── Always-present sr-only node ── */
+/*
+ * .truncateReveal__srValue must carry the .srOnly class in markup so that
+ * global sr-only rules (position:absolute,1×1,clip) apply.  The selector
+ * here is a no-op override hook kept for specificity safety.
+ */
+.truncateReveal__srValue {
+  /* Inherits all rules from .srOnly; no visual override needed. */
+}
+
+/* ── Reveal chip (visual-only, aria-hidden) ── */
+.truncateReveal__chip {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  /* Chip appearance */
+  background: var(--reveal-chip-bg);
+  border: 1px solid var(--reveal-chip-border);
+  color: var(--reveal-chip-color);
+  border-radius: var(--reveal-chip-radius);
+  padding: 1px 6px;
+  font: var(--font-body-sm, 400 12px/16px inherit);
+  font-family: var(--font-family-mono, monospace);
+
+  /* Hidden by default: invisible + shifted left */
+  opacity: 0;
+  transform: translateX(var(--reveal-chip-translate));
+  pointer-events: none;
+
+  /* Animate in */
+  transition:
+    opacity var(--reveal-chip-transition),
+    transform var(--reveal-chip-transition);
+
+  /* Spacing from truncated chip */
+  margin-inline-start: 4px;
+}
+
+/* ── Reveal on hover ── */
+.truncateReveal:hover .truncateReveal__chip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── Reveal on keyboard focus within wrapper ── */
+.truncateReveal:focus-within .truncateReveal__chip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── Forced-colors (Windows High Contrast): keep chip border visible ── */
+@media (forced-colors: active) {
+  .truncateReveal__chip {
+    border: 1px solid ButtonText;
+    forced-color-adjust: auto;
+  }
+}
+
+/* ── Respect prefers-reduced-motion: skip slide, keep fade ── */
+@media (prefers-reduced-motion: reduce) {
+  .truncateReveal__chip {
+    transform: translateX(0); /* no slide */
+    transition: opacity var(--reveal-chip-transition);
+  }
+}

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './footer.css';
 
 /**
@@ -27,34 +28,15 @@ const columnLinks: FooterColumn[] = [
   {
     heading: 'Product',
     links: [
-      { label: 'Features', href: '/features' },
-      { label: 'Dashboard', href: '/' },
+      { label: 'Home', href: '/' },
+      { label: 'Dashboard', href: '/app' },
       { label: 'Streams', href: '/streams' },
-      { label: 'Analytics', href: '/analytics' },
-    ],
-  },
-  {
-    heading: 'Documentation',
-    links: [
-      { label: 'Getting Started', href: '/docs/getting-started' },
-      { label: 'API Reference', href: '/docs/api-reference' },
-      { label: 'Smart Contracts', href: '/docs/smart-contracts' },
-      { label: 'Integration Guide', href: '/docs/integration-guide' },
-    ],
-  },
-  {
-    heading: 'Legal',
-    links: [
-      { label: 'Privacy Policy', href: '/legal/privacy-policy' },
-      { label: 'Terms of Service', href: '/legal/terms' },
-      { label: 'Security', href: '/legal/security' },
-      { label: 'Audits', href: '/legal/audits' },
+      { label: 'Connect Wallet', href: '/connect-wallet' },
     ],
   },
   {
     heading: 'Contact',
     links: [
-      { label: 'Support', href: '/support' },
       { label: 'Twitter', href: 'https://twitter.com/FluxoraHQ', external: true },
       { label: 'Discord', href: 'https://discord.gg/fluxora', external: true },
       { label: 'GitHub', href: 'https://github.com/Fluxora-Org/Fluxora-Frontend', external: true },
@@ -62,12 +44,7 @@ const columnLinks: FooterColumn[] = [
   },
 ];
 
-const utilityLinks: FooterLink[] = [
-  { label: 'Status', href: '/status' },
-  { label: 'Changelog', href: '/changelog' },
-  { label: 'Design System', href: '/design-system' },
-  { label: 'Error Pages', href: '/error-pages' },
-];
+const utilityLinks: FooterLink[] = [];
 
 export default function Footer() {
   return (
@@ -75,7 +52,7 @@ export default function Footer() {
       <div className="footer__container">
         <div className="footer__primary">
           <div className="footer__brand">
-            <a className="footer__logo-link" href="/" aria-label="Fluxora home">
+            <Link className="footer__logo-link" to="/" aria-label="Fluxora home">
               <span className="footer__logo-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" role="presentation">
                   <path d="M5 7.5c1.5 1 3.2 1.5 5.2 1.5s3.7-.5 5.2-1.5" />
@@ -84,7 +61,7 @@ export default function Footer() {
                 </svg>
               </span>
               <span className="footer__logo-text">Fluxora</span>
-            </a>
+            </Link>
 
             <p className="footer__tagline">
               Real-time treasury streaming on Stellar. Built for the next generation of DAOs and ecosystem funds.
@@ -115,13 +92,20 @@ export default function Footer() {
               <ul className="footer__column-list">
                 {column.links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      className="footer__link"
-                      href={link.href}
-                      {...(link.external && { target: '_blank', rel: 'noopener noreferrer' })}
-                    >
-                      {link.label}
-                    </a>
+                    {link.external ? (
+                      <a
+                        className="footer__link"
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link className="footer__link" to={link.href}>
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -131,15 +115,30 @@ export default function Footer() {
 
         <div className="footer__secondary">
           <p className="footer__copyright">© 2026 Fluxora. Built on Stellar.</p>
-          <nav className="footer__utility-nav" aria-label="Footer utility links">
-            {utilityLinks.map((link) => (
-              <a className="footer__utility-link" href={link.href} key={link.label}>
-                {link.label}
-              </a>
-            ))}
-          </nav>
+          {utilityLinks.length > 0 && (
+            <nav className="footer__utility-nav" aria-label="Footer utility links">
+              {utilityLinks.map((link) => (
+                link.external ? (
+                  <a
+                    className="footer__utility-link"
+                    href={link.href}
+                    key={link.label}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link className="footer__utility-link" to={link.href} key={link.label}>
+                    {link.label}
+                  </Link>
+                )
+              ))}
+            </nav>
+          )}
         </div>
       </div>
     </footer>
   );
 }
+
