@@ -39,6 +39,7 @@ describe("StreamsTable", () => {
     const emptyStateCell = screen.getByText("No recent streams available.");
     expect(emptyStateCell).not.toHaveClass("text-gray-500");
     expect(emptyStateCell).toHaveStyle({ color: "var(--color-text-muted)" });
+  });
   it("toggles sort direction from ascending to descending when clicking the same column header twice", async () => {
     const user = userEvent.setup();
     renderTable(<StreamsTable streams={streams} />);
