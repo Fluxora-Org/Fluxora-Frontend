@@ -6,6 +6,11 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
 import { streamRecords, type StreamRecord } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
+import {
+  writeStreamsSession,
+  readStreamsSession,
+  DEFAULT_STREAMS_FILTERS,
+} from "../lib/streamsSessionRecovery";
 
 /**
  * Mutable ref that the `useTreasury` mock reads. Defaults to the real
@@ -302,6 +307,103 @@ describe("Streams card recipient copy", () => {
     expect(
       await screen.findByText("Failed to copy address. Please copy manually."),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Streams session recovery banner", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("does not show the banner when there is no prior session", async () => {
+    renderStreams();
+    await finishLoading();
+
+    expect(
+      screen.queryByRole("status", { name: /we restored your previous session/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers to restore a prior session and applies it on Restore", async () => {
+    writeStreamsSession(
+      { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
+      Date.now(),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    expect(
+      screen.getByRole("status", { name: /we restored your previous session/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+
+    expect(screen.getByRole("button", { name: "Active" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText(/session restored/i)).toBeInTheDocument();
+  });
+
+  it("clears the stored session on Start fresh", async () => {
+    writeStreamsSession(
+      { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" }, draft: null },
+      Date.now(),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start fresh" }));
+
+    expect(screen.getByText(/starting fresh/i)).toBeInTheDocument();
+    expect(readStreamsSession(Date.now())).toBeNull();
+  });
+
+  it("hides the banner without applying anything when ignored via direct interaction", async () => {
+    writeStreamsSession(
+      { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
+      Date.now(),
+    );
+
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.click(screen.getByRole("button", { name: "Paused" }));
+
+    expect(
+      screen.queryByRole("status", { name: /we restored your previous session/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Paused" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("shows the always-on persistence indicator and autosaves filter changes", async () => {
+    renderStreams();
+    await finishLoading();
+
+    expect(
+      screen.getByRole("img", { name: /saved on this device/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Active" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(readStreamsSession(Date.now())?.filters.statusFilter).toBe("Active");
   });
 });
 

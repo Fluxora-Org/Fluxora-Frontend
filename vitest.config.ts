@@ -48,8 +48,17 @@ export default defineConfig({
         "src/lib/recentStreamMapper.ts",
         "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
+        // Colour-blind simulation module
+        "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
+        "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
+        // Contrast utilities
+        "src/utils/contrastUtils.ts",
       ],
-      exclude: ["src/components/**/*.test.tsx", "src/theme/**/__tests__/**"],
+      exclude: [
+        "src/components/**/*.test.tsx",
+        "src/theme/**/__tests__/**",
+        "src/components/colorBlindSimulation/__tests__/**",
+      ],
       thresholds: {
         lines: 95,
         functions: 95,
