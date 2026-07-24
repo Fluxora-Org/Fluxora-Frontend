@@ -132,6 +132,27 @@ describe("streamsService live mode", () => {
     await expect(getStreamById("STR-404")).resolves.toBeNull();
   });
 
+  it("forwards AbortSignal to fetch and rejects when aborted", async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        if (init?.signal?.aborted) {
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getStreamById("STR-1", controller.signal);
+    controller.abort();
+
+    await expect(promise).rejects.toThrow();
+    expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
+  });
+
   it("validates recipient addresses before issuing a request", async () => {
     await expect(getRecipientStreams("not-an-address")).resolves.toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -288,5 +309,23 @@ describe("streamsService mock mode", () => {
       "Withdrawable",
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("filters seeded streams by recipient and treasury filters", async () => {
+    const seed = streamRecords[0]!;
+    const filteredByRecipient = await getStreams({ recipient: seed.recipientAddress });
+    expect(filteredByRecipient.length).toBeGreaterThan(0);
+    expect(
+      filteredByRecipient.every(
+        (r) => r.recipientAddress === seed.recipientAddress,
+      ),
+    ).toBe(true);
+
+    const filteredByTreasury = await getStreams({ treasury: seed.treasuryAddress });
+    expect(
+      filteredByTreasury.every(
+        (r) => r.treasuryAddress === seed.treasuryAddress,
+      ),
+    ).toBe(true);
   });
 });

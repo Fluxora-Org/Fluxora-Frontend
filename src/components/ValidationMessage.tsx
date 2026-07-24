@@ -4,6 +4,8 @@ export interface ValidationMessageProps {
   id: string;
   message: string;
   type?: 'error' | 'hint' | 'success';
+  /** Prevents live-region output while the owning field is composing. */
+  composing?: boolean;
 }
 
 const ErrorIcon = () => (
@@ -52,9 +54,10 @@ const colorMap: Record<NonNullable<ValidationMessageProps['type']>, string> = {
 export const ValidationMessage: React.FC<ValidationMessageProps> = ({ 
   id, 
   message, 
-  type = 'error' 
+  type = 'error',
+  composing = false,
 }) => {
-  if (!message) return null;
+  if (!message || composing) return null;
 
   const role = roleMap[type];
   const textColor = colorMap[type];
