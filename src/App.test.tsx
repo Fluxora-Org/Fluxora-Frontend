@@ -16,6 +16,12 @@ function createDeferredPage(label: string): DeferredModule {
   return { promise, resolve };
 }
 
+vi.mock("./utils/env", () => ({
+  get IS_DEV() {
+    return (globalThis as any).mockIsDev !== false;
+  },
+}));
+
 let dashboardModule: DeferredModule;
 let streamsModule: DeferredModule;
 let recipientModule: DeferredModule;
@@ -166,3 +172,40 @@ describe("App landing routes", () => {
     });
   });
 });
+
+describe("App empty-state-demo routing based on environment", () => {
+  beforeEach(() => {
+    dashboardModule = createDeferredPage("Dashboard lazy route");
+    streamsModule = createDeferredPage("Streams lazy route");
+    recipientModule = createDeferredPage("Recipient lazy route");
+    treasuryModule = createDeferredPage("Treasury lazy route");
+    emptyStateModule = createDeferredPage("Empty state lazy route");
+    (globalThis as any).mockIsDev = true;
+  });
+
+  it("registers empty-state-demo route and loads it when IS_DEV is true", async () => {
+    (globalThis as any).mockIsDev = true;
+    window.history.pushState({}, "", "/app/empty-state-demo");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("status", { name: "Loading app page" }),
+    ).toBeInTheDocument();
+
+    emptyStateModule.resolve();
+
+    expect(await screen.findByText("Empty state lazy route")).toBeInTheDocument();
+  });
+
+  it("does not register empty-state-demo route and renders Not Found when IS_DEV is false", async () => {
+    (globalThis as any).mockIsDev = false;
+    window.history.pushState({}, "", "/app/empty-state-demo");
+
+    render(<App />);
+
+    // NotFound page mock renders "Not found route" heading
+    expect(await screen.findByRole("heading", { name: "Not found route" })).toBeInTheDocument();
+  });
+});
+

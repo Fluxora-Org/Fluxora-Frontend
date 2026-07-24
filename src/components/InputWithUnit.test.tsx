@@ -58,6 +58,35 @@ describe("InputWithUnit", () => {
       const { container } = render(<InputWithUnit id="rate" unit="USDC" hasError={false} />);
       expect(container.firstChild).not.toHaveClass("input-with-unit--error");
     });
+
+    it("sets aria-invalid=\"true\" on the input when hasError is true", () => {
+      render(<InputWithUnit id="rate" unit="USDC" hasError />);
+      expect(screen.getByRole("textbox")).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("omits aria-invalid on the input when hasError is false", () => {
+      render(<InputWithUnit id="rate" unit="USDC" hasError={false} />);
+      expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-invalid");
+    });
+
+    it("omits aria-invalid on the input when hasError is unset", () => {
+      render(<InputWithUnit id="rate" unit="USDC" />);
+      expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-invalid");
+    });
+
+    it("takes precedence over a caller-supplied aria-invalid attribute", () => {
+      // The component's hasError prop is the source of truth; it overrides any
+      // aria-invalid conflated into ...inputProps.
+      render(
+        <InputWithUnit
+          id="rate"
+          unit="USDC"
+          hasError
+          aria-invalid="false"
+        />,
+      );
+      expect(screen.getByRole("textbox")).toHaveAttribute("aria-invalid", "true");
+    });
   });
 
   describe("disabled state", () => {
