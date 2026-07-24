@@ -24,6 +24,17 @@ vi.mock("../StreamCreatedModal.module.css", () => {
       nextStepsBox: "nextStepsBox",
       nextStepsText: "nextStepsText",
       nextStepsTitle: "nextStepsTitle",
+      shareSection: "shareSection",
+      shareSectionTitle: "shareSectionTitle",
+      shareGroup: "shareGroup",
+      shareButton: "shareButton",
+      shareButtonActive: "shareButtonActive",
+      sharePreviewCard: "sharePreviewCard",
+      sharePreviewHeader: "sharePreviewHeader",
+      sharePreviewLabel: "sharePreviewLabel",
+      sharePreviewBody: "sharePreviewBody",
+      shareConnectState: "shareConnectState",
+      shareStatusBadge: "shareStatusBadge",
       actions: "actions",
       btn: "btn",
       btnSecondary: "btnSecondary",
@@ -94,6 +105,20 @@ describe("StreamCreatedModal", () => {
         vi.advanceTimersByTime(1000);
       });
     }).not.toThrow();
+  });
+
+  it("shows a share-to-Slack and share-to-Teams action group in the success modal", () => {
+    render(<StreamCreatedModal {...defaultProps} />);
+
+    expect(
+      screen.getByRole("button", { name: /share to slack/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /share to teams/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: /share stream/i }),
+    ).toBeInTheDocument();
   });
 
   it("calls onCreateAnother when 'Create another' button is clicked", () => {

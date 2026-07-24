@@ -159,3 +159,37 @@ describe("Recipient page accessibility", () => {
     expect(within(summary).getByText(/22,600 usdc/i)).toBeInTheDocument();
   });
 });
+
+describe("Recipient page empty state", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders RecipientEmptyState component when wallet is disconnected", async () => {
+    mockWalletState.connected = false;
+    render(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Connect wallet" })
+    ).toBeInTheDocument();
+
+    // Reset back for other test blocks
+    mockWalletState.connected = true;
+  });
+});
+

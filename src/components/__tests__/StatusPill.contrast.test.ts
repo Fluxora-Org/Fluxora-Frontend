@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { getContrastRatio } from '../../utils/contrastUtils';
 
 type Variant = {
@@ -39,13 +40,8 @@ const variants: Variant[] = [
   },
 ];
 
-describe.skip('StatusPill contrast ratios', () => {
-  // TODO: getContrastRatio expects hex colors but these test cases pass
-  // rgba() strings with alpha. Either normalize to hex (compositing onto a
-  // baseline surface) or extend getContrastRatio to accept rgba. Re-enable
-  // once addressed. Tracked from PR #786.
-  test.each(variants)('variant $name meets WCAG AA contrast', ({ name, background, color }) => {
-    void name;
+describe('StatusPill contrast ratios', () => {
+  test.each(variants)('variant $name meets WCAG AA contrast', ({ background, color }) => {
     const ratio = getContrastRatio(color, background);
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });

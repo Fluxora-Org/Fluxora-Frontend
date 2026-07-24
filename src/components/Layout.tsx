@@ -154,7 +154,6 @@ export default function Layout() {
           {showFooter && <Footer />}
         </div>
       </div>
-      </div>
 
       {/* BACKDROP */}
       <button
@@ -173,6 +172,7 @@ export default function Layout() {
         onConnectWalletConnect={handleCloseModal}
       />
       <KeyboardShortcutsModal />
+      </div>
     </div>
   );
 }
