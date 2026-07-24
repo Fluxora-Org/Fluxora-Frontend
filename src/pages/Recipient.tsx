@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import EmptyState from "../components/EmptyState";
+import RecipientEmptyState from "../components/RecipientEmptyState";
 import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
@@ -9,6 +9,9 @@ import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreas
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
 import { getStreamStatusNotificationContent } from "../components/ToastNotification";
+import { TransactionReceiptPreview } from "../components/receipt/TransactionReceiptPreview";
+import type { ReceiptData } from "../utils/receiptGenerator";
+import { X, CheckCircle2 } from "lucide-react";
 import "./Streams.css";
 import "./Recipient.css";
 
@@ -80,6 +83,7 @@ export function getWithdrawAmount(balance: number): string | null {
 }
 
 export default function Recipient() {
+  const timeoutRef = useRef<number | null>(null);
   const wallet = useWallet();
   const { addToast } = useToast();
 
@@ -97,6 +101,8 @@ export default function Recipient() {
   });
   const [isPrimingNotifications, setIsPrimingNotifications] = useState(false);
   const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
@@ -236,8 +242,21 @@ export default function Recipient() {
 
     try {
       setTxState("submitting");
-      await withdraw(recipientAddr, streamId, amountStr);
+      const txRes = await withdraw(recipientAddr, streamId, amountStr);
       setTxState("confirmed");
+      const newReceipt: ReceiptData = {
+        streamId: streamId || "1",
+        type: "Withdrawal",
+        sender: "Treasury Smart Contract",
+        recipient: recipientAddr,
+        amount: `${balance.toLocaleString()} USDC`,
+        timestamp: new Date().toISOString(),
+        txHash: typeof txRes === "string" ? txRes : null,
+        status: typeof txRes === "string" ? "confirmed" : "pending",
+        network: wallet.network || "Stellar Testnet",
+      };
+      setReceiptData(newReceipt);
+      setShowReceiptModal(true);
       addToast("Withdrawal completed successfully on-chain!", "success");
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: any) {
@@ -276,7 +295,7 @@ export default function Recipient() {
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
           View your incoming streams and withdraw accrued USDC at any time.
         </p>
-        <EmptyState variant="recipient" walletConnected={walletConnected} />
+        <RecipientEmptyState walletConnected={walletConnected} />
       </main>
     );
   }
@@ -412,6 +431,47 @@ export default function Recipient() {
           <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
         </div>
       </section>
+
+      {/* ── Withdrawal Receipt Dialog Modal ── */}
+      {showReceiptModal && receiptData && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="withdrawal-receipt-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div className="w-full max-w-xl bg-[var(--surface-base)] border border-[var(--border-strong)] rounded-2xl p-6 shadow-2xl space-y-4 text-left max-h-[90vh] overflow-y-auto relative">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={20} className="text-emerald-400" />
+                <h2 id="withdrawal-receipt-title" className="text-base font-bold text-[var(--text-vivid)]">
+                  Withdrawal Confirmed
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(false)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-vivid)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                aria-label="Close withdrawal receipt modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <TransactionReceiptPreview data={receiptData} />
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(false)}
+                className="px-4 py-2 rounded-xl bg-[var(--surface-sunken)] hover:bg-[var(--surface-elevated)] border border-[var(--border-neutral)] text-[var(--text-vivid)] text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

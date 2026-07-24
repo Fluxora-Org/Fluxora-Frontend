@@ -39,13 +39,12 @@
   padding: 8px 16px;
   z-index: 1000;
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: top 0.3s;
 }
 .skip-link:focus {
   top: 0;
 }
-
 
 .app-layout__body {
   display: flex;
@@ -173,6 +172,79 @@
   gap: var(--section-gap);
 }
 
+.app-install-banner {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-elevated) 85%, transparent),
+    color-mix(in srgb, var(--accent) 16%, transparent)
+  );
+  padding: var(--space-4);
+}
+
+.app-install-banner__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.app-install-banner__eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--accent);
+  font: var(--font-label-md, 600 0.75rem/1.2 "Plus Jakarta Sans", sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.app-install-banner__title {
+  margin: 0;
+  color: var(--text);
+  font: var(--font-heading-sm, 700 1rem/1.4 "Plus Jakarta Sans", sans-serif);
+}
+
+.app-install-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.app-install-banner__primary,
+.app-install-banner__secondary,
+.app-install-banner__ghost {
+  min-height: 2.4rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font: var(--font-label-md, 600 0.75rem/1.2 "Plus Jakarta Sans", sans-serif);
+  cursor: pointer;
+}
+
+.app-install-banner__primary {
+  border: none;
+  background: var(--accent);
+  color: #051019;
+}
+
+.app-install-banner__secondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.app-install-banner__ghost {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+.app-install-banner__primary:focus-visible,
+.app-install-banner__secondary:focus-visible,
+.app-install-banner__ghost:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .app-main {
   flex: 1;
   padding: var(--layout-gutter);
@@ -216,6 +288,15 @@
 @media (max-width: 860px) {
   .app-layout__body {
     padding: 0;
+  }
+
+  .app-install-banner__content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-install-banner__actions {
+    justify-content: flex-start;
   }
 
   .app-sidebar {
