@@ -97,4 +97,49 @@ describe("VirtualList", () => {
       height: "800px",
     });
   });
+
+  it("retains focus on the nearest visible row when the focused row is scrolled out of view", () => {
+    const itemsWithButtons = Array.from({ length: 30 }, (_, index) => ({
+      id: `item-${index}`,
+      name: `Stream ${index}`,
+    }));
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        className="streams-list"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={itemsWithButtons}
+        overscan={1}
+        renderItem={(item, index) => (
+          <article>
+            <span>{item.name}</span>
+            <button data-testid={`button-${index}`}>Action {index}</button>
+          </article>
+        )}
+        testId="virtual-streams"
+        threshold={5}
+      />,
+    );
+
+    const button0 = screen.getByTestId("button-0");
+    button0.focus();
+    expect(document.activeElement).toBe(button0);
+
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      writable: true,
+      value: 900,
+    });
+
+    act(() => {
+      fireEvent.scroll(window);
+    });
+
+    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
+
+    const button8 = screen.getByTestId("button-8");
+    expect(document.activeElement).toBe(button8);
+  });
 });

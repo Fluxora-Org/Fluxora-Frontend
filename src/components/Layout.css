@@ -29,6 +29,24 @@
   background: var(--bg);
 }
 
+/* Skip link – visually hidden until focused */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #fff;
+  color: #000;
+  padding: 8px 16px;
+  z-index: 1000;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: top 0.3s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+
 .app-layout__body {
   display: flex;
   flex: 1;

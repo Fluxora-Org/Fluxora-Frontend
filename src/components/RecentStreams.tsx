@@ -21,6 +21,13 @@ interface RecentStreamsProps {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  /**
+   * Whether a Stellar wallet is connected. Drives the empty/error copy:
+   * connected users see "Create stream", disconnected users see
+   * "Connect your wallet". Defaults to `false` so unconnected consumers
+   * never see misleading "Create stream" call-to-action copy.
+   */
+  walletConnected?: boolean;
 }
 
 export default function RecentStreams({
@@ -28,7 +35,8 @@ export default function RecentStreams({
   viewAllUrl = '/app/streams',
   loading = false,
   error = null,
-  onRetry
+  onRetry,
+  walletConnected = false
 }: RecentStreamsProps) {
   const [announcement, setAnnouncement] = useState('');
 
@@ -70,7 +78,7 @@ export default function RecentStreams({
           variant="error"
           errorMessage={error}
           onRetry={onRetry}
-          walletConnected={true}
+          walletConnected={walletConnected}
         />
       </section>
     );
@@ -87,7 +95,7 @@ export default function RecentStreams({
         </div>
         <EmptyState
           variant="streams"
-          walletConnected={true}
+          walletConnected={walletConnected}
         />
       </section>
     );
@@ -169,8 +177,8 @@ export default function RecentStreams({
 function StatusPill({ status }: { status: StreamStatus }) {
   const config = {
     Active: {
-      bg: '#d1f4e8',
-      color: '#00875a',
+      bg: 'var(--status-success-bg)',
+      color: 'var(--status-success)',
       icon: (
         <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">
           <circle cx="4" cy="4" r="4" />
@@ -179,8 +187,8 @@ function StatusPill({ status }: { status: StreamStatus }) {
       label: 'Active'
     },
     Paused: {
-      bg: '#fff4cc',
-      color: '#cc8800',
+      bg: 'var(--status-warning-bg)',
+      color: 'var(--status-warning)',
       icon: (
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <rect x="2" y="1" width="2" height="8" />
@@ -190,8 +198,8 @@ function StatusPill({ status }: { status: StreamStatus }) {
       label: 'Paused'
     },
     Completed: {
-      bg: '#d4e7ff',
-      color: '#0065cc',
+      bg: 'var(--status-info-bg)',
+      color: 'var(--status-info)',
       icon: (
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M2 6l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -235,7 +243,7 @@ const title: React.CSSProperties = {
 };
 
 const viewAllLink: React.CSSProperties = {
-  color: '#00d4aa',
+  color: 'var(--color-accent-secondary)',
   fontSize: '0.9375rem',
   textDecoration: 'none',
   display: 'flex',
@@ -329,7 +337,7 @@ const pillIcon: React.CSSProperties = {
 };
 
 const viewLink: React.CSSProperties = {
-  color: '#00d4aa',
+  color: 'var(--color-accent-secondary)',
   textDecoration: 'none',
   display: 'inline-flex',
   alignItems: 'center',

@@ -1,22 +1,47 @@
 /**
- * contrastUtils.ts
- * ─────────────────
- * WCAG 2.1 contrast ratio utilities.
+ * contrastUtils.ts — Live Contrast Checking Utilities (WCAG 2.1 AA)
+ * ─────────────────────────────────────────────────────────────────
+ * Provides functions for calculating relative luminance and WCAG contrast ratios
+ * between color pairs (hex format). Used across Fluxora components (such as
+ * CreateStreamModal label color swatches) to perform real-time accessibility evaluation.
  *
- * Implements the luminance formula from the Web Content Accessibility
- * Guidelines (WCAG) 2.1, Success Criterion 1.4.3 (Contrast — Minimum).
+ * WCAG 2.1 AA Standards:
+ *  - Normal text / dynamic label contrast: >= 4.5:1
+ *  - Large text (18pt / 14pt bold) & UI graphical components: >= 3.0:1
  *
- * Reference: https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+ * Theme Background Tokens (`--color-bg-primary`):
+ *  - Light theme: `#ffffff`
+ *  - Dark theme: `#0a0e17`
  *
- * ## Usage
- *
+ * Usage Example:
  * ```ts
- * import { contrastRatio, wcagLevel, hexToRgb } from "../utils/contrastUtils";
+ * import { contrastRatio, getContrastRatio, evaluateContrast, THEME_BACKGROUNDS } from './utils/contrastUtils';
  *
- * const ratio = contrastRatio("#1ec98e", "#121a2a"); // ≈ 5.2
- * const level = wcagLevel(ratio);                    // "AA"
+ * const fgColor = '#00a884'; // Stream label color swatch
+ * const bgLight = THEME_BACKGROUNDS.light; // '#ffffff'
+ * const ratio = getContrastRatio(fgColor, bgLight); // e.g. 2.6
+ *
+ * const evalResult = evaluateContrast(fgColor, bgLight);
+ * // { ratio: 2.6, passesAA: false, formattedRatio: '2.6:1' }
  * ```
+ *
+ * Also includes colour-blindness simulation utilities (see `simulateColorBlindness`
+ * and `simulatedContrastRatio`) used by the colour-blind simulation toggle.
  */
+
+/** Minimum WCAG 2.1 AA contrast ratio for normal text and label UI elements */
+export const WCAG_AA_NORMAL_TEXT_RATIO = 4.5;
+
+/** Minimum WCAG 2.1 AA contrast ratio for large text and graphic components */
+export const WCAG_AA_LARGE_TEXT_RATIO = 3.0;
+
+/** Default theme background colors representing `--color-bg-primary` */
+export const THEME_BACKGROUNDS = {
+  light: '#ffffff',
+  dark: '#0a0e17',
+} as const;
+
+export type ThemeMode = keyof typeof THEME_BACKGROUNDS;
 
 /** Parsed RGB components in the 0–255 range. */
 export interface Rgb {
@@ -26,75 +51,87 @@ export interface Rgb {
 }
 
 /**
- * Converts a 6-digit or 3-digit hex colour string to {@link Rgb}.
- *
- * @param hex - CSS hex colour, e.g. `"#1ec98e"` or `"#fff"`.
- * @returns The parsed RGB components, or `null` when the string is invalid.
+ * Calculates the WCAG 2.1 relative luminance of an RGB color (0-255).
+ * Formula: 0.2126 * R + 0.7152 * G + 0.0722 * B
  */
-export function hexToRgb(hex: string): Rgb | null {
-  // Normalise shorthand (#abc → #aabbcc)
-  const normalised = hex
-    .trim()
-    .replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i, "#$1$1$2$2$3$3");
+export function luminance(r: number, g: number, b: number): number {
+  const a = [r, g, b].map(v => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+}
 
-  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalised);
-  if (!match) return null;
+/**
+ * Calculates the WCAG 2.1 contrast ratio between two hex colors.
+ * Returns a number between 1 and 21 (e.g. 4.56).
+ */
+export function contrastRatio(hex1: string, hex2: string): number {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  const lum1 = luminance(rgb1.r, rgb1.g, rgb1.b);
+  const lum2 = luminance(rgb2.r, rgb2.g, rgb2.b);
+  const brightest = Math.max(lum1, lum2);
+  const darkest = Math.min(lum1, lum2);
+  const ratio = (brightest + 0.05) / (darkest + 0.05);
+  return Math.round(ratio * 10) / 10;
+}
 
+/** Alias for `contrastRatio()` for API consistency */
+export function getContrastRatio(hex1: string, hex2: string): number {
+  return contrastRatio(hex1, hex2);
+}
+
+export interface ContrastEvaluation {
+  ratio: number;
+  passesAA: boolean;
+  formattedRatio: string;
+}
+
+/**
+ * Evaluates a foreground color against a background color for WCAG 2.1 AA compliance (4.5:1 threshold).
+ */
+export function evaluateContrast(
+  foregroundHex: string,
+  backgroundHex: string = THEME_BACKGROUNDS.light,
+  threshold: number = WCAG_AA_NORMAL_TEXT_RATIO
+): ContrastEvaluation {
+  const ratio = getContrastRatio(foregroundHex, backgroundHex);
+  const passesAA = ratio >= threshold;
   return {
-    r: parseInt(match[1], 16),
-    g: parseInt(match[2], 16),
-    b: parseInt(match[3], 16),
+    ratio,
+    passesAA,
+    formattedRatio: `${ratio.toFixed(1)}:1`,
   };
 }
 
-/**
- * Computes the WCAG relative luminance of a single linear-light channel.
- *
- * @param channel8 - A channel value in the 0–255 sRGB range.
- * @returns The linearised luminance contribution, 0–1.
- */
-function linearChannel(channel8: number): number {
-  const sRGB = channel8 / 255;
-  return sRGB <= 0.03928
-    ? sRGB / 12.92
-    : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+/** Parses hex string (#FFF or #FFFFFF) to RGB object */
+export function hexToRgb(hex: string): Rgb {
+  let cleaned = hex.replace('#', '').trim();
+  if (cleaned.length === 3) {
+    cleaned = cleaned.split('').map(c => c + c).join('');
+  }
+  if (cleaned.length !== 6 || !/^[0-9A-Fa-f]{6}$/.test(cleaned)) {
+    // Default fallback to black if invalid hex
+    return { r: 0, g: 0, b: 0 };
+  }
+  const num = parseInt(cleaned, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
 }
 
 /**
- * Computes the WCAG relative luminance of an RGB colour.
+ * Converts an {@link Rgb} back to a CSS hex string.
  *
  * @param rgb - Colour channels in the 0–255 range.
- * @returns Relative luminance in the range [0, 1].
+ * @returns A lowercase 7-character hex string, e.g. `"#1ec98e"`.
  */
-export function relativeLuminance(rgb: Rgb): number {
+export function rgbToHex(rgb: Rgb): string {
   return (
-    0.2126 * linearChannel(rgb.r) +
-    0.7152 * linearChannel(rgb.g) +
-    0.0722 * linearChannel(rgb.b)
+    "#" +
+    [rgb.r, rgb.g, rgb.b]
+      .map((c) => c.toString(16).padStart(2, "0"))
+      .join("")
   );
-}
-
-/**
- * Computes the WCAG contrast ratio between two colours.
- *
- * The ratio is always ≥ 1, regardless of argument order.
- *
- * @param hexA - First CSS hex colour string.
- * @param hexB - Second CSS hex colour string.
- * @returns Contrast ratio in the range [1, 21], or `null` when either colour
- *   string cannot be parsed.
- */
-export function contrastRatio(hexA: string, hexB: string): number | null {
-  const rgbA = hexToRgb(hexA);
-  const rgbB = hexToRgb(hexB);
-  if (!rgbA || !rgbB) return null;
-
-  const lumA = relativeLuminance(rgbA);
-  const lumB = relativeLuminance(rgbB);
-  const lighter = Math.max(lumA, lumB);
-  const darker = Math.min(lumA, lumB);
-
-  return (lighter + 0.05) / (darker + 0.05);
 }
 
 /** WCAG conformance level for a given contrast ratio. */
@@ -141,21 +178,6 @@ export function applyColorMatrix(rgb: Rgb, matrix: readonly number[]): Rgb {
 }
 
 /**
- * Converts an {@link Rgb} back to a CSS hex string.
- *
- * @param rgb - Colour channels in the 0–255 range.
- * @returns A lowercase 7-character hex string, e.g. `"#1ec98e"`.
- */
-export function rgbToHex(rgb: Rgb): string {
-  return (
-    "#" +
-    [rgb.r, rgb.g, rgb.b]
-      .map((c) => c.toString(16).padStart(2, "0"))
-      .join("")
-  );
-}
-
-/**
  * Pre-defined colour-blindness simulation matrices (row-major 3×3, RGB space).
  *
  * Sources:
@@ -190,12 +212,10 @@ export type ColorBlindType = keyof typeof COLOR_BLIND_MATRICES;
  *
  * @param hex - Source CSS hex colour string.
  * @param type - The colour-blindness simulation type.
- * @returns Simulated hex colour string, or the original value if the input
- *   cannot be parsed.
+ * @returns Simulated hex colour string.
  */
 export function simulateColorBlindness(hex: string, type: ColorBlindType): string {
   const rgb = hexToRgb(hex);
-  if (!rgb) return hex;
   const matrix = COLOR_BLIND_MATRICES[type];
   return rgbToHex(applyColorMatrix(rgb, matrix));
 }
@@ -207,13 +227,13 @@ export function simulateColorBlindness(hex: string, type: ColorBlindType): strin
  * @param hexFg - Foreground hex colour.
  * @param hexBg - Background hex colour.
  * @param type - The colour-blindness type to simulate.
- * @returns Simulated contrast ratio, or `null` when a colour is unparseable.
+ * @returns Simulated contrast ratio.
  */
 export function simulatedContrastRatio(
   hexFg: string,
   hexBg: string,
   type: ColorBlindType,
-): number | null {
+): number {
   return contrastRatio(
     simulateColorBlindness(hexFg, type),
     simulateColorBlindness(hexBg, type),

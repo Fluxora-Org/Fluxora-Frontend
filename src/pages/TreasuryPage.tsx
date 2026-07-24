@@ -1,12 +1,15 @@
-import DemoBanner from "../components/treasuryOverviewPage/DemoBanner";
+import { useState } from "react";
+import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
 import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
+import ReportBuilderPanel from "../components/treasuryOverviewPage/ReportBuilderPanel";
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import {
   ColorBlindSimulationProvider,
   ColorBlindToggle,
 } from "../components/colorBlindSimulation";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -32,12 +35,20 @@ import {
 export default function TreasuryPage() {
   const { metrics, streams, isDemoMode, loading, error, refetch } =
     useTreasuryOverviewData();
+  const { connected: walletConnected } = useWallet();
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+
+  const demoState: DemoState = loading
+    ? "loading"
+    : (metrics && metrics.length > 0) || (streams && streams.length > 0)
+    ? "loaded"
+    : "empty";
 
   if (loading) {
     return (
       <ColorBlindSimulationProvider>
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-          {isDemoMode && <DemoBanner />}
+          {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           <ColorBlindToggle />
           <Header />
@@ -53,7 +64,7 @@ export default function TreasuryPage() {
     return (
       <ColorBlindSimulationProvider>
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-          {isDemoMode && <DemoBanner />}
+          {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           <ColorBlindToggle />
           <Header />
@@ -68,7 +79,7 @@ export default function TreasuryPage() {
   return (
     <ColorBlindSimulationProvider>
       <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-        {isDemoMode && <DemoBanner />}
+        {isDemoMode && <DemoBanner state={demoState} />}
 
         {/* Design-QA: colour-blind simulation toggle — placed above page content
             so the entire Metrics and RecentStreams area is filtered.
@@ -76,13 +87,20 @@ export default function TreasuryPage() {
             intended for design review and QA sessions only. */}
         <ColorBlindToggle />
 
-        <Header />
+        <Header onExportClick={() => setShowReportBuilder(true)} />
+        {showReportBuilder && (
+          <ReportBuilderPanel
+            streams={streams || []}
+            onClose={() => setShowReportBuilder(false)}
+          />
+        )}
         <Metrics metrics={metrics || []} loading={loading} error={error} />
         <RecentStreams
           streams={streams || []}
           loading={loading}
           error={error}
           onRetry={refetch}
+          walletConnected={walletConnected}
         />
       </div>
     </ColorBlindSimulationProvider>

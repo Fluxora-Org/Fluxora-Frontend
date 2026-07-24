@@ -29,17 +29,17 @@
   --surface-raised: #e8ecf1;
   --surface-highest: #dfe5ed;
 
-/* Icon sizes */
---icon-size-xs: 16px;   /* inline */
---icon-size-sm: 20px;   /* button/label */
---icon-size-md: 24px;   /* standalone */
---icon-size-lg: 32px;   /* hero/empty-state */
+/* Icon sizes (relative to root font-size for zoom scaling) */
+--icon-size-xs: 1rem;       /* inline, 16px equivalent */
+--icon-size-sm: 1.25rem;    /* button/label, 20px equivalent */
+--icon-size-md: 1.5rem;     /* standalone, 24px equivalent */
+--icon-size-lg: 2rem;       /* hero/empty-state, 32px equivalent */
 
-/* Utility classes for icon sizing */
-.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
-.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
-.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); }
-.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+/* Utility classes for icon sizing and high-DPI crisp rendering */
+.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); stroke-width: 1.5; }
+.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); stroke-width: 2.4; }
+.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); stroke-width: 2.0; }
+.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); stroke-width: 1.5; }
 
   /* ===== TEXT ===== */
   --text-vivid: #1a1f36;
@@ -79,8 +79,8 @@
   /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
-  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
-  --focus-ring-halo: rgba(14, 165, 233, 0.1);
+  --focus-ring-color: #0284c7; /* Sky Blue - >= 3:1 contrast vs all light surfaces (including surface-highest at #dfe5ed) */
+  --focus-ring-halo: rgba(2, 132, 199, 0.1);
   
   /* Dual-layer focus ring (outline + box-shadow for visibility) */
   --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
@@ -177,8 +177,8 @@
   --color-cta-secondary-text: var(--color-text-secondary);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.1);
-  --color-warning-bg: rgba(255, 167, 38, 0.1);
+  --color-success-bg: rgba(30, 201, 142, 0.3);
+  --color-warning-bg: rgba(255, 167, 38, 0.3);
   --color-danger-bg: rgba(255, 107, 107, 0.1);
   --color-info-bg: rgba(0, 184, 212, 0.1);
 
@@ -204,7 +204,7 @@
   --icon-info-default: var(--text-muted);
   --icon-info-hover: var(--accent);
   --icon-info-active: var(--accent-dim);
-  --icon-info-size: 16px;
+  --icon-info-size: var(--icon-size-xs);
 
   /* Navbar */
   --navbar-bg: #ffffff;
@@ -324,10 +324,10 @@
   --muted: var(--text-muted);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.15);
-  --color-warning-bg: rgba(255, 167, 38, 0.15);
+  --color-success-bg: rgba(30, 201, 142, 0.30);
+  --color-warning-bg: rgba(255, 167, 38, 0.30);
   --color-danger-bg: rgba(255, 107, 107, 0.15);
-  --color-info-bg: rgba(0, 184, 212, 0.15);
+  --color-info-bg: rgba(0, 184, 212, 0.30);
 
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
@@ -749,3 +749,69 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   12. COMPARE MODE
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Layout */
+  --compare-pane-min-width: 360px;
+  --compare-pane-gap: 0px; /* gap handled by divider */
+  --compare-header-height: 48px;
+  --compare-field-row-height: 56px;
+
+  /* Divider — must be ≥ 3:1 against white (#fff) surface.
+     #a0aab4 yields ~3.1:1. */
+  --compare-divider-color: #a0aab4;
+  --compare-divider-width: 1px;
+
+  /* Field-diff highlight (info-tinted background) */
+  --compare-field-highlight: rgba(14, 165, 233, 0.08);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.25);
+}
+
+[data-theme="dark"] {
+  --compare-divider-color: #4a5565;
+  --compare-field-highlight: rgba(14, 165, 233, 0.13);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.3);
+}
+
+/* -----------------------------------------------------------
+   13. STREAM STATUS TRANSITIONS
+   ----------------------------------------------------------- */
+
+:root {
+  --status-transition-duration: var(--motion-duration-stream-disclosure, 200ms);
+  --status-transition-ease: var(--transition-base, 200ms ease-in-out);
+}
+
+@keyframes pill-cross-fade {
+  0% { opacity: 0.5; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes highlight-ring-pulse {
+  0% { box-shadow: 0 0 0 0 var(--focus-ring-color); }
+  50% { box-shadow: 0 0 0 4px var(--focus-ring-color); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.status-pill-transition {
+  transition: background-color var(--status-transition-duration) ease-in-out,
+              color var(--status-transition-duration) ease-in-out;
+}
+
+.status-pill-animate .status-pill-label-enter {
+  animation: pill-cross-fade var(--status-transition-duration) ease-in-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill-transition {
+    transition: none !important;
+  }
+  .status-pill-animate .status-pill-label-enter {
+    animation: highlight-ring-pulse 500ms ease-out forwards;
+  }
+}
+

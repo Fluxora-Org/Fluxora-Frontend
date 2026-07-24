@@ -30,6 +30,7 @@
  * - info:     #00b8d4 on rgba(0,184,212,0.10)
  */
 
+import React, { useState, useEffect, useRef } from "react";
 import type { StreamStatus } from "./Stream";
 import {
   Play,
@@ -106,32 +107,52 @@ const statusStyles: Record<
 
 export default function StatusPill({ status, iconSize = "xs" }: Props) {
   const { background, color, Icon, label, tokenName } = statusStyles[status];
+  const [animateClass, setAnimateClass] = useState("");
+  const prevStatusRef = useRef(status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      prevStatusRef.current = status;
+      setAnimateClass(""); // Reset to re-trigger animation
+      // small delay to let DOM recognize the reset
+      const req = requestAnimationFrame(() => {
+        setAnimateClass("status-pill-animate");
+      });
+      return () => cancelAnimationFrame(req);
+    }
+  }, [status]);
 
   return (
-    <span
-      role="status"
-      aria-label={`${label} status`}
-      tabIndex={0}
-      style={{ backgroundColor: background, color }}
-      className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize}`}
-      /*
-       * data-status-token: used by design-review tooling and
-       * contrastUtils.ts contrast checks to resolve the active token.
-       * Also anchors redline annotations in COLORBLIND_SIMULATION_SPEC.md.
-       */
-      data-status-token={tokenName}
-      /*
-       * data-status: machine-readable status value for QA selectors
-       * and colour-blind simulation spec cross-references.
-       */
-      data-status={status}
-    >
-      {/*
-       * Icon provides shape-based differentiation that is independent of
-       * colour and therefore legible under all colour-blind simulations.
-       */}
-      <Icon size={14} aria-hidden="true" focusable={false} />
-      <span style={{ marginLeft: 8 }}>{label.toUpperCase()}</span>
-    </span>
+    <>
+      <span
+        role="status"
+        aria-label={`${label} status`}
+        tabIndex={0}
+        style={{ backgroundColor: background, color }}
+        className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize} status-pill-transition ${animateClass}`}
+        /*
+         * data-status-token: used by design-review tooling and
+         * contrastUtils.ts contrast checks to resolve the active token.
+         * Also anchors redline annotations in COLORBLIND_SIMULATION_SPEC.md.
+         */
+        data-status-token={tokenName}
+        /*
+         * data-status: machine-readable status value for QA selectors
+         * and colour-blind simulation spec cross-references.
+         */
+        data-status={status}
+      >
+        {/*
+         * Icon provides shape-based differentiation that is independent of
+         * colour and therefore legible under all colour-blind simulations.
+         */}
+        <Icon size={14} aria-hidden="true" focusable={false} />
+        <span key={label} className="status-pill-label-enter" style={{ marginLeft: 8 }}>{label.toUpperCase()}</span>
+      </span>
+      {/* Visually hidden aria-live region to announce status change without disrupting the animation */}
+      <span aria-live="polite" className="sr-only">
+        {`Stream status changed to ${label}`}
+      </span>
+    </>
   );
 }

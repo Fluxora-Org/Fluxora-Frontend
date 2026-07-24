@@ -32,15 +32,17 @@ export default function Layout() {
   };
 
   return (
-    <div
-      className={[
-        "app-layout",
-        isSidebarCollapsed && "is-collapsed",
-        isMobileSidebarOpen && "is-mobile-open",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <div
+        className={[
+          "app-layout",
+          isSidebarCollapsed && "is-collapsed",
+          isMobileSidebarOpen && "is-mobile-open",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
       <div className="app-layout__body">
         {/* SIDEBAR */}
         <aside
@@ -128,7 +130,7 @@ export default function Layout() {
             <div className="app-mobile-title">Fluxora</div>
           </header>
 
-          <main className="app-main">
+          <main id="main-content" className="app-main">
             <Outlet />
           </main>
 
@@ -153,6 +155,7 @@ export default function Layout() {
         onConnectWalletConnect={handleCloseModal}
       />
       <KeyboardShortcutsModal />
+      </div>
     </div>
   );
 }

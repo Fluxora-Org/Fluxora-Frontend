@@ -94,4 +94,4 @@ const walletOptions = [
 
 ## Integration Example
 
-See `ConnectWalletModal.example.tsx` for a complete working example.
+Use the `ConnectWalletModal` component as demonstrated in the Usage section above.
