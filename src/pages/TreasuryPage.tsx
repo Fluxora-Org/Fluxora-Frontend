@@ -1,7 +1,9 @@
+import { useState } from "react";
 import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
 import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
+import ReportBuilderPanel from "../components/treasuryOverviewPage/ReportBuilderPanel";
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 
@@ -22,6 +24,7 @@ export default function TreasuryPage() {
   const { metrics, streams, isDemoMode, loading, error, refetch } =
     useTreasuryOverviewData();
   const { connected: walletConnected } = useWallet();
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
 
   const demoState: DemoState = loading
     ? "loading"
@@ -56,7 +59,13 @@ export default function TreasuryPage() {
   return (
     <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
       {isDemoMode && <DemoBanner state={demoState} />}
-      <Header />
+      <Header onExportClick={() => setShowReportBuilder(true)} />
+      {showReportBuilder && (
+        <ReportBuilderPanel
+          streams={streams || []}
+          onClose={() => setShowReportBuilder(false)}
+        />
+      )}
       <Metrics metrics={metrics || []} loading={loading} error={error} />
       <RecentStreams
         streams={streams || []}

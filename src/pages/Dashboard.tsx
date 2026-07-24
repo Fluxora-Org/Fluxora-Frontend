@@ -24,6 +24,7 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
+  const [totalStreaming, setTotalStreaming] = useState<number | null>(null);
   const { announcement, announce } = useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setWithdrawable(walletConnected ? 22600 : null);
+    setTotalStreaming(walletConnected ? 48500 : null);
   }, [walletConnected]);
 
   useEffect(() => {
