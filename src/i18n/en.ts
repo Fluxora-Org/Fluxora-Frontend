@@ -12,6 +12,11 @@ export const en = {
   "createStream.steps.rateSchedule": "Rate & schedule",
   "createStream.steps.reviewCreate": "Review & create",
 
+  // CreateStreamModal Stepper header
+  "createStream.stepper.navLabel": "Create stream steps",
+  "createStream.stepper.jumpToStepAria": "Go back to step {step}: {label}",
+  "createStream.stepper.compactStatus": "Step {current} of {total}: {label}",
+
   // CreateStreamModal Step 1
   "createStream.step1.header": "Recipient & amount",
   "createStream.step1.subheader": "Set who receives the stream and how much USDC to lock.",

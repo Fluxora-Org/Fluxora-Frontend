@@ -20,6 +20,13 @@ import { useI18n } from '../i18n';
 
 const USDC_DECIMAL_PLACES = 7;
 
+const STEPPER_TOTAL_STEPS = 3;
+const STEPPER_LABEL_KEYS = [
+  "createStream.steps.recipientAmount",
+  "createStream.steps.rateSchedule",
+  "createStream.steps.reviewCreate",
+] as const;
+
 export function sanitizeDepositAmountInput(value: string): string {
   const digitsAndDots = value.replace(/[^0-9.]/g, "");
   const [rawInteger = "", ...fractionParts] = digitsAndDots.split(".");
@@ -399,6 +406,17 @@ export default function CreateStreamModal({
     }
   };
 
+  /** Jumps back to a completed step via the stepper header. Mirrors the
+   * review-card "Edit" buttons: only ever moves backward, and clears any
+   * in-flight transaction state the same way leaving step 3 already does. */
+  const handleStepClick = (step: number) => {
+    if (isBusyCreating || step >= currentStep) return;
+    if (currentStep === 3) {
+      resetTransactionState();
+    }
+    setCurrentStep(step);
+  };
+
   const handleCancel = () => {
     if (isBusyCreating) return;
     onClose();
@@ -454,53 +472,97 @@ export default function CreateStreamModal({
           </button>
         </div>
 
-        {/* Progress: Step 1 Recipient & amount, Step 2 Rate & schedule, Step 3 Review & create */}
-        <div className="progress-tracker">
-          <div className="progress-line">
-            <div
-              className="progress-line-fill"
-              style={{
-                width:
-                  currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
-              }}
-            />
-          </div>
-          <div className={`step-item ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}`}>
-            <div className="step-circle">{currentStep > 1 ? (
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : '1'}</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.recipientAmount").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-          <div className={`step-item ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}`}>
-            <div className="step-circle">{currentStep > 2 ? (
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : '2'}</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.rateSchedule").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-          <div className={`step-item ${currentStep === 3 ? 'active' : ''}`}>
-            <div className="step-circle">3</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.reviewCreate").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-        </div>
+        {(() => {
+          const stepLabels = STEPPER_LABEL_KEYS.map((key) => t(key));
+          const currentLabel = stepLabels[currentStep - 1];
+          const trackFillPercent =
+            ((currentStep - 1) / (STEPPER_TOTAL_STEPS - 1)) * 100;
+          const renderStepLabel = (label: string) => {
+            const [p1, p2] = label.split(" & ");
+            return p2 ? <>{p1} &<br />{p2}</> : label;
+          };
+
+          return (
+            <nav
+              className="stepper"
+              aria-label={t("createStream.stepper.navLabel")}
+            >
+              <div className="stepper-track-wrapper">
+                <div className="stepper-track" aria-hidden="true">
+                  <div
+                    className="stepper-track-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+                <ol className="stepper-list">
+                {stepLabels.map((label, index) => {
+                  const step = index + 1;
+                  const isCompleted = step < currentStep;
+                  const isCurrent = step === currentStep;
+
+                  if (isCompleted) {
+                    return (
+                      <li
+                        key={step}
+                        className="stepper-item stepper-item--completed"
+                      >
+                        <button
+                          type="button"
+                          className="stepper-step stepper-step--completed"
+                          onClick={() => handleStepClick(step)}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.stepper.jumpToStepAria", {
+                            step,
+                            label,
+                          })}
+                        >
+                          <span className="stepper-circle" aria-hidden="true">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                          <span className="stepper-label">{renderStepLabel(label)}</span>
+                        </button>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li
+                      key={step}
+                      className={`stepper-item ${isCurrent ? "stepper-item--current" : "stepper-item--upcoming"}`}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      <span className="stepper-step">
+                        <span className="stepper-circle" aria-hidden="true">
+                          {step}
+                        </span>
+                        <span className="stepper-label">{renderStepLabel(label)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+                </ol>
+              </div>
+
+              <div className="stepper-compact">
+                <p className="stepper-compact-text">
+                  {t("createStream.stepper.compactStatus", {
+                    current: currentStep,
+                    total: STEPPER_TOTAL_STEPS,
+                    label: currentLabel,
+                  })}
+                </p>
+                <div className="stepper-compact-track" aria-hidden="true">
+                  <div
+                    className="stepper-compact-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+              </div>
+            </nav>
+          );
+        })()}
 
         <div className="modal-body-scroll">
           {error && (
