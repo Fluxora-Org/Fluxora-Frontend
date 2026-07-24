@@ -174,6 +174,31 @@
   font: var(--font-body-md, 400 0.875rem/1.5 "Plus Jakarta Sans", sans-serif);
 }
 
+/* var(--accent) is the same teal in both themes — legible against this
+   toast's always-dark chrome regardless of the app's light/dark theme. */
+.toast-notification__action {
+  display: inline-flex;
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: var(--font-label-md, 600 0.75rem/1.2 "Plus Jakarta Sans", sans-serif);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.toast-notification__action:hover,
+.toast-notification__action:focus-visible {
+  color: var(--accent-dim);
+}
+
+.toast-notification__action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .toast-notification__close {
   display: inline-flex;
   align-items: center;

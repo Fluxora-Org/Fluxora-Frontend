@@ -6,6 +6,9 @@ interface ToastNotificationProps {
   message: string;
   variant: ToastVariant;
   onClose: () => void;
+  /** Optional inline action (e.g. "View stream"). Rendered only when both are set. */
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 const TOAST_COPY: Record<ToastVariant, { label: string; icon: string }> = {
@@ -48,6 +51,8 @@ export default function ToastNotification({
   message,
   variant,
   onClose,
+  actionLabel,
+  onAction,
 }: ToastNotificationProps) {
   const semantics = VARIANT_SEMANTICS[variant] ?? FALLBACK_SEMANTICS;
 
@@ -67,6 +72,18 @@ export default function ToastNotification({
       <div className="toast-notification__content">
         <p className="toast-notification__eyebrow">{label}</p>
         <p className="toast-notification__message">{message}</p>
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            className="toast-notification__action"
+            onClick={() => {
+              onAction();
+              onClose();
+            }}
+          >
+            {actionLabel}
+          </button>
+        )}
       </div>
       <button
         type="button"

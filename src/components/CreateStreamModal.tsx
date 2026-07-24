@@ -7,6 +7,14 @@ import { useModalAccessibility } from './useModalAccessibility';
 import { useWallet } from './wallet-connect/Walletcontext';
 import { useToast } from './toast/ToastProvider';
 import { useTransactionStatus } from '../hooks/useTransactionStatus';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import {
+  enqueueAction,
+  dequeueAction,
+  getQueuePosition,
+  getQueueLength,
+  subscribeToQueue,
+} from '../lib/offlineActionQueue';
 import { createStream, getTransactionStatus } from '../lib/stellar/tx';
 import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 import {
@@ -17,8 +25,32 @@ import {
   isDateTimeInPast,
 } from '../lib/createStreamDates';
 import { useI18n } from '../i18n';
+import {
+  evaluateContrast,
+  THEME_BACKGROUNDS,
+} from '../utils/contrastUtils';
+
+export const LABEL_COLOR_SWATCHES = [
+  { hex: '#3b82f6', label: 'Blue' },
+  { hex: '#00a884', label: 'Teal' },
+  { hex: '#8b5cf6', label: 'Purple' },
+  { hex: '#ec4899', label: 'Pink' },
+  { hex: '#059669', label: 'Emerald' },
+  { hex: '#dc2626', label: 'Red' },
+  { hex: '#fef08a', label: 'Light Yellow' },
+  { hex: '#94a3b8', label: 'Muted Slate' },
+  { hex: '#ffffff', label: 'White' },
+  { hex: '#0a0e17', label: 'Dark' },
+];
 
 const USDC_DECIMAL_PLACES = 7;
+
+const STEPPER_TOTAL_STEPS = 3;
+const STEPPER_LABEL_KEYS = [
+  "createStream.steps.recipientAmount",
+  "createStream.steps.rateSchedule",
+  "createStream.steps.reviewCreate",
+] as const;
 
 export function sanitizeDepositAmountInput(value: string): string {
   const digitsAndDots = value.replace(/[^0-9.]/g, "");
@@ -106,6 +138,17 @@ function validateDuration(value: string, t: any): string | undefined {
   return undefined;
 }
 
+/** Snapshot of everything `createStream` needs, captured at submit time so a
+ * queued (offline) submission replays with the exact values the user reviewed. */
+interface StreamSubmissionPayload {
+  sender: string;
+  recipient: string;
+  amount: string;
+  start: number;
+  end: number;
+  cliffTime?: number;
+}
+
 interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -135,6 +178,14 @@ export default function CreateStreamModal({
   const [customStartDate, setCustomStartDate] = useState("");
   const [cliffEnabled, setCliffEnabled] = useState(false);
   const [cliffDate, setCliffDate] = useState("");
+
+  // Stream Label Color & Live Contrast Check States
+  const [labelColor, setLabelColor] = useState<string>("");
+  const [customHexInput, setCustomHexInput] = useState<string>("");
+  const [overrideContrast, setOverrideContrast] = useState<boolean>(false);
+  const [targetTheme, setTargetTheme] = useState<'light' | 'dark'>('light');
+  const [focusedSwatchIndex, setFocusedSwatchIndex] = useState<number>(0);
+
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -143,9 +194,67 @@ export default function CreateStreamModal({
   const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const [hasCompletedConfirmation, setHasCompletedConfirmation] =
     useState(false);
+  const [queuedSubmission, setQueuedSubmission] = useState<
+    { id: string; position: number } | null
+  >(null);
+  const [queueLength, setQueueLength] = useState(0);
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
+  const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
   const submitInFlightRef = useRef(false);
+  const pendingSubmissionRef = useRef<StreamSubmissionPayload | null>(null);
+  const flushedFromQueueRef = useRef(false);
+  const isOnline = useOnlineStatus();
+
+  // Dynamic Contrast Evaluation against selected background theme
+  const bgHex = targetTheme === 'dark' ? THEME_BACKGROUNDS.dark : THEME_BACKGROUNDS.light;
+  const contrastEval = labelColor
+    ? evaluateContrast(labelColor, bgHex)
+    : { ratio: 0, passesAA: false, formattedRatio: '' };
+
+  const contrastState: 'no-selection' | 'AA-pass' | 'AA-fail-blocked' | 'AA-fail-overridden' = !labelColor
+    ? 'no-selection'
+    : contrastEval.passesAA
+    ? 'AA-pass'
+    : overrideContrast
+    ? 'AA-fail-overridden'
+    : 'AA-fail-blocked';
+
+  const handleSwatchKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(nextIndex);
+      const swatch = LABEL_COLOR_SWATCHES[nextIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = (index - 1 + LABEL_COLOR_SWATCHES.length) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(prevIndex);
+      const swatch = LABEL_COLOR_SWATCHES[prevIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setFocusedSwatchIndex(0);
+      const swatch = LABEL_COLOR_SWATCHES[0];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const lastIndex = LABEL_COLOR_SWATCHES.length - 1;
+      setFocusedSwatchIndex(lastIndex);
+      const swatch = LABEL_COLOR_SWATCHES[lastIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    }
+  };
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -160,17 +269,27 @@ export default function CreateStreamModal({
     getStatus: getTransactionStatus,
   });
   const isConfirmationPending = transactionStatus.status === "pending";
-  const isBusyCreating = isSubmitting || isConfirmationPending;
+  const isQueued = Boolean(queuedSubmission);
+  // Actively in-flight (network round trip or wallet signature); close/cancel
+  // stay blocked here, same as today. `isQueued` alone does NOT block them —
+  // a queued submission is just captured locally, nothing is in flight yet.
+  const isActivelySubmitting =
+    isSubmitting || isConfirmationPending || isFlushingQueue;
+  const isBusyCreating = isActivelySubmitting || isQueued;
   const submitButtonLabel =
-    currentStep === 3 && isSubmitting
-      ? t("createStream.button.submitting")
-      : currentStep === 3 && isConfirmationPending
-        ? t("createStream.button.confirming")
-        : currentStep === 3 && transactionStatus.status === "failed"
-          ? t("createStream.button.retry")
-          : currentStep === 2
-            ? t("createStream.button.next")
-            : t("createStream.button.create");
+    currentStep === 3 && isQueued
+      ? t("createStream.button.queued")
+      : currentStep === 3 && isFlushingQueue
+        ? t("createStream.button.flushing")
+        : currentStep === 3 && isSubmitting
+          ? t("createStream.button.submitting")
+          : currentStep === 3 && isConfirmationPending
+            ? t("createStream.button.confirming")
+            : currentStep === 3 && transactionStatus.status === "failed"
+              ? t("createStream.button.retry")
+              : currentStep === 2
+                ? t("createStream.button.next")
+                : t("createStream.button.create");
 
   useModalAccessibility({
     isOpen,
@@ -178,6 +297,63 @@ export default function CreateStreamModal({
     modalRef,
     initialFocusRef: recipientInputRef,
   });
+
+  const getStreamErrorMessage = (err: unknown): string => {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return t("createStream.error.generic");
+  };
+
+  const buildSubmissionPayload = (): StreamSubmissionPayload => {
+    const sender = wallet.address!;
+    const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+    const amount = Math.floor(parsedAmount * 10_000_000).toString();
+
+    const start = startTimeOption === "now"
+      ? Math.floor(Date.now() / 1000)
+      : Math.floor(new Date(customStartDate).getTime() / 1000);
+
+    const durationDays = parseFloat(duration) || 0;
+    const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+    const end = start + durationSeconds;
+
+    const cliffTime = cliffEnabled && cliffDate
+      ? Math.floor(new Date(cliffDate).getTime() / 1000)
+      : undefined;
+
+    return { sender, recipient: recipient.trim(), amount, start, end, cliffTime };
+  };
+
+  /** Submits a payload to the network. Identical for the immediate-online
+   * path and a queue flush — the confirmation/success/error handling that
+   * follows (polling, toast, onStreamCreated, onClose) is the same either way. */
+  const submitPayload = async (payload: StreamSubmissionPayload) => {
+    submitInFlightRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const response = await createStream(
+        payload.sender,
+        payload.recipient,
+        payload.amount,
+        payload.start,
+        payload.end,
+        payload.cliffTime,
+      );
+      if (!response.txHash) {
+        throw new Error("Missing transaction hash from Stellar RPC.");
+      }
+      setSubmittedTxHash(response.txHash);
+    } catch (err) {
+      const message = getStreamErrorMessage(err);
+      setStreamError(message);
+      addToast(t("createStream.error.failedWithMessage", { message }), "error");
+      onStreamError?.(err);
+    } finally {
+      submitInFlightRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (
@@ -188,7 +364,15 @@ export default function CreateStreamModal({
     }
 
     setHasCompletedConfirmation(true);
-    addToast(t("createStream.success.message"), "success");
+    if (flushedFromQueueRef.current) {
+      flushedFromQueueRef.current = false;
+      addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
+        label: t("createStream.queue.viewStreamAction"),
+        onClick: () => onStreamCreated?.(),
+      });
+    } else {
+      addToast(t("createStream.success.message"), "success");
+    }
     onStreamCreated?.();
     onClose();
   }, [
@@ -200,10 +384,75 @@ export default function CreateStreamModal({
     t,
   ]);
 
+  // Auto-flush a queued submission as soon as connectivity returns. Runs even
+  // while the modal is closed (isOpen=false only skips rendering — this
+  // component and its effects stay mounted for the lifetime of the parent).
+  useEffect(() => {
+    if (!isOnline || !queuedSubmission) return;
+
+    const submission = queuedSubmission;
+    const payload = pendingSubmissionRef.current;
+    if (!payload) return;
+
+    let cancelled = false;
+
+    const flush = async () => {
+      setIsFlushingQueue(true);
+      try {
+        const response = await createStream(
+          payload.sender,
+          payload.recipient,
+          payload.amount,
+          payload.start,
+          payload.end,
+          payload.cliffTime,
+        );
+        if (cancelled) return;
+        if (!response.txHash) {
+          throw new Error("Missing transaction hash from Stellar RPC.");
+        }
+        dequeueAction(submission.id);
+        pendingSubmissionRef.current = null;
+        flushedFromQueueRef.current = true;
+        setQueuedSubmission(null);
+        setQueueLength(getQueueLength());
+        setSubmittedTxHash(response.txHash);
+      } catch (err) {
+        if (cancelled) return;
+        dequeueAction(submission.id);
+        setQueuedSubmission(null);
+        setQueueLength(getQueueLength());
+        setQueueFlushError(getStreamErrorMessage(err));
+      } finally {
+        if (!cancelled) setIsFlushingQueue(false);
+      }
+    };
+
+    void flush();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on queuedSubmission.id via isOnline+id; the payload comes from a ref, not a dep.
+  }, [isOnline, queuedSubmission?.id]);
+
+  // Keeps the displayed queue position in sync if other queued actions ahead
+  // of this one flush or get removed (multi-submission scenario).
+  useEffect(() => {
+    if (!queuedSubmission) return;
+    return subscribeToQueue(() => {
+      setQueuedSubmission((prev) =>
+        prev ? { ...prev, position: getQueuePosition(prev.id) } : prev,
+      );
+      setQueueLength(getQueueLength());
+    });
+  }, [queuedSubmission?.id]);
+
   const resetTransactionState = () => {
     transactionStatus.reset();
     setSubmittedTxHash(null);
     setHasCompletedConfirmation(false);
+    setQueueFlushError(null);
+    flushedFromQueueRef.current = false;
   };
 
   const validateStep1 = (): boolean => {
@@ -233,6 +482,12 @@ export default function CreateStreamModal({
       setError(t("createStream.validation.depositPositive"));
       return false;
     }
+
+    if (contrastState === 'AA-fail-blocked') {
+      setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
+      return false;
+    }
+
     setError(null);
     return true;
   };
@@ -302,13 +557,6 @@ export default function CreateStreamModal({
     return true;
   };
 
-  const getStreamErrorMessage = (err: unknown): string => {
-    if (err instanceof Error && err.message.trim()) {
-      return err.message;
-    }
-    return t("createStream.error.generic");
-  };
-
   const handleNext = async () => {
     if (isBusyCreating) return;
 
@@ -340,50 +588,44 @@ export default function CreateStreamModal({
       setError(null);
       setStreamError(null);
       resetTransactionState();
-      submitInFlightRef.current = true;
-      setIsSubmitting(true);
 
-      const sender = wallet.address!;
-      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
-      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+      const payload = buildSubmissionPayload();
 
-      const start = startTimeOption === "now"
-        ? Math.floor(Date.now() / 1000)
-        : Math.floor(new Date(customStartDate).getTime() / 1000);
-
-      const durationDays = parseFloat(duration) || 0;
-      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
-      const end = start + durationSeconds;
-
-      const cliffTime = cliffEnabled && cliffDate
-        ? Math.floor(new Date(cliffDate).getTime() / 1000)
-        : undefined;
-
-      try {
-        const response = await createStream(
-          sender,
-          recipient.trim(),
-          amountStr,
-          start,
-          end,
-          cliffTime,
-        );
-        if (!response.txHash) {
-          throw new Error("Missing transaction hash from Stellar RPC.");
-        }
-        // Hand off to the confirmation poller; the success toast,
-        // onStreamCreated, and onClose fire once polling reports `confirmed`.
-        setSubmittedTxHash(response.txHash);
-      } catch (err) {
-        const message = getStreamErrorMessage(err);
-        setStreamError(message);
-        addToast(t("createStream.error.failedWithMessage", { message }), "error");
-        onStreamError?.(err);
-      } finally {
-        submitInFlightRef.current = false;
-        setIsSubmitting(false);
+      if (!isOnline) {
+        // Capture locally instead of hanging on a request that can't reach
+        // the network. Flushed automatically by the effect above once the
+        // `online` event fires.
+        const entry = enqueueAction(payload);
+        pendingSubmissionRef.current = payload;
+        setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
+        setQueueLength(getQueueLength());
+        return;
       }
+
+      // Unchanged online path.
+      await submitPayload(payload);
     }
+  };
+
+  const handleRetryQueuedSubmission = async () => {
+    const payload = pendingSubmissionRef.current;
+    if (!payload) return;
+    setQueueFlushError(null);
+
+    if (!isOnline) {
+      const entry = enqueueAction(payload);
+      setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
+      setQueueLength(getQueueLength());
+      return;
+    }
+
+    await submitPayload(payload);
+  };
+
+  const handleEditQueuedSubmission = () => {
+    setQueueFlushError(null);
+    pendingSubmissionRef.current = null;
+    setCurrentStep(1);
   };
 
   const handleBack = () => {
@@ -399,13 +641,26 @@ export default function CreateStreamModal({
     }
   };
 
+  /** Jumps back to a completed step via the stepper header. Mirrors the
+   * review-card "Edit" buttons: only ever moves backward, and clears any
+   * in-flight transaction state the same way leaving step 3 already does. */
+  const handleStepClick = (step: number) => {
+    if (isBusyCreating || step >= currentStep) return;
+    if (currentStep === 3) {
+      resetTransactionState();
+    }
+    setCurrentStep(step);
+  };
+
   const handleCancel = () => {
-    if (isBusyCreating) return;
+    // Intentionally checks isActivelySubmitting, not isBusyCreating: a
+    // queued-offline submission must not block Cancel from closing the modal.
+    if (isActivelySubmitting) return;
     onClose();
   };
 
   const handleClose = () => {
-    if (isBusyCreating) return;
+    if (isActivelySubmitting) return;
     onClose();
   };
 
@@ -434,7 +689,7 @@ export default function CreateStreamModal({
             type="button"
             className="close-button"
             onClick={handleClose}
-            disabled={isBusyCreating}
+            disabled={isActivelySubmitting}
             aria-label={t("createStream.accessibility.closeLabel")}
           >
             <svg
@@ -454,53 +709,97 @@ export default function CreateStreamModal({
           </button>
         </div>
 
-        {/* Progress: Step 1 Recipient & amount, Step 2 Rate & schedule, Step 3 Review & create */}
-        <div className="progress-tracker">
-          <div className="progress-line">
-            <div
-              className="progress-line-fill"
-              style={{
-                width:
-                  currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
-              }}
-            />
-          </div>
-          <div className={`step-item ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}`}>
-            <div className="step-circle">{currentStep > 1 ? (
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : '1'}</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.recipientAmount").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-          <div className={`step-item ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}`}>
-            <div className="step-circle">{currentStep > 2 ? (
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : '2'}</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.rateSchedule").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-          <div className={`step-item ${currentStep === 3 ? 'active' : ''}`}>
-            <div className="step-circle">3</div>
-            <div className="step-label">
-              {(() => {
-                const [p1, p2] = t("createStream.steps.reviewCreate").split(" & ");
-                return <>{p1} &<br />{p2}</>;
-              })()}
-            </div>
-          </div>
-        </div>
+        {(() => {
+          const stepLabels = STEPPER_LABEL_KEYS.map((key) => t(key));
+          const currentLabel = stepLabels[currentStep - 1];
+          const trackFillPercent =
+            ((currentStep - 1) / (STEPPER_TOTAL_STEPS - 1)) * 100;
+          const renderStepLabel = (label: string) => {
+            const [p1, p2] = label.split(" & ");
+            return p2 ? <>{p1} &<br />{p2}</> : label;
+          };
+
+          return (
+            <nav
+              className="stepper"
+              aria-label={t("createStream.stepper.navLabel")}
+            >
+              <div className="stepper-track-wrapper">
+                <div className="stepper-track" aria-hidden="true">
+                  <div
+                    className="stepper-track-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+                <ol className="stepper-list">
+                {stepLabels.map((label, index) => {
+                  const step = index + 1;
+                  const isCompleted = step < currentStep;
+                  const isCurrent = step === currentStep;
+
+                  if (isCompleted) {
+                    return (
+                      <li
+                        key={step}
+                        className="stepper-item stepper-item--completed"
+                      >
+                        <button
+                          type="button"
+                          className="stepper-step stepper-step--completed"
+                          onClick={() => handleStepClick(step)}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.stepper.jumpToStepAria", {
+                            step,
+                            label,
+                          })}
+                        >
+                          <span className="stepper-circle" aria-hidden="true">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                          <span className="stepper-label">{renderStepLabel(label)}</span>
+                        </button>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li
+                      key={step}
+                      className={`stepper-item ${isCurrent ? "stepper-item--current" : "stepper-item--upcoming"}`}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      <span className="stepper-step">
+                        <span className="stepper-circle" aria-hidden="true">
+                          {step}
+                        </span>
+                        <span className="stepper-label">{renderStepLabel(label)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+                </ol>
+              </div>
+
+              <div className="stepper-compact">
+                <p className="stepper-compact-text">
+                  {t("createStream.stepper.compactStatus", {
+                    current: currentStep,
+                    total: STEPPER_TOTAL_STEPS,
+                    label: currentLabel,
+                  })}
+                </p>
+                <div className="stepper-compact-track" aria-hidden="true">
+                  <div
+                    className="stepper-compact-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+              </div>
+            </nav>
+          );
+        })()}
 
         <div className="modal-body-scroll">
           {error && (
@@ -588,6 +887,202 @@ export default function CreateStreamModal({
                       placeholder={t("createStream.step1.depositPlaceholder")}
                     />
                   </InputField>
+
+                  {/* Stream Label Color Swatch Picker & Live Contrast Check */}
+                  <div className="label-color-section" role="region" aria-labelledby="label-color-heading">
+                    <div className="label-color-header">
+                      <label id="label-color-heading" className="label-color-title">
+                        Stream Label Color <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Optional)</span>
+                      </label>
+                      <div className="swatch-theme-toggle" role="group" aria-label="Contrast background theme preview">
+                        <span>Against:</span>
+                        <button
+                          type="button"
+                          className={targetTheme === 'light' ? 'active' : ''}
+                          onClick={() => setTargetTheme('light')}
+                          aria-pressed={targetTheme === 'light'}
+                        >
+                          Light (#FFF)
+                        </button>
+                        <button
+                          type="button"
+                          className={targetTheme === 'dark' ? 'active' : ''}
+                          onClick={() => setTargetTheme('dark')}
+                          aria-pressed={targetTheme === 'dark'}
+                        >
+                          Dark (#0A0E17)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Swatch Grid */}
+                    <div
+                      className="swatch-grid"
+                      role="radiogroup"
+                      aria-label="Stream label color swatches"
+                    >
+                      {LABEL_COLOR_SWATCHES.map((swatch, idx) => {
+                        const isSelected = labelColor.toLowerCase() === swatch.hex.toLowerCase();
+                        const isFocused = focusedSwatchIndex === idx;
+                        const isLightSwatch = ['#ffffff', '#fef08a', '#94a3b8'].includes(swatch.hex.toLowerCase());
+
+                        return (
+                          <button
+                            key={swatch.hex}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-label={`${swatch.label} (${swatch.hex})`}
+                            tabIndex={isFocused || (focusedSwatchIndex === 0 && idx === 0) ? 0 : -1}
+                            className={`swatch-btn ${isSelected ? 'selected' : ''} ${isLightSwatch ? 'swatch-btn--light' : ''}`}
+                            style={{ backgroundColor: swatch.hex }}
+                            onClick={() => {
+                              setLabelColor(swatch.hex);
+                              setCustomHexInput(swatch.hex);
+                              setFocusedSwatchIndex(idx);
+                              setOverrideContrast(false);
+                              if (error) setError(null);
+                            }}
+                            onKeyDown={(e) => handleSwatchKeyDown(e, idx)}
+                          >
+                            {isSelected && (
+                              <svg
+                                className="swatch-btn-checkmark"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {labelColor && (
+                        <button
+                          type="button"
+                          className="swatch-clear-btn"
+                          onClick={() => {
+                            setLabelColor('');
+                            setCustomHexInput('');
+                            setOverrideContrast(false);
+                            if (error) setError(null);
+                          }}
+                          aria-label="Clear label color selection"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Custom Hex Row */}
+                    <div className="swatch-custom-input-row">
+                      <label htmlFor="custom-label-hex" style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                        Custom Hex:
+                      </label>
+                      <input
+                        id="custom-label-hex"
+                        type="text"
+                        className="swatch-custom-input"
+                        placeholder="#3B82F6"
+                        maxLength={7}
+                        value={customHexInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomHexInput(val);
+                          if (error) setError(null);
+                          if (/^#?[0-9A-Fa-f]{6}$/.test(val)) {
+                            const formatted = val.startsWith('#') ? val : `#${val}`;
+                            setLabelColor(formatted);
+                            setOverrideContrast(false);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Live Contrast Indicator Badge */}
+                    <div
+                      className="contrast-badge-container"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      id="label-color-contrast-status"
+                    >
+                      {contrastState === 'no-selection' && (
+                        <span className="contrast-badge contrast-badge--none">
+                          No color selected
+                        </span>
+                      )}
+                      {contrastState === 'AA-pass' && (
+                        <span className="contrast-badge contrast-badge--pass">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Pass AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-blocked' && (
+                        <span className="contrast-badge contrast-badge--fail">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-overridden' && (
+                        <span className="contrast-badge contrast-badge--overridden">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA (Overridden)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Blocked / Low Contrast Warning Alert with Override Affordance */}
+                    {(contrastState === 'AA-fail-blocked' || contrastState === 'AA-fail-overridden') && (
+                      <div
+                        className="contrast-warning-box"
+                        role={contrastState === 'AA-fail-blocked' ? 'alert' : 'region'}
+                        aria-live={contrastState === 'AA-fail-blocked' ? 'assertive' : 'polite'}
+                      >
+                        <div className="contrast-warning-text">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          <span>
+                            Low contrast label color ({contrastEval.formattedRatio}). May be unreadable against the surface.
+                          </span>
+                        </div>
+                        <div className="contrast-override-row">
+                          <input
+                            type="checkbox"
+                            id="override-contrast-checkbox"
+                            className="contrast-override-checkbox"
+                            checked={overrideContrast}
+                            onChange={(e) => {
+                              setOverrideContrast(e.target.checked);
+                              if (error) setError(null);
+                            }}
+                          />
+                          <label htmlFor="override-contrast-checkbox" className="contrast-override-label">
+                            Use low-contrast color anyway (not recommended)
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </InputField>
                 </>
               );
             })()}
@@ -1179,6 +1674,72 @@ export default function CreateStreamModal({
                     <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
                     {t("createStream.step3.warningText", { reviewDeposit })}
                   </div>
+                  {queuedSubmission && (
+                    <div
+                      className="offline-queue-banner"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="offline-queue-banner__icon" aria-hidden="true">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="9" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                        </svg>
+                      </span>
+                      <div className="offline-queue-banner__body">
+                        <strong className="offline-queue-banner__title">
+                          {t("createStream.queue.bannerTitle")}
+                        </strong>
+                        <p>{t("createStream.queue.bannerBody")}</p>
+                        <span className="offline-queue-banner__position">
+                          {t("createStream.queue.bannerPosition", {
+                            position: queuedSubmission.position,
+                            total: Math.max(queueLength, queuedSubmission.position),
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {isFlushingQueue && (
+                    <div
+                      className="transaction-status-box"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {t("createStream.queue.flushingTitle")}
+                    </div>
+                  )}
+                  {queueFlushError && (
+                    <div className="offline-queue-banner offline-queue-banner--failed" role="alert">
+                      <span className="offline-queue-banner__icon" aria-hidden="true">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.66 20h18.68a1 1 0 00.85-1.44l-8.48-14.7a1 1 0 00-1.72 0z" />
+                        </svg>
+                      </span>
+                      <div className="offline-queue-banner__body">
+                        <strong className="offline-queue-banner__title">
+                          {t("createStream.queue.flushFailedTitle")}
+                        </strong>
+                        <p>{queueFlushError}</p>
+                        <div className="offline-queue-banner__actions">
+                          <button
+                            type="button"
+                            className="offline-queue-banner__btn offline-queue-banner__btn--primary"
+                            onClick={handleRetryQueuedSubmission}
+                          >
+                            {t("createStream.queue.flushFailedRetryBtn")}
+                          </button>
+                          <button
+                            type="button"
+                            className="offline-queue-banner__btn"
+                            onClick={handleEditQueuedSubmission}
+                          >
+                            {t("createStream.queue.flushFailedEditBtn")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {isSubmitting && (
                     <div
                       className="transaction-status-box"

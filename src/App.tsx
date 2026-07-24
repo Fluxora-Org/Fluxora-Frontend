@@ -13,6 +13,9 @@ import Home from "./pages/Home";
 import ConnectWallet from "./pages/ConnectWallet";
 import ErrorPage from "./pages/ErrorPage";
 import NotFound from "./pages/NotFound";
+import { VoiceProvider } from "./components/voice/VoiceContext";
+import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
+import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -94,48 +97,54 @@ export default function App() {
     <ThemeProvider>
       <I18nProvider>
         <BrowserRouter>
-          <WalletProvider>
-            <ToastProvider>
-              <a href="#main-content" className="skip-link">
-                Skip to content
-              </a>
-              <AppNavbar
-                onSidebarToggle={handleSidebarToggle}
-                isSidebarOpen={isSidebarOpen}
-              />
+          <VoiceProvider>
+            <WalletProvider>
+              <ToastProvider>
+                <a href="#main-content" className="skip-link">
+                  Skip to content
+                </a>
+                <AppNavbar
+                  onSidebarToggle={handleSidebarToggle}
+                  isSidebarOpen={isSidebarOpen}
+                />
 
-              <ErrorBoundary>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/dashboard" element={<Navigate to="/app" replace />} />
-                  <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
-                  <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
-                  <Route path="/landing" element={<Navigate to="/" replace />} />
-                  <Route
-                    path="/app"
-                    element={
-                      <RequireWallet>
-                        <Layout />
-                      </RequireWallet>
-                    }
-                  >
-                    <Route index element={lazyAppRoute(<Dashboard />)} />
-                    <Route path="streams" element={lazyAppRoute(<Streams />)} />
-                    <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
-                    <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
-                    <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
-                    <Route path="error" element={<ErrorPage />} />
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+                    <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
+                    <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
+                    <Route path="/landing" element={<Navigate to="/" replace />} />
                     <Route
-                      path="empty-state-demo"
-                      element={lazyAppRoute(<EmptyStateDemo />)}
-                    />
-                  </Route>
-                  <Route path="/connect-wallet" element={<ConnectWallet />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </ErrorBoundary>
-            </ToastProvider>
-          </WalletProvider>
+                      path="/app"
+                      element={
+                        <RequireWallet>
+                          <Layout />
+                        </RequireWallet>
+                      }
+                    >
+                      <Route index element={lazyAppRoute(<Dashboard />)} />
+                      <Route path="streams" element={lazyAppRoute(<Streams />)} />
+                      <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
+                      <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
+                      <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
+                      <Route path="error" element={<ErrorPage />} />
+                      <Route
+                        path="empty-state-demo"
+                        element={lazyAppRoute(<EmptyStateDemo />)}
+                      />
+                    </Route>
+                    <Route path="/connect-wallet" element={<ConnectWallet />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </ErrorBoundary>
+
+                {/* Voice Control Reference Panel & Destructive Action Modal */}
+                <VoiceCommandPanel />
+                <VoiceConfirmModal />
+              </ToastProvider>
+            </WalletProvider>
+          </VoiceProvider>
         </BrowserRouter>
       </I18nProvider>
     </ThemeProvider>
