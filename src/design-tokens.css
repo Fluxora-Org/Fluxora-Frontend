@@ -749,3 +749,41 @@
     transition-duration: 0.01ms !important;
   }
 }
+/* -----------------------------------------------------------
+   12. STREAM STATUS TRANSITIONS
+   ----------------------------------------------------------- */
+
+:root {
+  --status-transition-duration: var(--motion-duration-stream-disclosure, 200ms);
+  --status-transition-ease: var(--transition-base, 200ms ease-in-out);
+}
+
+@keyframes pill-cross-fade {
+  0% { opacity: 0.5; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes highlight-ring-pulse {
+  0% { box-shadow: 0 0 0 0 var(--focus-ring-color); }
+  50% { box-shadow: 0 0 0 4px var(--focus-ring-color); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.status-pill-transition {
+  transition: background-color var(--status-transition-duration) ease-in-out,
+              color var(--status-transition-duration) ease-in-out;
+}
+
+.status-pill-animate .status-pill-label-enter {
+  animation: pill-cross-fade var(--status-transition-duration) ease-in-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill-transition {
+    transition: none !important;
+  }
+  .status-pill-animate .status-pill-label-enter {
+    animation: highlight-ring-pulse 500ms ease-out forwards;
+  }
+}
+
