@@ -87,6 +87,19 @@ export const en = {
   "createStream.step3.statusDetail": "Confirmation check {attempts} - tx {txHash}",
   "createStream.step3.statusFailed": "{error}",
 
+  // CreateStreamModal Step 3 / Offline action queue
+  "createStream.queue.bannerTitle": "Queued — will submit when back online",
+  "createStream.queue.bannerBody": "You're offline. We saved your stream details on this device and will submit them automatically the moment your connection returns — no need to resubmit.",
+  "createStream.queue.bannerPosition": "Queue position: {position} of {total}",
+  "createStream.queue.flushingTitle": "Back online. Submitting your queued stream to Stellar…",
+  "createStream.queue.flushSuccessToast": "Your queued stream was submitted and confirmed on Stellar.",
+  "createStream.queue.viewStreamAction": "View stream",
+  "createStream.queue.flushFailedTitle": "Your queued stream couldn't be submitted.",
+  "createStream.queue.flushFailedRetryBtn": "Retry now",
+  "createStream.queue.flushFailedEditBtn": "Edit details",
+  "createStream.button.queued": "Queued — waiting for connection",
+  "createStream.button.flushing": "Submitting queued stream...",
+
   // CreateStreamModal Buttons & Validation
   "createStream.button.submitting": "Submitting...",
   "createStream.button.confirming": "Confirming...",

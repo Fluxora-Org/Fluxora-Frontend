@@ -835,6 +835,88 @@
   opacity: 0.7;
 }
 
+/* Offline action-queue banner (Step 3). Body copy always uses var(--text) /
+ * var(--text-secondary) — verified >4.5:1 on var(--surface-raised) in both
+ * themes. Status color is limited to the icon + left border accent (a
+ * decorative, redundant cue alongside the text label, not the sole indicator). */
+.offline-queue-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--status-warning);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.offline-queue-banner__icon {
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+  color: var(--status-warning);
+}
+
+.offline-queue-banner__body {
+  min-width: 0;
+}
+
+.offline-queue-banner__body p {
+  margin: 0.25rem 0 0;
+}
+
+.offline-queue-banner__title {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.offline-queue-banner__position {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.offline-queue-banner--failed {
+  border-left-color: var(--danger);
+}
+
+.offline-queue-banner--failed .offline-queue-banner__icon {
+  color: var(--danger);
+}
+
+.offline-queue-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.offline-queue-banner__btn {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.offline-queue-banner__btn:hover {
+  background: var(--surface-highest);
+}
+
+.offline-queue-banner__btn--primary {
+  background: var(--color-cta-primary-bg);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
 /* ==============================================
    RESPONSIVE STYLES
    ============================================== */
@@ -1053,6 +1135,15 @@
     align-self: flex-start;
   }
 
+  .offline-queue-banner {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .offline-queue-banner__btn {
+    align-self: flex-start;
+  }
+
   .modal-footer {
     gap: 0.5rem;
     margin-top: 0.875rem;
@@ -1143,6 +1234,10 @@
   }
 
   .review-error-box {
+    font-size: 0.6875rem;
+  }
+
+  .offline-queue-banner {
     font-size: 0.6875rem;
   }
 
