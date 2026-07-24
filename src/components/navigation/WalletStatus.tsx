@@ -32,6 +32,7 @@ export default function WalletStatus({
   const copied = copyStatus === "copied";
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const focusRingClassName =
     "outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--navbar-bg)]";
 
@@ -63,6 +64,59 @@ export default function WalletStatus({
       document.removeEventListener("keydown", esc);
     };
   }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (
+        document.activeElement === triggerRef.current &&
+        (e.key === "ArrowDown" || e.key === "ArrowUp")
+      ) {
+        e.preventDefault();
+        setOpen(true);
+        // Defer focus so the menu has time to render
+        requestAnimationFrame(() => {
+          const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])");
+          if (!focusableElements || focusableElements.length === 0) return;
+          if (e.key === "ArrowUp") {
+            focusableElements[focusableElements.length - 1].focus();
+          } else {
+            focusableElements[0].focus();
+          }
+        });
+      }
+      return;
+    }
+
+    // Menu is open
+    const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>(
+      "button:not([disabled])",
+    ) || [];
+    const items = Array.from(focusableElements);
+
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+
+    if (e.key === "Tab") {
+      if (e.shiftKey && (document.activeElement === firstItem || document.activeElement === triggerRef.current)) {
+        e.preventDefault();
+        lastItem.focus();
+      } else if (!e.shiftKey && (document.activeElement === lastItem || document.activeElement === triggerRef.current)) {
+        e.preventDefault();
+        firstItem.focus();
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      items[nextIndex].focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      items[prevIndex].focus();
+    }
+  };
 
   useEffect(() => {
     // Announce connection on mount
@@ -99,7 +153,7 @@ export default function WalletStatus({
   };
 
   return (
-    <div ref={ref} className="flex items-center gap-2">
+    <div ref={ref} onKeyDown={handleKeyDown} className="flex items-center gap-2">
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -150,6 +204,7 @@ export default function WalletStatus({
         {open && (
           <div
             role="menu"
+            ref={menuRef}
             aria-label="Wallet options"
             className="absolute right-0 mt-2 w-60 bg-[var(--navbar-bg)] border border-[var(--navbar-border)] rounded-xl shadow-md p-1.5 z-50"
           >
@@ -214,7 +269,13 @@ export default function WalletStatus({
 
                 <button
                   role="menuitem"
-                  onClick={() => setConfirmingDisconnect(true)}
+                  onClick={() => {
+                    setConfirmingDisconnect(true);
+                    requestAnimationFrame(() => {
+                      const firstButton = menuRef.current?.querySelector<HTMLElement>("button:not([disabled])");
+                      firstButton?.focus();
+                    });
+                  }}
                   className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
                 >
                   <LogOut size={16} />

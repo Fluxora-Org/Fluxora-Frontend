@@ -6,6 +6,26 @@ import { isTreasuryDemoMode } from "../useTreasuryOverviewData";
 
 const useTreasuryMock = vi.fn();
 
+// TreasuryPage now reads wallet connection state to thread into RecentStreams.
+// In live (non-demo) mode we assume a connected session so the test exercises the
+// `connected -> empty -> "No streams yet"` copy. The disconnected variant is
+// covered in the component-level RecentStreams tests.
+const walletState = vi.hoisted(() => ({ connected: true }));
+vi.mock("../../../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => ({
+    connected: walletState.connected,
+    address: null,
+    network: null,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
+
 vi.mock("../useTreasury", () => ({
   useTreasury: () => useTreasuryMock(),
   useRecipientStreams: () => ({
@@ -71,6 +91,11 @@ describe("treasury overview demo mode", () => {
     expect(screen.getByText("Demo state:")).toBeInTheDocument();
     expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
     expect(screen.getByText("Active Streams")).toBeInTheDocument();
+
+    // In demo mode with loaded fixture data, loaded badge must be highlighted exclusively
+    expect(screen.getByTestId("badge-loaded")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("badge-empty")).toHaveAttribute("data-active", "false");
+    expect(screen.getByTestId("badge-loading")).toHaveAttribute("data-active", "false");
   });
 
   it("defaults to live data and does not render fixture streams", async () => {

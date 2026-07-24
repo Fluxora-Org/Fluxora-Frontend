@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -11,16 +12,27 @@ import type { ToastVariant } from "../ToastNotification";
 
 export type { ToastVariant };
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
   timeout: number;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
   /** Add a toast to the queue. Returns the generated id. */
-  addToast: (message: string, variant: ToastVariant, timeout?: number) => string;
+  addToast: (
+    message: string,
+    variant: ToastVariant,
+    timeout?: number,
+    action?: ToastAction,
+  ) => string;
   /** Manually dismiss a toast by id. */
   dismiss: (id: string) => void;
 }
@@ -45,24 +57,59 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const dismiss = useCallback((id: string) => {
-    clearTimeout(timers.current.get(id));
-    timers.current.delete(id);
+    const timer = timers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timers.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const addToast = useCallback(
-    (message: string, variant: ToastVariant, timeout = DEFAULT_TIMEOUT): string => {
+    (
+      message: string,
+      variant: ToastVariant,
+      timeout = DEFAULT_TIMEOUT,
+      action?: ToastAction,
+    ): string => {
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, variant, timeout }]);
-      const timer = setTimeout(() => dismiss(id), timeout);
-      timers.current.set(id, timer);
+      setToasts((prev) => [...prev, { id, message, variant, timeout, action }]);
       return id;
     },
-    [dismiss],
+    [],
   );
 
   const visible = toasts.slice(-MAX_VISIBLE);
   const overflow = toasts.length - MAX_VISIBLE;
+
+  useEffect(() => {
+    const visibleIds = new Set(visible.map((t) => t.id));
+
+    // Clear timers for toasts that are no longer visible
+    for (const [id, timer] of timers.current.entries()) {
+      if (!visibleIds.has(id)) {
+        clearTimeout(timer);
+        timers.current.delete(id);
+      }
+    }
+
+    // Start timers for visible toasts that don't have an active timer
+    for (const toast of visible) {
+      if (!timers.current.has(toast.id)) {
+        const timer = setTimeout(() => dismiss(toast.id), toast.timeout);
+        timers.current.set(toast.id, timer);
+      }
+    }
+  }, [visible, dismiss]);
+
+  useEffect(() => {
+    return () => {
+      for (const timer of timers.current.values()) {
+        clearTimeout(timer);
+      }
+      timers.current.clear();
+    };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ addToast, dismiss }}>
@@ -79,6 +126,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             message={toast.message}
             variant={toast.variant}
             onClose={() => dismiss(toast.id)}
+            actionLabel={toast.action?.label}
+            onAction={toast.action?.onClick}
           />
         ))}
       </div>

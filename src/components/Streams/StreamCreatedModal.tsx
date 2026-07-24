@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
+import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview";
 
 interface StreamCreatedModalProps {
   isOpen: boolean;
@@ -9,6 +10,11 @@ interface StreamCreatedModalProps {
   streamId: string;
   streamUrl: string;
   onCreateAnother: () => void;
+  txHash?: string;
+  amount?: string;
+  rate?: string;
+  sender?: string;
+  recipient?: string;
 }
 
 export default function StreamCreatedModal({
@@ -17,6 +23,11 @@ export default function StreamCreatedModal({
   streamId,
   streamUrl,
   onCreateAnother,
+  txHash,
+  amount = "10,000.00 USDC",
+  rate = "0.0261 USDC/sec",
+  sender = "GAB...TREASURY",
+  recipient = "GCD...RECIPIENT",
 }: StreamCreatedModalProps) {
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -109,7 +120,7 @@ export default function StreamCreatedModal({
         console.error("Invalid URL scheme. Only https is allowed.");
         return;
       }
-    } catch (e) {
+    } catch {
       console.error("Invalid URL provided.");
       return;
     }
@@ -228,6 +239,23 @@ export default function StreamCreatedModal({
             stream link with your recipient. They can view real-time accrual and
             withdraw funds from the Recipient portal.
           </p>
+        </div>
+
+        {/* Transaction Receipt Preview & Download Button */}
+        <div className="my-4">
+          <TransactionReceiptPreview
+            data={{
+              streamId,
+              type: "Creation",
+              sender,
+              recipient,
+              amount,
+              rate,
+              timestamp: new Date().toISOString(),
+              txHash: txHash || null,
+              status: txHash ? "confirmed" : "pending",
+            }}
+          />
         </div>
 
         {isPopupBlocked && (

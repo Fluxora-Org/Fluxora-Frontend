@@ -57,4 +57,35 @@ describe("treasuryOverviewPage RecentStreams", () => {
     await user.click(screen.getByRole("button", { name: /view all/i }));
     // navigation happens; no error thrown confirms the handler ran
   });
+
+  // -------------------------------------------------------------------------
+  // walletConnected drives the empty/error copy
+  // -------------------------------------------------------------------------
+
+  it("shows the anonymous 'Connect your wallet' CTA in the empty state when walletConnected is false (default)", () => {
+    renderRecentStreams(<RecentStreams streams={[]} />);
+
+    expect(
+      screen.getByRole("heading", { name: /connect your wallet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /connect wallet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create stream/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the connected 'Create stream' CTA in the empty state when walletConnected is true", () => {
+    renderRecentStreams(
+      <RecentStreams streams={[]} walletConnected={true} />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: /no streams yet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /create stream/i }),
+    ).toBeInTheDocument();
+  });
 });

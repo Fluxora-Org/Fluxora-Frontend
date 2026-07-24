@@ -13,6 +13,7 @@ import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
+import Button from "../components/Button";
 import "../design-tokens.css";
 
 export default function Dashboard() {
@@ -24,6 +25,7 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
+  const [totalStreaming, setTotalStreaming] = useState<number | null>(null);
   const { announcement, announce } = useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
@@ -44,6 +46,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setWithdrawable(walletConnected ? 22600 : null);
+    setTotalStreaming(walletConnected ? 48500 : null);
   }, [walletConnected]);
 
   useEffect(() => {
@@ -152,14 +155,14 @@ export default function Dashboard() {
               streams.
             </span>
           </div>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
             aria-label="Connect Stellar wallet"
           >
             Connect wallet
-          </button>
+          </Button>
         </div>
       )}
 
@@ -200,13 +203,13 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={refetch}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -217,16 +220,17 @@ export default function Dashboard() {
             loading={loading}
             error={error}
             onRetry={refetch}
+            walletConnected={walletConnected}
           />
           {!loading && !error && (
-            <button
+            <Button
               type="button"
-              className="button button--primary"
+              variant="primary"
               onClick={() => setIsModalOpen(true)}
               aria-label="Create stream"
             >
               Create stream
-            </button>
+            </Button>
           )}
         </>
       ) : showOnboarding ? (
