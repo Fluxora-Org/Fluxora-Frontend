@@ -38,7 +38,9 @@ export interface I18nContextType {
   locale: Locale;
   /**
    * Retrieves the translated message for a given key, performs interpolation,
-   * escapes user input, and handles pluralization.
+   * and handles pluralization. Parameters are substituted verbatim; React
+   * escapes text content automatically when t() output is used as a JSX text
+   * child, which is the only supported rendering contract.
    */
   t: (key: TranslationKey | PluralizableKey, params?: TranslationParams) => string;
   /** Changes the active locale. */
@@ -46,6 +48,17 @@ export interface I18nContextType {
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+/**
+ * Escapes all regex-special characters in a string so it can be used safely
+ * as a literal pattern inside `new RegExp(...)`.
+ *
+ * @param value The raw string to escape.
+ * @returns The regex-escaped string.
+ */
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
  * Helper function to escape HTML characters in user-provided values
@@ -78,7 +91,17 @@ const es: Partial<TranslationCatalog> = {
 
 /**
  * Resolves a translation key to its corresponding message, handles fallback,
- * pluralization, and interpolates/escapes parameters.
+ * pluralization, and interpolates parameters.
+ *
+ * Parameters are substituted verbatim — HTML escaping is intentionally omitted
+ * because all current consumers render the result as plain JSX text children
+ * (e.g. `<p>{t("key", { name })}</p>`), and React already escapes text content
+ * before writing to the DOM.  Calling escapeHtml here would cause double-escaping:
+ * a value like "Acme & Co" would appear on-screen as "Acme &amp; Co".
+ *
+ * If a future consumer needs to use t() output inside dangerouslySetInnerHTML,
+ * that call site is responsible for escaping the returned string — do not add
+ * escaping back here.
  *
  * @param catalog The translation catalog to look up keys in.
  * @param key The translation key or a base pluralizable key.
@@ -103,17 +126,19 @@ export function translate(
   }
 
   // Get value from current catalog, fallback to English catalog, and finally to the key itself
-  let value: string = (catalog as any)[resolvedKey] || (fallbackCatalog as any)[resolvedKey];
+  const value: string = (catalog as any)[resolvedKey] || (fallbackCatalog as any)[resolvedKey];
   if (!value) {
     return resolvedKey;
   }
 
-  // Interpolation and Escaping
+  // Interpolation — substitute params verbatim; see JSDoc for escaping rationale
   if (params) {
     let result = value;
     for (const [paramKey, paramValue] of Object.entries(params)) {
-      const escapedValue = escapeHtml(String(paramValue));
-      result = result.replace(new RegExp(`\\{${paramKey}\\}`, "g"), escapedValue);
+      // Escape regex-metacharacters in the param key so a caller-controlled key
+      // such as "amount.usd" cannot widen the match or throw an invalid-pattern error.
+      const escapedKey = escapeRegExp(paramKey);
+      result = result.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), String(paramValue));
     }
     return result;
   }

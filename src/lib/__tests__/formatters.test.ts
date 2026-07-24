@@ -130,6 +130,26 @@ describe("formatAssetAmount", () => {
     const result = formatAssetAmount(100, "");
     expect(result).not.toContain("  ");
   });
+
+  // Regression: without maxFractionDigits the default of 0 would silently round
+  // fractional amounts to whole numbers, giving callers a misleading figure.
+  it("preserves fractional precision when maxFractionDigits is specified", () => {
+    const result = formatAssetAmount(1234.567, "XLM", "", 2);
+    expect(result).toContain("XLM");
+    // Value must NOT have been silently rounded to a whole number
+    expect(result).not.toMatch(/^1[,.]?234 XLM$/);
+    // Two decimal places: locale-agnostic check on the numeric portion
+    const numericPart = result.replace(/[^\d.,]/g, "");
+    const parsed = parseFloat(numericPart.replace(",", ""));
+    expect(parsed).toBeCloseTo(1234.57, 1);
+  });
+
+  it("still rounds to whole number by default (backward-compatible)", () => {
+    const result = formatAssetAmount(1234.9, "XLM");
+    // Default maxFractionDigits = 0: should round to nearest integer
+    const numericPart = result.replace(/[^\d]/g, "");
+    expect(parseInt(numericPart, 10)).toBe(1235);
+  });
 });
 
 // ─── formatLocalDate ─────────────────────────────────────────────────────────
@@ -172,6 +192,14 @@ describe("formatLocalDate", () => {
     });
     expect(result).toMatch(/\d/);
     expect(typeof result).toBe("string");
+  });
+
+  it('returns fallback for a malformed date string instead of throwing', () => {
+    expect(formatLocalDate("not-a-date")).toBe("Not set");
+  });
+
+  it("returns custom fallback for a malformed date string when provided", () => {
+    expect(formatLocalDate("not-a-date", {}, "N/A")).toBe("N/A");
   });
 });
 

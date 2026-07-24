@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { isValidStellarAddress, maskAddress } from "../../lib/stellar";
+import TruncatedReveal from "../common/TruncatedReveal";
 
 export interface BreadcrumbItem {
   label: string;
@@ -22,8 +23,14 @@ interface BreadcrumbProps {
  * - Separator chevrons are aria-hidden
  * - All link items are keyboard-focusable with visible focus ring
  * - Truncates checksum-valid Stellar addresses at 8...4 chars
+ * - Full Stellar address always in accessibility tree via TruncatedReveal
+ *   (sr-only span) — no interaction required for AT exposure
+ * - Visual reveal chip slides in on hover/focus-within (progressive
+ *   enhancement only, aria-hidden)
  *
  * WCAG 2.1 AA: 4.5:1 text contrast, 3:1 focus ring contrast
+ *
+ * @see docs/SR_ONLY_REVEAL_PATTERN_SPEC.md
  */
 export default function Breadcrumb({ items }: BreadcrumbProps) {
   if (items.length === 0) return null;
@@ -51,7 +58,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
 
           return (
             <li
-              key={item.label}
+              key={`${item.to ?? item.label}-${index}`}
               style={{ display: "flex", alignItems: "center", gap: "var(--breadcrumb-gap)" }}
             >
               {isLast || !item.to ? (
@@ -70,7 +77,24 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {displayLabel}
+                  {isStellarAddress ? (
+                    /*
+                     * TruncatedReveal provides:
+                     *   • An always-present sr-only span with the full address
+                     *     (AT encounters it without any interaction)
+                     *   • A visual chip that slides in on hover/focus-within
+                     *     (aria-hidden, purely decorative)
+                     *
+                     * The parent span's aria-label={item.label} ensures the
+                     * element itself is also announced with the full value by
+                     * ATs that read the label rather than the text content.
+                     */
+                    <TruncatedReveal fullValue={item.label} mono>
+                      <span>{displayLabel}</span>
+                    </TruncatedReveal>
+                  ) : (
+                    displayLabel
+                  )}
                 </span>
               ) : (
                 <Link
@@ -79,7 +103,13 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                   title={isStellarAddress ? item.label : undefined}
                   className="breadcrumb-link"
                 >
-                  {displayLabel}
+                  {isStellarAddress ? (
+                    <TruncatedReveal fullValue={item.label} mono>
+                      <span>{displayLabel}</span>
+                    </TruncatedReveal>
+                  ) : (
+                    displayLabel
+                  )}
                 </Link>
               )}
 

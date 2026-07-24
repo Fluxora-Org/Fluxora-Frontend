@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
-import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
 import ToastNotification, {
   type ToastVariant,
 } from "../components/ToastNotification";
+import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
+import Button from "../components/Button";
 import "../design-tokens.css";
 
 export default function Dashboard() {
@@ -107,8 +108,6 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) return <TreasuryOverviewLoading />;
-
   const hasStreams = streams.length > 0;
   const hasError = !!error;
 
@@ -156,14 +155,14 @@ export default function Dashboard() {
               streams.
             </span>
           </div>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
             aria-label="Connect Stellar wallet"
           >
             Connect wallet
-          </button>
+          </Button>
         </div>
       )}
 
@@ -204,27 +203,35 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={refetch}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
-      {hasStreams ? (
+      {loading || hasError || hasStreams ? (
         <>
-          <RecentStreams streams={streams} />
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => setIsModalOpen(true)}
-            aria-label="Create stream"
-          >
-            Create stream
-          </button>
+          <RecentStreams
+            streams={streams}
+            loading={loading}
+            error={error}
+            onRetry={refetch}
+            walletConnected={walletConnected}
+          />
+          {!loading && !error && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => setIsModalOpen(true)}
+              aria-label="Create stream"
+            >
+              Create stream
+            </Button>
+          )}
         </>
       ) : showOnboarding ? (
         <TreasuryOnboarding
@@ -242,6 +249,12 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+      />
+
+      <CreateStreamFab
+        onCreateStream={() => setIsModalOpen(true)}
+        disabled={!walletConnected}
+        hidden={isModalOpen}
       />
 
       <ConnectWalletModal
