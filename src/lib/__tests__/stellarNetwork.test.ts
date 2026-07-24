@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   getExpectedStellarNetwork,
+  getNetworkExplorerPath,
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
 } from "../stellarNetwork";
@@ -133,5 +134,27 @@ describe("isStellarNetworkMismatch", () => {
     expect(isStellarNetworkMismatch("PUBLIC")).toBe(false);
     expect(isStellarNetworkMismatch("TESTNET", undefined)).toBe(true);
     expect(isStellarNetworkMismatch("TESTNET")).toBe(true);
+  });
+});
+
+describe("getNetworkExplorerPath", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("should map PUBLIC network to 'public' explorer path segment", () => {
+    expect(getNetworkExplorerPath("PUBLIC")).toBe("public");
+  });
+
+  it("should map TESTNET network to 'testnet' explorer path segment", () => {
+    expect(getNetworkExplorerPath("TESTNET")).toBe("testnet");
+  });
+
+  it("should fall back to expected network when called without arguments", () => {
+    vi.stubEnv("VITE_NETWORK", "PUBLIC");
+    expect(getNetworkExplorerPath()).toBe("public");
+
+    vi.stubEnv("VITE_NETWORK", "TESTNET");
+    expect(getNetworkExplorerPath()).toBe("testnet");
   });
 });

@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest';
 import { getContrastRatio } from '../../utils/contrastUtils';
 
 type Variant = {
@@ -40,7 +41,7 @@ const variants: Variant[] = [
 ];
 
 describe('StatusPill contrast ratios', () => {
-  test.each(variants)('variant $name meets WCAG AA contrast', ({ name, background, color }) => {
+  test.each(variants)('variant $name meets WCAG AA contrast', ({ background, color }) => {
     const ratio = getContrastRatio(color, background);
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });

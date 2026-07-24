@@ -33,15 +33,16 @@ export default function Layout() {
 
   return (
     <div>
-      <a href="#main-content" className="skip-link">Skip to main content</a
-      className={[
-        "app-layout",
-        isSidebarCollapsed && "is-collapsed",
-        isMobileSidebarOpen && "is-mobile-open",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <div
+        className={[
+          "app-layout",
+          isSidebarCollapsed && "is-collapsed",
+          isMobileSidebarOpen && "is-mobile-open",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
       <div className="app-layout__body">
         {/* SIDEBAR */}
         <aside
@@ -154,6 +155,7 @@ export default function Layout() {
         onConnectWalletConnect={handleCloseModal}
       />
       <KeyboardShortcutsModal />
+      </div>
     </div>
   );
 }

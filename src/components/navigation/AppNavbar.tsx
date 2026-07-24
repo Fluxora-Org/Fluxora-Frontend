@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X, Moon, Sun, Search, Command } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
@@ -12,7 +12,7 @@ import {
   formatLocalISOWithOffset,
   getBrowserTimezone,
 } from "../../lib/timePresentation";
-
+import { VoiceMicButton } from "../voice/VoiceMicButton";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -341,7 +341,7 @@ const location = useLocation();
               aria-expanded={isSidebarOpen}
               aria-controls="app-sidebar"
             >
-              {isSidebarOpen ? <X size={26} aria-hidden="true" /> : <Menu size={26} aria-hidden="true" />}
+              {isSidebarOpen ? <X className="icon-md" aria-hidden="true" /> : <Menu className="icon-md" aria-hidden="true" />}
             </button>
           )}
           <FluxoraLogo connected={connected} />
@@ -387,6 +387,26 @@ const location = useLocation();
 
           {/* Right: Actions (desktop) */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Command Palette / Search Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-command-palette"));
+              }}
+              aria-label="Open command palette and help search (Cmd+K)"
+              className="flex items-center gap-2.5 px-3.5 py-1.5 h-10 rounded-full border border-[var(--navbar-icon-border)] bg-[var(--surface-sunken)] hover:border-[var(--accent)]/50 text-[var(--text-muted)] hover:text-[var(--text)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-xs font-medium"
+            >
+              <Search size={15} aria-hidden="true" />
+              <span className="hidden lg:inline">Search commands & help...</span>
+              <span className="lg:hidden">Search...</span>
+              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[10px] font-mono font-semibold text-[var(--text-muted)]">
+                <Command size={10} />K
+              </kbd>
+            </button>
+
+            {/* Voice Control Mic Activation */}
+            <VoiceMicButton variant="navbar" />
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
@@ -394,9 +414,9 @@ const location = useLocation();
               className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               {theme === "light" ? (
-                <Moon size={16} aria-hidden="true" />
+                <Moon className="icon-xs" aria-hidden="true" />
               ) : (
-                <Sun size={16} aria-hidden="true" />
+                <Sun className="icon-xs" aria-hidden="true" />
               )}
             </button>
 
@@ -478,9 +498,9 @@ const location = useLocation();
               className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               {theme === "light" ? (
-                <Moon size={16} aria-hidden="true" />
+                <Moon className="icon-xs" aria-hidden="true" />
               ) : (
-                <Sun size={16} aria-hidden="true" />
+                <Sun className="icon-xs" aria-hidden="true" />
               )}
             </button>
 
