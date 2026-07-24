@@ -261,3 +261,100 @@ export function getUrgencyLevel(
 
   return { cliff: cliffUrgency, end: endUrgency };
 }
+
+/**
+ * Resolves the browser's timezone, falling back to UTC if detection fails or is unavailable.
+ */
+export function getBrowserTimezone(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz || tz.toLowerCase() === "etc/unknown") {
+      return "UTC";
+    }
+    return tz;
+  } catch (e) {
+    return "UTC";
+  }
+}
+
+/**
+ * Formats a Date object or ISO string for the navbar display.
+ * Default format: "2:45 PM PDT" or "2:45 PM UTC" (if fallback).
+ * On mobile/compact: "2:45 PM" (time only, no timezone abbreviation).
+ */
+export function formatNavbarTime(
+  dateInput: Date | string,
+  options?: {
+    compact?: boolean;
+    timezone?: string;
+  },
+): string {
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const tz = options?.timezone || getBrowserTimezone();
+
+  try {
+    const timeOptions: Intl.DateTimeFormatOptions = {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: tz === "UTC" ? "UTC" : tz,
+    };
+
+    if (!options?.compact && tz !== "UTC") {
+      timeOptions.timeZoneName = "short";
+    }
+
+    let formatted = new Intl.DateTimeFormat(undefined, timeOptions).format(date);
+
+    if (!options?.compact && tz === "UTC" && !formatted.includes("UTC")) {
+      formatted += " UTC";
+    }
+
+    return formatted;
+  } catch (e) {
+    const fallbackOptions: Intl.DateTimeFormatOptions = {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+    };
+    let formatted = new Intl.DateTimeFormat(undefined, fallbackOptions).format(date);
+    if (!options?.compact) {
+      formatted += " UTC";
+    }
+    return formatted;
+  }
+}
+
+/**
+ * Formats a Date object as an ISO 8601 string with the local UTC offset.
+ * Example: "2026-07-24T01:07:26-04:00"
+ */
+export function formatLocalISOWithOffset(dateInput: Date | string): string {
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const timezone = getBrowserTimezone();
+
+  if (timezone === "UTC") {
+    return date.toISOString();
+  }
+
+  try {
+    const offsetMin = date.getTimezoneOffset();
+    const absOffsetMin = Math.abs(offsetMin);
+    const offsetHours = Math.floor(absOffsetMin / 60);
+    const offsetMinutes = absOffsetMin % 60;
+    const sign = offsetMin <= 0 ? "+" : "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+
+    const offsetStr = `${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetStr}`;
+  } catch (e) {
+    return date.toISOString();
+  }
+}
+

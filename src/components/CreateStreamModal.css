@@ -93,12 +93,6 @@
   }
 }
 
-/* Active step: teal circle with white number for contrast */
-.step-item.active .step-circle {
-  color: var(--color-text-inverse);
-  font-weight: 700;
-}
-
 /* Cancel: dark charcoal, white text */
 .btn-cancel {
   background: var(--surface-elevated);
@@ -190,46 +184,75 @@
     0 0 0 6px rgba(0, 212, 170, 0.35);
 }
 
-/* Progress Tracker */
-.progress-tracker {
-  display: flex;
-  position: relative;
+/* Progress stepper header. State is conveyed by fill + icon + label
+ * together (never color alone): upcoming = unfilled circle + number;
+ * current = filled circle + number + aria-current="step"; completed =
+ * filled circle + checkmark + clickable (jumps back).
+ *
+ * Fill/border use the tokens called out in the design ticket
+ * (--color-accent-secondary, --color-border-default). The circle's icon
+ * color is a fixed dark navy, NOT var(--text) — --color-accent-secondary
+ * is the same value in both themes, so a theme-dependent icon color would
+ * pass contrast in light mode and fail in dark mode (verified: white/
+ * var(--text) on this fill is ~2:1 in dark theme). See
+ * docs/CREATE_STREAM_PROGRESS_STEPPER_SPEC.md for the computed ratios.
+ */
+.stepper {
   margin-bottom: 1.25rem;
-  justify-content: space-between;
-  padding: 0 0.5rem;
   flex-shrink: 0;
 }
 
-.progress-line {
+.stepper-track-wrapper {
+  position: relative;
+}
+
+.stepper-track {
   position: absolute;
   top: 16px;
   left: 0.5rem;
-  right: 3.5rem;
+  right: 0.5rem;
   height: 2px;
-  background: var(--border);
+  background: var(--color-border-default);
   z-index: 1;
-  width: 100%;
 }
 
-.progress-line-fill {
+.stepper-track-fill {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  background: var(--primary);
-  width: 50%;
+  background: var(--color-accent-secondary);
+  transition: width 0.2s ease;
 }
 
-.step-item {
+.stepper-list {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  position: relative;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  margin: 0;
+  list-style: none;
+}
+
+.stepper-item {
   position: relative;
   z-index: 2;
   width: 80px;
 }
 
-.step-circle {
+.stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: default;
+}
+
+.stepper-circle {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -239,33 +262,76 @@
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  background: var(--surface-highest);
-  border: 1px solid var(--border);
-  color: var(--muted);
+  background: var(--surface-elevated);
+  border: 2px solid var(--color-border-default);
+  color: var(--text-secondary);
 }
 
-.step-item.completed .step-circle {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--text);
+.stepper-item--current .stepper-circle,
+.stepper-item--completed .stepper-circle {
+  background: var(--color-accent-secondary);
+  border-color: var(--color-accent-secondary);
+  /* Fixed — see comment above the .stepper rule. */
+  color: #1a1f36;
 }
 
-.step-item.active .step-circle {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.step-label {
+.stepper-label {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--text-secondary);
   text-align: center;
   line-height: 1.3;
 }
 
-.step-item.active .step-label,
-.step-item.completed .step-label {
+.stepper-item--current .stepper-label,
+.stepper-item--completed .stepper-label {
   color: var(--text);
   font-weight: 500;
+}
+
+.stepper-step--completed {
+  cursor: pointer;
+}
+
+.stepper-step--completed:hover .stepper-circle {
+  background: var(--color-accent-secondary-dark);
+  border-color: var(--color-accent-secondary-dark);
+}
+
+.stepper-step--completed:focus-visible {
+  outline: 2px solid var(--color-accent-secondary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.stepper-step--completed:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Compact "Step X of 3" + bar variant for narrow modal widths. Hidden by
+ * default; swapped in for .stepper-list at the 480px breakpoint below. */
+.stepper-compact {
+  display: none;
+}
+
+.stepper-compact-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.stepper-compact-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border-default);
+  overflow: hidden;
+}
+
+.stepper-compact-fill {
+  height: 100%;
+  background: var(--color-accent-secondary);
+  transition: width 0.2s ease;
 }
 
 /* Section Header */
@@ -552,7 +618,8 @@
 @media (forced-colors: active) {
   .create-stream-modal .modal-footer .btn:focus-visible,
   .segment-btn:focus-visible,
-  .close-button:focus-visible {
+  .close-button:focus-visible,
+  .stepper-step--completed:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
     box-shadow: none;
@@ -835,6 +902,166 @@
   opacity: 0.7;
 }
 
+/* Offline action-queue banner (Step 3). Body copy always uses var(--text) /
+ * var(--text-secondary) — verified >4.5:1 on var(--surface-raised) in both
+ * themes. Status color is limited to the icon + left border accent (a
+ * decorative, redundant cue alongside the text label, not the sole indicator). */
+.offline-queue-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--status-warning);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.offline-queue-banner__icon {
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+  color: var(--status-warning);
+}
+
+.offline-queue-banner__body {
+  min-width: 0;
+}
+
+.offline-queue-banner__body p {
+  margin: 0.25rem 0 0;
+}
+
+.offline-queue-banner__title {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.offline-queue-banner__position {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.offline-queue-banner--failed {
+  border-left-color: var(--danger);
+}
+
+.offline-queue-banner--failed .offline-queue-banner__icon {
+  color: var(--danger);
+}
+
+.offline-queue-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.offline-queue-banner__btn {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.offline-queue-banner__btn:hover {
+  background: var(--surface-highest);
+}
+
+.offline-queue-banner__btn--primary {
+  background: var(--color-cta-primary-bg);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+/* ==============================================
+   MODE SELECTION (step 0)
+   ============================================== */
+
+.mode-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.mode-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.mode-card:hover {
+  border-color: var(--accent);
+  background: rgba(0, 212, 170, 0.05);
+}
+
+.mode-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 2px var(--surface-elevated),
+    0 0 0 4px var(--accent),
+    0 0 0 6px rgba(0, 212, 170, 0.35);
+}
+
+.mode-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(0, 184, 212, 0.12);
+  color: var(--primary);
+}
+
+.mode-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.mode-card__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+}
+
+.mode-card__desc {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  display: block;
+  line-height: 1.4;
+}
+
+.mode-card__chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
 /* ==============================================
    MODE SELECTION (step 0)
    ============================================== */
@@ -929,21 +1156,21 @@
     max-height: min(90vh, 600px);
   }
 
-  .progress-tracker {
+  .stepper-list {
     padding: 0 0.5rem;
   }
 
-  .step-item {
+  .stepper-item {
     width: 70px;
   }
 
-  .step-circle {
+  .stepper-circle {
     width: 28px;
     height: 28px;
     font-size: 0.8125rem;
   }
 
-  .step-label {
+  .stepper-label {
     font-size: 0.6875rem;
   }
 
@@ -999,29 +1226,18 @@
     font-size: 1.125rem;
   }
 
-  .progress-tracker {
-    padding: 0;
+  .stepper {
     margin-bottom: 0.875rem;
   }
 
-  .progress-line {
-    left: 0.25rem;
-    right: 3rem;
+  /* Below 480px, swap the numbered stepper for "Step X of 3" + a bar —
+   * there isn't room for three labeled circles without truncating text. */
+  .stepper-track-wrapper {
+    display: none;
   }
 
-  .step-item {
-    width: 60px;
-  }
-
-  .step-circle {
-    width: 26px;
-    height: 26px;
-    font-size: 0.75rem;
-    margin-bottom: 0.375rem;
-  }
-
-  .step-label {
-    font-size: 0.625rem;
+  .stepper-compact {
+    display: block;
   }
 
   .divider {
@@ -1131,6 +1347,15 @@
     align-self: flex-start;
   }
 
+  .offline-queue-banner {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .offline-queue-banner__btn {
+    align-self: flex-start;
+  }
+
   .modal-footer {
     gap: 0.5rem;
     margin-top: 0.875rem;
@@ -1149,23 +1374,9 @@
     padding: 0.75rem;
   }
 
-  .progress-tracker {
-    padding: 0;
-  }
-
-  .step-item {
-    width: 55px;
-  }
-
-  .step-circle {
-    width: 24px;
-    height: 24px;
-    font-size: 0.6875rem;
-  }
-
-  .step-label {
-    font-size: 0.5625rem;
-  }
+  /* .stepper-track-wrapper is already display:none below 480px — the
+   * compact "Step X of 3" variant (.stepper-compact) doesn't need further
+   * shrinking at this breakpoint. */
 
   .review-card {
     padding: 0.5rem 0.625rem;
@@ -1224,6 +1435,10 @@
     font-size: 0.6875rem;
   }
 
+  .offline-queue-banner {
+    font-size: 0.6875rem;
+  }
+
   .btn {
     padding: 0.4375rem 0.5rem;
     font-size: 0.8125rem;
@@ -1241,7 +1456,7 @@
     max-height: calc(95vh - 180px);
   }
 
-  .progress-tracker {
+  .stepper {
     margin-bottom: 0.5rem;
   }
 
@@ -1327,7 +1542,9 @@
   border: 2px solid var(--color-danger);
   background: rgba(239, 68, 68, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Success state: 1px success border + subtle green tint */
@@ -1335,7 +1552,9 @@
   border: 1px solid var(--color-success);
   background: rgba(16, 185, 129, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Validation message: base */
@@ -1357,7 +1576,273 @@
   color: var(--color-text-muted);
 }
 
+.unit-cycle-hint {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
 /* Success message modifier */
 .validation-message--success {
   color: var(--color-success);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE CONTRAST-CHECK UX (Stream Label Color Swatch Picker)
+   ═══════════════════════════════════════════════════════════ */
+
+.label-color-section {
+  margin-top: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.label-color-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.label-color-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-vivid, #1a1f36);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.swatch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.swatch-btn:hover {
+  transform: scale(1.15);
+}
+
+.swatch-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-bg-primary, #ffffff),
+    0 0 0 4px var(--focus-ring-color, #00d4aa);
+}
+
+.swatch-btn.selected {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 2px var(--color-bg-primary, #ffffff),
+    0 0 0 4px var(--focus-ring-color, #00d4aa);
+}
+
+.swatch-btn-checkmark {
+  width: 14px;
+  height: 14px;
+  color: #ffffff;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+}
+
+.swatch-btn.swatch-btn--light .swatch-btn-checkmark {
+  color: #0f172a;
+}
+
+.swatch-clear-btn {
+  background: transparent;
+  border: 1px solid var(--border-neutral, #d0d7e0);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7a94);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.swatch-clear-btn:hover {
+  border-color: var(--border-strong, #a0aec0);
+  color: var(--text-vivid, #1a1f36);
+}
+
+.swatch-custom-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.swatch-custom-input {
+  width: 110px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-family: monospace;
+  border: 1px solid var(--border-neutral, #d0d7e0);
+  border-radius: 6px;
+  background: var(--surface-base, #ffffff);
+  color: var(--text-vivid, #1a1f36);
+}
+
+.swatch-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7a94);
+  background: var(--surface-sunken, #f5f7fa);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.swatch-theme-toggle button {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-muted, #6b7a94);
+}
+
+.swatch-theme-toggle button.active {
+  background: var(--surface-base, #ffffff);
+  color: var(--text-vivid, #1a1f36);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Indicator Badges */
+.contrast-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.contrast-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.contrast-badge--none {
+  background: var(--surface-sunken, #f1f5f9);
+  color: var(--text-muted, #475569);
+  border: 1px solid var(--border-neutral, #cbd5e1);
+}
+
+.contrast-badge--pass {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+:root[data-theme="dark"] .contrast-badge--pass {
+  background: rgba(16, 185, 129, 0.15);
+  color: #00d4aa;
+  border: 1px solid rgba(0, 212, 170, 0.3);
+}
+
+.contrast-badge--fail {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+:root[data-theme="dark"] .contrast-badge--fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.contrast-badge--overridden {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+:root[data-theme="dark"] .contrast-badge--overridden {
+  background: rgba(245, 158, 11, 0.15);
+  color: #ffa726;
+  border: 1px solid rgba(255, 167, 38, 0.3);
+}
+
+/* Contrast Warning & Override Container */
+.contrast-warning-box {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--status-error, #ff6b6b);
+  color: var(--text-vivid, #1a1f36);
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:root[data-theme="dark"] .contrast-warning-box {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.contrast-warning-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+:root[data-theme="dark"] .contrast-warning-text {
+  color: #ff6b6b;
+}
+
+.contrast-override-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.contrast-override-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent, #00d4aa);
+}
+
+.contrast-override-label {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary, #4a5565);
+}
+
+:root[data-theme="dark"] .contrast-override-label {
+  color: var(--text-secondary, #b0b8c9);
+}
+

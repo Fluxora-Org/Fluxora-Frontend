@@ -38,7 +38,7 @@ export default function NotFound() {
         <div className="nf-actions" role="group" aria-label="404 actions">
           <Button
             variant="primary"
-            onClick={() => navigate('/', { replace: true })}
+            onClick={() => navigate('/app', { replace: true })}
             icon={
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clipPath="url(#clip0_1_7424)">
@@ -58,7 +58,7 @@ export default function NotFound() {
 
           <Button
             variant="secondary"
-            onClick={() => window.location.href = '/'}
+            onClick={() => navigate('/')}
           >
             Back to home
           </Button>
