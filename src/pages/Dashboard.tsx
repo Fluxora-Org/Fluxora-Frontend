@@ -7,6 +7,7 @@ import ConnectWalletModal from "../components/ConnectWalletModal";
 import ToastNotification, {
   type ToastVariant,
 } from "../components/ToastNotification";
+import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
@@ -248,6 +249,12 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+      />
+
+      <CreateStreamFab
+        onCreateStream={() => setIsModalOpen(true)}
+        disabled={!walletConnected}
+        hidden={isModalOpen}
       />
 
       <ConnectWalletModal

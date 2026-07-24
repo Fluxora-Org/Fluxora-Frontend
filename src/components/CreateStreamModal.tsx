@@ -1,1257 +1,1895 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
-import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check } from "lucide-react";
-import styles from "./ConnectWalletModal.module.css";
-import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
-import { useWallet } from "./wallet-connect/Walletcontext";
-import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
-import { getNetworkLabel } from "../lib/config";
-import WalletIcon from "./WalletIcon";
+import { useState, useRef, useEffect } from 'react';
+import './CreateStreamModal.css';
+import { InputField } from './InputField';
+import { InputWithUnit } from './InputWithUnit';
+import { InfoTooltip } from './InfoTooltip';
+import { useModalAccessibility } from './useModalAccessibility';
+import { useWallet } from './wallet-connect/Walletcontext';
+import { useToast } from './toast/ToastProvider';
+import { useTransactionStatus } from '../hooks/useTransactionStatus';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import {
+  enqueueAction,
+  dequeueAction,
+  getQueuePosition,
+  getQueueLength,
+  subscribeToQueue,
+} from '../lib/offlineActionQueue';
+import { createStream, getTransactionStatus } from '../lib/stellar/tx';
+import { isValidStellarAddress, maskAddress } from '../lib/stellar';
+import {
+  computeStreamEndDate,
+  validateCliffBeforeEnd,
+  formatLocalDateTime,
+  isBeforeLocalDateTime,
+  isDateTimeInPast,
+} from '../lib/createStreamDates';
+import { useI18n } from '../i18n';
+import type { StreamDraftSnapshot } from '../lib/streamsSessionRecovery';
+import {
+  evaluateContrast,
+  THEME_BACKGROUNDS,
+} from '../utils/contrastUtils';
 
-/** Duration (ms) before the Freighter network check is considered hung. */
-const NETWORK_TIMEOUT_MS = 5000;
+export const LABEL_COLOR_SWATCHES = [
+  { hex: '#3b82f6', label: 'Blue' },
+  { hex: '#00a884', label: 'Teal' },
+  { hex: '#8b5cf6', label: 'Purple' },
+  { hex: '#ec4899', label: 'Pink' },
+  { hex: '#059669', label: 'Emerald' },
+  { hex: '#dc2626', label: 'Red' },
+  { hex: '#fef08a', label: 'Light Yellow' },
+  { hex: '#94a3b8', label: 'Muted Slate' },
+  { hex: '#ffffff', label: 'White' },
+  { hex: '#0a0e17', label: 'Dark' },
+];
+
+const USDC_DECIMAL_PLACES = 7;
+
+const STEPPER_TOTAL_STEPS = 3;
+const STEPPER_LABEL_KEYS = [
+  "createStream.steps.recipientAmount",
+  "createStream.steps.rateSchedule",
+  "createStream.steps.reviewCreate",
+] as const;
+
+export function sanitizeDepositAmountInput(value: string): string {
+  const digitsAndDots = value.replace(/[^0-9.]/g, "");
+  const [rawInteger = "", ...fractionParts] = digitsAndDots.split(".");
+  const hasDecimal = digitsAndDots.includes(".");
+  const integerPart = rawInteger.replace(/^0+(?=\d)/, "");
+  const normalizedInteger = integerPart || (hasDecimal ? "0" : "");
+  const fractionPart = fractionParts
+    .join("")
+    .slice(0, USDC_DECIMAL_PLACES);
+
+  return hasDecimal ? `${normalizedInteger}.${fractionPart}` : normalizedInteger;
+}
+
+// Keep demo stream math below JS safe-integer territory while still allowing large institutional schedules.
+export const MAX_ACCRUAL_RATE = 100_000;
+export const MIN_DURATION_DAYS = 1;
+export const MAX_DURATION_DAYS = 3_650;
+export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
 /**
- * Wraps a promise with a timeout that rejects after `ms` milliseconds.
- * The underlying timer is cleared when the promise settles, preventing
- * unnecessary work after resolution or rejection.
+ * Converts a user-entered decimal string into the numeric value used by stream
+ * rate, duration, and deposit calculations.
  */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("NETWORK_CHECK_TIMEOUT")), ms);
-    promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
-    );
-  });
+function parseStreamNumber(value: string): number {
+  return parseFloat(value.replace(/,/g, ""));
 }
 
-interface ConnectWalletModalProps {
+/**
+ * Calculates the total USDC deposit required for a daily stream rate across the
+ * entered duration in days.
+ */
+function calculateRequiredDeposit(
+  dailyRate: string,
+  durationDays: string,
+): string {
+  return (
+    parseStreamNumber(dailyRate || "0") * parseStreamNumber(durationDays || "0")
+  ).toFixed(2);
+}
+
+/**
+ * Formats a validated deposit amount for the review step without substituting
+ * fabricated placeholder values.
+ */
+function formatReviewDeposit(value: string): string {
+  return parseStreamNumber(value).toFixed(2);
+}
+
+/** Formats the daily duration unit with singular/plural copy. */
+function formatDurationUnit(value: string, t: any): string {
+  const count = parseStreamNumber(value);
+  return count === 1 ? t("createStream.duration.day_one") : t("createStream.duration.day_other", { count });
+}
+
+function validateAccrualRate(value: string, t: any): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return t("createStream.validation.ratePositive");
+  }
+
+  if (numericValue > MAX_ACCRUAL_RATE) {
+    return t("createStream.validation.rateMax", { max: MAX_ACCRUAL_RATE.toLocaleString() });
+  }
+
+  return undefined;
+}
+
+function validateDuration(value: string, t: any): string | undefined {
+  const numericValue = parseFloat(value);
+
+  if (!value.trim() || isNaN(numericValue) || numericValue <= 0) {
+    return t("createStream.validation.durationPositive");
+  }
+
+  if (numericValue < MIN_DURATION_DAYS) {
+    return t("createStream.validation.durationMin", { min: MIN_DURATION_DAYS });
+  }
+
+  if (numericValue > MAX_DURATION_DAYS) {
+    return t("createStream.validation.durationMax", { max: MAX_DURATION_DAYS.toLocaleString() });
+  }
+
+  return undefined;
+}
+
+/** Snapshot of everything `createStream` needs, captured at submit time so a
+ * queued (offline) submission replays with the exact values the user reviewed. */
+interface StreamSubmissionPayload {
+  sender: string;
+  recipient: string;
+  amount: string;
+  start: number;
+  end: number;
+  cliffTime?: number;
+}
+
+interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConnectFreighter?: () => void;
-  onConnectAlbedo?: () => void;
-  onConnectWalletConnect?: () => void;
-  // Optional controlled error state to drive the modal view from a parent component
-  errorState?:
-    | "not_installed"
-    | "rejected"
-    | "network_mismatch"
-    | "network_timeout"
-    | "device-searching"
-    | "device-found-selecting"
-    | "awaiting-device-confirmation"
-    | "device-locked-error"
-    | "wrong-app-error"
-    | "unplugged-error"
-    | "mobile-unsupported"
-    | null;
-  // Handler for retrying connection
-  onRetryConnection?: () => void;
-  // Handler for downloading extension
-  onDownloadFreighter?: () => void;
-  // Optional flag to explicitly show or hide the Design QA Preview switcher (default: true for reviewability)
-  showStateSwitcher?: boolean;
-  expectedNetworkLabel?: string;
-  actualNetworkLabel?: string | null;
+  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
+  onStreamCreated?: () => void | Promise<void>;
+  /** Called when stream creation fails after the user confirms the review step. */
+  onStreamError?: (err: unknown) => void;
+  /**
+   * Restores step 1/2 field values when the modal opens — used by the Streams
+   * session-recovery banner to resume an unsubmitted draft. Never applied past
+   * step 2 (see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2).
+   */
+  initialDraft?: StreamDraftSnapshot | null;
+  /**
+   * Fires with the current safe-to-persist draft fields while the modal is
+   * open on step 1/2, and with `null` the instant the modal closes (any path)
+   * so a completed or abandoned draft is never left resumable.
+   */
+  onDraftChange?: (draft: StreamDraftSnapshot | null) => void;
 }
 
-interface WalletOption {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  iconSrc?: string;
-  action: () => void;
-  disabled?: boolean;
-}
-
-export default function ConnectWalletModal({
+export default function CreateStreamModal({
   isOpen,
   onClose,
-  onConnectFreighter,
-  onConnectAlbedo,
-  onConnectWalletConnect,
-  errorState,
-  onRetryConnection,
-  onDownloadFreighter,
-  showStateSwitcher = true,
-  expectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork()),
-  actualNetworkLabel = null,
-}: ConnectWalletModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
-  
-  // Track hovered/focused options in default view
-  const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
-  const [focusedOptionId, setFocusedOptionId] = useState<string | null>(null);
-  const [connectingId, setConnectingId] = useState<string | null>(null);
-  const isRequestInFlight = useRef(false);
-  
-  const { connect } = useWallet();
+  onStreamCreated,
+  onStreamError,
+  initialDraft,
+  onDraftChange,
+}: CreateStreamModalProps) {
+  const wallet = useWallet();
+  const { addToast } = useToast();
+  const { t } = useI18n();
 
-  // Internal error state for uncontrolled usage/simulation
-  const [internalErrorState, setInternalErrorState] = useState<
-    | "not_installed"
-    | "rejected"
-    | "network_mismatch"
-    | "network_timeout"
-    | "device-searching"
-    | "device-found-selecting"
-    | "awaiting-device-confirmation"
-    | "device-locked-error"
-    | "wrong-app-error"
-    | "unplugged-error"
-    | "mobile-unsupported"
-    | null
+  const [recipient, setRecipient] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [accrualRate, setAccrualRate] = useState("38.62");
+  const [duration, setDuration] = useState("1");
+  const [startTimeOption, setStartTimeOption] = useState<"now" | "custom">(
+    "now",
+  );
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [cliffEnabled, setCliffEnabled] = useState(false);
+  const [cliffDate, setCliffDate] = useState("");
+
+  // Stream Label Color & Live Contrast Check States
+  const [labelColor, setLabelColor] = useState<string>("");
+  const [customHexInput, setCustomHexInput] = useState<string>("");
+  const [overrideContrast, setOverrideContrast] = useState<boolean>(false);
+  const [targetTheme, setTargetTheme] = useState<'light' | 'dark'>('light');
+  const [focusedSwatchIndex, setFocusedSwatchIndex] = useState<number>(0);
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
+  const [hasCompletedConfirmation, setHasCompletedConfirmation] =
+    useState(false);
+  const [queuedSubmission, setQueuedSubmission] = useState<
+    { id: string; position: number } | null
   >(null);
+  const [queueLength, setQueueLength] = useState(0);
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
+  const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const recipientInputRef = useRef<HTMLInputElement>(null);
+  const submitInFlightRef = useRef(false);
+  const pendingSubmissionRef = useRef<StreamSubmissionPayload | null>(null);
+  const flushedFromQueueRef = useRef(false);
+  const isOnline = useOnlineStatus();
 
-  // Determine active state (controlled prop takes priority over internal state)
-  const currentErrorState = errorState !== undefined ? errorState : internalErrorState;
+  // Dynamic Contrast Evaluation against selected background theme
+  const bgHex = targetTheme === 'dark' ? THEME_BACKGROUNDS.dark : THEME_BACKGROUNDS.light;
+  const contrastEval = labelColor
+    ? evaluateContrast(labelColor, bgHex)
+    : { ratio: 0, passesAA: false, formattedRatio: '' };
 
-  // Hardware wallet configuration states
-  const [selectedDevice, setSelectedDevice] = useState<"ledger" | "trezor">("ledger");
-  const [derivationPath, setDerivationPath] = useState<string>("m/44'/148'/0'");
-  const [customPath, setCustomPath] = useState<string>("m/44'/148'/0'");
-  const [pathError, setPathError] = useState<string | null>(null);
+  const contrastState: 'no-selection' | 'AA-pass' | 'AA-fail-blocked' | 'AA-fail-overridden' = !labelColor
+    ? 'no-selection'
+    : contrastEval.passesAA
+    ? 'AA-pass'
+    : overrideContrast
+    ? 'AA-fail-overridden'
+    : 'AA-fail-blocked';
 
-  const [isMobile, setIsMobile] = useState(false);
-  const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(
-        window.innerWidth <= 768 ||
-        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      );
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  const handleCustomPathChange = (val: string) => {
-    setCustomPath(val);
-    const regex = /^m\/44'\/148'\/[0-9]+'?$/;
-    if (!regex.test(val)) {
-      setPathError("Invalid Stellar derivation path format (e.g. m/44'/148'/0')");
-    } else {
-      setPathError(null);
+  const handleSwatchKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(nextIndex);
+      const swatch = LABEL_COLOR_SWATCHES[nextIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = (index - 1 + LABEL_COLOR_SWATCHES.length) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(prevIndex);
+      const swatch = LABEL_COLOR_SWATCHES[prevIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setFocusedSwatchIndex(0);
+      const swatch = LABEL_COLOR_SWATCHES[0];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const lastIndex = LABEL_COLOR_SWATCHES.length - 1;
+      setFocusedSwatchIndex(lastIndex);
+      const swatch = LABEL_COLOR_SWATCHES[lastIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
     }
   };
 
-  // Simulate desktop scanning transition
-  useEffect(() => {
-    if (currentErrorState === "device-searching" && isSimulatingHardwareFlow) {
-      const timer = setTimeout(() => {
-        setInternalErrorState("device-found-selecting");
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [currentErrorState, isSimulatingHardwareFlow]);
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+  const userDeposit = 200.0;
+  const accrualRateValue = parseFloat(accrualRate || "0");
+  const durationValue = parseFloat(duration || "0");
+  const requiredDepositValue = accrualRateValue * durationValue;
+  const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
+  const transactionStatus = useTransactionStatus(submittedTxHash, {
+    enabled: currentStep === 3 && Boolean(submittedTxHash),
+    getStatus: getTransactionStatus,
+  });
+  const isConfirmationPending = transactionStatus.status === "pending";
+  const isQueued = Boolean(queuedSubmission);
+  // Actively in-flight (network round trip or wallet signature); close/cancel
+  // stay blocked here, same as today. `isQueued` alone does NOT block them —
+  // a queued submission is just captured locally, nothing is in flight yet.
+  const isActivelySubmitting =
+    isSubmitting || isConfirmationPending || isFlushingQueue;
+  const isBusyCreating = isActivelySubmitting || isQueued;
+  const submitButtonLabel =
+    currentStep === 3 && isQueued
+      ? t("createStream.button.queued")
+      : currentStep === 3 && isFlushingQueue
+        ? t("createStream.button.flushing")
+        : currentStep === 3 && isSubmitting
+          ? t("createStream.button.submitting")
+          : currentStep === 3 && isConfirmationPending
+            ? t("createStream.button.confirming")
+            : currentStep === 3 && transactionStatus.status === "failed"
+              ? t("createStream.button.retry")
+              : currentStep === 2
+                ? t("createStream.button.next")
+                : t("createStream.button.create");
 
-  // Simulate on-device approval confirmation transition
-  useEffect(() => {
-    if (currentErrorState === "awaiting-device-confirmation" && isSimulatingHardwareFlow) {
-      const timer = setTimeout(() => {
-        connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
-        setIsSimulatingHardwareFlow(false);
-        if (onConnectFreighter) {
-          onConnectFreighter();
-        }
-        onClose();
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [currentErrorState, isSimulatingHardwareFlow, connect, onClose, onConnectFreighter]);
+  useModalAccessibility({
+    isOpen,
+    onClose,
+    modalRef,
+    initialFocusRef: recipientInputRef,
+  });
 
-  const handleHardwareClick = () => {
-    setIsSimulatingHardwareFlow(true);
-    if (isMobile) {
-      setInternalErrorState("mobile-unsupported");
-    } else {
-      setInternalErrorState("device-searching");
+  // Apply a restored draft when the modal is opened for it. Capped at step 2 —
+  // never resume directly into step 3 (review/create); see spec §2.
+  useEffect(() => {
+    if (!isOpen || !initialDraft) return;
+
+    setRecipient(initialDraft.recipient);
+    setDepositAmount(initialDraft.depositAmount);
+    setAccrualRate(initialDraft.accrualRate);
+    setDuration(initialDraft.duration);
+    setStartTimeOption(initialDraft.startTimeOption);
+    setCustomStartDate(initialDraft.customStartDate);
+    setCliffEnabled(initialDraft.cliffEnabled);
+    setCliffDate(initialDraft.cliffDate);
+    setCurrentStep(initialDraft.step);
+    // Only re-apply when the modal transitions open; initialDraft is a one-shot
+    // seed, not a controlled value the modal should keep resyncing to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Report the safe-to-persist draft fields upward while unsubmitted (step 1/2
+  // only). The parent clears this to null on every close path and on success —
+  // see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2.
+  useEffect(() => {
+    if (!isOpen || currentStep > 2 || !onDraftChange) return;
+
+    onDraftChange({
+      step: currentStep === 2 ? 2 : 1,
+      recipient,
+      depositAmount,
+      accrualRate,
+      duration,
+      startTimeOption,
+      customStartDate,
+      cliffEnabled,
+      cliffDate,
+    });
+  }, [
+    isOpen,
+    currentStep,
+    recipient,
+    depositAmount,
+    accrualRate,
+    duration,
+    startTimeOption,
+    customStartDate,
+    cliffEnabled,
+    cliffDate,
+    onDraftChange,
+  ]);
+
+  const getStreamErrorMessage = (err: unknown): string => {
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
     }
+    return t("createStream.error.generic");
   };
 
-  // Handle Freighter selection: perform actual connection and network verification
-  const handleFreighterClick = async () => {
-    if (isRequestInFlight.current) return;
-    isRequestInFlight.current = true;
-    setConnectingId("freighter");
-    setInternalErrorState(null);
+  const buildSubmissionPayload = (): StreamSubmissionPayload => {
+    const sender = wallet.address!;
+    const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+    const amount = Math.floor(parsedAmount * 10_000_000).toString();
+
+    const start = startTimeOption === "now"
+      ? Math.floor(Date.now() / 1000)
+      : Math.floor(new Date(customStartDate).getTime() / 1000);
+
+    const durationDays = parseFloat(duration) || 0;
+    const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+    const end = start + durationSeconds;
+
+    const cliffTime = cliffEnabled && cliffDate
+      ? Math.floor(new Date(cliffDate).getTime() / 1000)
+      : undefined;
+
+    return { sender, recipient: recipient.trim(), amount, start, end, cliffTime };
+  };
+
+  /** Submits a payload to the network. Identical for the immediate-online
+   * path and a queue flush — the confirmation/success/error handling that
+   * follows (polling, toast, onStreamCreated, onClose) is the same either way. */
+  const submitPayload = async (payload: StreamSubmissionPayload) => {
+    submitInFlightRef.current = true;
+    setIsSubmitting(true);
     try {
-      const ready = await isConnected();
-      if (!ready.isConnected) {
-        setInternalErrorState("not_installed");
-        if (onDownloadFreighter) {
-          onDownloadFreighter();
-        }
-        return;
+      const response = await createStream(
+        payload.sender,
+        payload.recipient,
+        payload.amount,
+        payload.start,
+        payload.end,
+        payload.cliffTime,
+      );
+      if (!response.txHash) {
+        throw new Error("Missing transaction hash from Stellar RPC.");
       }
-
-      const access = await requestAccess();
-      if (access.error || !access.address) {
-        setInternalErrorState("rejected");
-        return;
-      }
-
-      const net = await withTimeout(getNetwork(), NETWORK_TIMEOUT_MS);
-      if (net.error || !net.network) {
-        setInternalErrorState("rejected");
-        return;
-      }
-
-      const expectedNet = getExpectedStellarNetwork();
-      const actualUpper = net.network.toUpperCase();
-      const expectedUpper = expectedNet.toUpperCase();
-      if (actualUpper !== expectedUpper) {
-        setInternalErrorState("network_mismatch");
-        return;
-      }
-
-      // Successful connection!
-      connect(access.address, net.network);
-      if (onConnectFreighter) {
-        onConnectFreighter();
-      }
-      onClose();
+      setSubmittedTxHash(response.txHash);
     } catch (err) {
-      if (err instanceof Error && err.message === "NETWORK_CHECK_TIMEOUT") {
-        setInternalErrorState("network_timeout");
-      } else {
-        setInternalErrorState("rejected");
-      }
+      const message = getStreamErrorMessage(err);
+      setStreamError(message);
+      addToast(t("createStream.error.failedWithMessage", { message }), "error");
+      onStreamError?.(err);
     } finally {
-      isRequestInFlight.current = false;
-      setConnectingId(null);
+      submitInFlightRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
-  // Reset internal error state back to default wallet list
-  const handleBackToWalletSelection = () => {
-    setInternalErrorState(null);
-    if (onRetryConnection) {
-      onRetryConnection();
-    }
-  };
-
-  // Keyboard navigation & Focus Trapping
   useEffect(() => {
-    if (!isOpen) {
+    if (
+      transactionStatus.status !== "confirmed" ||
+      hasCompletedConfirmation
+    ) {
       return;
     }
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    setHasCompletedConfirmation(true);
+    if (flushedFromQueueRef.current) {
+      flushedFromQueueRef.current = false;
+      addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
+        label: t("createStream.queue.viewStreamAction"),
+        onClick: () => onStreamCreated?.(),
+      });
+    } else {
+      addToast(t("createStream.success.message"), "success");
+    }
+    onStreamCreated?.();
+    onClose();
+  }, [
+    addToast,
+    hasCompletedConfirmation,
+    onClose,
+    onStreamCreated,
+    transactionStatus.status,
+    t,
+  ]);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-
-      if (e.key !== "Tab") {
-        return;
-      }
-
-      const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-
-      if (!focusableElements || focusableElements.length === 0) {
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (e.shiftKey && document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement.focus();
-      } else if (!e.shiftKey && document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    
-    // Auto-focus the close button or primary action when the modal opens
-    closeButtonRef.current?.focus();
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocusedRef.current?.focus();
-      previouslyFocusedRef.current = null;
-    };
-  }, [isOpen, onClose]);
-
-  // Focus Management: Automatically shift focus to the primary recovery action when the screen changes
+  // Auto-flush a queued submission as soon as connectivity returns. Runs even
+  // while the modal is closed (isOpen=false only skips rendering — this
+  // component and its effects stay mounted for the lifetime of the parent).
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOnline || !queuedSubmission) return;
 
-    const timer = setTimeout(() => {
-      if (currentErrorState) {
-        const autofocusElement = modalRef.current?.querySelector<HTMLElement>(
-          '[data-autofocus="true"]'
+    const submission = queuedSubmission;
+    const payload = pendingSubmissionRef.current;
+    if (!payload) return;
+
+    let cancelled = false;
+
+    const flush = async () => {
+      setIsFlushingQueue(true);
+      try {
+        const response = await createStream(
+          payload.sender,
+          payload.recipient,
+          payload.amount,
+          payload.start,
+          payload.end,
+          payload.cliffTime,
         );
-        if (autofocusElement) {
-          autofocusElement.focus();
-        } else {
-          closeButtonRef.current?.focus();
+        if (cancelled) return;
+        if (!response.txHash) {
+          throw new Error("Missing transaction hash from Stellar RPC.");
         }
-      } else {
-        closeButtonRef.current?.focus();
+        dequeueAction(submission.id);
+        pendingSubmissionRef.current = null;
+        flushedFromQueueRef.current = true;
+        setQueuedSubmission(null);
+        setQueueLength(getQueueLength());
+        setSubmittedTxHash(response.txHash);
+      } catch (err) {
+        if (cancelled) return;
+        dequeueAction(submission.id);
+        setQueuedSubmission(null);
+        setQueueLength(getQueueLength());
+        setQueueFlushError(getStreamErrorMessage(err));
+      } finally {
+        if (!cancelled) setIsFlushingQueue(false);
       }
-    }, 50);
+    };
 
-    return () => clearTimeout(timer);
-  }, [isOpen, currentErrorState]);
+    void flush();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on queuedSubmission.id via isOnline+id; the payload comes from a ref, not a dep.
+  }, [isOnline, queuedSubmission?.id]);
 
-  if (!isOpen) {
-    return null;
-  }
+  // Keeps the displayed queue position in sync if other queued actions ahead
+  // of this one flush or get removed (multi-submission scenario).
+  useEffect(() => {
+    if (!queuedSubmission) return;
+    return subscribeToQueue(() => {
+      setQueuedSubmission((prev) =>
+        prev ? { ...prev, position: getQueuePosition(prev.id) } : prev,
+      );
+      setQueueLength(getQueueLength());
+    });
+  }, [queuedSubmission?.id]);
 
-  const handleBackdropClick = (e: MouseEvent) => {
-    if (e.target === e.currentTarget) {
+  const resetTransactionState = () => {
+    transactionStatus.reset();
+    setSubmittedTxHash(null);
+    setHasCompletedConfirmation(false);
+    setQueueFlushError(null);
+    flushedFromQueueRef.current = false;
+  };
+
+  const validateStep1 = (): boolean => {
+    if (!recipient.trim()) {
+      setError(t("createStream.validation.recipientRequired"));
+      return false;
+    }
+    const normalizedRecipient = recipient.trim();
+
+    /**
+     * Self-send rule: Reject streams where the recipient equals the connected wallet address.
+     * This prevents users from wasting a deposit on a no-op transfer to themselves.
+     */
+    if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
+      setError("Recipient cannot be the same as the connected wallet address.");
+      return false;
+    }
+
+    if (!isValidStellarAddress(normalizedRecipient)) {
+      setError(
+        t("createStream.validation.recipientInvalid"),
+      );
+      return false;
+    }
+    const amount = parseFloat(depositAmount.replace(/,/g, ""));
+    if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
+      setError(t("createStream.validation.depositPositive"));
+      return false;
+    }
+
+    if (contrastState === 'AA-fail-blocked') {
+      setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
+      return false;
+    }
+
+    setError(null);
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    // Mark all active step-2 fields as touched
+    const touchedFields: Record<string, boolean> = {
+      accrualRate: true,
+      duration: true,
+    };
+    if (startTimeOption === 'custom') {
+      touchedFields.customStartDate = true;
+    }
+    if (cliffEnabled) {
+      touchedFields.cliffDate = true;
+    }
+    setTouched(prev => ({ ...prev, ...touchedFields }));
+
+    if (validateAccrualRate(accrualRate, t)) {
+      return false;
+    }
+    if (validateDuration(duration, t)) {
+      return false;
+    }
+    if (
+      !Number.isFinite(requiredDepositValue) ||
+      requiredDepositValue > MAX_REQUIRED_DEPOSIT
+    ) {
+      return false;
+    }
+    // Validate deposit balance
+    if (parseFloat(requiredDeposit) > userDeposit) {
+      return false;
+    }
+    // Validate custom start date
+    if (startTimeOption === 'custom') {
+      if (!customStartDate) {
+        return false;
+      }
+      if (isDateTimeInPast(customStartDate)) {
+        return false;
+      }
+    }
+    // Validate cliff date
+    if (cliffEnabled) {
+      if (!cliffDate) {
+        return false;
+      }
+      if (isDateTimeInPast(cliffDate)) {
+        return false;
+      }
+      if (startTimeOption === 'custom' && customStartDate) {
+        if (isBeforeLocalDateTime(cliffDate, customStartDate)) {
+          return false;
+        }
+      }
+      // Cross-field: cliff must not exceed stream end date
+      const selectedCliffDate = new Date(cliffDate);
+      const startMs = startTimeOption === 'custom' && customStartDate
+        ? new Date(customStartDate).getTime()
+        : Date.now();
+      const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+      if (endDate && validateCliffBeforeEnd(selectedCliffDate, endDate) !== null) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNext = async () => {
+    if (isBusyCreating) return;
+
+    if (currentStep === 1) {
+      setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
+      if (!validateStep1()) return;
+      setCurrentStep(2);
+      return;
+    }
+    if (currentStep === 2) {
+      if (!validateStep2()) return;
+      resetTransactionState();
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      if (submitInFlightRef.current) return;
+
+      if (!wallet.connected) {
+        setError(t("createStream.validation.walletNotConnected"));
+        return;
+      }
+      if (wallet.isNetworkMismatch) {
+        setError(t("createStream.validation.networkMismatch", {
+          expected: wallet.expectedNetwork,
+          actual: wallet.network?.toUpperCase() || "",
+        }));
+        return;
+      }
+
+      setError(null);
+      setStreamError(null);
+      resetTransactionState();
+
+      const payload = buildSubmissionPayload();
+
+      if (!isOnline) {
+        // Capture locally instead of hanging on a request that can't reach
+        // the network. Flushed automatically by the effect above once the
+        // `online` event fires.
+        const entry = enqueueAction(payload);
+        pendingSubmissionRef.current = payload;
+        setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
+        setQueueLength(getQueueLength());
+        return;
+      }
+
+      // Unchanged online path.
+      await submitPayload(payload);
+    }
+  };
+
+  const handleRetryQueuedSubmission = async () => {
+    const payload = pendingSubmissionRef.current;
+    if (!payload) return;
+    setQueueFlushError(null);
+
+    if (!isOnline) {
+      const entry = enqueueAction(payload);
+      setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
+      setQueueLength(getQueueLength());
+      return;
+    }
+
+    await submitPayload(payload);
+  };
+
+  const handleEditQueuedSubmission = () => {
+    setQueueFlushError(null);
+    pendingSubmissionRef.current = null;
+    setCurrentStep(1);
+  };
+
+  const handleBack = () => {
+    if (isBusyCreating) return;
+
+    if (currentStep === 3) {
+      resetTransactionState();
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+    } else {
       onClose();
     }
   };
 
-  const walletOptions: WalletOption[] = [
-    {
-      id: "freighter",
-      name: "Freighter",
-      description: "Recommended browser extension for Stellar wallets.",
-      icon: "🚀",
-      iconSrc: "/src/assets/images/freighter.svg",
-      action: handleFreighterClick,
-    },
-    {
-      id: "albedo",
-      name: "Albedo",
-      description: "Open in-browser wallet for quick secure approvals.",
-      icon: "⭐",
-      iconSrc: "/src/assets/images/albedo.svg",
-      action: onConnectAlbedo ?? (() => {}),
-      disabled: !onConnectAlbedo,
-    },
-    {
-      id: "walletconnect",
-      name: "WalletConnect",
-      description: "Pair with compatible mobile wallets via QR.",
-      icon: "🔗",
-      iconSrc: "/src/assets/images/walletconnect.svg",
-      action: onConnectWalletConnect ?? (() => {}),
-      disabled: !onConnectWalletConnect,
-    },
-    {
-      id: "hardware",
-      name: "Hardware Wallet",
-      description: "Connect via Ledger or Trezor device.",
-      icon: "🛠️",
-      iconSrc: "/src/assets/images/hardware.svg",
-      action: handleHardwareClick,
-    },
-  ];
+  /** Jumps back to a completed step via the stepper header. Mirrors the
+   * review-card "Edit" buttons: only ever moves backward, and clears any
+   * in-flight transaction state the same way leaving step 3 already does. */
+  const handleStepClick = (step: number) => {
+    if (isBusyCreating || step >= currentStep) return;
+    if (currentStep === 3) {
+      resetTransactionState();
+    }
+    setCurrentStep(step);
+  };
+
+  const handleCancel = () => {
+    // Intentionally checks isActivelySubmitting, not isBusyCreating: a
+    // queued-offline submission must not block Cancel from closing the modal.
+    if (isActivelySubmitting) return;
+    onClose();
+  };
+
+  const handleClose = () => {
+    if (isActivelySubmitting) return;
+    onClose();
+  };
+
+  if (!isOpen) return null;
 
   return (
-    <div
-      className={styles.backdrop}
-      onClick={handleBackdropClick}
-      data-testid="connect-wallet-backdrop"
-    >
+    <div className="modal-overlay create-stream-overlay" onClick={handleClose}>
       <div
-        id="connect-wallet-modal"
-        className={styles.modal}
+        className="modal-content create-stream-modal"
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="connect-wallet-modal-title"
-        aria-describedby="connect-wallet-modal-description"
+        aria-labelledby="create-stream-title"
+        aria-describedby="create-stream-description"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button - always visible and accessible in any view */}
-        <button
-          type="button"
-          ref={closeButtonRef}
-          className={styles.closeButton}
-          onClick={onClose}
-          aria-label="Close wallet connection dialog"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
+        <div className="modal-header">
+          <div>
+            <h2 id="create-stream-title">{t("createStream.title")}</h2>
+            <p id="create-stream-description" className="modal-description">
+              {t("createStream.description")}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="close-button"
+            onClick={handleClose}
+            disabled={isActivelySubmitting}
+            aria-label={t("createStream.accessibility.closeLabel")}
           >
-            <path
-              d="M1 1l12 12M13 1L1 13"
+            <svg
+              width="24"
+              height="24"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
 
-        {/* DEFAULT STATE: Choose Wallet Provider */}
-        {!currentErrorState && (
+        {(() => {
+          const stepLabels = STEPPER_LABEL_KEYS.map((key) => t(key));
+          const currentLabel = stepLabels[currentStep - 1];
+          const trackFillPercent =
+            ((currentStep - 1) / (STEPPER_TOTAL_STEPS - 1)) * 100;
+          const renderStepLabel = (label: string) => {
+            const [p1, p2] = label.split(" & ");
+            return p2 ? <>{p1} &<br />{p2}</> : label;
+          };
+
+          return (
+            <nav
+              className="stepper"
+              aria-label={t("createStream.stepper.navLabel")}
+            >
+              <div className="stepper-track-wrapper">
+                <div className="stepper-track" aria-hidden="true">
+                  <div
+                    className="stepper-track-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+                <ol className="stepper-list">
+                {stepLabels.map((label, index) => {
+                  const step = index + 1;
+                  const isCompleted = step < currentStep;
+                  const isCurrent = step === currentStep;
+
+                  if (isCompleted) {
+                    return (
+                      <li
+                        key={step}
+                        className="stepper-item stepper-item--completed"
+                      >
+                        <button
+                          type="button"
+                          className="stepper-step stepper-step--completed"
+                          onClick={() => handleStepClick(step)}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.stepper.jumpToStepAria", {
+                            step,
+                            label,
+                          })}
+                        >
+                          <span className="stepper-circle" aria-hidden="true">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                          <span className="stepper-label">{renderStepLabel(label)}</span>
+                        </button>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li
+                      key={step}
+                      className={`stepper-item ${isCurrent ? "stepper-item--current" : "stepper-item--upcoming"}`}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      <span className="stepper-step">
+                        <span className="stepper-circle" aria-hidden="true">
+                          {step}
+                        </span>
+                        <span className="stepper-label">{renderStepLabel(label)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+                </ol>
+              </div>
+
+              <div className="stepper-compact">
+                <p className="stepper-compact-text">
+                  {t("createStream.stepper.compactStatus", {
+                    current: currentStep,
+                    total: STEPPER_TOTAL_STEPS,
+                    label: currentLabel,
+                  })}
+                </p>
+                <div className="stepper-compact-track" aria-hidden="true">
+                  <div
+                    className="stepper-compact-fill"
+                    style={{ width: `${trackFillPercent}%` }}
+                  />
+                </div>
+              </div>
+            </nav>
+          );
+        })()}
+
+        <div className="modal-body-scroll">
+          {error && (
+            <div className="validation-message validation-message--error" style={{ margin: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255, 107, 107, 0.15)', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)' }} role="alert">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+          {currentStep === 1 && (
           <>
-            <div className={styles.header}>
-              <span className={styles.badge} id="badge-default">Step 1 of 1</span>
-              <h2 id="connect-wallet-modal-title" className={styles.title}>
-                Choose your wallet
-              </h2>
-              <p id="connect-wallet-modal-description" className={styles.subtitle}>
-                Select a provider below to connect. You will review and approve the
-                request in your wallet.
+            <hr className="divider" />
+            <div className="section-header">
+              <h3>{t("createStream.step1.header")}</h3>
+              <p>{t("createStream.step1.subheader")}</p>
+            </div>
+            {(() => {
+              // Derived per-field validation state (not stored, computed inline)
+              const recipientError = touched.recipient
+                ? (!recipient.trim()
+                    ? t("createStream.validation.recipientRequired")
+                    : (wallet.connected && wallet.address && recipient.trim().toLowerCase() === wallet.address.toLowerCase())
+                    ? 'Recipient cannot be the same as the connected wallet address.'
+                    : !isValidStellarAddress(recipient.trim())
+                    ? t("createStream.validation.recipientInvalid")
+                    : undefined)
+                : undefined;
+              const recipientSuccess = touched.recipient && !recipientError && recipient.trim().length > 0;
+
+              const depositAmountNum = parseFloat(depositAmount.replace(/,/g, ''));
+              const depositError = touched.depositAmount
+                ? (!depositAmount.trim() || isNaN(depositAmountNum) || depositAmountNum <= 0
+                    ? t("createStream.validation.depositPositive")
+                    : undefined)
+                : undefined;
+              const depositSuccess = touched.depositAmount && !depositError && depositAmount.trim().length > 0;
+
+              return (
+                <>
+                  <InputField
+                    id="create-stream-recipient"
+                    label={t("createStream.step1.recipientLabel")}
+                    required
+                    error={recipientError}
+                    helperText={t("createStream.step1.recipientHelper")}
+                    success={recipientSuccess}
+                  >
+                    <input
+                      ref={recipientInputRef}
+                      type="text"
+                      className="input-field"
+                      value={recipient}
+                      onChange={(e) => {
+                        setRecipient(e.target.value);
+                        if (error) setError(null);
+                      }}
+                      onBlur={() => handleBlur('recipient')}
+                      placeholder={t("createStream.step1.recipientPlaceholder")}
+                      autoComplete="off"
+                    />
+                  </InputField>
+
+                  <InputField
+                    id="create-stream-deposit"
+                    label={t("createStream.step1.depositLabel")}
+                    required
+                    error={depositError}
+                    helperText={t("createStream.step1.depositHelper")}
+                    success={depositSuccess}
+                  >
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="input-field"
+                      value={depositAmount}
+                      onChange={(e) => {
+                        const v = sanitizeDepositAmountInput(e.target.value);
+                        setDepositAmount(v);
+                        if (error) setError(null);
+                      }}
+                      onBlur={() => handleBlur('depositAmount')}
+                      placeholder={t("createStream.step1.depositPlaceholder")}
+                    />
+                  </InputField>
+
+                  {/* Stream Label Color Swatch Picker & Live Contrast Check */}
+                  <div className="label-color-section" role="region" aria-labelledby="label-color-heading">
+                    <div className="label-color-header">
+                      <label id="label-color-heading" className="label-color-title">
+                        Stream Label Color <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Optional)</span>
+                      </label>
+                      <div className="swatch-theme-toggle" role="group" aria-label="Contrast background theme preview">
+                        <span>Against:</span>
+                        <button
+                          type="button"
+                          className={targetTheme === 'light' ? 'active' : ''}
+                          onClick={() => setTargetTheme('light')}
+                          aria-pressed={targetTheme === 'light'}
+                        >
+                          Light (#FFF)
+                        </button>
+                        <button
+                          type="button"
+                          className={targetTheme === 'dark' ? 'active' : ''}
+                          onClick={() => setTargetTheme('dark')}
+                          aria-pressed={targetTheme === 'dark'}
+                        >
+                          Dark (#0A0E17)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Swatch Grid */}
+                    <div
+                      className="swatch-grid"
+                      role="radiogroup"
+                      aria-label="Stream label color swatches"
+                    >
+                      {LABEL_COLOR_SWATCHES.map((swatch, idx) => {
+                        const isSelected = labelColor.toLowerCase() === swatch.hex.toLowerCase();
+                        const isFocused = focusedSwatchIndex === idx;
+                        const isLightSwatch = ['#ffffff', '#fef08a', '#94a3b8'].includes(swatch.hex.toLowerCase());
+
+                        return (
+                          <button
+                            key={swatch.hex}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-label={`${swatch.label} (${swatch.hex})`}
+                            tabIndex={isFocused || (focusedSwatchIndex === 0 && idx === 0) ? 0 : -1}
+                            className={`swatch-btn ${isSelected ? 'selected' : ''} ${isLightSwatch ? 'swatch-btn--light' : ''}`}
+                            style={{ backgroundColor: swatch.hex }}
+                            onClick={() => {
+                              setLabelColor(swatch.hex);
+                              setCustomHexInput(swatch.hex);
+                              setFocusedSwatchIndex(idx);
+                              setOverrideContrast(false);
+                              if (error) setError(null);
+                            }}
+                            onKeyDown={(e) => handleSwatchKeyDown(e, idx)}
+                          >
+                            {isSelected && (
+                              <svg
+                                className="swatch-btn-checkmark"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {labelColor && (
+                        <button
+                          type="button"
+                          className="swatch-clear-btn"
+                          onClick={() => {
+                            setLabelColor('');
+                            setCustomHexInput('');
+                            setOverrideContrast(false);
+                            if (error) setError(null);
+                          }}
+                          aria-label="Clear label color selection"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Custom Hex Row */}
+                    <div className="swatch-custom-input-row">
+                      <label htmlFor="custom-label-hex" style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                        Custom Hex:
+                      </label>
+                      <input
+                        id="custom-label-hex"
+                        type="text"
+                        className="swatch-custom-input"
+                        placeholder="#3B82F6"
+                        maxLength={7}
+                        value={customHexInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomHexInput(val);
+                          if (error) setError(null);
+                          if (/^#?[0-9A-Fa-f]{6}$/.test(val)) {
+                            const formatted = val.startsWith('#') ? val : `#${val}`;
+                            setLabelColor(formatted);
+                            setOverrideContrast(false);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Live Contrast Indicator Badge */}
+                    <div
+                      className="contrast-badge-container"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      id="label-color-contrast-status"
+                    >
+                      {contrastState === 'no-selection' && (
+                        <span className="contrast-badge contrast-badge--none">
+                          No color selected
+                        </span>
+                      )}
+                      {contrastState === 'AA-pass' && (
+                        <span className="contrast-badge contrast-badge--pass">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Pass AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-blocked' && (
+                        <span className="contrast-badge contrast-badge--fail">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-overridden' && (
+                        <span className="contrast-badge contrast-badge--overridden">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA (Overridden)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Blocked / Low Contrast Warning Alert with Override Affordance */}
+                    {(contrastState === 'AA-fail-blocked' || contrastState === 'AA-fail-overridden') && (
+                      <div
+                        className="contrast-warning-box"
+                        role={contrastState === 'AA-fail-blocked' ? 'alert' : 'region'}
+                        aria-live={contrastState === 'AA-fail-blocked' ? 'assertive' : 'polite'}
+                      >
+                        <div className="contrast-warning-text">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          <span>
+                            Low contrast label color ({contrastEval.formattedRatio}). May be unreadable against the surface.
+                          </span>
+                        </div>
+                        <div className="contrast-override-row">
+                          <input
+                            type="checkbox"
+                            id="override-contrast-checkbox"
+                            className="contrast-override-checkbox"
+                            checked={overrideContrast}
+                            onChange={(e) => {
+                              setOverrideContrast(e.target.checked);
+                              if (error) setError(null);
+                            }}
+                          />
+                          <label htmlFor="override-contrast-checkbox" className="contrast-override-label">
+                            Use low-contrast color anyway (not recommended)
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </InputField>
+                </>
+              );
+            })()}
+            <div className="info-box" role="region" aria-labelledby="info-box-title">
+              <div id="info-box-title" className="info-box-title">{t("createStream.step1.infoBoxTitle")}</div>
+              <p className="info-box-text">
+                {t("createStream.step1.infoBoxText")}
+              </p>
+            </div>
+          </>
+        )}
+        {currentStep === 2 && (() => {
+          // Derived per-field validation state for step 2
+          const accrualRateError = touched.accrualRate
+            ? validateAccrualRate(accrualRate, t)
+            : undefined;
+          const accrualRateSuccess = touched.accrualRate && !accrualRateError && accrualRate.trim().length > 0;
+
+          const durationError = touched.duration
+            ? validateDuration(duration, t)
+            : undefined;
+          const durationSuccess = touched.duration && !durationError && duration.trim().length > 0;
+
+          const customStartDateError = (startTimeOption === 'custom' && touched.customStartDate)
+            ? (!customStartDate
+                ? t("createStream.validation.startDateRequired")
+                : isDateTimeInPast(customStartDate)
+                ? t("createStream.validation.startDateFuture")
+                : undefined)
+            : undefined;
+          const customStartDateSuccess = startTimeOption === 'custom' && touched.customStartDate && !customStartDateError && Boolean(customStartDate);
+
+          const cliffDateError = (cliffEnabled && touched.cliffDate)
+            ? (!cliffDate
+                ? t("createStream.validation.cliffDateRequired")
+                : isDateTimeInPast(cliffDate)
+                ? t("createStream.validation.cliffDatePast")
+                : (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate))
+                ? t("createStream.validation.cliffDateAfterStart")
+                : (() => {
+                    // Cross-field: cliff must be on or before the stream end date.
+                    const startMs = startTimeOption === 'custom' && customStartDate
+                      ? new Date(customStartDate).getTime()
+                      : Date.now();
+                    const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+                    if (endDate) {
+                      const msg = validateCliffBeforeEnd(new Date(cliffDate), endDate);
+                      if (msg) return msg;
+                    }
+                    return undefined;
+                  })())
+            : undefined;
+          const cliffDateSuccess = cliffEnabled && touched.cliffDate && !cliffDateError && Boolean(cliffDate);
+
+          return (
+          <>
+            <hr className="divider" />
+
+            <div className="section-header">
+              <h3>{t("createStream.step2.header")}</h3>
+              <p>{t("createStream.step2.subheader")}</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {t("createStream.step2.timezoneNote")}
               </p>
             </div>
 
-            <div className={styles.walletList} role="list" aria-label="Wallet providers">
-              {walletOptions.map((wallet) => {
-                const isActive =
-                  !wallet.disabled &&
-                  (hoveredOptionId === wallet.id || focusedOptionId === wallet.id);
-                const isConnectingThis = connectingId === wallet.id;
-                const isDisabled = wallet.disabled || connectingId !== null;
+            {/* Stream Rate */}
+            <div className="form-group">
+              <label htmlFor="create-stream-accrual-rate" className="form-label">
+                {t("createStream.step2.rateLabel")}
+                {<span className="required" aria-hidden="true"> *</span>}
+                <InfoTooltip
+                  id="stream-rate-tooltip"
+                  title={t("createStream.step2.rateTooltipTitle")}
+                  ariaLabel={t("createStream.step2.rateTooltipAria")}
+                  content={
+                    <>
+                      <p>
+                        {t("createStream.step2.rateTooltipBody1")}
+                      </p>
+                      <p style={{ marginTop: '8px', fontWeight: 500 }}>
+                        {t("createStream.step2.rateTooltipBody2")}
+                      </p>
+                    </>
+                  }
+                />
+              </label>
+              <div className={`input-container ${accrualRateError ? 'input-container--error' : accrualRateSuccess ? 'input-container--success' : ''}`.trim()}>
+                <InputWithUnit
+                  id="create-stream-accrual-rate"
+                  unit="USDC / day"
+                  type="text"
+                  inputMode="decimal"
+                  value={accrualRate}
+                  onChange={(e) => setAccrualRate(e.target.value)}
+                  onBlur={() => handleBlur('accrualRate')}
+                  placeholder="0.00"
+                  hasError={Boolean(accrualRateError)}
+                  aria-required="true"
+                  aria-invalid={Boolean(accrualRateError)}
+                  aria-describedby={accrualRateError ? 'create-stream-accrual-rate-error' : 'create-stream-accrual-rate-hint'}
+                />
+              </div>
+              {accrualRateError && (
+                <span id="create-stream-accrual-rate-error" className="validation-message validation-message--error" role="alert">
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                    <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                    <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+                  </svg>
+                  {accrualRateError}
+                </span>
+              )}
+              {!accrualRateError && (
+                <span id="create-stream-accrual-rate-hint" className="validation-message validation-message--hint" role="status">
+                  {t("createStream.step2.rateHint")}
+                </span>
+              )}
+            </div>
 
-                return (
-                  <button
-                    key={wallet.id}
-                    type="button"
-                    role="listitem"
-                    className={styles.walletOption}
-                    style={{
-                      background: wallet.disabled
-                        ? "var(--surface-neutral)"
-                        : isActive
-                          ? "var(--surface-elevated)"
-                          : "var(--surface-neutral)",
-                      borderColor: wallet.disabled
-                        ? "var(--border-neutral)"
-                        : isActive
-                          ? "var(--border-interactive)"
-                          : "var(--border-neutral)",
-                      boxShadow:
-                        !wallet.disabled && isActive
-                          ? "0 0 0 2px var(--surface-base), 0 0 0 4px var(--interactive-focus-ring)"
-                          : "none",
-                      opacity: wallet.disabled ? 0.5 : 1,
-                      cursor: isDisabled ? "not-allowed" : "pointer",
-                    }}
-                    onClick={isDisabled ? undefined : wallet.action}
-                    onMouseEnter={() => !wallet.disabled && setHoveredOptionId(wallet.id)}
-                    onMouseLeave={() => setHoveredOptionId(null)}
-                    onFocus={() => !wallet.disabled && setFocusedOptionId(wallet.id)}
-                    onBlur={() => setFocusedOptionId(null)}
-                    aria-label={
-                      wallet.disabled
-                        ? `${wallet.name} — coming soon`
-                        : `Connect with ${wallet.name}`
-                    }
-                    aria-disabled={isDisabled}
-                    disabled={isDisabled}
+            {/* Stream Duration */}
+            <div className="form-group">
+              <label htmlFor="create-stream-duration" className="form-label">
+                {t("createStream.step2.durationLabel")}
+                {<span className="required" aria-hidden="true"> *</span>}
+                <InfoTooltip
+                  id="stream-duration-tooltip"
+                  title={t("createStream.step2.durationTooltipTitle")}
+                  ariaLabel={t("createStream.step2.durationTooltipAria")}
+                  content={
+                    <>
+                      <p>
+                        {t("createStream.step2.durationTooltipBody1")}
+                      </p>
+                      <p style={{ marginTop: '8px' }}>
+                        {t("createStream.step2.durationTooltipBody2")}
+                      </p>
+                    </>
+                  }
+                />
+              </label>
+              <div className={`input-container ${durationError ? 'input-container--error' : durationSuccess ? 'input-container--success' : ''}`.trim()}>
+                <InputWithUnit
+                  id="create-stream-duration"
+                  unit="days"
+                  type="text"
+                  inputMode="decimal"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  onBlur={() => handleBlur('duration')}
+                  placeholder="1"
+                  hasError={Boolean(durationError)}
+                  aria-required="true"
+                  aria-invalid={Boolean(durationError)}
+                  aria-describedby={durationError ? 'create-stream-duration-error' : 'create-stream-duration-hint'}
+                />
+              </div>
+              {durationError && (
+                <span id="create-stream-duration-error" className="validation-message validation-message--error" role="alert">
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                    <circle cx="6" cy="6" r="5.5" stroke="currentColor" />
+                    <path d="M6 3.5V6.5" stroke="currentColor" strokeLinecap="round" />
+                    <circle cx="6" cy="8.5" r="0.5" fill="currentColor" />
+                  </svg>
+                  {durationError}
+                </span>
+              )}
+              {!durationError && (
+                <span id="create-stream-duration-hint" className="validation-message validation-message--hint" role="status">
+                  {t("createStream.step2.durationHint")}
+                </span>
+              )}
+            </div>
+
+            {/* Start Time */}
+            <div className="form-group">
+              <label className="form-label">{t("createStream.step2.startTimeLabel")}</label>
+              <div className="segmented-control">
+                <button
+                  className={`segment-btn ${startTimeOption === 'now' ? 'active' : ''}`}
+                  onClick={() => setStartTimeOption('now')}
+                >
+                  {t("createStream.step2.startNowBtn")}
+                </button>
+                <button
+                  className={`segment-btn ${startTimeOption === 'custom' ? 'active' : ''}`}
+                  onClick={() => setStartTimeOption('custom')}
+                >
+                  {t("createStream.step2.customDateBtn")}
+                </button>
+              </div>
+              {startTimeOption === 'custom' && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <InputField
+                    id="create-stream-custom-start-date"
+                    label={t("createStream.step2.customStartDateLabel")}
+                    required
+                    error={customStartDateError}
+                    helperText={t("createStream.step2.customStartDateHelper")}
+                    success={customStartDateSuccess}
                   >
-                    <div className={styles.walletIcon} aria-hidden="true">
-                      {isConnectingThis ? (
-                        <Loader2 size={24} className={styles.spinning} />
-                      ) : (
-                        <WalletIcon name={wallet.name} iconSrc={wallet.iconSrc} />
-                      )}
-                    </div>
-                    <div className={styles.walletInfo}>
-                      <div className={styles.walletName}>
-                        {wallet.name}
-                        {wallet.disabled && (
-                          <span
-                            style={{
-                              marginLeft: "0.5rem",
-                              fontSize: "0.7em",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              color: "var(--text-tertiary, #888)",
-                              border: "1px solid currentColor",
-                              borderRadius: "4px",
-                              padding: "1px 5px",
-                              verticalAlign: "middle",
-                            }}
+                    <input
+                      type="datetime-local"
+                      className="input-field"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      onBlur={() => handleBlur('customStartDate')}
+                    />
+                  </InputField>
+                </div>
+              )}
+            </div>
+
+            {/* Cliff Period */}
+            <div className="form-group">
+              <label className="form-label">
+                {t("createStream.step2.cliffPeriodLabel")}{' '}
+                <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>{t("createStream.step2.optionalLabel")}</span>
+                <InfoTooltip
+                  id="cliff-tooltip"
+                  title={t("createStream.step2.cliffTooltipTitle")}
+                  ariaLabel={t("createStream.step2.cliffTooltipAria")}
+                  content={
+                    <>
+                      <p>
+                        {t("createStream.step2.cliffTooltipBody1")}
+                      </p>
+                      <ul style={{ marginTop: '4px', marginLeft: '16px', listStyle: 'disc' }}>
+                        <li>{t("createStream.step2.cliffTooltipList1")}</li>
+                        <li>{t("createStream.step2.cliffTooltipList2")}</li>
+                        <li>{t("createStream.step2.cliffTooltipList3")}</li>
+                      </ul>
+                      <p style={{ marginTop: '8px' }}>
+                        {t("createStream.step2.cliffTooltipBody2")}
+                      </p>
+                      <p style={{ marginTop: '8px' }}>
+                        {t("createStream.step2.cliffTooltipBody3")}
+                      </p>
+                    </>
+                  }
+                />
+              </label>
+              <div className="toggle-container" onClick={() => setCliffEnabled(!cliffEnabled)}>
+                <div className={`toggle-switch ${cliffEnabled ? 'on' : ''}`}>
+                  <div className="toggle-knob" />
+                </div>
+                <span>{t("createStream.step2.enableCliffLabel")}</span>
+              </div>
+              {cliffEnabled && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <InputField
+                    id="create-stream-cliff-date"
+                    label={t("createStream.step2.cliffDateLabel")}
+                    required
+                    error={cliffDateError}
+                    helperText={t("createStream.step2.cliffDateHelper")}
+                    success={cliffDateSuccess}
+                  >
+                    <input
+                      type="datetime-local"
+                      className="input-field"
+                      value={cliffDate}
+                      onChange={(e) => setCliffDate(e.target.value)}
+                      onBlur={() => handleBlur('cliffDate')}
+                    />
+                  </InputField>
+                </div>
+              )}
+            </div>
+
+            {/* Deposit Summary */}
+            <div className="deposit-summary">
+              <div className="deposit-box">
+                <div className="deposit-label">{t("createStream.step2.requiredDepositLabel")}</div>
+                <div className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? 'required' : ''}`}>
+                  {requiredDeposit} USDC
+                </div>
+              </div>
+              <div className="deposit-box">
+                <div className="deposit-label">{t("createStream.step2.yourDepositLabel")}</div>
+                <div className="deposit-value">{userDeposit.toFixed(2)} USDC</div>
+              </div>
+            </div>
+          </>
+          );
+        })()}
+
+          {currentStep === 3 &&
+            (() => {
+              const reviewRecipient = recipient.trim();
+              const reviewDeposit = formatReviewDeposit(depositAmount);
+              const durationUnit = formatDurationUnit(duration, t);
+              return (
+                <>
+                  <hr className="divider" />
+                  <div className="review-cards">
+                    {/* Recipient card */}
+                    <div className="review-card review-card-vertical">
+                      <div className="review-card-header">
+                        <span className="review-card-icon" aria-hidden="true">
+                          <svg
+                            width="20"
+                            height="20"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        </span>
+                        <div className="review-card-title">{t("createStream.step3.recipientCardTitle")}</div>
+                        <button
+                          type="button"
+                          className="review-card-edit"
+                          onClick={() => {
+                            resetTransactionState();
+                            setCurrentStep(1);
+                          }}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.step3.editRecipientAria")}
+                        >
+                          {t("createStream.step3.editBtn")}
+                          <svg
+                            width="14"
+                            height="14"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
                             aria-hidden="true"
                           >
-                            coming soon
-                          </span>
-                        )}
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
+                          </svg>
+                        </button>
                       </div>
-                      <div className={styles.walletDescription}>
-                        {isConnectingThis ? "Connecting..." : wallet.description}
+                      <div className="review-card-content">
+                        <div className="review-card-sublabel">{t("createStream.step3.addressLabel")}</div>
+                        <div className="review-card-value">
+                          {maskAddress(reviewRecipient)}
+                        </div>
                       </div>
                     </div>
-                    {!wallet.disabled && !isConnectingThis && (
-                      <svg
-                        className={styles.chevron}
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        aria-hidden="true"
+
+                    {/* Deposit card */}
+                    <div className="review-card review-card-vertical">
+                      <div className="review-card-header">
+                        <span className="review-card-icon" aria-hidden="true">
+                          <svg
+                            width="20"
+                            height="20"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </span>
+                        <div className="review-card-title">{t("createStream.step3.depositCardTitle")}</div>
+                        <button
+                          type="button"
+                          className="review-card-edit"
+                          onClick={() => {
+                            resetTransactionState();
+                            setCurrentStep(1);
+                          }}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.step3.editDepositAria")}
+                        >
+                          {t("createStream.step3.editBtn")}
+                          <svg
+                            width="14"
+                            height="14"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="review-card-content">
+                        <div className="review-card-amount">
+                          {reviewDeposit}{" "}
+                          <span className="review-card-unit">USDC</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rate & schedule card */}
+                    <div className="review-card review-card-schedule-card">
+                      <div className="review-card-schedule-header">
+                        <span className="review-card-icon" aria-hidden="true">
+                          <svg
+                            width="20"
+                            height="20"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                            />
+                          </svg>
+                        </span>
+                        <div className="review-card-title">{t("createStream.step3.rateScheduleCardTitle")}</div>
+                        <button
+                          type="button"
+                          className="review-card-edit"
+                          onClick={() => {
+                            resetTransactionState();
+                            setCurrentStep(2);
+                          }}
+                          disabled={isBusyCreating}
+                          aria-label={t("createStream.step3.editRateScheduleAria")}
+                        >
+                          {t("createStream.step3.editBtn")}
+                          <svg
+                            width="14"
+                            height="14"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="review-card-rows">
+                        <div className="review-card-row">
+                          <span
+                            className="review-card-row-icon"
+                            aria-hidden="true"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                              />
+                            </svg>
+                          </span>
+                          <span className="review-card-row-label">{t("createStream.step3.rateLabel")}</span>
+                          <span className="review-card-row-value">
+                            {t("createStream.step3.rateValue", { accrualRate })}
+                          </span>
+                        </div>
+                        <div className="review-card-row">
+                          <span
+                            className="review-card-row-icon"
+                            aria-hidden="true"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                          </span>
+                          <span className="review-card-row-label">
+                            {t("createStream.step3.durationLabel")}
+                          </span>
+                          <span className="review-card-row-value">
+                            {t("createStream.step3.durationValue", { duration, unit: durationUnit })}
+                          </span>
+                        </div>
+                        <div className="review-card-row">
+                          <span
+                            className="review-card-row-icon"
+                            aria-hidden="true"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </span>
+                          <span className="review-card-row-label">{t("createStream.step3.startLabel")}</span>
+                          <span className="review-card-row-value">
+                            {startTimeOption === "now"
+                              ? t("createStream.step3.startImmediately")
+                              : customStartDate
+                                ? formatLocalDateTime(customStartDate)
+                                : "—"}
+                          </span>
+                        </div>
+                        <div className="review-card-row">
+                          <span
+                            className="review-card-row-icon"
+                            aria-hidden="true"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <path strokeLinecap="round" d="M12 6v6" />
+                            </svg>
+                          </span>
+                          <span className="review-card-row-label">{t("createStream.step3.cliffLabel")}</span>
+                          <span className="review-card-row-value">
+                            {cliffEnabled && cliffDate
+                              ? formatLocalDateTime(cliffDate)
+                              : t("createStream.step3.cliffNotSet")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {streamError && (
+                    <div className="review-error-box" role="alert">
+                      <div>
+                        <strong>{t("createStream.step3.errorTitle")}</strong>
+                        <p>{streamError}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="review-error-retry"
+                        onClick={handleNext}
+                        disabled={isSubmitting}
                       >
-                        <path
-                          d="M6 3l5 5-5 5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <p className={styles.footer}>
-              By continuing, you agree to Fluxora&apos;s{" "}
-              <a href="/terms" className={styles.termsLink}>
-                Terms of Service
-              </a>
-              .
-            </p>
-          </>
-        )}
-
-        {/* ERROR STATE: Freighter Not Installed */}
-        {currentErrorState === "not_installed" && (
-          <div className={styles.errorContainer} data-testid="error-state-not-installed">
-            <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
-              <Download size={28} />
-            </div>
-            
-            <span className={styles.badge} id="badge-not-installed">Extension Required</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Freighter Not Installed
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Freighter is the official browser extension for Stellar and Soroban. 
-              You will need to install the extension to securely connect your wallet to Fluxora.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <a
-                href="https://www.freighter.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.primaryButton}
-                data-autofocus="true"
-                onClick={onDownloadFreighter}
-                aria-label="Download Freighter browser extension"
-              >
-                <Download size={18} />
-                Download Freighter
-              </a>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ERROR STATE: Connection Request Rejected */}
-        {currentErrorState === "rejected" && (
-          <div className={styles.errorContainer} data-testid="error-state-rejected">
-            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
-              <AlertCircle size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-rejected">Connection Failed</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Connection Rejected
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The connection was declined in your wallet extension. To interact with Fluxora, 
-              please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                data-autofocus="true"
-                onClick={handleFreighterClick}
-                aria-label="Retry connecting to Freighter wallet"
-              >
-                <RefreshCw size={18} />
-                Retry Connection
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ERROR STATE: Network Mismatch */}
-        {currentErrorState === "network_mismatch" && (
-          <div className={styles.errorContainer} data-testid="error-state-network-mismatch">
-            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
-              <AlertTriangle size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-network-mismatch">Network Mismatch</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Wrong Stellar Network
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Your wallet is connected to the wrong network. Fluxora is configured for Stellar{" "}
-              <strong>{expectedNetworkLabel}</strong>, but your wallet is currently on{" "}
-              <strong>{actualNetworkLabel ?? "an unsupported network"}</strong>.
-            </p>
-
-            <ol className={styles.errorInstructions} aria-label="Instructions to switch network">
-              <li className={styles.instructionItem}>
-                <span className={styles.instructionNumber}>1</span>
-                <span className={styles.instructionText}>
-                  Open your <strong>Freighter extension</strong> in your browser toolbar.
-                </span>
-              </li>
-              <li className={styles.instructionItem}>
-                <span className={styles.instructionNumber}>2</span>
-                <span className={styles.instructionText}>
-                  Click the <strong>network dropdown</strong> at the top of the extension popup.
-                </span>
-              </li>
-              <li className={styles.instructionItem}>
-                <span className={styles.instructionNumber}>3</span>
-                <span className={styles.instructionText}>
-                  Select <strong>{expectedNetworkLabel}</strong> and return here.
-                </span>
-              </li>
-            </ol>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                data-autofocus="true"
-                onClick={handleFreighterClick}
-                aria-label="Check network configuration again"
-              >
-                <RefreshCw size={18} />
-                Check Network Again
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ERROR STATE: Network Check Timed Out */}
-        {currentErrorState === "network_timeout" && (
-          <div className={styles.errorContainer} data-testid="error-state-network-timeout">
-            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
-              <Timer size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-timeout">Timed Out</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Network Check Timed Out
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The network check did not respond in time. This can happen if the Freighter
-              extension is hung or unresponsive. Please try again.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                data-autofocus="true"
-                onClick={handleFreighterClick}
-                aria-label="Retry network check"
-              >
-                <RefreshCw size={18} />
-                Retry Connection
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Device Searching */}
-        {currentErrorState === "device-searching" && (
-          <div className={styles.errorContainer} data-testid="error-state-device-searching">
-            <div className={styles.radarContainer} aria-hidden="true">
-              <div className={styles.radarRing}></div>
-              <div className={styles.radarRing2}></div>
-              <div className={styles.pulseDot}></div>
-            </div>
-
-            <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
-              Scanning for connected hardware wallets...
-            </div>
-
-            <span className={styles.badge} id="badge-device-searching">Step 1 of 3</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Connect via USB
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Searching for connected hardware wallets... Please plug in your Ledger or Trezor device via USB, unlock it with your PIN, and ensure the Stellar app is open.
-            </p>
-
-            <div className={styles.actionGroup}>
-              {showStateSwitcher && (
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => setInternalErrorState("device-found-selecting")}
-                  aria-label="Simulate device detected"
-                >
-                  Simulate Found
-                </button>
-              )}
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Device Found & Selection */}
-        {currentErrorState === "device-found-selecting" && (
-          <div className={styles.errorContainer} data-testid="error-state-device-found-selecting">
-            <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
-              <Cpu size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-device-found-selecting">Step 2 of 3</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Configure Device
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Select your hardware wallet and choose a derivation path configuration.
-            </p>
-
-            <div
-              className={styles.deviceList}
-              role="radiogroup"
-              aria-label="Select USB hardware wallet device"
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selectedDevice === "ledger"}
-                className={`${styles.deviceOption} ${
-                  selectedDevice === "ledger" ? styles.deviceOptionActive : ""
-                }`}
-                onClick={() => setSelectedDevice("ledger")}
-                aria-label="Ledger Nano X or S"
-              >
-                <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
-                  L
-                </div>
-                <div className={styles.walletInfo}>
-                  <div className={styles.walletName}>Ledger Nano X / S</div>
-                  <div className={styles.walletDescription}>Connect via USB and confirm public key.</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selectedDevice === "trezor"}
-                className={`${styles.deviceOption} ${
-                  selectedDevice === "trezor" ? styles.deviceOptionActive : ""
-                }`}
-                onClick={() => setSelectedDevice("trezor")}
-                aria-label="Trezor Model T or One"
-              >
-                <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
-                  T
-                </div>
-                <div className={styles.walletInfo}>
-                  <div className={styles.walletName}>Trezor Model T / One</div>
-                  <div className={styles.walletDescription}>Connect via USB and unlock via screen.</div>
-                </div>
-              </button>
-            </div>
-
-            <div className={styles.derivationPathContainer}>
-              <label htmlFor="derivation-path-select" className={styles.derivationPathLabel}>
-                Derivation Path
-              </label>
-              <select
-                id="derivation-path-select"
-                className={styles.selectInput}
-                value={derivationPath}
-                onChange={(e) => {
-                  setDerivationPath(e.target.value);
-                  if (e.target.value !== "custom") {
-                    setPathError(null);
-                  }
-                }}
-              >
-                <option value="m/44'/148'/0'">Stellar Standard (m/44'/148'/0')</option>
-                <option value="m/44'/148'/1'">Stellar Secondary (m/44'/148'/1')</option>
-                <option value="custom">Custom Derivation Path...</option>
-              </select>
-
-              {derivationPath === "custom" && (
-                <div>
-                  <input
-                    type="text"
-                    id="custom-derivation-path-input"
-                    className={styles.customPathInput}
-                    value={customPath}
-                    onChange={(e) => handleCustomPathChange(e.target.value)}
-                    placeholder="m/44'/148'/0'"
-                    aria-label="Enter custom Stellar derivation path"
-                    aria-invalid={pathError !== null}
-                    aria-describedby={pathError ? "custom-path-error" : undefined}
-                  />
-                  {pathError && (
-                    <span
-                      id="custom-path-error"
-                      style={{
-                        color: "var(--status-error)",
-                        fontSize: "0.85em",
-                        marginTop: "4px",
-                        display: "block",
-                      }}
-                    >
-                      {pathError}
-                    </span>
+                        {t("createStream.step3.tryAgainBtn")}
+                      </button>
+                    </div>
                   )}
-                </div>
-              )}
-            </div>
 
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={derivationPath === "custom" && pathError !== null}
-                onClick={() => setInternalErrorState("awaiting-device-confirmation")}
-                aria-label="Confirm selection and connect"
-              >
-                <Check size={18} />
-                Confirm & Connect
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
-                aria-label="Back to device scanning"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back
-              </button>
-            </div>
-          </div>
-        )}
+                  <div
+                    className="review-warning-box"
+                    role="region"
+                    aria-live="polite"
+                  >
+                    <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
+                    {t("createStream.step3.warningText", { reviewDeposit })}
+                  </div>
+                  {queuedSubmission && (
+                    <div
+                      className="offline-queue-banner"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="offline-queue-banner__icon" aria-hidden="true">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="9" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                        </svg>
+                      </span>
+                      <div className="offline-queue-banner__body">
+                        <strong className="offline-queue-banner__title">
+                          {t("createStream.queue.bannerTitle")}
+                        </strong>
+                        <p>{t("createStream.queue.bannerBody")}</p>
+                        <span className="offline-queue-banner__position">
+                          {t("createStream.queue.bannerPosition", {
+                            position: queuedSubmission.position,
+                            total: Math.max(queueLength, queuedSubmission.position),
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {isFlushingQueue && (
+                    <div
+                      className="transaction-status-box"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {t("createStream.queue.flushingTitle")}
+                    </div>
+                  )}
+                  {queueFlushError && (
+                    <div className="offline-queue-banner offline-queue-banner--failed" role="alert">
+                      <span className="offline-queue-banner__icon" aria-hidden="true">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.66 20h18.68a1 1 0 00.85-1.44l-8.48-14.7a1 1 0 00-1.72 0z" />
+                        </svg>
+                      </span>
+                      <div className="offline-queue-banner__body">
+                        <strong className="offline-queue-banner__title">
+                          {t("createStream.queue.flushFailedTitle")}
+                        </strong>
+                        <p>{queueFlushError}</p>
+                        <div className="offline-queue-banner__actions">
+                          <button
+                            type="button"
+                            className="offline-queue-banner__btn offline-queue-banner__btn--primary"
+                            onClick={handleRetryQueuedSubmission}
+                          >
+                            {t("createStream.queue.flushFailedRetryBtn")}
+                          </button>
+                          <button
+                            type="button"
+                            className="offline-queue-banner__btn"
+                            onClick={handleEditQueuedSubmission}
+                          >
+                            {t("createStream.queue.flushFailedEditBtn")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {isSubmitting && (
+                    <div
+                      className="transaction-status-box"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {t("createStream.step3.statusSubmitting")}
+                    </div>
+                  )}
+                  {!isSubmitting && transactionStatus.status === "pending" && (
+                    <div
+                      className="transaction-status-box"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {t("createStream.step3.statusWaiting")}
+                      <span className="transaction-status-detail">
+                        {t("createStream.step3.statusDetail", {
+                          attempts: transactionStatus.attempts,
+                          txHash: submittedTxHash
+                            ? `${submittedTxHash.slice(0, 10)}...${submittedTxHash.slice(-8)}`
+                            : "",
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {transactionStatus.status === "failed" && (
+                    <div
+                      className="transaction-status-box transaction-status-box--error"
+                      role="alert"
+                    >
+                      {transactionStatus.error ??
+                        t("createStream.step3.statusFailed", {
+                          error: "Transaction confirmation failed. Please retry.",
+                        })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+        </div>
 
-        {/* HARDWARE WALLET: Awaiting Device Confirmation */}
-        {currentErrorState === "awaiting-device-confirmation" && (
-          <div className={styles.errorContainer} data-testid="error-state-awaiting-device-confirmation">
-            <div className={styles.radarContainer} aria-hidden="true">
-              <div className={styles.radarRing} style={{ animationDuration: "1.5s" }}></div>
-              <div className={styles.pulseDot} style={{ background: "var(--status-info)", boxShadow: "0 0 8px var(--status-info)" }}></div>
-            </div>
-
-            <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
-              Confirm Connection on Device... Please review public key on your hardware wallet.
-            </div>
-
-            <span className={styles.badge} id="badge-awaiting-device-confirmation">Step 3 of 3</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Confirm on Device
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Please review and approve the public key connection request on your physical hardware wallet screen. Ensure the Stellar app is active.
-            </p>
-
-            <div className={styles.actionGroup}>
-              {showStateSwitcher && (
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => {
-                    connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
-                    if (onConnectFreighter) onConnectFreighter();
-                    onClose();
-                  }}
-                  aria-label="Simulate successful connection"
-                >
-                  Simulate Success
-                </button>
-              )}
+        {/* Footer */}
+        <div className="modal-footer">
+          {currentStep === 1 ? (
+            <>
               <button
                 type="button"
-                className={styles.secondaryButton}
-                onClick={() => setInternalErrorState("device-found-selecting")}
-                aria-label="Cancel confirmation and go back to configure"
+                className="btn btn-cancel"
+                onClick={handleCancel}
+                disabled={isBusyCreating}
               >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Device Locked Error */}
-        {currentErrorState === "device-locked-error" && (
-          <div className={styles.errorContainer} data-testid="error-state-device-locked-error">
-            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
-              <Lock size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-device-locked">Device Locked</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Hardware Wallet Locked
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Your hardware wallet is locked. Please enter your PIN on the physical device to unlock it and try again.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
-                aria-label="Retry connection scan"
-              >
-                <RefreshCw size={18} />
-                Retry Connection
+                {t("createStream.button.cancel")}
               </button>
               <button
                 type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                className="btn btn-next"
+                onClick={handleNext}
+                disabled={isBusyCreating}
               >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("createStream.button.next")}
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Wrong App Error */}
-        {currentErrorState === "wrong-app-error" && (
-          <div className={styles.errorContainer} data-testid="error-state-wrong-app-error">
-            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
-              <AlertTriangle size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-wrong-app">Stellar App Closed</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Stellar App Not Open
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The Stellar application is not open on your device. Please open the Stellar application on your Ledger or Trezor device before continuing.
-            </p>
-
-            <div className={styles.actionGroup}>
+            </>
+          ) : (
+            <>
               <button
                 type="button"
-                className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
-                aria-label="Retry connection scan"
+                className="btn btn-back"
+                onClick={handleBack}
+                disabled={isBusyCreating}
               >
-                <RefreshCw size={18} />
-                Retry Connection
+                {t("createStream.button.back")}
               </button>
               <button
                 type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                className="btn btn-next"
+                onClick={handleNext}
+                disabled={isBusyCreating}
+                aria-busy={isBusyCreating && currentStep === 3}
               >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {submitButtonLabel}
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Unplugged Error */}
-        {currentErrorState === "unplugged-error" && (
-          <div className={styles.errorContainer} data-testid="error-state-unplugged-error">
-            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
-              <PowerOff size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-unplugged">Disconnected</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Device Disconnected
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The hardware wallet was unplugged or disconnected mid-flow. Please check your USB cable and reconnect the device.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
-                aria-label="Scan for hardware wallet again"
-              >
-                <RefreshCw size={18} />
-                Scan for Device
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* HARDWARE WALLET: Mobile Fallback */}
-        {currentErrorState === "mobile-unsupported" && (
-          <div className={styles.errorContainer} data-testid="error-state-mobile-unsupported">
-            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
-              <Smartphone size={28} />
-            </div>
-
-            <span className={styles.badge} id="badge-mobile-unsupported">Mobile Fallback</span>
-            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Device Unsupported on Mobile
-            </h2>
-            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              USB hardware wallet connections are not supported on mobile web browsers. Please connect using a supported mobile-friendly wallet instead.
-            </p>
-
-            <div className={styles.actionGroup}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => {
-                  setInternalErrorState(null);
-                  if (onConnectWalletConnect) onConnectWalletConnect();
-                }}
-                aria-label="Connect using WalletConnect mobile flow"
-              >
-                Connect via WalletConnect
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
-              >
-                <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* DESIGN QA PREVIEW TOOLBAR - Rendered exclusively for Design Review & Verification */}
-        {showStateSwitcher && (
-          <div className={styles.previewToolbar} data-testid="design-qa-toolbar">
-            <span className={styles.previewTitle}>Design QA Preview:</span>
-            <div className={styles.previewBtnGroup} role="group" aria-label="Select design preview state">
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === null ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState(null);
-                }}
-                aria-pressed={currentErrorState === null}
-              >
-                Default View
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "not_installed" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("not_installed");
-                }}
-                aria-pressed={currentErrorState === "not_installed"}
-              >
-                Not Installed
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "rejected" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("rejected");
-                }}
-                aria-pressed={currentErrorState === "rejected"}
-              >
-                Rejected
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "network_mismatch" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("network_mismatch");
-                }}
-                aria-pressed={currentErrorState === "network_mismatch"}
-              >
-                Wrong Network
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "network_timeout" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("network_timeout");
-                }}
-                aria-pressed={currentErrorState === "network_timeout"}
-              >
-                Timed Out
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "device-searching" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-searching");
-                }}
-                aria-pressed={currentErrorState === "device-searching"}
-              >
-                HW: Search
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "device-found-selecting" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-found-selecting");
-                }}
-                aria-pressed={currentErrorState === "device-found-selecting"}
-              >
-                HW: Select
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "awaiting-device-confirmation" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("awaiting-device-confirmation");
-                }}
-                aria-pressed={currentErrorState === "awaiting-device-confirmation"}
-              >
-                HW: Confirm
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "device-locked-error" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-locked-error");
-                }}
-                aria-pressed={currentErrorState === "device-locked-error"}
-              >
-                HW: Locked
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "wrong-app-error" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("wrong-app-error");
-                }}
-                aria-pressed={currentErrorState === "wrong-app-error"}
-              >
-                HW: Wrong App
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "unplugged-error" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("unplugged-error");
-                }}
-                aria-pressed={currentErrorState === "unplugged-error"}
-              >
-                HW: Unplugged
-              </button>
-              <button
-                type="button"
-                className={`${styles.previewButton} ${
-                  currentErrorState === "mobile-unsupported" ? styles.previewButtonActive : ""
-                }`}
-                onClick={() => {
-                  setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("mobile-unsupported");
-                }}
-                aria-pressed={currentErrorState === "mobile-unsupported"}
-              >
-                HW: Mobile Unsupported
-              </button>
-            </div>
-          </div>
-        )}
-
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -22,7 +22,12 @@ const Streams = lazy(() => import("./pages/Streams"));
 const StreamDetail = lazy(() => import("./pages/StreamDetail"));
 const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
-const EmptyStateDemo = lazy(() => import("./pages/EmptyStateDemo"));
+import { IS_DEV } from "./utils/env";
+
+const EmptyStateDemo = IS_DEV
+  ? lazy(() => import("./pages/EmptyStateDemo"))
+  : () => null;
+
 
 function LegacyStreamRedirect() {
   const { streamId } = useParams();
@@ -129,10 +134,12 @@ export default function App() {
                       <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
                       <Route path="error" element={<ErrorPage />} />
-                      <Route
-                        path="empty-state-demo"
-                        element={lazyAppRoute(<EmptyStateDemo />)}
-                      />
+                      {IS_DEV && (
+                        <Route
+                          path="empty-state-demo"
+                          element={lazyAppRoute(<EmptyStateDemo />)}
+                        />
+                      )}
                     </Route>
                     <Route path="/connect-wallet" element={<ConnectWallet />} />
                     <Route path="*" element={<NotFound />} />
