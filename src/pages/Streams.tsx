@@ -41,7 +41,7 @@ import { useTickingNow } from "../hooks/useTickingNow";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
 import { copyToClipboard } from "../hooks/useClipboard";
-
+import CreateStreamFab from "../components/CreateStreamFab";
 
 type StatusFilter = "All" | StreamStatus;
 
@@ -253,16 +253,19 @@ const StreamCard = memo(function StreamCard({
     onCopyRecipientError(stream);
   }, [onCopyRecipientError, stream]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
-    // Enter/Space selects the card; do not intercept if a button inside is focused
-    if (
-      e.target === e.currentTarget &&
-      (e.key === "Enter" || e.key === " ")
-    ) {
-      e.preventDefault();
-      handleSelect();
-    }
-  }, [handleSelect]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLElement>) => {
+      // Enter/Space selects the card; do not intercept if a button inside is focused
+      if (
+        e.target === e.currentTarget &&
+        (e.key === "Enter" || e.key === " ")
+      ) {
+        e.preventDefault();
+        handleSelect();
+      }
+    },
+    [handleSelect],
+  );
 
   const classNames = [
     "stream-card",
@@ -325,8 +328,8 @@ const StreamCard = memo(function StreamCard({
         <div className="stream-meta-block">
           <span>Recipient</span>
           <strong>{stream.recipientName}</strong>
-          <TruncatedAddress 
-            address={stream.recipientAddress} 
+          <TruncatedAddress
+            address={stream.recipientAddress}
             onCopy={handleRecipientCopied}
             onCopyStateChange={(state) => {
               if (state === "error") {
@@ -360,10 +363,16 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__cliff is-${cliffStatus}`}
             aria-label={`Cliff date: ${formatDateWithTimezone(stream.cliffDate)} (${cliffStatus})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">⏱</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              ⏱
+            </span>
             <span className="stream-time-bar__label">Cliff</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.cliffDate)}</span>
-            <span className="stream-time-bar__relative">({getRelativeTime(stream.cliffDate)})</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.cliffDate)}
+            </span>
+            <span className="stream-time-bar__relative">
+              ({getRelativeTime(stream.cliffDate)})
+            </span>
           </div>
         )}
         {stream.endDate && (
@@ -371,9 +380,13 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__end is-${urgency.end}`}
             aria-label={`End date: ${formatDateWithTimezone(stream.endDate)} (${endRelative})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">→</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              →
+            </span>
             <span className="stream-time-bar__label">End</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.endDate)}</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.endDate)}
+            </span>
             <span className="stream-time-bar__relative">({endRelative})</span>
           </div>
         )}
@@ -439,7 +452,9 @@ const StreamCard = memo(function StreamCard({
                 <div className="stream-panel__row">
                   <span className="stream-panel__row-label">End date</span>
                   <div className="stream-panel__row-value">
-                    {formatDetailTime(stream.endDate, { includeTimezone: true })}
+                    {formatDetailTime(stream.endDate, {
+                      includeTimezone: true,
+                    })}
                   </div>
                 </div>
                 <div className="stream-panel__row">
@@ -515,8 +530,12 @@ function StreamDetail({
           <div className="stream-detail__meta">
             <span className="stream-chip">{stream.id}</span>
             <span className="stream-chip">{stream.recipientName}</span>
-            <span className="stream-chip">{formatMonthlyRate(stream.monthlyRate)}</span>
-            <span className="stream-chip">Ends {formatDate(stream.endDate)}</span>
+            <span className="stream-chip">
+              {formatMonthlyRate(stream.monthlyRate)}
+            </span>
+            <span className="stream-chip">
+              Ends {formatDate(stream.endDate)}
+            </span>
           </div>
         </div>
 
@@ -581,10 +600,7 @@ function StreamDetail({
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -600,8 +616,8 @@ function StreamDetail({
                 <div className="stream-panel__row-value">
                   {stream.recipientName}
                   <div className="mt-1">
-                    <TruncatedAddress 
-                      address={stream.recipientAddress} 
+                    <TruncatedAddress
+                      address={stream.recipientAddress}
                       onCopy={onCopyAddress}
                     />
                   </div>
@@ -657,7 +673,10 @@ function StreamDetail({
             <h2 className="stream-panel__header">Timeline</h2>
             <div className="stream-timeline">
               {stream.timeline.map((event) => (
-                <div className="stream-timeline__item" key={event.date + event.title}>
+                <div
+                  className="stream-timeline__item"
+                  key={event.date + event.title}
+                >
                   <div className="stream-timeline__date">
                     {formatDate(event.date)}
                   </div>
@@ -874,34 +893,43 @@ export default function Streams() {
     refetch();
   }, [refetch, streams.length]);
 
-  const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
-    const success = await copyToClipboard(stream.recipientAddress);
-    if (success) {
+  const handleCopyRecipient = useCallback(
+    async (stream: StreamRecord) => {
+      const success = await copyToClipboard(stream.recipientAddress);
+      if (success) {
+        addToast(
+          `Recipient for ${stream.name} copied to your clipboard.`,
+          "success",
+        );
+      } else {
+        addToast(
+          "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+          "error",
+        );
+      }
+    },
+    [addToast],
+  );
+
+  const handleRecipientCopied = useCallback(
+    (stream: StreamRecord) => {
       addToast(
         `Recipient for ${stream.name} copied to your clipboard.`,
         "success",
       );
-    } else {
+    },
+    [addToast],
+  );
+
+  const handleRecipientCopyError = useCallback(
+    (_stream: StreamRecord) => {
       addToast(
         "Clipboard access is unavailable in this browser. Copy the address manually instead.",
         "error",
       );
-    }
-  }, [addToast]);
-
-  const handleRecipientCopied = useCallback((stream: StreamRecord) => {
-    addToast(
-      `Recipient for ${stream.name} copied to your clipboard.`,
-      "success",
-    );
-  }, [addToast]);
-
-  const handleRecipientCopyError = useCallback((_stream: StreamRecord) => {
-    addToast(
-      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
-      "error",
-    );
-  }, [addToast]);
+    },
+    [addToast],
+  );
 
   const handleToggleStreamCard = useCallback((streamId: string) => {
     setExpandedStreamId((current) => (current === streamId ? "" : streamId));
@@ -911,9 +939,12 @@ export default function Streams() {
     setSelectedStreamId(streamId);
   }, []);
 
-  const handleOpenStreamDetail = useCallback((streamId: string) => {
-    navigate(`/app/streams/${streamId}`);
-  }, [navigate]);
+  const handleOpenStreamDetail = useCallback(
+    (streamId: string) => {
+      navigate(`/app/streams/${streamId}`);
+    },
+    [navigate],
+  );
 
   const handleAnnounceStreamToggle = useCallback(
     (streamName: string, nextExpanded: boolean) => {
@@ -958,6 +989,10 @@ export default function Streams() {
           onClose={() => setIsCreateModalOpen(false)}
           onStreamCreated={handleStreamCreated}
         />
+        <CreateStreamFab
+          onCreateStream={handleCreateStream}
+          hidden={isCreateModalOpen}
+        />
         <StreamCreatedModal
           isOpen={isSuccessModalOpen}
           onClose={() => setIsSuccessModalOpen(false)}
@@ -988,9 +1023,7 @@ export default function Streams() {
       ) : showEmptyState ? (
         <section>
           <h1 style={{ marginTop: 0 }}>{t("streams.hero.title")}</h1>
-          <p style={{ color: "var(--muted)" }}>
-            {t("streams.hero.subtitle")}
-          </p>
+          <p style={{ color: "var(--muted)" }}>{t("streams.hero.subtitle")}</p>
           <EmptyState
             variant="streams"
             walletConnected={walletConnected}
@@ -1007,9 +1040,7 @@ export default function Streams() {
             <div className="streams-hero__copy">
               <p className="streams-eyebrow">{t("streams.hero.eyebrow")}</p>
               <h1>{t("streams.hero.title")}</h1>
-              <p className="streams-subtitle">
-                {t("streams.hero.subtitle")}
-              </p>
+              <p className="streams-subtitle">{t("streams.hero.subtitle")}</p>
             </div>
             <div className="streams-hero__actions">
               <button
@@ -1039,12 +1070,19 @@ export default function Streams() {
                   const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel={hasZeroRateStream ? "Review stream settings" : "Check cliff date"}
+                actionLabel={
+                  hasZeroRateStream
+                    ? "Review stream settings"
+                    : "Check cliff date"
+                }
               />
             </div>
           )}
 
-          <section className="streams-summary-grid" aria-label={t("streams.list.cardsAriaLabel")}>
+          <section
+            className="streams-summary-grid"
+            aria-label={t("streams.list.cardsAriaLabel")}
+          >
             <div className="streams-summary-card">
               <span>{t("streams.summary.activeStreamsLabel")}</span>
               <strong>{activeStreams.length}</strong>
@@ -1071,11 +1109,12 @@ export default function Streams() {
             <div className="streams-list-head">
               <div>
                 <h2>{t("streams.list.title")}</h2>
-                <p className="streams-subtitle">
-                  {t("streams.list.subtitle")}
-                </p>
+                <p className="streams-subtitle">{t("streams.list.subtitle")}</p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label={t("streams.list.filterAriaLabel")}>
+              <div
+                className="flex flex-wrap items-center gap-3 w-full mt-4"
+                aria-label={t("streams.list.filterAriaLabel")}
+              >
                 <div className="flex-1 min-w-[200px]">
                   <Input
                     id="streams-search"
@@ -1165,6 +1204,10 @@ export default function Streams() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+      />
+      <CreateStreamFab
+        onCreateStream={handleCreateStream}
+        hidden={isCreateModalOpen || isSuccessModalOpen}
       />
       <StreamCreatedModal
         isOpen={isSuccessModalOpen}
