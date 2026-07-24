@@ -12,6 +12,11 @@ export const en = {
   "createStream.steps.rateSchedule": "Rate & schedule",
   "createStream.steps.reviewCreate": "Review & create",
 
+  // CreateStreamModal Stepper header
+  "createStream.stepper.navLabel": "Create stream steps",
+  "createStream.stepper.jumpToStepAria": "Go back to step {step}: {label}",
+  "createStream.stepper.compactStatus": "Step {current} of {total}: {label}",
+
   // CreateStreamModal Step 1
   "createStream.step1.header": "Recipient & amount",
   "createStream.step1.subheader": "Set who receives the stream and how much USDC to lock.",
@@ -86,6 +91,19 @@ export const en = {
   "createStream.step3.statusWaiting": "Waiting for Stellar confirmation before opening the success receipt.",
   "createStream.step3.statusDetail": "Confirmation check {attempts} - tx {txHash}",
   "createStream.step3.statusFailed": "{error}",
+
+  // CreateStreamModal Step 3 / Offline action queue
+  "createStream.queue.bannerTitle": "Queued — will submit when back online",
+  "createStream.queue.bannerBody": "You're offline. We saved your stream details on this device and will submit them automatically the moment your connection returns — no need to resubmit.",
+  "createStream.queue.bannerPosition": "Queue position: {position} of {total}",
+  "createStream.queue.flushingTitle": "Back online. Submitting your queued stream to Stellar…",
+  "createStream.queue.flushSuccessToast": "Your queued stream was submitted and confirmed on Stellar.",
+  "createStream.queue.viewStreamAction": "View stream",
+  "createStream.queue.flushFailedTitle": "Your queued stream couldn't be submitted.",
+  "createStream.queue.flushFailedRetryBtn": "Retry now",
+  "createStream.queue.flushFailedEditBtn": "Edit details",
+  "createStream.button.queued": "Queued — waiting for connection",
+  "createStream.button.flushing": "Submitting queued stream...",
 
   // CreateStreamModal Buttons & Validation
   "createStream.button.submitting": "Submitting...",

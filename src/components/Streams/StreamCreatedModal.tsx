@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
+import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview";
 
 interface StreamCreatedModalProps {
   isOpen: boolean;
@@ -9,6 +10,11 @@ interface StreamCreatedModalProps {
   streamId: string;
   streamUrl: string;
   onCreateAnother: () => void;
+  txHash?: string;
+  amount?: string;
+  rate?: string;
+  sender?: string;
+  recipient?: string;
 }
 
 export default function StreamCreatedModal({
@@ -17,14 +23,15 @@ export default function StreamCreatedModal({
   streamId,
   streamUrl,
   onCreateAnother,
+  txHash,
+  amount = "10,000.00 USDC",
+  rate = "0.0261 USDC/sec",
+  sender = "GAB...TREASURY",
+  recipient = "GCD...RECIPIENT",
 }: StreamCreatedModalProps) {
   const [copied, setCopied] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [isPopupBlocked, setIsPopupBlocked] = useState(false);
-  const [shareTarget, setShareTarget] = useState<"slack" | "teams" | null>(
-    null,
-  );
-  const [isConnectedToWorkspace, setIsConnectedToWorkspace] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -121,9 +128,7 @@ export default function StreamCreatedModal({
     const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
     if (!newWindow) {
       setIsPopupBlocked(true);
-      setAnnouncement(
-        "Popup blocked. Please use the fallback link to view your stream.",
-      );
+      setAnnouncement("Popup blocked. Please use the fallback link to view your stream.");
     } else {
       setIsPopupBlocked(false);
     }
@@ -236,56 +241,22 @@ export default function StreamCreatedModal({
           </p>
         </div>
 
-        <section
-          className={styles.shareSection}
-          aria-label="Share stream"
-          role="region"
-        >
-          <div className={styles.shareSectionTitle}>Share stream</div>
-          <div className={styles.shareGroup}>
-            <button
-              type="button"
-              className={`${styles.shareButton} ${shareTarget === "slack" ? styles.shareButtonActive : ""}`}
-              onClick={() => setShareTarget("slack")}
-              aria-pressed={shareTarget === "slack"}
-            >
-              Share to Slack
-            </button>
-            <button
-              type="button"
-              className={`${styles.shareButton} ${shareTarget === "teams" ? styles.shareButtonActive : ""}`}
-              onClick={() => setShareTarget("teams")}
-              aria-pressed={shareTarget === "teams"}
-            >
-              Share to Teams
-            </button>
-          </div>
-
-          <div className={styles.sharePreviewCard}>
-            <div className={styles.sharePreviewHeader}>
-              <span className={styles.sharePreviewLabel}>Preview</span>
-              <span className={styles.shareStatusBadge}>
-                {isConnectedToWorkspace
-                  ? "Connected workspace"
-                  : "Connect workspace"}
-              </span>
-            </div>
-            <div className={styles.sharePreviewBody}>
-              {shareTarget === "slack"
-                ? "Slack"
-                : shareTarget === "teams"
-                  ? "Teams"
-                  : "Choose a workspace"}{" "}
-              · {streamId} · {streamUrl}
-            </div>
-          </div>
-
-          <div className={styles.shareConnectState}>
-            {isConnectedToWorkspace
-              ? "Workspace connected. Your message preview is ready to send."
-              : "Connect your workspace from account settings to send this summary card."}
-          </div>
-        </section>
+        {/* Transaction Receipt Preview & Download Button */}
+        <div className="my-4">
+          <TransactionReceiptPreview
+            data={{
+              streamId,
+              type: "Creation",
+              sender,
+              recipient,
+              amount,
+              rate,
+              timestamp: new Date().toISOString(),
+              txHash: txHash || null,
+              status: txHash ? "confirmed" : "pending",
+            }}
+          />
+        </div>
 
         {isPopupBlocked && (
           <div className={styles.popupBlockedMessage} role="alert">

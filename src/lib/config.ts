@@ -1,5 +1,6 @@
 import {
   getExpectedStellarNetwork,
+  getNetworkExplorerPath,
   type StellarNetwork,
 } from "./stellarNetwork";
 
@@ -113,6 +114,8 @@ export function getNetworkLabel(network: StellarNetwork): string {
 export function getNetworkPassphrase(network: StellarNetwork): string {
   return NETWORK_PASSPHRASES[network];
 }
+
+export { getNetworkExplorerPath };
 
 export function createConfig(env: ImportMetaEnv): AppConfig {
   const network = getExpectedStellarNetwork(env.VITE_NETWORK);
