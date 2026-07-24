@@ -82,7 +82,9 @@ describe("Recipient wallet source", () => {
   it("uses disconnected state from useWallet for the empty state", () => {
     renderRecipient();
 
-    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Withdraw 22,600 USDC/i }),
     ).not.toBeInTheDocument();
@@ -90,7 +92,8 @@ describe("Recipient wallet source", () => {
 
   it("enables the withdraw surface when useWallet reports a connected wallet", () => {
     walletState.connected = true;
-    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.address =
+      "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
     // Match the expected network so the on-chain mismatch guard does not
     // disable the withdraw action.
     walletState.network = "TESTNET";
@@ -105,7 +108,8 @@ describe("Recipient wallet source", () => {
 
   it("withdraws using the selected live recipient stream id", async () => {
     walletState.connected = true;
-    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.address =
+      "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
     walletState.network = "TESTNET";
     recipientStreamsState.streams = [
       {
@@ -118,7 +122,9 @@ describe("Recipient wallet source", () => {
 
     renderRecipient();
 
-    fireEvent.click(screen.getByRole("button", { name: /Withdraw 4,200 USDC/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Withdraw 4,200 USDC/i }),
+    );
 
     await act(async () => {});
 
@@ -127,6 +133,43 @@ describe("Recipient wallet source", () => {
       "2",
       "42000000000",
     );
+  });
+
+  it("updates the document title when the tab is blurred and clears it on focus", () => {
+    walletState.connected = true;
+    walletState.address =
+      "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.streams = [
+      {
+        id: "1",
+        status: "Active",
+        withdrawableAmount: 4200,
+        streamedAmount: 5000,
+      },
+      {
+        id: "2",
+        status: "Active",
+        withdrawableAmount: 2800,
+        streamedAmount: 5000,
+      },
+    ];
+
+    renderRecipient();
+
+    expect(document.title).toBe("Fluxora — Recipient portal");
+
+    act(() => {
+      window.dispatchEvent(new Event("blur"));
+    });
+
+    expect(document.title).toBe("(2) Fluxora — Recipient portal");
+
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    expect(document.title).toBe("Fluxora — Recipient portal");
   });
 
   it("selects only active withdrawable streams with valid contract ids", () => {

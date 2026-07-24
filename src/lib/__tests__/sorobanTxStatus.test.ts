@@ -7,14 +7,13 @@ const TX_HASH = "abcdef1234567890";
 /**
  * Build a minimal fetch-compatible Response for a Soroban RPC getTransaction reply.
  */
-function makeRpcResponse(status: string, opts?: { ok?: boolean; httpStatus?: number }) {
-  const ok = opts?.ok ?? true;
+function makeRpcResponse(status: string, opts?: { httpStatus?: number }) {
   const httpStatus = opts?.httpStatus ?? 200;
   return Promise.resolve(
     new Response(
       JSON.stringify({ jsonrpc: "2.0", id: 1, result: { status } }),
       { status: httpStatus, headers: { "Content-Type": "application/json" } },
-    ) as Response & { ok: boolean },
+    ),
   );
 }
 

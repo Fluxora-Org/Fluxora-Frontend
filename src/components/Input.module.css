@@ -101,6 +101,20 @@
   border-color: var(--color-danger);
 }
 
+/* IME composition is pending text, not an invalid value. */
+.input.composing,
+.input[data-composing="true"] {
+  border-color: var(--focus-ring-color);
+  border-bottom-width: 2px;
+  padding-bottom: 9px;
+  box-shadow: none;
+}
+
+.input-container--composing {
+  border-bottom: 2px solid var(--focus-ring-color);
+  border-radius: var(--radius-sm);
+}
+
 /* ═══════════════════════════════════════════════════════════
    LABEL STYLING
    ═══════════════════════════════════════════════════════════ */

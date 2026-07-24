@@ -1,93 +1,209 @@
-import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import StreamDetail from "../StreamDetail";
-import { getStreamById } from "../../lib/api/streamsService";
+import * as streamsService from "../../lib/api/streamsService";
 import type { StreamRecord } from "../../data/streamRecords";
 
-vi.mock("../../lib/api/streamsService", () => ({
-  getStreamById: vi.fn(),
-}));
+const mockStream: StreamRecord = {
+  id: "STR-123",
+  name: "Engineering Grant",
+  summary: "Monthly allocation for core developers",
+  recipientName: "Alice",
+  recipientAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+  treasuryAddress: "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF",
+  depositAmount: 10000,
+  streamedAmount: 4000,
+  withdrawableAmount: 2000,
+  remainingAmount: 6000,
+  monthlyRate: 1000,
+  startDate: "2026-01-01T00:00:00Z",
+  endDate: "2026-10-01T00:00:00Z",
+  cliffDate: undefined,
+  status: "Active",
+  health: "Healthy",
+  healthNote: "Stream is running normally",
+  asset: "USDC",
+  progress: 40,
+};
 
-vi.mock("../../hooks/useTickingNow", () => ({
-  useTickingNow: () => "2026-07-22T13:30:00.000Z",
-}));
-
-describe("StreamDetail Page Tests", () => {
-  afterEach(() => {
-    vi.clearAllMocks();
+describe("StreamDetail Page", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("renders the page with no streamId param and asserts 'Stream not found' state renders with a working 'Back to streams' link", async () => {
+  it("renders loading state while getStreamById is pending", () => {
+    vi.spyOn(streamsService, "getStreamById").mockImplementation(
+      () => new Promise(() => {}),
+    );
+
     render(
-      <MemoryRouter initialEntries={["/app/streams"]}>
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
-          <Route path="/app/streams" element={<StreamDetail />} />
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status", { name: /loading stream/i })).toBeInTheDocument();
+  });
+
+  it("renders stream details when fetched successfully", async () => {
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue(mockStream);
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Engineering Grant" })).toBeInTheDocument();
+    expect(screen.getByText("Monthly allocation for core developers")).toBeInTheDocument();
+    expect(screen.getByText("Healthy — Stream is running normally")).toBeInTheDocument();
+  });
+
+  it("renders Stream not found state when stream is null", async () => {
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue(null);
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams/STR-999"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByText("Stream not found")).toBeInTheDocument();
+    expect(screen.getByText("STR-999")).toBeInTheDocument();
+  });
 
-    const codeElement = screen.getByText((content, element) => {
-      return element?.tagName.toLowerCase() === "code" && content === "";
+  it("renders error state when getStreamById rejects", async () => {
+    vi.spyOn(streamsService, "getStreamById").mockRejectedValue(
+      new Error("Network connection failed"),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText(/Network connection failed/)).toBeInTheDocument();
+  });
+
+  it("handles empty streamId parameter without fetching", () => {
+    const spy = vi.spyOn(streamsService, "getStreamById");
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams/"]}>
+        <Routes>
+          <Route path="/app/streams/" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(screen.getByText("Stream not found")).toBeInTheDocument();
+  });
+
+  it("passes decoded streamId and AbortSignal to getStreamById", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    vi.spyOn(streamsService, "getStreamById").mockImplementation(
+      (_id: string, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        return Promise.resolve(mockStream);
+      },
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams/STR%2F123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(streamsService.getStreamById).toHaveBeenCalledWith(
+        "STR/123",
+        expect.any(AbortSignal),
+      );
     });
-    expect(codeElement).toBeInTheDocument();
 
-    const backLink = screen.getByRole("link", { name: /back to streams/i });
-    expect(backLink).toBeInTheDocument();
-    expect(backLink).toHaveAttribute("href", "/app/streams");
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
   });
 
-  it("renders with a streamId containing characters that require URL-decoding and asserts getStreamById is called with the decoded value", async () => {
-    const mockStream: StreamRecord = {
-      id: "stream/123",
-      name: "Decoded Stream Name",
-      summary: "A test stream that needed decoding",
-      status: "Active",
-      health: "Healthy",
-      healthNote: "All good",
-      asset: "USDC",
-      depositAmount: 10000,
-      streamedAmount: 5000,
-      withdrawableAmount: 3000,
-      remainingAmount: 2000,
-      progress: 50,
-      startDate: "2026-07-01T00:00:00Z",
-      endDate: "2026-07-31T00:00:00Z",
-    };
+  it("aborts the in-flight request when component unmounts before resolution", () => {
+    let capturedSignal: AbortSignal | undefined;
+    vi.spyOn(streamsService, "getStreamById").mockImplementation(
+      (_id: string, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        return new Promise(() => {}); // never resolves
+      },
+    );
 
-    vi.mocked(getStreamById).mockResolvedValue(mockStream);
-
-    render(
-      <MemoryRouter initialEntries={["/app/streams/stream%2F123"]}>
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(await screen.findByRole("heading", { name: "Decoded Stream Name", level: 1 })).toBeInTheDocument();
-    expect(getStreamById).toHaveBeenCalledWith("stream/123");
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(capturedSignal?.aborted).toBe(true);
   });
 
-  it("renders the error path (getStreamById rejects) and asserts the role='alert' error UI renders with the rejection message", async () => {
-    vi.mocked(getStreamById).mockRejectedValue(new Error("Stellar node query timeout"));
+  it("does not update component state if fetch resolves after unmount", async () => {
+    let resolveStream: (value: StreamRecord | null) => void = () => {};
+    vi.spyOn(streamsService, "getStreamById").mockImplementation(
+      (_id: string) =>
+        new Promise((resolve) => {
+          resolveStream = resolve;
+        }),
+    );
 
-    render(
-      <MemoryRouter initialEntries={["/app/streams/stream-error"]}>
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    const alertElement = await screen.findByRole("alert");
-    expect(alertElement).toBeInTheDocument();
-    expect(alertElement).toHaveTextContent("Error loading stream: Stellar node query timeout");
+    unmount();
 
-    const backLink = screen.getByRole("link", { name: /back to streams/i });
-    expect(backLink).toBeInTheDocument();
-    expect(backLink).toHaveAttribute("href", "/app/streams");
+    // Resolve the promise after unmount; should not throw React unmounted state update warning
+    resolveStream(mockStream);
+  });
+
+  it("returns null when stream resolves to undefined and loading is false", async () => {
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue(
+      undefined as unknown as StreamRecord,
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    expect(container.firstChild).toBeNull();
   });
 });

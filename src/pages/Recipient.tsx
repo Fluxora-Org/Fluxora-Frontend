@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import EmptyState from "../components/EmptyState";
+import RecipientEmptyState from "../components/RecipientEmptyState";
 import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
@@ -8,7 +8,12 @@ import { useToast } from "../components/toast/ToastProvider";
 import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
+import { getStreamStatusNotificationContent } from "../components/ToastNotification";
+import { TransactionReceiptPreview } from "../components/receipt/TransactionReceiptPreview";
+import type { ReceiptData } from "../utils/receiptGenerator";
+import { X, CheckCircle2 } from "lucide-react";
 import "./Streams.css";
+import "./Recipient.css";
 
 // Demo balances used as a UI fallback when the service returns no recipient
 // streams (no live backend yet, or no seeded match for the connected address).
@@ -18,6 +23,15 @@ const DEMO_TOTAL_ACCRUED = 43250.0;
 const DEMO_TOTAL_WITHDRAWN = 20650.0;
 const USDC_SCALE = 10_000_000;
 const MAX_U64 = 18_446_744_073_709_551_615n;
+const RECIPIENT_PAGE_TITLE = "Fluxora — Recipient portal";
+const ALERTS_STORAGE_KEY = "fluxora.stream-alerts.enabled";
+
+export type NotificationPermissionState = "default" | "granted" | "denied" | "unsupported";
+
+function getBrowserNotificationPermission(): NotificationPermissionState {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return window.Notification.permission;
+}
 
 type WithdrawStreamCandidate = Pick<
   StreamRecord,
@@ -69,13 +83,42 @@ export function getWithdrawAmount(balance: number): string | null {
   return scaledAmount > 0 ? scaledAmount.toString() : null;
 }
 
+export function getRecipientPageTitle(
+  count: number,
+  isTabFocused: boolean,
+): string {
+  if (isTabFocused || count <= 0) return RECIPIENT_PAGE_TITLE;
+
+  const displayCount = count >= 9 ? "9+" : count.toString();
+  return `(${displayCount}) ${RECIPIENT_PAGE_TITLE}`;
+}
+
 export default function Recipient() {
+  const timeoutRef = useRef<number | null>(null);
   const wallet = useWallet();
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [txState, setTxState] = useState<"idle" | "signing" | "submitting" | "confirmed" | "error">("idle");
+  const [txState, setTxState] = useState<
+    "idle" | "signing" | "submitting" | "confirmed" | "error"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isTabFocused, setIsTabFocused] = useState<boolean>(() =>
+    typeof window === "undefined" ? true : document.hasFocus(),
+  );
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(getBrowserNotificationPermission);
+  const [alertsEnabled, setAlertsEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isPrimingNotifications, setIsPrimingNotifications] = useState(false);
+  const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
@@ -99,10 +142,21 @@ export default function Recipient() {
   }, [wallet.address]);
 
   useEffect(() => {
+    const handleBlur = () => setIsTabFocused(false);
+    const handleFocus = () => setIsTabFocused(true);
+
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+
     return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+
+      document.title = RECIPIENT_PAGE_TITLE;
     };
   }, []);
 
@@ -119,9 +173,21 @@ export default function Recipient() {
     status: "Active",
     withdrawableAmount: DEMO_BALANCE,
   };
-  const selectedWithdrawStream = selectWithdrawStream(
-    hasLiveStreams ? liveStreams : [demoWithdrawStream],
-  );
+
+  const walletConnected = wallet.connected;
+
+  const withdrawStreamCandidates = walletConnected
+    ? hasLiveStreams
+      ? liveStreams
+      : [demoWithdrawStream]
+    : [];
+  const pendingWithdrawalCount = withdrawStreamCandidates.filter(
+    (stream) =>
+      stream.status === "Active" &&
+      stream.withdrawableAmount > 0 &&
+      isValidWithdrawStreamId(stream.id),
+  ).length;
+  const selectedWithdrawStream = selectWithdrawStream(withdrawStreamCandidates);
 
   const balance = hasLiveStreams
     ? liveStreams.reduce((sum, stream) => sum + stream.withdrawableAmount, 0)
@@ -134,19 +200,64 @@ export default function Recipient() {
     : DEMO_TOTAL_ACCRUED;
   const totalWithdrawn = hasLiveStreams
     ? liveStreams.reduce(
-        (sum, stream) => sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
+        (sum, stream) =>
+          sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
         0,
       )
     : DEMO_TOTAL_WITHDRAWN;
 
-  const walletConnected = wallet.connected;
   const hasStreams = activeStreams > 0;
 
   const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
 
+  useEffect(() => {
+    document.title = getRecipientPageTitle(
+      pendingWithdrawalCount,
+      isTabFocused,
+    );
+  }, [isTabFocused, pendingWithdrawalCount]);
+
+  const setStoredAlertsEnabled = (enabled: boolean) => {
+    setAlertsEnabled(enabled);
+    try {
+      window.localStorage.setItem(ALERTS_STORAGE_KEY, String(enabled));
+    } catch {
+      // The visual preference remains available for this session.
+    }
+  };
+
+  const openNotificationPriming = () => {
+    setNotificationState("priming-shown");
+    setIsPrimingNotifications(true);
+  };
+
+  const enableNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      setNotificationState("permission-denied-recovery-hint");
+      setIsPrimingNotifications(false);
+      addToast("Browser notifications are not available here. Stream updates remain in Fluxora.", "info");
+      return;
+    }
+
+    const permission = await window.Notification.requestPermission();
+    setNotificationPermission(permission);
+    setIsPrimingNotifications(false);
+    if (permission === "granted") {
+      setNotificationState("permission-granted");
+      setStoredAlertsEnabled(true);
+      addToast("Stream alerts are enabled.", "success");
+    } else {
+      setNotificationState(permission === "denied" ? "permission-denied-recovery-hint" : "permission-denied");
+      addToast("No browser permission was granted. You can try again from stream settings.", "info");
+    }
+  };
+
+  const notificationPreview = getStreamStatusNotificationContent("new-stream", "a new USDC stream");
+
   // Zero-accrual: connected + streams exist + no withdrawable balance yet
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
-  
+
   const isPending = txState === "signing" || txState === "submitting";
   const disabled =
     !walletConnected ||
@@ -177,8 +288,21 @@ export default function Recipient() {
 
     try {
       setTxState("submitting");
-      await withdraw(recipientAddr, streamId, amountStr);
+      const txRes = await withdraw(recipientAddr, streamId, amountStr);
       setTxState("confirmed");
+      const newReceipt: ReceiptData = {
+        streamId: streamId || "1",
+        type: "Withdrawal",
+        sender: "Treasury Smart Contract",
+        recipient: recipientAddr,
+        amount: `${balance.toLocaleString()} USDC`,
+        timestamp: new Date().toISOString(),
+        txHash: typeof txRes === "string" ? txRes : null,
+        status: typeof txRes === "string" ? "confirmed" : "pending",
+        network: wallet.network || "Stellar Testnet",
+      };
+      setReceiptData(newReceipt);
+      setShowReceiptModal(true);
       addToast("Withdrawal completed successfully on-chain!", "success");
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: any) {
@@ -217,7 +341,7 @@ export default function Recipient() {
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
           View your incoming streams and withdraw accrued USDC at any time.
         </p>
-        <EmptyState variant="recipient" walletConnected={walletConnected} />
+        <RecipientEmptyState walletConnected={walletConnected} />
       </main>
     );
   }
@@ -235,8 +359,12 @@ export default function Recipient() {
             withdrawal to your connected wallet.
           </p>
           {(errorMsg || networkMismatch) && (
-            <p className="validation-message validation-message--error" style={{ color: "var(--color-danger)", marginTop: "1rem" }} role="alert">
-              {networkMismatch 
+            <p
+              className="validation-message validation-message--error"
+              style={{ color: "var(--color-danger)", marginTop: "1rem" }}
+              role="alert"
+            >
+              {networkMismatch
                 ? `Wrong network: Freighter is connected to ${wallet.network?.toUpperCase()}, but Fluxora is configured for ${wallet.expectedNetworkLabel}.`
                 : errorMsg}
             </p>
@@ -286,10 +414,60 @@ export default function Recipient() {
         </div>
         <div className="streams-summary-card">
           <span>Withdrawable now</span>
-          <strong style={{ color: "var(--accent)" }}>{balance.toLocaleString()} USDC</strong>
+          <strong style={{ color: "var(--accent)" }}>
+            {balance.toLocaleString()} USDC
+          </strong>
           <p>Available for immediate withdrawal.</p>
         </div>
       </section>
+
+      <section className="recipient-alerts-panel" aria-labelledby="stream-alerts-title">
+        <div>
+          <p className="recipient-alerts-eyebrow">Optional alerts</p>
+          <h2 id="stream-alerts-title">Know when your stream changes</h2>
+          <p>Get a browser notification when a cliff passes, a stream is fully accrued, or a new stream arrives.</p>
+        </div>
+        {alertsEnabled && notificationPermission === "granted" ? (
+          <button type="button" className="recipient-alerts-toggle" onClick={() => setStoredAlertsEnabled(false)} aria-pressed="true">
+            Alerts on · Turn off
+          </button>
+        ) : (
+          <button type="button" className="recipient-alerts-toggle" onClick={openNotificationPriming}>
+            Notify me
+          </button>
+        )}
+        {notificationState === "permission-denied-recovery-hint" && (
+          <p className="recipient-alerts-recovery" role="status">
+            Permission is blocked by your browser. Allow notifications for Fluxora in site settings, then choose Notify me again.
+          </p>
+        )}
+      </section>
+
+      {isPrimingNotifications && (
+        <div className="recipient-alerts-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setIsPrimingNotifications(false);
+        }}>
+          <section className="recipient-alerts-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-priming-title" aria-describedby="notification-priming-description">
+            <p className="recipient-alerts-eyebrow">Before browser permission</p>
+            <h2 id="notification-priming-title">Keep stream milestones in view</h2>
+            <p id="notification-priming-description">Fluxora will notify you only when one of these happens:</p>
+            <ul>
+              <li>A stream cliff passes</li>
+              <li>A stream becomes fully accrued</li>
+              <li>You receive a new stream</li>
+            </ul>
+            <div className="recipient-alerts-preview" aria-label="Example notification">
+              <img src={notificationPreview.icon} alt="" width="24" height="24" />
+              <span><strong>{notificationPreview.title}</strong><small>{notificationPreview.body}</small></span>
+            </div>
+            <p className="recipient-alerts-note">You can turn Fluxora alerts off here later. Browser permission can be changed in your site settings.</p>
+            <div className="recipient-alerts-actions">
+              <button type="button" className="recipient-alerts-secondary" onClick={() => setIsPrimingNotifications(false)}>Not now</button>
+              <button type="button" className="recipient-alerts-primary" onClick={() => void enableNotifications()}>Allow stream alerts</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* ── Streams List ── */}
       <section className="streams-list-shell">
@@ -297,7 +475,8 @@ export default function Recipient() {
           <div>
             <h2>Incoming streams</h2>
             <p className="streams-subtitle">
-              Review and manage each individual stream currently committing funds to you.
+              Review and manage each individual stream currently committing
+              funds to you.
             </p>
           </div>
         </div>
@@ -305,6 +484,47 @@ export default function Recipient() {
           <RecipientStreams fetchStreamsFn={fetchIncomingStreams} />
         </div>
       </section>
+
+      {/* ── Withdrawal Receipt Dialog Modal ── */}
+      {showReceiptModal && receiptData && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="withdrawal-receipt-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div className="w-full max-w-xl bg-[var(--surface-base)] border border-[var(--border-strong)] rounded-2xl p-6 shadow-2xl space-y-4 text-left max-h-[90vh] overflow-y-auto relative">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={20} className="text-emerald-400" />
+                <h2 id="withdrawal-receipt-title" className="text-base font-bold text-[var(--text-vivid)]">
+                  Withdrawal Confirmed
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(false)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-vivid)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                aria-label="Close withdrawal receipt modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <TransactionReceiptPreview data={receiptData} />
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(false)}
+                className="px-4 py-2 rounded-xl bg-[var(--surface-sunken)] hover:bg-[var(--surface-elevated)] border border-[var(--border-neutral)] text-[var(--text-vivid)] text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
