@@ -1,9 +1,15 @@
+import {
+  getExpectedStellarNetwork,
+  getNetworkExplorerPath,
+  normalizeStellarNetwork,
+} from "./stellarNetwork";
+
 const STELLAR_ADDRESS_REGEX = /^G[ABCDEFGHIJKLMNOPQRSTUVWXYZ234567]{55}$/;
 const STRKEY_BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
 const ED25519_PUBLIC_KEY_BYTE_LENGTH = 35;
 
-function decodeBase32(value: string): Uint8Array | null {
+export function decodeBase32(value: string): Uint8Array | null {
   let bits = 0;
   let bitCount = 0;
   const bytes: number[] = [];
@@ -20,6 +26,12 @@ function decodeBase32(value: string): Uint8Array | null {
       bytes.push((bits >> bitCount) & 0xff);
     }
   }
+
+  // Per RFC 4648, any leftover sub-byte bits after the last full byte must be
+  // zero. Non-zero trailing padding bits mean this is a non-canonical encoding
+  // of the same byte payload — reject it so that exactly one base32 string maps
+  // to each byte sequence.
+  if (bitCount > 0 && (bits & ((1 << bitCount) - 1)) !== 0) return null;
 
   return new Uint8Array(bytes);
 }
@@ -76,11 +88,12 @@ export function maskAddress(value: string, prefix = 8, suffix = 4): string {
 }
 
 export function stellarExplorerUrl(address: string, network?: string | null) {
-  const normalizedNetwork = network?.toUpperCase();
-  const explorerNetwork =
-    normalizedNetwork === "PUBLIC" || normalizedNetwork === "MAINNET"
+  const normalizedNetwork = network ? normalizeStellarNetwork(network) : null;
+  const explorerNetwork = normalizedNetwork
+    ? getNetworkExplorerPath(normalizedNetwork)
+    : network?.toUpperCase() === "MAINNET"
       ? "public"
-      : "testnet";
+      : getNetworkExplorerPath(getExpectedStellarNetwork());
 
   return `https://stellar.expert/explorer/${explorerNetwork}/account/${encodeURIComponent(
     address,

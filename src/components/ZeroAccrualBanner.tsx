@@ -153,7 +153,7 @@ export default function ZeroAccrualBanner({
 }: ZeroAccrualBannerProps) {
   const cfg = REASON_CONFIG[reason];
   const label = actionLabel ?? cfg.defaultActionLabel;
-  const formattedEventDate = nextEventDate ? formatEventDate(nextEventDate) : null;
+  const formattedEventDate = nextEventDate ? formatLocalDate(nextEventDate) : null;
 
   return (
     <div

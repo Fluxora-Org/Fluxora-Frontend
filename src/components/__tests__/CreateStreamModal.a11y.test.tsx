@@ -10,9 +10,7 @@ const VALID_STELLAR =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderOpenModal(onClose = vi.fn()) {
-  const result = render(
-    <button type="button">Open create stream</button>,
-  );
+  const result = render(<button type="button">Open create stream</button>);
   const trigger = screen.getByRole("button", { name: /open create stream/i });
   trigger.focus();
 
@@ -110,5 +108,26 @@ describe("CreateStreamModal accessibility and keyboard behavior", () => {
     expect(
       within(dialog).getByRole("button", { name: /^create stream$/i }),
     ).toBeEnabled();
+  });
+
+  it("shows a visible unit-cycle shortcut hint and toggles the rate unit from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderOpenModal();
+    await flushAnimationFrame();
+
+    const dialog = screen.getByRole("dialog", { name: /create stream/i });
+
+    fillValidStepOne(dialog);
+    await user.click(within(dialog).getByRole("button", { name: /^next$/i }));
+
+    const rateInput = within(dialog).getByLabelText(/accrual rate/i);
+    const cycleHint = within(dialog).getByText(/press u to cycle unit/i);
+
+    expect(cycleHint).toBeInTheDocument();
+
+    await user.click(rateInput);
+    await user.keyboard("u");
+
+    expect(within(dialog).getByText(/USDC \/ hour/i)).toBeInTheDocument();
   });
 });
