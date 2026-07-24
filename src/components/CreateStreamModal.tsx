@@ -25,6 +25,7 @@ import {
   isDateTimeInPast,
 } from '../lib/createStreamDates';
 import { useI18n } from '../i18n';
+import type { StreamDraftSnapshot } from '../lib/streamsSessionRecovery';
 import {
   evaluateContrast,
   THEME_BACKGROUNDS,
@@ -156,6 +157,18 @@ interface CreateStreamModalProps {
   onStreamCreated?: () => void | Promise<void>;
   /** Called when stream creation fails after the user confirms the review step. */
   onStreamError?: (err: unknown) => void;
+  /**
+   * Restores step 1/2 field values when the modal opens — used by the Streams
+   * session-recovery banner to resume an unsubmitted draft. Never applied past
+   * step 2 (see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2).
+   */
+  initialDraft?: StreamDraftSnapshot | null;
+  /**
+   * Fires with the current safe-to-persist draft fields while the modal is
+   * open on step 1/2, and with `null` the instant the modal closes (any path)
+   * so a completed or abandoned draft is never left resumable.
+   */
+  onDraftChange?: (draft: StreamDraftSnapshot | null) => void;
 }
 
 export default function CreateStreamModal({
@@ -163,6 +176,8 @@ export default function CreateStreamModal({
   onClose,
   onStreamCreated,
   onStreamError,
+  initialDraft,
+  onDraftChange,
 }: CreateStreamModalProps) {
   const wallet = useWallet();
   const { addToast } = useToast();
@@ -297,6 +312,56 @@ export default function CreateStreamModal({
     modalRef,
     initialFocusRef: recipientInputRef,
   });
+
+  // Apply a restored draft when the modal is opened for it. Capped at step 2 —
+  // never resume directly into step 3 (review/create); see spec §2.
+  useEffect(() => {
+    if (!isOpen || !initialDraft) return;
+
+    setRecipient(initialDraft.recipient);
+    setDepositAmount(initialDraft.depositAmount);
+    setAccrualRate(initialDraft.accrualRate);
+    setDuration(initialDraft.duration);
+    setStartTimeOption(initialDraft.startTimeOption);
+    setCustomStartDate(initialDraft.customStartDate);
+    setCliffEnabled(initialDraft.cliffEnabled);
+    setCliffDate(initialDraft.cliffDate);
+    setCurrentStep(initialDraft.step);
+    // Only re-apply when the modal transitions open; initialDraft is a one-shot
+    // seed, not a controlled value the modal should keep resyncing to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Report the safe-to-persist draft fields upward while unsubmitted (step 1/2
+  // only). The parent clears this to null on every close path and on success —
+  // see docs/STREAMS_SESSION_RECOVERY_SPEC.md §2.
+  useEffect(() => {
+    if (!isOpen || currentStep > 2 || !onDraftChange) return;
+
+    onDraftChange({
+      step: currentStep === 2 ? 2 : 1,
+      recipient,
+      depositAmount,
+      accrualRate,
+      duration,
+      startTimeOption,
+      customStartDate,
+      cliffEnabled,
+      cliffDate,
+    });
+  }, [
+    isOpen,
+    currentStep,
+    recipient,
+    depositAmount,
+    accrualRate,
+    duration,
+    startTimeOption,
+    customStartDate,
+    cliffEnabled,
+    cliffDate,
+    onDraftChange,
+  ]);
 
   const getStreamErrorMessage = (err: unknown): string => {
     if (err instanceof Error && err.message.trim()) {

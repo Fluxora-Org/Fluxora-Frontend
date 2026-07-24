@@ -1386,7 +1386,9 @@
   border: 2px solid var(--color-danger);
   background: rgba(239, 68, 68, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Success state: 1px success border + subtle green tint */
@@ -1394,7 +1396,9 @@
   border: 1px solid var(--color-success);
   background: rgba(16, 185, 129, 0.05);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-base), background var(--transition-base);
+  transition:
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 /* Validation message: base */
@@ -1414,6 +1418,12 @@
 /* Hint message modifier */
 .validation-message--hint {
   color: var(--color-text-muted);
+}
+
+.unit-cycle-hint {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
 }
 
 /* Success message modifier */
