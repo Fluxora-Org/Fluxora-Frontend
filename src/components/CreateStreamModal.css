@@ -1283,3 +1283,263 @@
 .validation-message--success {
   color: var(--color-success);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE CONTRAST-CHECK UX (Stream Label Color Swatch Picker)
+   ═══════════════════════════════════════════════════════════ */
+
+.label-color-section {
+  margin-top: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.label-color-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.label-color-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-vivid, #1a1f36);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.swatch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.swatch-btn:hover {
+  transform: scale(1.15);
+}
+
+.swatch-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-bg-primary, #ffffff),
+    0 0 0 4px var(--focus-ring-color, #00d4aa);
+}
+
+.swatch-btn.selected {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 2px var(--color-bg-primary, #ffffff),
+    0 0 0 4px var(--focus-ring-color, #00d4aa);
+}
+
+.swatch-btn-checkmark {
+  width: 14px;
+  height: 14px;
+  color: #ffffff;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+}
+
+.swatch-btn.swatch-btn--light .swatch-btn-checkmark {
+  color: #0f172a;
+}
+
+.swatch-clear-btn {
+  background: transparent;
+  border: 1px solid var(--border-neutral, #d0d7e0);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7a94);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.swatch-clear-btn:hover {
+  border-color: var(--border-strong, #a0aec0);
+  color: var(--text-vivid, #1a1f36);
+}
+
+.swatch-custom-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.swatch-custom-input {
+  width: 110px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-family: monospace;
+  border: 1px solid var(--border-neutral, #d0d7e0);
+  border-radius: 6px;
+  background: var(--surface-base, #ffffff);
+  color: var(--text-vivid, #1a1f36);
+}
+
+.swatch-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7a94);
+  background: var(--surface-sunken, #f5f7fa);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.swatch-theme-toggle button {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-muted, #6b7a94);
+}
+
+.swatch-theme-toggle button.active {
+  background: var(--surface-base, #ffffff);
+  color: var(--text-vivid, #1a1f36);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Indicator Badges */
+.contrast-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.contrast-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.contrast-badge--none {
+  background: var(--surface-sunken, #f1f5f9);
+  color: var(--text-muted, #475569);
+  border: 1px solid var(--border-neutral, #cbd5e1);
+}
+
+.contrast-badge--pass {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+:root[data-theme="dark"] .contrast-badge--pass {
+  background: rgba(16, 185, 129, 0.15);
+  color: #00d4aa;
+  border: 1px solid rgba(0, 212, 170, 0.3);
+}
+
+.contrast-badge--fail {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+:root[data-theme="dark"] .contrast-badge--fail {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.contrast-badge--overridden {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+:root[data-theme="dark"] .contrast-badge--overridden {
+  background: rgba(245, 158, 11, 0.15);
+  color: #ffa726;
+  border: 1px solid rgba(255, 167, 38, 0.3);
+}
+
+/* Contrast Warning & Override Container */
+.contrast-warning-box {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--status-error, #ff6b6b);
+  color: var(--text-vivid, #1a1f36);
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+:root[data-theme="dark"] .contrast-warning-box {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.contrast-warning-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+:root[data-theme="dark"] .contrast-warning-text {
+  color: #ff6b6b;
+}
+
+.contrast-override-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.contrast-override-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent, #00d4aa);
+}
+
+.contrast-override-label {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary, #4a5565);
+}
+
+:root[data-theme="dark"] .contrast-override-label {
+  color: var(--text-secondary, #b0b8c9);
+}
+

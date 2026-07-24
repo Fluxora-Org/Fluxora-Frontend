@@ -17,6 +17,23 @@ import {
   isDateTimeInPast,
 } from '../lib/createStreamDates';
 import { useI18n } from '../i18n';
+import {
+  evaluateContrast,
+  THEME_BACKGROUNDS,
+} from '../utils/contrastUtils';
+
+export const LABEL_COLOR_SWATCHES = [
+  { hex: '#3b82f6', label: 'Blue' },
+  { hex: '#00a884', label: 'Teal' },
+  { hex: '#8b5cf6', label: 'Purple' },
+  { hex: '#ec4899', label: 'Pink' },
+  { hex: '#059669', label: 'Emerald' },
+  { hex: '#dc2626', label: 'Red' },
+  { hex: '#fef08a', label: 'Light Yellow' },
+  { hex: '#94a3b8', label: 'Muted Slate' },
+  { hex: '#ffffff', label: 'White' },
+  { hex: '#0a0e17', label: 'Dark' },
+];
 
 const USDC_DECIMAL_PLACES = 7;
 
@@ -135,6 +152,14 @@ export default function CreateStreamModal({
   const [customStartDate, setCustomStartDate] = useState("");
   const [cliffEnabled, setCliffEnabled] = useState(false);
   const [cliffDate, setCliffDate] = useState("");
+
+  // Stream Label Color & Live Contrast Check States
+  const [labelColor, setLabelColor] = useState<string>("");
+  const [customHexInput, setCustomHexInput] = useState<string>("");
+  const [overrideContrast, setOverrideContrast] = useState<boolean>(false);
+  const [targetTheme, setTargetTheme] = useState<'light' | 'dark'>('light');
+  const [focusedSwatchIndex, setFocusedSwatchIndex] = useState<number>(0);
+
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -146,6 +171,55 @@ export default function CreateStreamModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
   const submitInFlightRef = useRef(false);
+
+  // Dynamic Contrast Evaluation against selected background theme
+  const bgHex = targetTheme === 'dark' ? THEME_BACKGROUNDS.dark : THEME_BACKGROUNDS.light;
+  const contrastEval = labelColor
+    ? evaluateContrast(labelColor, bgHex)
+    : { ratio: 0, passesAA: false, formattedRatio: '' };
+
+  const contrastState: 'no-selection' | 'AA-pass' | 'AA-fail-blocked' | 'AA-fail-overridden' = !labelColor
+    ? 'no-selection'
+    : contrastEval.passesAA
+    ? 'AA-pass'
+    : overrideContrast
+    ? 'AA-fail-overridden'
+    : 'AA-fail-blocked';
+
+  const handleSwatchKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(nextIndex);
+      const swatch = LABEL_COLOR_SWATCHES[nextIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = (index - 1 + LABEL_COLOR_SWATCHES.length) % LABEL_COLOR_SWATCHES.length;
+      setFocusedSwatchIndex(prevIndex);
+      const swatch = LABEL_COLOR_SWATCHES[prevIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setFocusedSwatchIndex(0);
+      const swatch = LABEL_COLOR_SWATCHES[0];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const lastIndex = LABEL_COLOR_SWATCHES.length - 1;
+      setFocusedSwatchIndex(lastIndex);
+      const swatch = LABEL_COLOR_SWATCHES[lastIndex];
+      setLabelColor(swatch.hex);
+      setCustomHexInput(swatch.hex);
+      setOverrideContrast(false);
+    }
+  };
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -233,6 +307,12 @@ export default function CreateStreamModal({
       setError(t("createStream.validation.depositPositive"));
       return false;
     }
+
+    if (contrastState === 'AA-fail-blocked') {
+      setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
+      return false;
+    }
+
     setError(null);
     return true;
   };
@@ -588,6 +668,202 @@ export default function CreateStreamModal({
                       placeholder={t("createStream.step1.depositPlaceholder")}
                     />
                   </InputField>
+
+                  {/* Stream Label Color Swatch Picker & Live Contrast Check */}
+                  <div className="label-color-section" role="region" aria-labelledby="label-color-heading">
+                    <div className="label-color-header">
+                      <label id="label-color-heading" className="label-color-title">
+                        Stream Label Color <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(Optional)</span>
+                      </label>
+                      <div className="swatch-theme-toggle" role="group" aria-label="Contrast background theme preview">
+                        <span>Against:</span>
+                        <button
+                          type="button"
+                          className={targetTheme === 'light' ? 'active' : ''}
+                          onClick={() => setTargetTheme('light')}
+                          aria-pressed={targetTheme === 'light'}
+                        >
+                          Light (#FFF)
+                        </button>
+                        <button
+                          type="button"
+                          className={targetTheme === 'dark' ? 'active' : ''}
+                          onClick={() => setTargetTheme('dark')}
+                          aria-pressed={targetTheme === 'dark'}
+                        >
+                          Dark (#0A0E17)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Swatch Grid */}
+                    <div
+                      className="swatch-grid"
+                      role="radiogroup"
+                      aria-label="Stream label color swatches"
+                    >
+                      {LABEL_COLOR_SWATCHES.map((swatch, idx) => {
+                        const isSelected = labelColor.toLowerCase() === swatch.hex.toLowerCase();
+                        const isFocused = focusedSwatchIndex === idx;
+                        const isLightSwatch = ['#ffffff', '#fef08a', '#94a3b8'].includes(swatch.hex.toLowerCase());
+
+                        return (
+                          <button
+                            key={swatch.hex}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-label={`${swatch.label} (${swatch.hex})`}
+                            tabIndex={isFocused || (focusedSwatchIndex === 0 && idx === 0) ? 0 : -1}
+                            className={`swatch-btn ${isSelected ? 'selected' : ''} ${isLightSwatch ? 'swatch-btn--light' : ''}`}
+                            style={{ backgroundColor: swatch.hex }}
+                            onClick={() => {
+                              setLabelColor(swatch.hex);
+                              setCustomHexInput(swatch.hex);
+                              setFocusedSwatchIndex(idx);
+                              setOverrideContrast(false);
+                              if (error) setError(null);
+                            }}
+                            onKeyDown={(e) => handleSwatchKeyDown(e, idx)}
+                          >
+                            {isSelected && (
+                              <svg
+                                className="swatch-btn-checkmark"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {labelColor && (
+                        <button
+                          type="button"
+                          className="swatch-clear-btn"
+                          onClick={() => {
+                            setLabelColor('');
+                            setCustomHexInput('');
+                            setOverrideContrast(false);
+                            if (error) setError(null);
+                          }}
+                          aria-label="Clear label color selection"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Custom Hex Row */}
+                    <div className="swatch-custom-input-row">
+                      <label htmlFor="custom-label-hex" style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                        Custom Hex:
+                      </label>
+                      <input
+                        id="custom-label-hex"
+                        type="text"
+                        className="swatch-custom-input"
+                        placeholder="#3B82F6"
+                        maxLength={7}
+                        value={customHexInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomHexInput(val);
+                          if (error) setError(null);
+                          if (/^#?[0-9A-Fa-f]{6}$/.test(val)) {
+                            const formatted = val.startsWith('#') ? val : `#${val}`;
+                            setLabelColor(formatted);
+                            setOverrideContrast(false);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Live Contrast Indicator Badge */}
+                    <div
+                      className="contrast-badge-container"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      id="label-color-contrast-status"
+                    >
+                      {contrastState === 'no-selection' && (
+                        <span className="contrast-badge contrast-badge--none">
+                          No color selected
+                        </span>
+                      )}
+                      {contrastState === 'AA-pass' && (
+                        <span className="contrast-badge contrast-badge--pass">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Pass AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-blocked' && (
+                        <span className="contrast-badge contrast-badge--fail">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA
+                        </span>
+                      )}
+                      {contrastState === 'AA-fail-overridden' && (
+                        <span className="contrast-badge contrast-badge--overridden">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          {contrastEval.formattedRatio} — Fail AA (Overridden)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Blocked / Low Contrast Warning Alert with Override Affordance */}
+                    {(contrastState === 'AA-fail-blocked' || contrastState === 'AA-fail-overridden') && (
+                      <div
+                        className="contrast-warning-box"
+                        role={contrastState === 'AA-fail-blocked' ? 'alert' : 'region'}
+                        aria-live={contrastState === 'AA-fail-blocked' ? 'assertive' : 'polite'}
+                      >
+                        <div className="contrast-warning-text">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                          <span>
+                            Low contrast label color ({contrastEval.formattedRatio}). May be unreadable against the surface.
+                          </span>
+                        </div>
+                        <div className="contrast-override-row">
+                          <input
+                            type="checkbox"
+                            id="override-contrast-checkbox"
+                            className="contrast-override-checkbox"
+                            checked={overrideContrast}
+                            onChange={(e) => {
+                              setOverrideContrast(e.target.checked);
+                              if (error) setError(null);
+                            }}
+                          />
+                          <label htmlFor="override-contrast-checkbox" className="contrast-override-label">
+                            Use low-contrast color anyway (not recommended)
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </InputField>
                 </>
               );
             })()}
