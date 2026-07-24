@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { writeOnboardingDismissed } from "../lib/onboarding";
+import { useWallet } from "./wallet-connect/Walletcontext";
 import "./TreasuryOnboarding.css";
 
 interface TreasuryOnboardingProps {
@@ -32,6 +33,7 @@ export default function TreasuryOnboarding({
   onCreateStream,
   onDismiss,
 }: TreasuryOnboardingProps) {
+  const { expectedNetwork, expectedNetworkLabel } = useWallet();
   const [step, setStep] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const regionRef = useRef<HTMLDivElement>(null);
@@ -523,8 +525,9 @@ export default function TreasuryOnboarding({
                     <path strokeLinecap="round" d="M12 16v-4M12 8h.01" />
                   </svg>
                   <p>
-                    Fluxora connects to Stellar Testnet by default. No real
-                    funds are used during exploration.
+                    {expectedNetwork === "PUBLIC"
+                      ? `Fluxora is configured for ${expectedNetworkLabel}. This wallet connection uses real funds; review requests carefully before approving.`
+                      : `Fluxora is configured for ${expectedNetworkLabel}. No real funds are used during exploration.`}
                   </p>
                 </div>
               </>
