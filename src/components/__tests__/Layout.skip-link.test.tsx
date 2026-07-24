@@ -7,10 +7,12 @@ import Layout from "../Layout";
 /**
  * The skip link is the WCAG 2.4.1 bypass-block mechanism for the app shell.
  * In real browsers, activating the skip link moves focus onto the matching
- * `#main-content` element. jsdom does NOT replicate that fragment → focus
- * transfer (see https://github.com/jsdom/jsdom/issues/4159), so we verify
- * the underlying *configuration* (href, target id, tabIndex=-1, tab order)
- * rather than the implicit focus outcome.
+ * `#main-content` element via native fragment navigation, which jsdom does
+ * NOT replicate (see https://github.com/jsdom/jsdom/issues/4159). Layout's
+ * `handleSkipLinkClick` works around this by imperatively calling
+ * `main.focus()` on click, so we can verify both the underlying
+ * *configuration* (href, target id, tabIndex=-1, tab order) and the resulting
+ * focus transfer.
  */
 test("skip link is configured for WCAG 2.4.1 bypass-block and is first in tab order", async () => {
   render(
@@ -39,4 +41,9 @@ test("skip link is configured for WCAG 2.4.1 bypass-block and is first in tab or
   document.body.focus();
   await userEvent.tab();
   expect(document.activeElement).toBe(skipLink);
+
+  // 4. Activating the link triggers handleSkipLinkClick, which moves focus
+  //    to #main-content directly (bypassing jsdom's lack of fragment nav).
+  await userEvent.click(skipLink);
+  expect(document.activeElement).toBe(main);
 });

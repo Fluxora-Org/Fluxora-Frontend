@@ -12,16 +12,27 @@ import type { ToastVariant } from "../ToastNotification";
 
 export type { ToastVariant };
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
   timeout: number;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
   /** Add a toast to the queue. Returns the generated id. */
-  addToast: (message: string, variant: ToastVariant, timeout?: number) => string;
+  addToast: (
+    message: string,
+    variant: ToastVariant,
+    timeout?: number,
+    action?: ToastAction,
+  ) => string;
   /** Manually dismiss a toast by id. */
   dismiss: (id: string) => void;
 }
@@ -55,9 +66,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addToast = useCallback(
-    (message: string, variant: ToastVariant, timeout = DEFAULT_TIMEOUT): string => {
+    (
+      message: string,
+      variant: ToastVariant,
+      timeout = DEFAULT_TIMEOUT,
+      action?: ToastAction,
+    ): string => {
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, variant, timeout }]);
+      setToasts((prev) => [...prev, { id, message, variant, timeout, action }]);
       return id;
     },
     [],
@@ -110,6 +126,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             message={toast.message}
             variant={toast.variant}
             onClose={() => dismiss(toast.id)}
+            actionLabel={toast.action?.label}
+            onAction={toast.action?.onClick}
           />
         ))}
       </div>
