@@ -166,10 +166,10 @@ export default function Sidebar({
             {/* Mobile Close Button */}
             <button
               onClick={onMobileClose}
-              className="md:hidden p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-md"
+              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-md"
               aria-label="Close sidebar"
             >
-              <X size={20} />
+              <X className="icon-sm" />
             </button>
           </div>
 
@@ -203,9 +203,8 @@ export default function Sidebar({
                       )} 
                     />
                     <item.icon
-                      size={20}
                       className={cn(
-                        "flex-shrink-0 transition-colors",
+                        "icon-sm flex-shrink-0 transition-colors",
                         isActive ? "text-[var(--accent)]" : "group-hover:text-[var(--text)]"
                       )}
                     />
@@ -234,7 +233,7 @@ export default function Sidebar({
                 {...(item.external && { target: "_blank", rel: "noopener noreferrer" })}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
-                <item.icon size={20} className="flex-shrink-0 group-hover:text-[var(--text)]" />
+                <item.icon className="icon-sm flex-shrink-0 group-hover:text-[var(--text)]" />
                 <span
                   className={cn(
                     "transition-opacity duration-300 whitespace-nowrap",
@@ -250,15 +249,14 @@ export default function Sidebar({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
+              className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 min-h-[44px] min-w-[44px] text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!collapsed}
               aria-controls="app-sidebar"
             >
               <ChevronLeft
-                size={20}
                 className={cn(
-                  "transition-transform duration-300",
+                  "icon-sm transition-transform duration-300",
                   collapsed ? "rotate-180" : "rotate-0"
                 )}
               />

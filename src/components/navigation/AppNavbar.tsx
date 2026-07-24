@@ -199,7 +199,7 @@ const location = useLocation();
               aria-expanded={isSidebarOpen}
               aria-controls="app-sidebar"
             >
-              {isSidebarOpen ? <X size={26} aria-hidden="true" /> : <Menu size={26} aria-hidden="true" />}
+              {isSidebarOpen ? <X className="icon-md" aria-hidden="true" /> : <Menu className="icon-md" aria-hidden="true" />}
             </button>
           )}
           <FluxoraLogo connected={connected} />
@@ -248,9 +248,9 @@ const location = useLocation();
             className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             {theme === "light" ? (
-              <Moon size={16} aria-hidden="true" />
+              <Moon className="icon-xs" aria-hidden="true" />
             ) : (
-              <Sun size={16} aria-hidden="true" />
+              <Sun className="icon-xs" aria-hidden="true" />
             )}
           </button>
 
@@ -279,7 +279,7 @@ const location = useLocation();
         {/* Mobile: hamburger (only in Marketing View or if not using sidebar) */}
         {!isAppView && (
           <button
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            className="md:hidden flex items-center justify-center w-11 h-11 rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             onClick={handleMobileToggle}
             aria-label={
               mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
@@ -288,9 +288,9 @@ const location = useLocation();
             aria-controls="mobile-nav"
           >
             {mobileMenuOpen ? (
-              <X size={22} aria-hidden="true" />
+              <X className="icon-md" aria-hidden="true" />
             ) : (
-              <Menu size={22} aria-hidden="true" />
+              <Menu className="icon-md" aria-hidden="true" />
             )}
           </button>
         )}
@@ -331,9 +331,9 @@ const location = useLocation();
               className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             >
               {theme === "light" ? (
-                <Moon size={16} aria-hidden="true" />
+                <Moon className="icon-xs" aria-hidden="true" />
               ) : (
-                <Sun size={16} aria-hidden="true" />
+                <Sun className="icon-xs" aria-hidden="true" />
               )}
             </button>
 

@@ -29,17 +29,17 @@
   --surface-raised: #e8ecf1;
   --surface-highest: #dfe5ed;
 
-/* Icon sizes */
---icon-size-xs: 16px;   /* inline */
---icon-size-sm: 20px;   /* button/label */
---icon-size-md: 24px;   /* standalone */
---icon-size-lg: 32px;   /* hero/empty-state */
+/* Icon sizes (relative to root font-size for zoom scaling) */
+--icon-size-xs: 1rem;       /* inline, 16px equivalent */
+--icon-size-sm: 1.25rem;    /* button/label, 20px equivalent */
+--icon-size-md: 1.5rem;     /* standalone, 24px equivalent */
+--icon-size-lg: 2rem;       /* hero/empty-state, 32px equivalent */
 
-/* Utility classes for icon sizing */
-.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
-.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
-.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); }
-.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+/* Utility classes for icon sizing and high-DPI crisp rendering */
+.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); stroke-width: 1.5; }
+.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); stroke-width: 2.4; }
+.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); stroke-width: 2.0; }
+.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); stroke-width: 1.5; }
 
   /* ===== TEXT ===== */
   --text-vivid: #1a1f36;
@@ -204,7 +204,7 @@
   --icon-info-default: var(--text-muted);
   --icon-info-hover: var(--accent);
   --icon-info-active: var(--accent-dim);
-  --icon-info-size: 16px;
+  --icon-info-size: var(--icon-size-xs);
 
   /* Navbar */
   --navbar-bg: #ffffff;
