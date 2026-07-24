@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import Breadcrumb from "../components/navigation/Breadcrumb";
 import { Skeleton } from "../components/Skeleton";
 import StreamTimeline from "../components/StreamTimeline";
+import StreamComparePane from "../components/StreamComparePane";
 import { useTickingNow } from "../hooks/useTickingNow";
 
 /**
@@ -15,18 +16,27 @@ import { useTickingNow } from "../hooks/useTickingNow";
  * detail view including the {@link StreamTimeline}, health indicators, and
  * key financial metrics.
  *
- * The `streamId` parameter is URL-decoded before being passed to
- * `getStreamById`, which in turn applies `encodeURIComponent` when building
- * the API path — preventing double-encoding while still sanitising the value.
+ * Compare mode
+ * ────────────
+ * When the URL contains `?compare=<otherStreamId>` the page renders a
+ * two-pane {@link StreamComparePane} instead of the single-stream layout.
+ * The StreamsTable drives this by calling its `onCompare` prop which
+ * navigates to `/app/streams/:leftId?compare=<rightId>`.
  *
  * States:
- * - **loading** – skeleton shimmer while the request is in-flight
+ * - **loading**   – skeleton shimmer while the request is in-flight
  * - **not found** – friendly empty state with a link back to the list
- * - **error** – error message with a retry button
- * - **success** – full stream detail layout
+ * - **error**     – error message with a retry button
+ * - **compare**   – two-pane split view
+ * - **success**   – full single stream detail layout
  */
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Compare mode: ?compare=<otherStreamId>
+  const compareWithId = searchParams.get("compare");
+  const isCompareMode = Boolean(compareWithId && streamId);
 
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
@@ -36,6 +46,12 @@ export default function StreamDetail() {
   const currentDate = useTickingNow();
 
   useEffect(() => {
+    // In compare mode the individual panes manage their own fetches
+    if (isCompareMode) {
+      setLoading(false);
+      return;
+    }
+
     if (!streamId) {
       setStream(null);
       setLoading(false);
@@ -43,7 +59,6 @@ export default function StreamDetail() {
     }
 
     let cancelled = false;
-    const controller = new AbortController();
 
     setLoading(true);
     setError(null);
@@ -66,10 +81,36 @@ export default function StreamDetail() {
 
     return () => {
       cancelled = true;
-      controller.abort();
     };
-  }, [streamId]);
+  }, [streamId, isCompareMode]);
 
+  // ── Compare mode ──────────────────────────────────────────────────────────
+  if (isCompareMode && streamId && compareWithId) {
+    return (
+      <div data-testid="stream-detail-page">
+        {/* Breadcrumb still visible above the compare shell */}
+        <div style={{ padding: "0.75rem 1.5rem 0" }}>
+          <Breadcrumb
+            items={[
+              { label: "Streams", to: "/app/streams" },
+              { label: "Compare" },
+            ]}
+          />
+        </div>
+
+        <StreamComparePane
+          leftId={decodeURIComponent(streamId)}
+          rightId={decodeURIComponent(compareWithId)}
+          onExit={() => {
+            // Remove compare param — return to single-stream view
+            setSearchParams({});
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
     { label: "Streams", to: "/app/streams" },
     { label: stream?.name ?? streamId ?? "Stream" },
@@ -130,7 +171,13 @@ export default function StreamDetail() {
             color: "var(--color-text-secondary, #6b7280)",
           }}
         >
-          <p style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <p
+            style={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              marginBottom: "0.5rem",
+            }}
+          >
             Stream not found
           </p>
           <p style={{ marginBottom: "1.5rem" }}>
@@ -166,6 +213,7 @@ export default function StreamDetail() {
     Settled: "var(--color-text-secondary, #6b7280)",
   };
 
+  // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
       <Breadcrumb items={breadcrumbItems} />
@@ -266,7 +314,11 @@ export default function StreamDetail() {
       <section aria-labelledby="stream-timeline-heading">
         <h2
           id="stream-timeline-heading"
-          style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}
+          style={{
+            fontSize: "1rem",
+            fontWeight: 600,
+            marginBottom: "0.75rem",
+          }}
         >
           Timeline
         </h2>

@@ -11,6 +11,13 @@ export interface StreamTimelineProps {
   totalAmount: number;
   status: "active" | "paused" | "completed" | "upcoming";
   isLoading?: boolean;
+  /**
+   * Set to `true` when rendered inside a compare pane.
+   * Applies `data-compare="true"` to the container so the
+   * half-width CSS rules in StreamTimeline.module.css activate,
+   * compacting bar height, legend, and cliff-label positioning.
+   */
+  compareMode?: boolean;
 }
 
 /**
@@ -40,6 +47,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   totalAmount,
   status,
   isLoading = false,
+  compareMode = false,
 }) => {
   // Parse dates
   const start = new Date(startDate);
@@ -62,6 +70,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         className="stream-timeline-container"
         role="region"
         aria-label="Stream timeline"
+        data-compare={compareMode ? "true" : undefined}
       >
         <div className="stream-timeline__error">Invalid date configuration</div>
       </div>
@@ -108,6 +117,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       className="stream-timeline-container"
       role="region"
       aria-label="Stream timeline visualization"
+      data-compare={compareMode ? "true" : undefined}
     >
       {/* Accessible text summary for screen readers */}
       <div className="stream-timeline__sr-summary" role="doc-subtitle">

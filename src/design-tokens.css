@@ -749,3 +749,30 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   12. COMPARE MODE
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Layout */
+  --compare-pane-min-width: 360px;
+  --compare-pane-gap: 0px; /* gap handled by divider */
+  --compare-header-height: 48px;
+  --compare-field-row-height: 56px;
+
+  /* Divider — must be ≥ 3:1 against white (#fff) surface.
+     #a0aab4 yields ~3.1:1. */
+  --compare-divider-color: #a0aab4;
+  --compare-divider-width: 1px;
+
+  /* Field-diff highlight (info-tinted background) */
+  --compare-field-highlight: rgba(14, 165, 233, 0.08);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.25);
+}
+
+[data-theme="dark"] {
+  --compare-divider-color: #4a5565;
+  --compare-field-highlight: rgba(14, 165, 233, 0.13);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.3);
+}

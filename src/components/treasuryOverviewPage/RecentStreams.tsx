@@ -72,7 +72,14 @@ export default function RecentStreams({
         </button>
       </div>
 
-      <StreamsTable streams={streams} />
+      <StreamsTable
+        streams={streams}
+        onCompare={(leftId, rightId) =>
+          navigate(
+            `/app/streams/${encodeURIComponent(leftId)}?compare=${encodeURIComponent(rightId)}`,
+          )
+        }
+      />
     </div>
   );
 }

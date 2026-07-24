@@ -5,14 +5,23 @@ import { formatNumber } from "../../lib/formatters";
 
 interface Props {
   stream: Stream;
-  /** Whether this row is currently selected */
+  /** Whether this row is currently selected (single-select highlight) */
   isSelected?: boolean;
+  /** Whether the row's compare checkbox is checked */
+  isChecked?: boolean;
   /** Called when the row is activated (click or Enter/Space) */
   onSelect?: (id: string) => void;
+  /**
+   * Called when the compare checkbox is toggled.
+   * If provided, a checkbox column is rendered to the left of the row.
+   */
+  onCompareToggle?: (id: string) => void;
 }
 
 function truncateAddress(address: string) {
-  return address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
+  return address.length > 14
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : address;
 }
 
 function formatAccruedAmount(amount: number) {
@@ -20,7 +29,13 @@ function formatAccruedAmount(amount: number) {
   return `${formatNumber(amount, 2)} USDC accrued`;
 }
 
-export default function StreamRow({ stream, isSelected = false, onSelect }: Props) {
+export default function StreamRow({
+  stream,
+  isSelected = false,
+  isChecked = false,
+  onSelect,
+  onCompareToggle,
+}: Props) {
   const navigate = useNavigate();
   const recipientLabel = truncateAddress(stream.recipient);
 
@@ -55,8 +70,10 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
         outline: "none",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
-        e.currentTarget.style.outline = "2px solid var(--color-accent-primary)";
+        e.currentTarget.style.backgroundColor =
+          "var(--color-surface-elevated)";
+        e.currentTarget.style.outline =
+          "2px solid var(--color-accent-primary)";
       }}
       onBlur={(e) => {
         e.currentTarget.style.backgroundColor = isSelected
@@ -67,7 +84,8 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
       onClick={handleActivate}
       onKeyDown={handleKeyDown}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)";
+        e.currentTarget.style.backgroundColor =
+          "var(--color-surface-elevated)";
       }}
       onMouseLeave={(e) => {
         if (document.activeElement !== e.currentTarget) {
@@ -77,6 +95,28 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
         }
       }}
     >
+      {/* Compare checkbox — only rendered when parent supplies onCompareToggle */}
+      {onCompareToggle !== undefined && (
+        <td
+          className="py-4 px-3"
+          style={{ width: "2.5rem" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={isChecked}
+            aria-label={`Select ${stream.name} for comparison`}
+            onChange={() => onCompareToggle(stream.id)}
+            style={{
+              width: "1rem",
+              height: "1rem",
+              cursor: "pointer",
+              accentColor: "var(--color-accent-primary, #00a884)",
+            }}
+          />
+        </td>
+      )}
+
       <td className="py-4 px-3">
         <div
           className="font-medium"
@@ -84,10 +124,7 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
         >
           {stream.name}
         </div>
-        <div
-          className="text-xs"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {stream.id}
         </div>
       </td>
@@ -101,10 +138,7 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
         {recipientLabel}
       </td>
 
-      <td
-        className="py-4 px-3"
-        style={{ color: "var(--color-text-primary)" }}
-      >
+      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
         <div>{stream.rate}</div>
         {typeof stream.accruedAmount === "number" && (
           <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -132,7 +166,8 @@ export default function StreamRow({ stream, isSelected = false, onSelect }: Prop
               "color var(--motion-duration-stream-disclosure) var(--motion-ease-stream-disclosure)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--color-accent-primary-dark)";
+            e.currentTarget.style.color =
+              "var(--color-accent-primary-dark)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = "var(--color-accent-primary)";

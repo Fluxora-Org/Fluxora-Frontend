@@ -517,3 +517,63 @@
     break-inside: avoid;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Compare Mode: half-width pane adjustments
+   ─────────────────────────────────────────────────────────────
+   When the timeline is rendered inside a compare pane (~50 % of
+   the viewport width) it receives the `data-compare="true"`
+   attribute. The rules below tighten spacing, lower bar height,
+   and switch the cliff-date label from absolute-positioned
+   marginLeft to a top-anchored flex position so it never
+   overlaps neighbour labels at narrow widths.
+   ─────────────────────────────────────────────────────────────── */
+
+.stream-timeline-container[data-compare="true"] {
+  padding: var(--space-sm, 0.5rem);
+  gap: 0.5rem;
+}
+
+.stream-timeline-container[data-compare="true"] .stream-timeline-bar {
+  height: 36px; /* fixed compact height in compare mode */
+}
+
+/* Compress legend to a single row to save vertical space */
+.stream-timeline-container[data-compare="true"] .stream-timeline-legend {
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* In compare panes the label row must not overflow the pane.
+   Convert the cliff label from absolute-positioned to in-flow
+   so it stacks above the bar instead of colliding with start/end. */
+.stream-timeline-container[data-compare="true"] .stream-timeline-labels {
+  flex-wrap: wrap;
+  height: auto;
+  gap: 0.25rem 1rem;
+}
+
+.stream-timeline-container[data-compare="true"] .stream-timeline-labels__cliff {
+  position: static;
+  transform: none;
+  margin-left: 0;
+}
+
+/* Truncate long dates more aggressively in narrow panes */
+.stream-timeline-container[data-compare="true"] .stream-timeline-labels__date {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.7rem;
+}
+
+.stream-timeline-container[data-compare="true"] .stream-timeline-labels__label {
+  font-size: 0.65rem;
+}
+
+/* Keep segment labels legible — hide them when segment is too narrow */
+.stream-timeline-container[data-compare="true"] .stream-timeline-bar__segment-label {
+  font-size: 0.65rem;
+}
