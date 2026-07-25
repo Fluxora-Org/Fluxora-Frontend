@@ -26,6 +26,7 @@ export default defineConfig({
         "src/components/ZeroAccrualBanner.tsx",
         "src/components/useModalAccessibility.ts",
         "src/components/navigation/NavLink.tsx",
+        "src/components/navigation/ThemeSegmentedControl.tsx",
         "src/components/RecentStreams.tsx",
         "src/components/StreamsLoading.tsx",
         "src/components/ToastNotification.tsx",

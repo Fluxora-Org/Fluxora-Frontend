@@ -109,14 +109,27 @@ export interface ThemeRegistrationError {
 
 // ─── 3. Storage helpers ───────────────────────────────────────────────────────
 
-function getStoredTheme(): Theme | null {
+export type ThemePreference = "light" | "dark" | "auto";
+
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "auto";
+}
+
+function getStoredTheme(): ThemePreference | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(stored) ? stored : null;
+    return isThemePreference(stored) ? stored : null;
   } catch {
     return null;
   }
+}
+
+export function resolveThemeFromPreference(pref: ThemePreference): Theme {
+  if (pref === "auto") {
+    return getSystemTheme();
+  }
+  return pref;
 }
 
 /**
@@ -191,7 +204,8 @@ const CUSTOM_PROP_PREFIX = "--custom-";
  * no FOUC.
  */
 export function resolveInitialTheme(): Theme {
-  return getStoredTheme() ?? getSystemTheme();
+  const stored = getStoredTheme();
+  return resolveThemeFromPreference(stored ?? "auto");
 }
 
 /**
@@ -293,6 +307,10 @@ export interface ThemeContextValue {
   setEasyReadFont: (easyReadFont: boolean) => void;
   /** Flips the easy-read font preference. */
   toggleEasyReadFont: () => void;
+  /** The theme preference chosen by the user (light, dark, auto). */
+  themePreference: ThemePreference;
+  /** Sets and persists the theme preference. */
+  setThemePreference: (pref: ThemePreference) => void;
 
   /** The currently registered custom theme, or `null`. */
   customTheme: RegisteredTheme | null;
@@ -358,13 +376,22 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // ── built-in theme ──────────────────────────────────────────────────────────
-  const [theme, setThemeState] = useState<Theme>(resolveInitialTheme);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => {
+    return getStoredTheme() ?? "auto";
+  });
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const initialPref = getStoredTheme() ?? "auto";
+    return resolveThemeFromPreference(initialPref);
+  });
   const [easyReadFont, setEasyReadState] = useState<boolean>(getStoredFontPreference);
 
   // Whether the user (in this tab or another) has explicitly picked a theme.
   // While `false`, we keep following the OS preference. A ref keeps the latest
   // value available to long-lived event listeners without re-subscribing.
-  const hasExplicitChoiceRef = useRef<boolean>(getStoredTheme() !== null);
+  const hasExplicitChoiceRef = useRef<boolean>(themePreference !== "auto");
+
+  // Keep hasExplicitChoiceRef in sync with themePreference state
+  hasExplicitChoiceRef.current = themePreference !== "auto";
 
   // Mirror built-in theme to DOM (only when not in custom mode).
   useEffect(() => {
@@ -379,17 +406,39 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyFontPreference(easyReadFont);
   }, [easyReadFont]);
 
-  const setTheme = useCallback((next: Theme) => {
-    hasExplicitChoiceRef.current = true;
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch { /* ignore quota errors */ }
-    setThemeState(next);
+  const setThemePreference = useCallback((pref: ThemePreference) => {
+    setThemePreferenceState(pref);
+    hasExplicitChoiceRef.current = pref !== "auto";
+    if (pref === "auto") {
+      try {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+      } catch { /* ignore quota errors */ }
+      const systemTheme = getSystemTheme();
+      setThemeState(systemTheme);
+    } else {
+      try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, pref);
+      } catch { /* ignore quota errors */ }
+      setThemeState(pref);
+    }
   }, []);
 
+  const setTheme = useCallback((next: Theme) => {
+    if (next === "light" || next === "dark") {
+      setThemePreference(next);
+    } else {
+      hasExplicitChoiceRef.current = true;
+      try {
+        window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      } catch { /* ignore quota errors */ }
+      setThemeState(next);
+    }
+  }, [setThemePreference]);
+
   const toggleTheme = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
+    const nextPref = theme === "light" ? "dark" : "light";
+    setThemePreference(nextPref);
+  }, [theme, setThemePreference]);
 
   const setEasyReadFont = useCallback((next: boolean) => {
     if (typeof document !== "undefined") {
@@ -437,11 +486,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (event.newValue === null) {
           // Another tab cleared the choice → resume following the OS.
           hasExplicitChoiceRef.current = false;
+          setThemePreferenceState("auto");
           setThemeState(getSystemTheme());
           return;
         }
 
-        if (isTheme(event.newValue)) {
+        if (isThemePreference(event.newValue)) {
+          hasExplicitChoiceRef.current = event.newValue !== "auto";
+          setThemePreferenceState(event.newValue);
+          setThemeState(resolveThemeFromPreference(event.newValue));
+        } else if (isTheme(event.newValue)) {
           hasExplicitChoiceRef.current = true;
           setThemeState(event.newValue);
         }
@@ -627,6 +681,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       easyReadFont,
       setEasyReadFont,
       toggleEasyReadFont,
+      themePreference,
+      setThemePreference,
       customTheme,
       customThemeState,
       registrationErrors,
@@ -642,6 +698,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       easyReadFont,
       setEasyReadFont,
       toggleEasyReadFont,
+      themePreference,
+      setThemePreference,
       customTheme,
       customThemeState,
       registrationErrors,
@@ -684,5 +742,17 @@ export function useOptionalTheme(): ThemeContextValue {
     theme: "light",
     setTheme: () => undefined,
     toggleTheme: () => undefined,
+    easyReadFont: false,
+    setEasyReadFont: () => undefined,
+    toggleEasyReadFont: () => undefined,
+    themePreference: "light",
+    setThemePreference: () => undefined,
+    customTheme: null,
+    customThemeState: "default",
+    registrationErrors: [],
+    registerTheme: () => false,
+    applyCustomTheme: () => undefined,
+    clearCustomTheme: () => undefined,
+    previewCustomTheme: () => false,
   };
 }
