@@ -51,6 +51,7 @@ export function toLegacyStream(record: StreamRecord): Stream {
     rate: formatMonthlyRate(record),
     accruedAmount: record.streamedAmount,
     status: record.status,
+    startDate: record.startDate,
   };
 }
 

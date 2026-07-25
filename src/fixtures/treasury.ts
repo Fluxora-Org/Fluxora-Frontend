@@ -41,6 +41,7 @@ export const treasuryDemoStreams: Stream[] = [
     recipient: "GABC...xyz1",
     rate: "5,000 USDC/mo",
     status: "Active",
+    startDate: "2026-07-20",
   },
   {
     name: "Marketing Budget",
@@ -48,6 +49,7 @@ export const treasuryDemoStreams: Stream[] = [
     recipient: "GDEF...abc2",
     rate: "3,200 USDC/mo",
     status: "Active",
+    startDate: "2026-07-20",
   },
   {
     name: "Core Contributor",
@@ -55,6 +57,7 @@ export const treasuryDemoStreams: Stream[] = [
     recipient: "GHJ1...def3",
     rate: "8,600 USDC/mo",
     status: "Paused",
+    startDate: "2026-06-15",
   },
   {
     name: "Community Rewards",
@@ -62,6 +65,7 @@ export const treasuryDemoStreams: Stream[] = [
     recipient: "GKLH...gh14",
     rate: "1,200 USDC/mo",
     status: "Active",
+    startDate: "2026-06-15",
   },
   {
     name: "Q4 2025 Grant",
@@ -69,5 +73,6 @@ export const treasuryDemoStreams: Stream[] = [
     recipient: "GNOP...jk35",
     rate: "10,000 USDC/mo",
     status: "Completed",
+    startDate: "2026-05-10",
   },
 ];

@@ -53,6 +53,8 @@ export default defineConfig({
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
         // Contrast utilities
         "src/utils/contrastUtils.ts",
+        // Activity Heatmap
+        "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
