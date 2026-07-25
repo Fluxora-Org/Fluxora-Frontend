@@ -7,6 +7,7 @@ import ConnectWalletModal from "../components/ConnectWalletModal";
 import ToastNotification, {
   type ToastVariant,
 } from "../components/ToastNotification";
+import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
@@ -24,6 +25,7 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
+  const [totalStreaming, setTotalStreaming] = useState<number | null>(null);
   const { announcement, announce } = useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
@@ -44,6 +46,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setWithdrawable(walletConnected ? 22600 : null);
+    setTotalStreaming(walletConnected ? 48500 : null);
   }, [walletConnected]);
 
   useEffect(() => {
@@ -246,6 +249,12 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+      />
+
+      <CreateStreamFab
+        onCreateStream={() => setIsModalOpen(true)}
+        disabled={!walletConnected}
+        hidden={isModalOpen}
       />
 
       <ConnectWalletModal

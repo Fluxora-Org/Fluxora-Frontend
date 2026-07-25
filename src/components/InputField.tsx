@@ -8,6 +8,8 @@ export interface InputFieldProps {
   error?: string;
   helperText?: string;
   success?: boolean;
+  /** Defers error styling and live announcements until compositionend. */
+  compositionAware?: boolean;
   children: React.ReactNode;
 }
 
@@ -18,10 +20,12 @@ export const InputField: React.FC<InputFieldProps> = ({
   error,
   helperText,
   success,
+  compositionAware = true,
   children,
 }) => {
+  const [isComposing, setIsComposing] = React.useState(false);
   // Determine which message (if any) is active
-  const hasError = Boolean(error);
+  const hasError = Boolean(error) && !(compositionAware && isComposing);
   const hasHint = Boolean(helperText) && !hasError;
   const hasSuccess = success === true && !hasError;
 
@@ -41,11 +45,24 @@ export const InputField: React.FC<InputFieldProps> = ({
 
   // Clone the child element to inject ARIA props onto the underlying <input>
   const child = React.Children.only(children) as React.ReactElement;
+  const childProps = child.props as {
+    onCompositionStart?: (event: React.CompositionEvent<HTMLElement>) => void;
+    onCompositionEnd?: (event: React.CompositionEvent<HTMLElement>) => void;
+  };
   const clonedChild = React.cloneElement(child, {
     id,
     'aria-invalid': hasError ? 'true' : 'false',
     ...(required ? { 'aria-required': 'true' } : {}),
     ...(messageId ? { 'aria-describedby': messageId } : {}),
+    'data-composing': compositionAware && isComposing ? 'true' : undefined,
+    onCompositionStart: (event: React.CompositionEvent<HTMLElement>) => {
+      childProps.onCompositionStart?.(event);
+      if (compositionAware) setIsComposing(true);
+    },
+    onCompositionEnd: (event: React.CompositionEvent<HTMLElement>) => {
+      childProps.onCompositionEnd?.(event);
+      if (compositionAware) setIsComposing(false);
+    },
   });
 
   return (
@@ -56,7 +73,9 @@ export const InputField: React.FC<InputFieldProps> = ({
       </label>
 
       <div className={`input-container ${containerModifier}`.trim()}>
-        {clonedChild}
+        <div className={compositionAware && isComposing ? 'input-container--composing' : ''}>
+          {clonedChild}
+        </div>
       </div>
 
       {hasError && (

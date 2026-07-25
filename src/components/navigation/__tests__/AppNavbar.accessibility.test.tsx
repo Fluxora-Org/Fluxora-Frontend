@@ -22,6 +22,15 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => <div data-testid="mock-voice-mic-button" />,
+}));
+
+// Mock useTickingNow to avoid infinite loops in vi.runAllTimers()
+vi.mock("../../../hooks/useTickingNow", () => ({
+  useTickingNow: () => "2026-07-24T05:07:26.000Z",
+}));
+
 // Mock react-router-dom
 vi.mock("react-router-dom", () => ({
   Link: ({
@@ -78,13 +87,13 @@ describe("Property 3: Icon-only buttons have non-empty aria-labels", () => {
             expect(hamburgerLabel).toBeTruthy();
             expect(hamburgerLabel!.length).toBeGreaterThan(0);
 
-            // Theme toggle (desktop; may be multiple when mobile menu open)
-            const themeToggles = screen.getAllByRole("button", {
-              name: /switch to (dark|light) mode/i,
+            // Theme preference segmented control
+            const themeControls = screen.getAllByRole("radiogroup", {
+              name: /theme preference/i,
             });
-            expect(themeToggles.length).toBeGreaterThanOrEqual(1);
-            themeToggles.forEach((btn) => {
-              const label = btn.getAttribute("aria-label");
+            expect(themeControls.length).toBeGreaterThanOrEqual(1);
+            themeControls.forEach((group) => {
+              const label = group.getAttribute("aria-label");
               expect(label).toBeTruthy();
               expect(label!.length).toBeGreaterThan(0);
             });
@@ -158,4 +167,39 @@ describe("Property 4: aria-expanded reflects mobileOpen state", () => {
     },
     60000
   );
+});
+
+describe("Property 5: Easy-read font toggle", () => {
+  it("has non-empty aria-label and updates aria-pressed on click", () => {
+    render(
+      <ThemeProvider>
+        <AppNavbar />
+      </ThemeProvider>
+    );
+
+    // Flush connecting skeleton timer
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    const fontToggles = screen.getAllByRole("button", {
+      name: /toggle easy-read font/i,
+    });
+    expect(fontToggles.length).toBeGreaterThanOrEqual(1);
+
+    fontToggles.forEach((btn) => {
+      const label = btn.getAttribute("aria-label");
+      expect(label).toBeTruthy();
+      expect(label!.length).toBeGreaterThan(0);
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+    });
+
+    // Click the first toggle button
+    act(() => {
+      fireEvent.click(fontToggles[0]);
+    });
+
+    // Verify it updates state and mirrors to aria-pressed
+    expect(fontToggles[0].getAttribute("aria-pressed")).toBe("true");
+  });
 });

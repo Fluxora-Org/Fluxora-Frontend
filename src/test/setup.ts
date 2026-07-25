@@ -55,7 +55,10 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
-// Mock localStorage and sessionStorage for jsdom tests
+// Mock localStorage and sessionStorage for jsdom tests. The guard keeps this
+// block side-effect free in pure node environments (e.g. `.test.ts` files that
+// opt out of jsdom via `// @vitest-environment node`) so loading the setup
+// file never throws `ReferenceError: window is not defined`.
 const createStorageMock = () => {
   let store: Record<string, string> = {};
   return {
@@ -67,8 +70,10 @@ const createStorageMock = () => {
     length: 0,
   } as unknown as Storage;
 };
-Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+}
 
 afterEach(() => {
   cleanup();

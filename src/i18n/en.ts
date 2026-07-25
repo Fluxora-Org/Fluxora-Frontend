@@ -12,6 +12,11 @@ export const en = {
   "createStream.steps.rateSchedule": "Rate & schedule",
   "createStream.steps.reviewCreate": "Review & create",
 
+  // CreateStreamModal Stepper header
+  "createStream.stepper.navLabel": "Create stream steps",
+  "createStream.stepper.jumpToStepAria": "Go back to step {step}: {label}",
+  "createStream.stepper.compactStatus": "Step {current} of {total}: {label}",
+
   // CreateStreamModal Step 1
   "createStream.step1.header": "Recipient & amount",
   "createStream.step1.subheader": "Set who receives the stream and how much USDC to lock.",
@@ -86,6 +91,19 @@ export const en = {
   "createStream.step3.statusWaiting": "Waiting for Stellar confirmation before opening the success receipt.",
   "createStream.step3.statusDetail": "Confirmation check {attempts} - tx {txHash}",
   "createStream.step3.statusFailed": "{error}",
+
+  // CreateStreamModal Step 3 / Offline action queue
+  "createStream.queue.bannerTitle": "Queued — will submit when back online",
+  "createStream.queue.bannerBody": "You're offline. We saved your stream details on this device and will submit them automatically the moment your connection returns — no need to resubmit.",
+  "createStream.queue.bannerPosition": "Queue position: {position} of {total}",
+  "createStream.queue.flushingTitle": "Back online. Submitting your queued stream to Stellar…",
+  "createStream.queue.flushSuccessToast": "Your queued stream was submitted and confirmed on Stellar.",
+  "createStream.queue.viewStreamAction": "View stream",
+  "createStream.queue.flushFailedTitle": "Your queued stream couldn't be submitted.",
+  "createStream.queue.flushFailedRetryBtn": "Retry now",
+  "createStream.queue.flushFailedEditBtn": "Edit details",
+  "createStream.button.queued": "Queued — waiting for connection",
+  "createStream.button.flushing": "Submitting queued stream...",
 
   // CreateStreamModal Buttons & Validation
   "createStream.button.submitting": "Submitting...",
@@ -178,4 +196,70 @@ export const en = {
   "zeroAccrual.rateZero.title": "Stream rate is zero",
   "zeroAccrual.rateZero.description": "The stream is active but the accrual rate is set to zero. No USDC is accumulating. Contact your treasury manager to update the rate.",
   "zeroAccrual.rateZero.nextEvent": "Pending rate update",
+
+  // ─── CSV Bulk-Upload Flow ─────────────────────────────────────────────────
+
+  // Mode selection (step 0)
+  "csvUpload.mode.title": "How would you like to create streams?",
+  "csvUpload.mode.single": "Create a single stream",
+  "csvUpload.mode.singleDesc": "Step through recipient, rate, and schedule for one stream.",
+  "csvUpload.mode.bulk": "Bulk create from CSV",
+  "csvUpload.mode.bulkDesc": "Upload a CSV file to create multiple streams at once.",
+
+  // Upload step (step B1)
+  "csvUpload.upload.title": "Upload recipient CSV",
+  "csvUpload.upload.subtitle": "Upload a CSV file with recipient addresses and stream details.",
+  "csvUpload.upload.dropzone": "Drag & drop your CSV here",
+  "csvUpload.upload.browse": "or click to browse files",
+  "csvUpload.upload.accepts": "Accepts .csv · max 500 rows",
+  "csvUpload.upload.templateLink": "Download CSV template",
+  "csvUpload.upload.parsing": "Parsing file…",
+  "csvUpload.upload.success": "{fileName} — {rowCount} rows detected",
+  "csvUpload.upload.errorType": "Only .csv files are accepted.",
+  "csvUpload.upload.errorEmpty": "The CSV file has no data rows.",
+  "csvUpload.upload.errorTooLarge": "This CSV has {rowCount} rows. Maximum is 500.",
+  "csvUpload.upload.inputAriaLabel": "Upload CSV file. Accepts .csv format, maximum 500 rows.",
+
+  // Column mapping step (step B2)
+  "csvUpload.mapping.title": "Map your columns",
+  "csvUpload.mapping.subtitle": "We couldn't auto-detect all required columns. Map each required field to a column in your file.",
+  "csvUpload.mapping.fieldRecipient": "Recipient address",
+  "csvUpload.mapping.fieldDeposit": "Deposit amount (USDC)",
+  "csvUpload.mapping.fieldRate": "Rate (USDC/day)",
+  "csvUpload.mapping.fieldDuration": "Duration (days)",
+  "csvUpload.mapping.selectPlaceholder": "-- Select column --",
+  "csvUpload.mapping.errorDuplicate": "Each column can only be used once.",
+  "csvUpload.mapping.applyBtn": "Apply mapping",
+
+  // Preview/validate step (step B3)
+  "csvUpload.preview.title": "Review {total} streams",
+  "csvUpload.preview.attention": "{count} rows need attention before you can submit.",
+  "csvUpload.preview.colRow": "#",
+  "csvUpload.preview.colRecipient": "Recipient",
+  "csvUpload.preview.colDeposit": "Deposit (USDC)",
+  "csvUpload.preview.colRate": "Rate/day",
+  "csvUpload.preview.colDuration": "Duration",
+  "csvUpload.preview.colStatus": "Status",
+  "csvUpload.preview.statusValid": "Valid",
+  "csvUpload.preview.statusNeedsFix": "Needs fix",
+  "csvUpload.preview.statusDuplicate": "Duplicate",
+  "csvUpload.preview.statusSkipped": "Skipped",
+  "csvUpload.preview.fixBtn": "Fix",
+  "csvUpload.preview.skipBtn": "Skip row",
+  "csvUpload.preview.replaceLink": "Replace CSV",
+  "csvUpload.preview.skipInvalidBtn": "Skip invalid rows",
+  "csvUpload.preview.submitBtn": "Submit {count} valid streams",
+  "csvUpload.preview.editSave": "Save",
+  "csvUpload.preview.editCancel": "Cancel",
+  "csvUpload.preview.rowAria": "Row {n}: {status}",
+  "csvUpload.preview.editRowAria": "Editing row {n}",
+  "csvUpload.preview.scrollRegionAria": "CSV preview table. Scroll horizontally to see all columns.",
+  "csvUpload.preview.captionSr": "{valid} valid, {errors} need attention, {dups} duplicate recipients",
+  "csvUpload.preview.liveUpdate": "Row {n} updated: {status}.",
+  "csvUpload.preview.replaceConfirm": "Replacing the file will clear your current preview. Continue?",
+
+  // Submission
+  "csvUpload.submit.progress": "Submitting stream {current} of {total}…",
+  "csvUpload.submit.success": "{success} of {total} streams created successfully.",
+  "csvUpload.submit.partial": "{success} of {total} streams created. {failed} failed.",
 };

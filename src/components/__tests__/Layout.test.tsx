@@ -40,11 +40,96 @@ function renderLayout(initialRoute = "/app") {
   return render(
     <MemoryRouter initialEntries={[initialRoute]}>
       <Layout />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
 describe("Layout component sidebar toggle accessibility", () => {
+  it("renders the install banner when the browser emits a beforeinstallprompt event", () => {
+    const matchMediaMock = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    });
+
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: matchMediaMock,
+    });
+
+    renderLayout();
+
+    const installEvent = new Event("beforeinstallprompt") as Event & {
+      preventDefault: () => void;
+      prompt: () => Promise<void>;
+      userChoice: Promise<{
+        outcome: "accepted" | "dismissed";
+        platform: string;
+      }>;
+    };
+
+    installEvent.preventDefault = () => {};
+    installEvent.prompt = async () => {};
+    installEvent.userChoice = Promise.resolve({
+      outcome: "accepted",
+      platform: "web",
+    });
+
+    window.dispatchEvent(installEvent);
+
+    expect(
+      screen.getByRole("region", { name: /install fluxora/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /install/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("dismisses the install banner and stores a remind-later state", () => {
+    const matchMediaMock = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    });
+
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: matchMediaMock,
+    });
+
+    renderLayout();
+
+    const installEvent = new Event("beforeinstallprompt") as Event & {
+      preventDefault: () => void;
+      prompt: () => Promise<void>;
+      userChoice: Promise<{
+        outcome: "accepted" | "dismissed";
+        platform: string;
+      }>;
+    };
+
+    installEvent.preventDefault = () => {};
+    installEvent.prompt = async () => {};
+    installEvent.userChoice = Promise.resolve({
+      outcome: "accepted",
+      platform: "web",
+    });
+
+    window.dispatchEvent(installEvent);
+
+    fireEvent.click(screen.getByRole("button", { name: /remind me later/i }));
+
+    expect(
+      screen.queryByRole("region", { name: /install fluxora/i }),
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("fluxora-pwa-banner-state")).toContain(
+      "reminderAt",
+    );
+  });
   it("renders the sidebar toggle control as a real button with aria-expanded and dynamic aria-label", () => {
     renderLayout();
 
@@ -88,16 +173,19 @@ describe("Layout component sidebar toggle accessibility", () => {
     const getSidebarFocusables = () =>
       Array.from(
         sidebar!.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
       );
 
     // In expanded state
     const expandedFocusables = getSidebarFocusables();
     expect(expandedFocusables.length).toBeGreaterThan(0);
-    
+
     // First focusable item is toggle button, then nav links, then Connect wallet button
-    expect(expandedFocusables[0]).toHaveAttribute("aria-controls", "app-sidebar");
+    expect(expandedFocusables[0]).toHaveAttribute(
+      "aria-controls",
+      "app-sidebar",
+    );
 
     // Cycle focus through all focusable items in expanded state
     expandedFocusables.forEach((el) => {
@@ -167,7 +255,9 @@ describe("Layout component sidebar toggle accessibility", () => {
     expect(mobileMenuBtn).toHaveAttribute("aria-expanded", "false");
 
     // Click backdrop closes mobile sidebar
-    const backdrop = container.querySelector(".app-sidebar-backdrop") as HTMLElement;
+    const backdrop = container.querySelector(
+      ".app-sidebar-backdrop",
+    ) as HTMLElement;
     fireEvent.click(mobileMenuBtn);
     expect(mobileMenuBtn).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(backdrop);
@@ -179,4 +269,3 @@ describe("Layout component sidebar toggle accessibility", () => {
     expect(screen.queryByTestId("footer")).not.toBeInTheDocument();
   });
 });
-
