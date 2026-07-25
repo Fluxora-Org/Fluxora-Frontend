@@ -31,6 +31,20 @@ export interface RecipientStreamsProps {
 /**
  * RecipientStreams handles real-time verification, state matrix representation
  * (loading, empty, error, populated), and manual refresh of incoming stream assets.
+ *
+ * Error banner design:
+ * - role="alert" aria-live="assertive" — interrupts AT immediately on data-sync
+ *   failure (assertive is correct here because this is a foreground data failure
+ *   that blocks the recipient from seeing their streams, not a background poll
+ *   notification — see docs/RECIPIENT_STREAMS_ERROR_RETRY_SPEC.md §3).
+ * - Focus is programmatically moved to the Retry button on first error mount
+ *   so keyboard/AT users have an immediate recovery path without tabbing.
+ * - retryCount tracks repeated failures so the UI can surface an escalated
+ *   "persistent failure" message after two or more consecutive retries.
+ * - isRetrying disables the Retry button and shows an in-flight label while a
+ *   retry fetch is in progress to prevent double-submission.
+ * - borderColor uses var(--color-error-border) (not a hardcoded rgba) so both
+ *   light (#dc2626) and dark (#ef4444) themes resolve correctly.
  */
 export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   isLoading: externalIsLoading,
@@ -44,12 +58,24 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [internalError, setInternalError] = useState<string | null>(null);
+  /** Tracks how many consecutive retry attempts have been made without a
+   *  successful response so the banner can escalate its message. */
+  const [retryCount, setRetryCount] = useState<number>(0);
+  /** True while a user-initiated retry fetch is in flight (distinct from the
+   *  background-poll isRefreshing so the button state is independently tracked). */
+  const [isRetrying, setIsRetrying] = useState<boolean>(false);
 
   // Ref tracking to block concurrent overlapping requests
   const isFetchingRef = useRef<boolean>(false);
+  /** Ref to the Retry button so focus can be moved to it when the error banner
+   *  first mounts (WCAG 2.4.3 Focus Order, 3.3.1 Error Identification). */
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  /** Tracks the previous error value so we can detect the transition from
+   *  null → error (new error mount) without running focus logic on every render. */
+  const prevErrorRef = useRef<string | null>(null);
 
   /**
-   * Main data worker executing secure background refresh calls
+   * Main data worker executing secure background refresh calls.
    */
   const handleRefresh = useCallback(async () => {
     if (!fetchStreamsFn || isFetchingRef.current) return;
@@ -61,6 +87,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     try {
       const updatedStreams = await fetchStreamsFn();
 
+      // Successful fetch resets the retry counter.
+      setRetryCount(0);
       setInternalStreams((prevStreams) => {
         const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
         return updatedStreams.map((stream) => ({
@@ -100,11 +128,43 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const effectiveError = externalError ?? internalError;
   const effectiveStreams = externalStreams ?? internalStreams;
 
-  const handleRetryAction = () => {
+  /**
+   * Move focus to the Retry button when the error banner first appears.
+   * This runs only when effectiveError transitions from null/undefined to
+   * a truthy string so the focus shift does not repeat on re-renders while
+   * the banner is already visible.
+   */
+  useEffect(() => {
+    const hadError = Boolean(prevErrorRef.current);
+    const hasError = Boolean(effectiveError);
+
+    if (!hadError && hasError && retryButtonRef.current) {
+      retryButtonRef.current.focus();
+    }
+
+    prevErrorRef.current = effectiveError ?? null;
+  }, [effectiveError]);
+
+  /**
+   * Handles the Retry button click.
+   * Sets isRetrying while in flight so the button can show a loading state
+   * and increments retryCount to track repeated failures.
+   */
+  const handleRetryAction = async () => {
+    setRetryCount((c) => c + 1);
+
     if (onRetry) {
       onRetry();
-    } else if (fetchStreamsFn) {
-      handleRefresh();
+      return;
+    }
+
+    if (fetchStreamsFn) {
+      setIsRetrying(true);
+      try {
+        await handleRefresh();
+      } finally {
+        setIsRetrying(false);
+      }
     }
   };
 
@@ -175,6 +235,16 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     (a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
   );
 
+  /**
+   * Determine the banner message based on retry history.
+   * After two or more failed attempts we surface a more specific message
+   * so the recipient knows to check connectivity or contact support.
+   */
+  const errorMessage =
+    retryCount >= 2
+      ? "Still unable to load your streams. Check your connection or try again later."
+      : (effectiveError ?? "Failed to sync latest stream data. Please try again.");
+
   return (
     <div
       className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
@@ -187,7 +257,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             className="text-xl font-bold"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Your incoming streams
+            Incoming Streams
           </h2>
           <p
             className="text-sm"
@@ -207,27 +277,62 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
         )}
       </div>
 
-      {/* State 2: Error State (Dismissable/retryable banner with role="alert") */}
+      {/*
+       * State 2: Error banner
+       *
+       * role="alert" + aria-live="assertive" + aria-atomic="true":
+       *   Assertive is chosen over polite because this is a foreground data-sync
+       *   failure — the recipient cannot see their streams until it is resolved.
+       *   A background poll that silently retries would warrant polite.
+       *   aria-atomic="true" ensures the entire banner is announced as a unit
+       *   so screen readers do not speak a partial update.
+       *
+       * Visual tokens:
+       *   --color-error-bg    light #fef2f2  / dark rgba(220,38,38,0.1)
+       *   --color-error-text  light #b91c1c  / dark #fca5a5
+       *   --color-error-border light #dc2626 / dark #ef4444
+       *
+       * Repeated-failure state (retryCount >= 2):
+       *   Message escalates and the banner uses a slightly thicker border
+       *   (via box-shadow) to increase visual urgency without changing layout.
+       *
+       * Retry-in-flight state (isRetrying):
+       *   Button label changes to "Retrying…" and the button is disabled so
+       *   the recipient cannot trigger duplicate concurrent fetches.
+       *
+       * Recovery (auto-clear):
+       *   Once handleRefresh() succeeds it calls setInternalError(null) and
+       *   setRetryCount(0), which removes the banner from the DOM. No manual
+       *   dismiss is offered — success is the only exit so recipients are never
+       *   left in a silently-failed-but-dismissed state.
+       */}
       {effectiveError && (
         <div
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
-          className="p-4 mb-6 text-sm rounded-xl flex items-center justify-between gap-3 border"
+          className="p-4 mb-6 text-sm rounded-xl flex items-start justify-between gap-3 border"
           style={{
             color: "var(--color-error-text)",
             backgroundColor: "var(--color-error-bg)",
-            borderColor: "rgba(239, 68, 68, 0.3)",
+            borderColor: "var(--color-error-border)",
+            /* Escalated persistent-failure ring: adds a subtle outer shadow on 3rd+ attempt */
+            boxShadow:
+              retryCount >= 2
+                ? "0 0 0 1px var(--color-error-border), var(--shadow-error-focus)"
+                : undefined,
           }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2" style={{ minWidth: 0 }}>
+            {/* Warning icon — aria-hidden because the role="alert" text conveys the meaning */}
             <svg
               width="18"
               height="18"
               viewBox="0 0 16 16"
               fill="none"
               aria-hidden="true"
-              style={{ flexShrink: 0 }}
+              focusable="false"
+              style={{ flexShrink: 0, marginTop: 1 }}
             >
               <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
               <path
@@ -237,20 +342,25 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 strokeLinecap="round"
               />
             </svg>
-            <span>{effectiveError}</span>
+            <span>{errorMessage}</span>
           </div>
           {(onRetry || fetchStreamsFn) && (
             <button
+              ref={retryButtonRef}
               onClick={handleRetryAction}
-              aria-label="Retry"
+              disabled={isRetrying}
+              aria-label="Retry loading recipient streams"
               className="px-3 py-1.5 text-xs font-semibold rounded-lg transition border"
               style={{
+                flexShrink: 0,
                 color: "var(--color-error-text)",
-                borderColor: "rgba(239, 68, 68, 0.4)",
+                borderColor: "var(--color-error-border)",
                 backgroundColor: "transparent",
+                opacity: isRetrying ? 0.65 : 1,
+                cursor: isRetrying ? "not-allowed" : "pointer",
               }}
             >
-              Retry
+              {isRetrying ? "Retrying…" : "Retry"}
             </button>
           )}
         </div>

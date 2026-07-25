@@ -55,7 +55,10 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
 
     renderWith(fetchStreamsFn);
 
-    const alert = await screen.findByRole("status");
+    // Error banner uses role="alert" (assertive) — not role="status" (polite).
+    // Data-sync failures interrupt the recipient immediately because they block
+    // stream visibility; background-only poll failures would use polite.
+    const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/Failed to sync/i);
   });
 
