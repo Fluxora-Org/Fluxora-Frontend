@@ -83,7 +83,7 @@ export function EmbedWidgetLayoutCard({
               {stream.progress.toFixed(0)}%
             </span>
           </div>
-          <div 
+          <div
             className="embed-widget-card__progress-bar"
             role="progressbar"
             aria-valuenow={stream.progress}
@@ -175,7 +175,7 @@ export function EmbedWidgetLayoutBanner({
         />
         <div className="embed-widget-banner__progress">
           <span className="embed-widget-banner__progress-label">Progress</span>
-          <div 
+          <div
             className="embed-widget-banner__progress-bar"
             role="progressbar"
             aria-valuenow={stream.progress}
@@ -268,25 +268,25 @@ function StatusBadge({ status, compact = false }: StatusBadgeProps) {
   const statusConfig = {
     Active: {
       label: "Active",
-      className: "status-badge--active",
+      className: "embed-widget-status-badge--active",
       ariaLabel: "Stream status: Active"
     },
     Paused: {
       label: "Paused",
-      className: "status-badge--paused",
+      className: "embed-widget-status-badge--paused",
       ariaLabel: "Stream status: Paused"
     },
     Completed: {
       label: "Completed",
-      className: "status-badge--completed",
+      className: "embed-widget-status-badge--completed",
       ariaLabel: "Stream status: Completed"
     }
   };
-  
+
   const config = statusConfig[status];
-  
+
   return (
-    <span 
+    <span
       className={`embed-widget-status-badge ${config.className} ${compact ? 'compact' : ''}`}
       role="status"
       aria-label={config.ariaLabel}

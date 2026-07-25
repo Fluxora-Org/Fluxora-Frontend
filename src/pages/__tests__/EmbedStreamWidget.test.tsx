@@ -216,9 +216,10 @@ describe('EmbedStreamWidget', () => {
       renderEmbedWidget('STR-001', 'theme=invalid');
 
       await waitFor(() => {
+        // Should not have data-theme attribute for invalid theme, so no
+        // ancestor matches this selector at all.
         const container = screen.getByRole('article').closest('[data-theme]');
-        // Should not have data-theme attribute for invalid theme
-        expect(container).not.toHaveAttribute('data-theme');
+        expect(container).toBeNull();
       });
     });
 
@@ -248,7 +249,10 @@ describe('EmbedStreamWidget', () => {
         expect(statusBadge).toHaveAttribute('role', 'status');
         expect(statusBadge).toHaveAttribute('aria-label', 'Stream status: Active');
         
-        const progressBar = screen.getByRole('progressbar');
+        // The card preset also embeds StreamTimeline, which exposes its own
+        // (time-based) progressbar — disambiguate by accessible name to get
+        // the widget's own fund-accrual progress bar.
+        const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
         expect(progressBar).toHaveAttribute('aria-valuenow', '40');
         expect(progressBar).toHaveAttribute('aria-valuemin', '0');
         expect(progressBar).toHaveAttribute('aria-valuemax', '100');
@@ -260,7 +264,9 @@ describe('EmbedStreamWidget', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('article')).toBeInTheDocument();
-        expect(screen.getByRole('progressbar')).toBeInTheDocument();
+        // Card preset embeds StreamTimeline (time-based progressbar) alongside
+        // the widget's own fund-accrual progressbar — both are legitimate.
+        expect(screen.getByRole('progressbar', { name: /stream progress/i })).toBeInTheDocument();
         expect(screen.getByRole('status')).toBeInTheDocument();
         
         // Metrics should have role="definition"

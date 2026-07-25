@@ -82,8 +82,11 @@ export function isValidCssVariableValue(value: string): boolean {
     }
   }
   
-  // Additional safety: reject strings that could be interpreted as code
-  if (value.includes(';') && (value.includes('{') || value.includes('}'))) {
+  // Additional safety: reject strings that could be interpreted as code.
+  // A single CSS custom-property value never legitimately needs a `;` —
+  // it's a declaration terminator, so its presence means the value could
+  // smuggle in extra declarations when interpolated into an inline style.
+  if (value.includes(';') || value.includes('{') || value.includes('}')) {
     return false;
   }
   

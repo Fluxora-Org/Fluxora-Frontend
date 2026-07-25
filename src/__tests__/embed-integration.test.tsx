@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import App from '../App';
 
 // Mock the lazy components to avoid loading them in tests
@@ -33,6 +32,26 @@ vi.mock('../components/navigation/AppNavbar', () => ({
   default: () => <div>AppNavbar Mock</div>
 }));
 
+// RequireWallet guards the /app subtree via useWallet; report a connected,
+// finished-restoring wallet so the nested-app-route test can reach StreamDetail.
+vi.mock('../components/wallet-connect/Walletcontext', () => ({
+  WalletProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  useWallet: () => ({
+    address: 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN',
+    network: 'TESTNET',
+    connected: true,
+    loading: false,
+    error: null,
+    expectedNetwork: 'TESTNET',
+    expectedNetworkLabel: 'Testnet',
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
+
 vi.mock('../components/voice/VoiceCommandPanel', () => ({
   VoiceCommandPanel: () => <div>VoiceCommandPanel Mock</div>
 }));
@@ -47,11 +66,11 @@ describe('Embed Route Integration', () => {
   });
 
   const renderAppWithRoute = (path: string) => {
-    return render(
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
-    );
+    // App.tsx wraps its routes in its own <BrowserRouter>, so tests must not
+    // nest another Router around it — instead, seed the starting location via
+    // history, which BrowserRouter reads from directly.
+    window.history.pushState({}, '', path);
+    return render(<App />);
   };
 
   it('renders embed route at /embed/streams/:streamId', async () => {
