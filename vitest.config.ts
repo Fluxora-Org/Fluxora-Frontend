@@ -26,6 +26,7 @@ export default defineConfig({
         "src/components/ZeroAccrualBanner.tsx",
         "src/components/useModalAccessibility.ts",
         "src/components/navigation/NavLink.tsx",
+        "src/components/navigation/ThemeSegmentedControl.tsx",
         "src/components/RecentStreams.tsx",
         "src/components/StreamsLoading.tsx",
         "src/components/ToastNotification.tsx",
@@ -55,6 +56,10 @@ export default defineConfig({
         "src/utils/contrastUtils.ts",
         // Activity Heatmap
         "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
+        // Presence feature
+        "src/components/presence/PresenceBadge.tsx",
+        "src/components/presence/PresenceViewerList.tsx",
+        "src/hooks/usePresenceViewers.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

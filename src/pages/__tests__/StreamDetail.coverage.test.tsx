@@ -1,9 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import StreamDetail from "../StreamDetail";
 import { getStreamById } from "../../lib/api/streamsService";
 import type { StreamRecord } from "../../data/streamRecords";
+
+const renderWithHelmet = (ui: React.ReactElement) => {
+  return render(<HelmetProvider>{ui}</HelmetProvider>);
+};
 
 vi.mock("../../lib/api/streamsService", () => ({
   getStreamById: vi.fn(),
@@ -19,7 +24,7 @@ describe("StreamDetail Page Tests", () => {
   });
 
   it("renders the page with no streamId param and asserts 'Stream not found' state renders with a working 'Back to streams' link", async () => {
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams"]}>
         <Routes>
           <Route path="/app/streams" element={<StreamDetail />} />
@@ -59,7 +64,7 @@ describe("StreamDetail Page Tests", () => {
 
     vi.mocked(getStreamById).mockResolvedValue(mockStream);
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/stream%2F123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -74,7 +79,7 @@ describe("StreamDetail Page Tests", () => {
   it("renders the error path (getStreamById rejects) and asserts the role='alert' error UI renders with the rejection message", async () => {
     vi.mocked(getStreamById).mockRejectedValue(new Error("Stellar node query timeout"));
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/stream-error"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />

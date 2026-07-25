@@ -22,6 +22,7 @@ const Streams = lazy(() => import("./pages/Streams"));
 const StreamDetail = lazy(() => import("./pages/StreamDetail"));
 const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
+const EmbedStreamWidget = lazy(() => import("./pages/EmbedStreamWidget"));
 import { IS_DEV } from "./utils/env";
 
 const EmptyStateDemo = IS_DEV
@@ -142,6 +143,7 @@ export default function App() {
                       )}
                     </Route>
                     <Route path="/connect-wallet" element={<ConnectWallet />} />
+                    <Route path="/embed/streams/:streamId" element={<EmbedStreamWidget />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </ErrorBoundary>

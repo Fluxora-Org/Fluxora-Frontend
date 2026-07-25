@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import StreamDetail from "../StreamDetail";
 import * as streamsService from "../../lib/api/streamsService";
 import type { StreamRecord } from "../../data/streamRecords";
+
+const renderWithHelmet = (ui: React.ReactElement) => {
+  return render(<HelmetProvider>{ui}</HelmetProvider>);
+};
 
 const mockStream: StreamRecord = {
   id: "STR-123",
@@ -37,7 +42,7 @@ describe("StreamDetail Page", () => {
       () => new Promise(() => {}),
     );
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -51,7 +56,7 @@ describe("StreamDetail Page", () => {
   it("renders stream details when fetched successfully", async () => {
     vi.spyOn(streamsService, "getStreamById").mockResolvedValue(mockStream);
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -67,7 +72,7 @@ describe("StreamDetail Page", () => {
   it("renders Stream not found state when stream is null", async () => {
     vi.spyOn(streamsService, "getStreamById").mockResolvedValue(null);
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-999"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -84,7 +89,7 @@ describe("StreamDetail Page", () => {
       new Error("Network connection failed"),
     );
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -99,7 +104,7 @@ describe("StreamDetail Page", () => {
   it("handles empty streamId parameter without fetching", () => {
     const spy = vi.spyOn(streamsService, "getStreamById");
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/"]}>
         <Routes>
           <Route path="/app/streams/" element={<StreamDetail />} />
@@ -120,7 +125,7 @@ describe("StreamDetail Page", () => {
       },
     );
 
-    render(
+    renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR%2F123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -148,7 +153,7 @@ describe("StreamDetail Page", () => {
       },
     );
 
-    const { unmount } = render(
+    const { unmount } = renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -173,7 +178,7 @@ describe("StreamDetail Page", () => {
         }),
     );
 
-    const { unmount } = render(
+    const { unmount } = renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />
@@ -192,7 +197,7 @@ describe("StreamDetail Page", () => {
       undefined as unknown as StreamRecord,
     );
 
-    const { container } = render(
+    const { container } = renderWithHelmet(
       <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
         <Routes>
           <Route path="/app/streams/:streamId" element={<StreamDetail />} />

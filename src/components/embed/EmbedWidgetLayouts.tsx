@@ -1,0 +1,318 @@
+import React from "react";
+import StreamTimeline from "../StreamTimeline";
+import { StreamRecord, StreamStatus } from "../../data/streamRecords";
+import { ThemeConfig } from "../../lib/embedThemeParser";
+import "./EmbedWidgetLayouts.css";
+
+interface EmbedWidgetLayoutProps {
+  stream: StreamRecord;
+  currentDate: string;
+  themeConfig: ThemeConfig;
+}
+
+/**
+ * Card Layout - Designed for narrow sidebars (300px-420px)
+ * 
+ * Features:
+ * - Stream title and status badge
+ * - Progress bar and timeline
+ * - Payment rate and amounts
+ * - Completion percentage
+ * - Powered by Fluxora footer
+ */
+export function EmbedWidgetLayoutCard({ 
+  stream, 
+  currentDate 
+}: EmbedWidgetLayoutProps) {
+  const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
+  
+  return (
+    <div 
+      className="embed-widget-card"
+      role="article"
+      aria-label={`Stream widget: ${stream.name}`}
+    >
+      {/* Header with title and status */}
+      <div className="embed-widget-card__header">
+        <h1 className="embed-widget-card__title" id="stream-title">
+          {stream.name}
+        </h1>
+        <StatusBadge status={stream.status} />
+      </div>
+      
+      {/* Main content */}
+      <div className="embed-widget-card__content">
+        {/* Timeline visualization */}
+        <div className="embed-widget-card__timeline">
+          <StreamTimeline
+            startDate={stream.startDate}
+            cliffDate={stream.cliffDate || null}
+            currentDate={currentDate}
+            endDate={stream.endDate}
+            withdrawableAmount={stream.withdrawableAmount}
+            totalAmount={stream.depositAmount}
+            status={timelineStatus}
+            compareMode={false}
+          />
+        </div>
+        
+        {/* Key metrics grid */}
+        <div className="embed-widget-card__metrics">
+          <MetricItem
+            label="Payment Rate"
+            value={`$${stream.monthlyRate.toLocaleString()}/month`}
+            ariaLabel={`Monthly payment rate: $${stream.monthlyRate.toLocaleString()}`}
+          />
+          <MetricItem
+            label="Streamed"
+            value={`$${stream.streamedAmount.toLocaleString()}`}
+            ariaLabel={`Amount streamed: $${stream.streamedAmount.toLocaleString()}`}
+          />
+          <MetricItem
+            label="Remaining"
+            value={`$${stream.remainingAmount.toLocaleString()}`}
+            ariaLabel={`Remaining amount: $${stream.remainingAmount.toLocaleString()}`}
+          />
+        </div>
+        
+        {/* Progress and completion */}
+        <div className="embed-widget-card__progress">
+          <div className="embed-widget-card__progress-label">
+            <span>Progress</span>
+            <span className="embed-widget-card__progress-percentage">
+              {stream.progress.toFixed(0)}%
+            </span>
+          </div>
+          <div
+            className="embed-widget-card__progress-bar"
+            role="progressbar"
+            aria-valuenow={stream.progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
+          >
+            <div 
+              className="embed-widget-card__progress-fill"
+              style={{ width: `${stream.progress}%` }}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Footer with attribution */}
+      <footer className="embed-widget-card__footer">
+        <div className="embed-widget-card__attribution">
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 16 16" 
+            fill="none" 
+            aria-hidden="true"
+          >
+            <path 
+              d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1.5A5.5 5.5 0 1 0 13.5 8 5.5 5.5 0 0 0 8 2.5zM8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 1.5A2.5 2.5 0 1 0 10.5 8 2.5 2.5 0 0 0 8 5.5z" 
+              fill="currentColor" 
+            />
+          </svg>
+          <span>Powered by Fluxora</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+/**
+ * Banner Layout - Horizontal layout optimized for 600px+ widths
+ * 
+ * Features:
+ * - Title and status
+ * - Timeline visualization
+ * - Payment rate
+ * - Progress and completion
+ * - Compact spacing
+ */
+export function EmbedWidgetLayoutBanner({ 
+  stream, 
+  currentDate 
+}: EmbedWidgetLayoutProps) {
+  const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
+  
+  return (
+    <div 
+      className="embed-widget-banner"
+      role="article"
+      aria-label={`Stream widget: ${stream.name}`}
+    >
+      {/* Left section: Title and status */}
+      <div className="embed-widget-banner__info">
+        <h1 className="embed-widget-banner__title" id="stream-title">
+          {stream.name}
+        </h1>
+        <StatusBadge status={stream.status} compact />
+      </div>
+      
+      {/* Middle section: Timeline */}
+      <div className="embed-widget-banner__timeline">
+        <StreamTimeline
+          startDate={stream.startDate}
+          cliffDate={stream.cliffDate || null}
+          currentDate={currentDate}
+          endDate={stream.endDate}
+          withdrawableAmount={stream.withdrawableAmount}
+          totalAmount={stream.depositAmount}
+          status={timelineStatus}
+          compareMode={true} // Compact timeline for banner
+        />
+      </div>
+      
+      {/* Right section: Metrics */}
+      <div className="embed-widget-banner__metrics">
+        <MetricItem
+          label="Rate"
+          value={`$${stream.monthlyRate.toLocaleString()}/mo`}
+          compact
+          ariaLabel={`Monthly payment rate: $${stream.monthlyRate.toLocaleString()}`}
+        />
+        <div className="embed-widget-banner__progress">
+          <span className="embed-widget-banner__progress-label">Progress</span>
+          <div
+            className="embed-widget-banner__progress-bar"
+            role="progressbar"
+            aria-valuenow={stream.progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
+          >
+            <div 
+              className="embed-widget-banner__progress-fill"
+              style={{ width: `${stream.progress}%` }}
+            />
+          </div>
+          <span className="embed-widget-banner__progress-percentage">
+            {stream.progress.toFixed(0)}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Compact Layout - Minimal layout optimized for 200-300px widths
+ * 
+ * Features:
+ * - Status badge
+ * - Progress percentage
+ * - Progress bar
+ * - Attribution
+ */
+export function EmbedWidgetLayoutCompact({ 
+  stream 
+}: EmbedWidgetLayoutProps) {
+  return (
+    <div 
+      className="embed-widget-compact"
+      role="article"
+      aria-label={`Stream widget: ${stream.name}`}
+    >
+      {/* Status and progress in a single row */}
+      <div className="embed-widget-compact__main">
+        <StatusBadge status={stream.status} compact />
+        <div className="embed-widget-compact__progress">
+          <span className="embed-widget-compact__progress-percentage">
+            {stream.progress.toFixed(0)}%
+          </span>
+          <div 
+            className="embed-widget-compact__progress-bar"
+            role="progressbar"
+            aria-valuenow={stream.progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
+          >
+            <div 
+              className="embed-widget-compact__progress-fill"
+              style={{ width: `${stream.progress}%` }}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Attribution */}
+      <div className="embed-widget-compact__attribution">
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 12 12" 
+          fill="none" 
+          aria-hidden="true"
+        >
+          <path 
+            d="M6 1a5 5 0 1 1 0 10A5 5 0 0 1 6 1zm0 1a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" 
+            fill="currentColor" 
+          />
+        </svg>
+        <span>Fluxora</span>
+      </div>
+    </div>
+  );
+}
+
+// Reusable Status Badge component
+interface StatusBadgeProps {
+  status: StreamStatus;
+  compact?: boolean;
+}
+
+function StatusBadge({ status, compact = false }: StatusBadgeProps) {
+  const statusConfig = {
+    Active: {
+      label: "Active",
+      className: "embed-widget-status-badge--active",
+      ariaLabel: "Stream status: Active"
+    },
+    Paused: {
+      label: "Paused",
+      className: "embed-widget-status-badge--paused",
+      ariaLabel: "Stream status: Paused"
+    },
+    Completed: {
+      label: "Completed",
+      className: "embed-widget-status-badge--completed",
+      ariaLabel: "Stream status: Completed"
+    }
+  };
+
+  const config = statusConfig[status];
+
+  return (
+    <span
+      className={`embed-widget-status-badge ${config.className} ${compact ? 'compact' : ''}`}
+      role="status"
+      aria-label={config.ariaLabel}
+    >
+      {compact ? config.label.charAt(0) : config.label}
+    </span>
+  );
+}
+
+// Reusable Metric Item component
+interface MetricItemProps {
+  label: string;
+  value: string;
+  compact?: boolean;
+  ariaLabel?: string;
+}
+
+function MetricItem({ label, value, compact = false, ariaLabel }: MetricItemProps) {
+  return (
+    <div 
+      className={`embed-widget-metric ${compact ? 'compact' : ''}`}
+      role="definition"
+      aria-label={ariaLabel || `${label}: ${value}`}
+    >
+      <div className="embed-widget-metric__label">{label}</div>
+      <div className="embed-widget-metric__value">{value}</div>
+    </div>
+  );
+}

@@ -8,6 +8,8 @@ import StreamTimeline from "../components/StreamTimeline";
 import StreamComparePane from "../components/StreamComparePane";
 import { useTickingNow } from "../hooks/useTickingNow";
 import { MetaTags } from "../components/MetaTags";
+import { usePresenceViewers } from "../hooks/usePresenceViewers";
+import { PresenceBadge } from "../components/presence";
 
 /**
  * StreamDetail page
@@ -34,6 +36,7 @@ import { MetaTags } from "../components/MetaTags";
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { viewers } = usePresenceViewers(streamId);
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");
@@ -237,6 +240,13 @@ export default function StreamDetail() {
         <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
           {stream.summary}
         </p>
+      </div>
+
+      {/* Presence Badge Container */}
+      <div style={{ position: "relative", zIndex: 30 }}>
+        <div style={{ position: "absolute", right: 0, top: "-54px" }}>
+          <PresenceBadge viewers={viewers} />
+        </div>
       </div>
 
       {/* Health badge */}
