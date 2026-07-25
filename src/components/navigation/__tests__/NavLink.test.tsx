@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { axe } from "vitest-axe";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import NavLink from "../NavLink";
 
 function renderNavLink(props: Partial<React.ComponentProps<typeof NavLink>> = {}) {
@@ -169,6 +170,27 @@ describe("NavLink disabled state", () => {
     const link = screen.getByRole("link", { name: "Streams" });
     expect(link).toHaveAttribute("aria-disabled", "true");
     expect(link).toHaveStyle({ pointerEvents: "none" });
+  });
+
+  it("does not navigate or call onClick when activated by keyboard", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+
+    render(
+      <MemoryRouter initialEntries={["/home"]}>
+        <Routes>
+          <Route path="/home" element={<NavLink to="/details" label="Streams" disabled onClick={onClick} />} />
+          <Route path="/details" element={<div>Details page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole("link", { name: "Streams" });
+    link.focus();
+    await user.keyboard("{Enter}");
+
+    expect(onClick).not.toHaveBeenCalled();
+    expect(screen.queryByText("Details page")).not.toBeInTheDocument();
   });
 });
 
