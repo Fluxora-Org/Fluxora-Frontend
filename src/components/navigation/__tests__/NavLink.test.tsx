@@ -169,6 +169,7 @@ describe("NavLink disabled state", () => {
     renderNavLink({ disabled: true });
     const link = screen.getByRole("link", { name: "Streams" });
     expect(link).toHaveAttribute("aria-disabled", "true");
+    expect(link).toHaveAttribute("tabindex", "-1");
     expect(link).toHaveStyle({ pointerEvents: "none" });
   });
 
