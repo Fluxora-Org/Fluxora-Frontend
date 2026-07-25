@@ -53,6 +53,10 @@ export default defineConfig({
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
         // Contrast utilities
         "src/utils/contrastUtils.ts",
+        // Presence feature
+        "src/components/presence/PresenceBadge.tsx",
+        "src/components/presence/PresenceViewerList.tsx",
+        "src/hooks/usePresenceViewers.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
