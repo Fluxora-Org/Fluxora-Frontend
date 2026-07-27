@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Stream } from "./Stream";
 import { useToast } from "../toast/ToastProvider";
 import {
@@ -28,25 +28,57 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
   const [exportFormat, setExportFormat] = useState<ExportFormat>("CSV");
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [dateError, setDateError] = useState("");
+  const [exportError, setExportError] = useState(false);
   const { addToast } = useToast();
+  const mountedRef = useRef(true);
 
-  const handleFieldToggle = (field: Field) => {
+  // Track mounted state for safe async state updates
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const handleFieldToggle = useCallback((field: Field) => {
     setSelectedFields((prev) => {
       const next = new Set(prev);
       if (next.has(field)) next.delete(field);
       else next.add(field);
       return next;
     });
-  };
+  }, []);
 
-  // Simulate preview loading
+  // Deterministic preview loading: triggered on filter change, resolved
+  // at the next animation frame so the DOM can paint the loading overlay.
   useEffect(() => {
     setIsPreviewLoading(true);
-    const timer = setTimeout(() => setIsPreviewLoading(false), 400);
-    return () => clearTimeout(timer);
+    const rafId = requestAnimationFrame(() => {
+      if (mountedRef.current) {
+        setIsPreviewLoading(false);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [startDate, endDate, selectedFields, grouping]);
 
-  const canExport = selectedFields.size > 0;
+  // Keyboard handler: Escape to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isExporting) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, isExporting]);
+
+  // Focus trap: focus the panel when mounted
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
+
+  const canExport = selectedFields.size > 0 && !dateError;
 
   // Streams matching the selected date range; this is what actually gets exported.
   const reportStreams = useMemo(
@@ -59,9 +91,10 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     [selectedFields]
   );
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     if (!canExport) return;
     setIsExporting(true);
+    setExportError(false);
     try {
       if (exportFormat === "CSV") {
         downloadReportCSV(reportStreams, orderedSelectedFields, grouping);
@@ -71,14 +104,16 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
       addToast(`Successfully exported report as ${exportFormat}`, "success");
       onClose();
     } catch {
+      setExportError(true);
       addToast("Failed to export report. Please try again.", "error");
     } finally {
-      setIsExporting(false);
+      if (mountedRef.current) {
+        setIsExporting(false);
+      }
     }
-  };
+  }, [canExport, exportFormat, reportStreams, orderedSelectedFields, grouping, addToast, onClose]);
 
   const filteredStreams = useMemo(() => {
-    // Preview shows only the first few rows of the actual (date-filtered) export set.
     return reportStreams.slice(0, 5);
   }, [reportStreams]);
 
@@ -92,27 +127,32 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
 
   return (
     <div
-      className="p-6 rounded-lg mb-8"
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Export Treasury Report"
+      tabIndex={-1}
+      className="p-6 rounded-lg mb-8 focus:outline-none"
       style={{
         backgroundColor: "var(--color-bg-primary)",
         border: "1px solid var(--color-border-default)",
         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
       }}
     >
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
         <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
           Export Treasury Report
         </h2>
         <button
           onClick={onClose}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] self-end sm:self-auto"
           aria-label="Close report builder"
         >
           ✕
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="startDate">
@@ -123,8 +163,10 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               id="startDate"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              aria-invalid={!!dateError}
+              aria-describedby={dateError ? "date-error" : undefined}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
-              style={{ borderColor: "var(--color-border-default)" }}
+              style={{ borderColor: dateError ? "var(--color-error-border)" : "var(--color-border-default)" }}
             />
           </div>
           <div>
@@ -136,10 +178,17 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               id="endDate"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+              aria-invalid={!!dateError}
+              aria-describedby={dateError ? "date-error" : undefined}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
-              style={{ borderColor: "var(--color-border-default)" }}
+              style={{ borderColor: dateError ? "var(--color-error-border)" : "var(--color-border-default)" }}
             />
           </div>
+          {dateError && (
+            <p id="date-error" role="alert" className="text-sm" style={{ color: "var(--color-error-text)" }}>
+              {dateError}
+            </p>
+          )}
         </div>
 
         <fieldset className="border p-4 rounded-md" style={{ borderColor: "var(--color-border-default)" }}>
@@ -208,10 +257,15 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
       </div>
 
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4">Live Preview</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4" id="preview-heading">
+          Live Preview
+        </h3>
         <div
           className="overflow-x-auto rounded-lg relative"
           style={{ border: "1px solid var(--color-border-default)" }}
+          role="region"
+          aria-labelledby="preview-heading"
+          aria-busy={isPreviewLoading}
         >
           {isPreviewLoading && (
             <div className="absolute inset-0 flex items-center justify-center z-10" style={{ backgroundColor: "var(--color-bg-primary)", opacity: 0.9 }}>
@@ -261,7 +315,23 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <div aria-live="polite" className="sr-only">
+          {isExporting && "Exporting report"}
+          {exportError && "Export failed"}
+        </div>
+        {exportError && !isExporting && (
+          <button
+            onClick={handleExport}
+            className="px-6 py-2 rounded-lg font-semibold transition-opacity"
+            style={{
+              color: "var(--color-text-primary)",
+              border: "1px solid var(--color-border-default)",
+            }}
+          >
+            Retry Export
+          </button>
+        )}
         <button
           onClick={handleExport}
           disabled={!canExport || isExporting}

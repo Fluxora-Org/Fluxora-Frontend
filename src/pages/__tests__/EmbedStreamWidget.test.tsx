@@ -78,6 +78,7 @@ describe('EmbedStreamWidget', () => {
       expect(screen.getByRole('status')).toBeInTheDocument();
       expect(screen.getByLabelText('Loading stream widget')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-card');
     });
 
     it('shows card preset skeleton by default', () => {
@@ -87,6 +88,7 @@ describe('EmbedStreamWidget', () => {
       
       // Card skeleton has title skeleton and metrics grid
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-card');
     });
 
     it('shows banner preset skeleton', () => {
@@ -95,6 +97,7 @@ describe('EmbedStreamWidget', () => {
       renderEmbedWidget('STR-001', 'preset=banner');
       
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-banner-skeleton embed-widget-banner');
     });
 
     it('shows compact preset skeleton', () => {
@@ -103,6 +106,7 @@ describe('EmbedStreamWidget', () => {
       renderEmbedWidget('STR-001', 'preset=compact');
       
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-compact');
     });
   });
 
@@ -114,6 +118,7 @@ describe('EmbedStreamWidget', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveClass('embed-widget-card');
         expect(screen.getByText(/Stream unavailable/)).toBeInTheDocument();
         expect(screen.getByText(/Powered by Fluxora/)).toBeInTheDocument();
       });
@@ -137,6 +142,7 @@ describe('EmbedStreamWidget', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveClass('embed-widget-compact');
         expect(screen.getByText(/Not found/)).toBeInTheDocument();
         // Compact shouldn't have "Powered by Fluxora" in the error
         expect(screen.queryByText(/Powered by Fluxora/)).not.toBeInTheDocument();
