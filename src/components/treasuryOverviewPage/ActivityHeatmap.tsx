@@ -214,18 +214,15 @@ export default function ActivityHeatmap({ streams, loading, error }: ActivityHea
     );
   }
 
-  // Generate date range for the trailing 12 weeks (84 days) ending on the Sunday of this week
+  // Generate date range for the trailing 12 weeks (84 days) ending today
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + daysToSunday);
-  endOfWeek.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
+  const endDate = new Date(today);
+  endDate.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
 
   const dates: Date[] = [];
   for (let i = 83; i >= 0; i--) {
-    const d = new Date(endOfWeek);
-    d.setDate(endOfWeek.getDate() - i);
+    const d = new Date(endDate);
+    d.setDate(endDate.getDate() - i);
     dates.push(d);
   }
 
@@ -287,8 +284,8 @@ export default function ActivityHeatmap({ streams, loading, error }: ActivityHea
     .filter((day) => day.count > 0);
 
   const totalEvents = activeDays.reduce((sum, day) => sum + day.count, 0);
-  const endDateStr = formatDate(endOfWeek);
-  const heatmapAriaLabel = `Treasury Activity Heatmap: trailing 12 weeks of stream-creation and withdrawal events ending Sunday ${endDateStr}. ${totalEvents} ${totalEvents === 1 ? "event" : "events"} across ${activeDays.length} ${activeDays.length === 1 ? "active day" : "active days"}. Use Tab to focus each day cell, or use the View as table toggle for a sortable list.`;
+  const endDateStr = formatDate(endDate);
+  const heatmapAriaLabel = `Treasury Activity Heatmap: trailing 12 weeks of stream-creation and withdrawal events ending ${endDateStr}. ${totalEvents} ${totalEvents === 1 ? "event" : "events"} across ${activeDays.length} ${activeDays.length === 1 ? "active day" : "active days"}. Use Tab to focus each day cell, or use the View as table toggle for a sortable list.`;
 
   return (
     <div className="activity-heatmap-container" data-activity-tone={tone}>

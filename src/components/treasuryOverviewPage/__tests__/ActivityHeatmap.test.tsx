@@ -482,6 +482,29 @@ describe("ActivityHeatmap", () => {
       expect(lastCell.getAttribute("aria-label")).toContain("2026-07-26");
     });
 
+    it("correctly handles a non-Sunday as the current day of week (e.g. Wednesday)", () => {
+      vi.setSystemTime(new Date("2026-07-29T12:00:00Z")); // This is a Wednesday
+      const { container } = render(<ActivityHeatmap streams={[]} />);
+      const cells = container.querySelectorAll(".heatmap-grid .heatmap-cell");
+      expect(cells.length).toBe(84);
+      
+      const lastCell = cells[cells.length - 1];
+      const label = lastCell.getAttribute("aria-label") || "";
+      expect(label).toContain("2026-07-29");
+      
+      // Ensure no date is later than today (2026-07-29)
+      const futureDates = Array.from(cells).some(cell => {
+        const cellLabel = cell.getAttribute("aria-label") || "";
+        const match = cellLabel.match(/(\d{4}-\d{2}-\d{2})/);
+        if (match) {
+          const dateStr = match[1];
+          return new Date(dateStr) > new Date("2026-07-29T00:00:00Z");
+        }
+        return false;
+      });
+      expect(futureDates).toBe(false);
+    });
+
     it("ignores streams with missing or empty startDate", () => {
       const streamsWithNoStart: Stream[] = [
         {
@@ -601,7 +624,7 @@ describe("ActivityHeatmap", () => {
       const wrapper = screen.getByRole("img");
       const label = wrapper.getAttribute("aria-label") ?? "";
       expect(label).toMatch(/trailing 12 weeks/);
-      expect(label).toMatch(/ending Sunday/);
+      expect(label).toMatch(/ending/);
       expect(label).toMatch(/15 events/);
       expect(label).toMatch(/4 active days/);
     });
