@@ -22,6 +22,7 @@ export interface InfoTooltipProps {
  * - Keyboard accessible (Enter/Space to toggle, ESC to close)
  * - Click outside to close
  * - Smart positioning (flips if insufficient space)
+ * - Non-clipped focus-visible outline for interactive elements (using theme tokens)
  * - Focus trap when open
  * - Mobile-friendly tap interactions
  * 

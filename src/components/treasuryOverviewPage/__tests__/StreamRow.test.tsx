@@ -73,7 +73,7 @@ describe("StreamRow", () => {
   });
 
   it("opens the actions menu when the ellipsis button is clicked and closes on Escape", async () => {
-    const { onSelect } = renderRow();
+    renderRow();
 
     // The ellipsis trigger should exist
     const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
@@ -165,6 +165,45 @@ describe("StreamRow", () => {
 
     const pauseCancelItem = screen.getByRole("menuitem", { name: /pause\/cancel/i });
     expect(pauseCancelItem).toBeDisabled();
+  });
+
+  it("closes the menu when clicking outside it", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    // Click outside the menu and trigger
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("toggles the menu closed when the trigger is clicked a second time", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("'View details' menu item navigates to the stream detail route", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("menuitem", { name: /view details/i }));
+
+    // Menu should close after selection
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
 

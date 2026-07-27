@@ -111,21 +111,101 @@ Desktop Viewport (>= 768px)            Mobile Viewport (< 768px)
 
 1. **Keyboard Walkthrough:**
    - Microphone button is focusable via `Tab` key in both `AppNavbar` and `Sidebar`.
-   - Triggerable via `Enter` or `Space` keys.
+   - Triggerable via `Enter` or `Space` keys (native button behavior).
    - Focus ring uses `--focus-ring` (2px cyan/teal outline with 2px offset).
+   - VoiceMicButton uses `aria-pressed` toggle state for screen reader context.
+   - VoiceConfirmModal traps focus on the "Confirm Action" button when opened.
+   - Escape key cancels the destructive confirmation modal and returns focus.
 2. **Screen Reader Announcements (`aria-live="polite"`):**
    - All voice state changes and recognized commands announce via `useLiveAnnouncer()`.
+   - VoiceCommandPanel uses `aria-live="polite"` on the aside container.
+   - Recognized commands announce: *"Voice command recognized: {phrase}. Navigating."*
+   - Unrecognized commands announce: *"Command not recognized. Say 'Go to streams' or view command reference."*
+   - Destructive confirmation announces: *"Confirmation required to {phrase}. Say confirm or click confirm button."*
 3. **WCAG 2.1 AA Contrast:**
    - Non-text mic button states exceed **3:1** contrast ratio against surrounding surface colors in light and dark themes.
+   - See Section 2.1 for per-state contrast token measurements.
 
 ---
 
-## 7. Engineering Test Suite Summary
+## 7. Component File Inventory
 
-- **Test Suite Location:** `src/components/voice/__tests__/VoiceCommandManager.test.tsx`
-- **Covered Scenarios:**
-  - Mic control keyboard accessibility (`role="button"`, `aria-label`).
-  - Route navigation on spoken phrase match (`"Go to streams"` -> `/app/streams`).
-  - Destructive confirmation modal requirement (`"Cancel stream"` -> modal opened -> `confirming-destructive` state).
-  - Unrecognized command handling and notification.
-  - Command reference panel rendering and grammar categories.
+| File | Purpose | States Managed |
+| --- | --- | --- |
+| `src/components/voice/voiceTypes.ts` | TypeScript types for `VoiceState`, `VoiceCommandDef`, `RecognizedCommand`, `VoiceContextValue` | All 8 states |
+| `src/components/voice/VoiceContext.tsx` | React Context provider wrapping SpeechRecognition, command matching, state machine, and navigation execution | idle, listening, processing, command-recognized, command-unrecognized, confirming-destructive, permission-denied, unsupported-browser |
+| `src/components/voice/VoiceMicButton.tsx` | Microphone toggle control with visual state indicators; navbar (circular) and sidebar (full-width) variants | Visual feedback per state |
+| `src/components/voice/VoiceCommandPanel.tsx` | Fixed bottom-right reference panel with command grammar, status badge, live transcript, and manual command simulator | All 8 states (badge labels) |
+| `src/components/voice/VoiceConfirmModal.tsx` | Full-screen modal overlay for destructive action confirmation; focus trap, Escape key, confirm/cancel buttons | confirming-destructive |
+
+### Integration Points
+
+| Integration | File | How |
+| --- | --- | --- |
+| VoiceProvider wraps app | `src/App.tsx` | `<VoiceProvider>` in provider hierarchy, before `WalletProvider` |
+| VoiceCommandPanel rendered | `src/App.tsx` | Rendered outside `<Routes>` (always available) |
+| VoiceConfirmModal rendered | `src/App.tsx` | Rendered outside `<Routes>` (always available) |
+| Mic button in sidebar | `src/components/Sidebar.tsx` | `<VoiceMicButton variant="sidebar" />` |
+| Mic button in navbar | `src/components/navigation/AppNavbar.tsx` | `<VoiceMicButton variant="navbar" />` |
+
+---
+
+## 8. Engineering Test Suite Summary
+
+### Test File Inventory
+
+| Test File | Location | Test Count |
+| --- | --- | --- |
+| VoiceCommandManager.test.tsx | `src/components/voice/__tests__/VoiceCommandManager.test.tsx` | 5 integration tests |
+| VoiceCommandPanel.test.tsx | `src/components/voice/__tests__/VoiceCommandPanel.test.tsx` | 32 unit tests |
+| VoiceMicButton.test.tsx | `src/components/voice/__tests__/VoiceMicButton.test.tsx` | 25 unit tests |
+| VoiceConfirmModal.test.tsx | `src/components/voice/__tests__/VoiceConfirmModal.test.tsx` | 17 unit tests |
+| **Total** | | **79 tests** |
+
+### Covered Scenarios
+
+**VoiceCommandManager.test.tsx (Integration)**
+- Mic control keyboard accessibility (`role="button"`, `aria-label`).
+- Route navigation on spoken phrase match (`"Go to streams"` -> `/app/streams`).
+- Destructive confirmation modal requirement (`"Cancel stream"` -> modal opened -> `confirming-destructive` state).
+- Unrecognized command handling and notification.
+- Command reference panel rendering and grammar categories.
+
+**VoiceCommandPanel.test.tsx (Unit)**
+- `panelOpen` gate: renders nothing when closed, renders aside when open.
+- `getStatusBadge`: all 8 VoiceState branches produce correct label and icon.
+- Category filtering: Navigation, Action, Destructive sections render correctly.
+- `isSupported=false` renders unsupported-browser alert.
+- `state=permission-denied` renders mic-denied alert.
+- `state=confirming-destructive` renders confirmation banner with Confirm/Cancel buttons.
+- Live transcript display when transcript/recognizedCommand are set.
+- Manual simulator form: input, submit, blank/whitespace handling.
+- Header controls: close button, aria-label.
+- Footer controls: Start/Stop Listening button, disabled when unsupported.
+
+**VoiceMicButton.test.tsx (Unit)**
+- All 8 VoiceState branches for navbar variant: correct aria-label.
+- All 8 VoiceState branches for sidebar variant: correct aria-label.
+- `aria-pressed` toggle: true when listening, false when idle.
+- Click triggers `toggleListening`.
+- Keyboard triggerable (native button Enter/Space behavior).
+- Disabled when unsupported.
+- Visual state indicators: cyan bg (listening), danger border (denied), opacity (unsupported).
+- Sidebar variant: "Voice Active"/"Voice Commands" label toggle.
+- Sidebar variant: panel toggle button with "Help"/"Hide" text, calls `togglePanel`.
+- Sidebar variant: panel toggle click does not trigger `toggleListening`.
+
+**VoiceConfirmModal.test.tsx (Unit)**
+- Renders nothing when state is idle, listening, or pendingDestructiveCommand is null.
+- Renders dialog with `role="dialog"`, `aria-modal="true"`.
+- `aria-labelledby` points to "Voice Command Confirmation" heading.
+- `aria-describedby` points to destructive action description.
+- Displays destructive command phrase ("Cancel stream").
+- Displays spoken instructions ("Say Confirm" / "Say Cancel").
+- Confirm button calls `confirmDestructiveAction`.
+- Cancel button calls `cancelDestructiveAction`.
+- Close (X) button calls `cancelDestructiveAction`.
+- Escape key calls `cancelDestructiveAction`.
+- Non-Escape keys do not cancel.
+- Escape does not cancel when modal is closed.
+- Auto-focuses Confirm Action button on open (50ms timeout).

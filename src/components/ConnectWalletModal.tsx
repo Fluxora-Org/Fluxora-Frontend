@@ -6,6 +6,7 @@ import { useWallet } from "./wallet-connect/Walletcontext";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
+import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -81,6 +82,7 @@ export default function ConnectWalletModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const customPathInputRef = useRef<HTMLInputElement>(null);
   
   // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
@@ -115,21 +117,30 @@ export default function ConnectWalletModal({
   const [customPath, setCustomPath] = useState<string>("m/44'/148'/0'");
   const [pathError, setPathError] = useState<string | null>(null);
 
-  const [isMobile, setIsMobile] = useState(false);
+ const [isMobile, setIsMobile] = useState(() => isMobileViewport());
   const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(
-        window.innerWidth <= 768 ||
-        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      );
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
 
+    const syncMobileState = () => {
+      const mobile = isMobileViewport();
+      setIsMobile((prev) => (prev === mobile ? prev : mobile));
+    };
+
+    const handleResize = () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(syncMobileState, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(debounceId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+  
   const handleCustomPathChange = (val: string) => {
     setCustomPath(val);
     const regex = /^m\/44'\/148'\/[0-9]+'?$/;
@@ -139,6 +150,15 @@ export default function ConnectWalletModal({
       setPathError(null);
     }
   };
+
+  useEffect(() => {
+    if (derivationPath === "custom") {
+      const timer = setTimeout(() => {
+        customPathInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [derivationPath]);
 
   // Simulate desktop scanning transition
   useEffect(() => {
@@ -835,6 +855,7 @@ export default function ConnectWalletModal({
                 <div>
                   <input
                     type="text"
+                    ref={customPathInputRef}
                     id="custom-derivation-path-input"
                     className={styles.customPathInput}
                     value={customPath}

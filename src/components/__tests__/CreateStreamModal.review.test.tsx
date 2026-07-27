@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent, screen, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 // Checksum-valid Stellar public key (required by the centralized
 // isValidStellarAddress validator introduced in #331).
@@ -8,6 +9,7 @@ const VALID_STELLAR =
   'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
 function fillStep1(container: HTMLElement, deposit = '123.45') {
+  selectSingleStreamInContainer(container);
   const recipientInput = container.querySelector(
     '#create-stream-recipient',
   ) as HTMLInputElement;

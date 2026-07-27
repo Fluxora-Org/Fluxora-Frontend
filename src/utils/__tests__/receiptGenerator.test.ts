@@ -3,7 +3,6 @@ import {
   maskAddress,
   formatTimestamp,
   drawReceiptToCanvas,
-  downloadReceipt,
   ReceiptData,
 } from "../receiptGenerator";
 

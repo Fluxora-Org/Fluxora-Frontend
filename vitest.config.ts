@@ -54,6 +54,8 @@ export default defineConfig({
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
         // Contrast utilities
         "src/utils/contrastUtils.ts",
+        // Dynamic favicon badge
+        "src/utils/faviconBadge.ts",
         // Activity Heatmap
         "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
         // Treasury flow Sankey diagram

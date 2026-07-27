@@ -10,7 +10,12 @@ export interface Viewer {
 }
 
 /**
- * usePresenceViewers — Simulated live presence hook for a stream.
+ * usePresenceViewers — Presence state for a stream.
+ *
+ * The app does not yet have a production presence transport wired to a real
+ * backend. To avoid silently rendering the badge as though live presence were
+ * available, the hook exposes an explicit unavailable state when no transport
+ * is configured and only uses dev/test mock viewers for local development.
  *
  * @param streamId - The ID of the current stream.
  * @param __devMockViewers - Optional mock viewers array for local development/testing.
@@ -19,18 +24,33 @@ export interface Viewer {
  * - `viewers`: Array of current active viewers (excluding the local user).
  * - `markActive`: Function to reset `lastSeen` timestamps.
  * - `viewerCount`: Number of active viewers (excluding those fading out).
+ * - `isPresenceEnabled`: Whether the badge should render as live presence.
+ * - `presenceStatus`: Current availability state for the presence feature.
  */
 export function usePresenceViewers(
   streamId?: string,
   __devMockViewers: Viewer[] = []
 ) {
+  const hasRealPresenceTransport = false;
+  const isPresenceEnabled = hasRealPresenceTransport && Boolean(streamId);
+  const presenceStatus = __devMockViewers.length > 0 ? "mocked" : "unavailable";
   const [viewers, setViewers] = useState<Viewer[]>(() => __devMockViewers);
 
   useEffect(() => {
+    if (!streamId) {
+      setViewers([]);
+      return;
+    }
+
     if (__devMockViewers.length > 0) {
       setViewers(__devMockViewers);
+      return;
     }
-  }, [__devMockViewers]);
+
+    if (!isPresenceEnabled) {
+      setViewers([]);
+    }
+  }, [streamId, __devMockViewers, isPresenceEnabled]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -71,11 +91,11 @@ export function usePresenceViewers(
 
   const viewerCount = viewers.filter(v => !v.fadingOut).length;
 
-  // Support both tuple [viewers, markActive, viewerCount] and object destructuring { viewers, markActive, viewerCount }
-  const result = [viewers, markActive, viewerCount] as any;
-  result.viewers = viewers;
-  result.markActive = markActive;
-  result.viewerCount = viewerCount;
-
-  return result;
+  return {
+    viewers,
+    markActive,
+    viewerCount,
+    isPresenceEnabled,
+    presenceStatus,
+  };
 }

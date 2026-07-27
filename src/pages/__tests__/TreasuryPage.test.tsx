@@ -6,6 +6,13 @@ import type { Metric } from '../../components/treasuryOverviewPage/Metric';
 import type { Stream } from '../../components/treasuryOverviewPage/Stream';
 
 
+// Mock IS_DEV to allow testing production-gated features
+vi.mock("../../utils/env", () => ({
+  get IS_DEV() {
+    return (globalThis as any).mockIsDev !== false;
+  },
+}));
+
 // Mock child components to keep the tests focused on TreasuryPage logic
 vi.mock('../../components/treasuryOverviewPage/DemoBanner', () => ({ default: () => <div data-testid="demo-banner" /> }));
 vi.mock('../../components/treasuryOverviewPage/Header', () => ({ default: () => <header data-testid="header" /> }));
@@ -80,6 +87,10 @@ import { useTreasuryOverviewData } from '../../components/treasuryOverviewPage/u
 const mockHook = useTreasuryOverviewData as unknown as Mock;
 
 describe('TreasuryPage', () => {
+  beforeEach(() => {
+    (globalThis as any).mockIsDev = true;
+  });
+
   afterEach(() => {
     vi.resetAllMocks();
   });
@@ -162,5 +173,49 @@ describe('TreasuryPage', () => {
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify([]));
     expect(screen.getByTestId('activity-heatmap')).toHaveTextContent(JSON.stringify([]));
     expect(screen.getByTestId('treasury-flow-sankey')).toHaveTextContent(JSON.stringify([]));
+  });
+
+  describe('ColorBlindToggle gating', () => {
+    it('renders ColorBlindToggle in loading state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: true, error: null });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in loading state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: true, error: null });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
+
+    it('renders ColorBlindToggle in error state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: 'err' });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in error state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: 'err' });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
+
+    it('renders ColorBlindToggle in success state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: [{ total: 100 }], streams: [{ id: 1 }], isDemoMode: false, loading: false, error: null });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in success state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: [{ total: 100 }], streams: [{ id: 1 }], isDemoMode: false, loading: false, error: null });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
   });
 });

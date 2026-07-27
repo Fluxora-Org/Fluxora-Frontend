@@ -1,6 +1,11 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Stream } from "./Stream";
 import { useToast } from "../toast/ToastProvider";
+import {
+  filterStreamsByDateRange,
+  downloadReportCSV,
+  printReportAsPDF,
+} from "../../utils/reportExporter";
 
 export interface ReportBuilderPanelProps {
   streams: Stream[];
@@ -10,6 +15,8 @@ export interface ReportBuilderPanelProps {
 export type Field = "name" | "recipient" | "rate" | "accruedAmount" | "status";
 export type Grouping = "None" | "Recipient" | "Status";
 export type ExportFormat = "CSV" | "PDF";
+
+const FIELD_ORDER: Field[] = ["name", "recipient", "rate", "accruedAmount", "status"];
 
 export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPanelProps) {
   const [startDate, setStartDate] = useState("");
@@ -41,21 +48,39 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
 
   const canExport = selectedFields.size > 0;
 
+  // Streams matching the selected date range; this is what actually gets exported.
+  const reportStreams = useMemo(
+    () => filterStreamsByDateRange(streams, startDate, endDate),
+    [streams, startDate, endDate]
+  );
+
+  const orderedSelectedFields = useMemo(
+    () => FIELD_ORDER.filter((f) => selectedFields.has(f)),
+    [selectedFields]
+  );
+
   const handleExport = () => {
     if (!canExport) return;
     setIsExporting(true);
-    // Simulate export delay
-    setTimeout(() => {
-      setIsExporting(false);
+    try {
+      if (exportFormat === "CSV") {
+        downloadReportCSV(reportStreams, orderedSelectedFields, grouping);
+      } else {
+        printReportAsPDF(reportStreams, orderedSelectedFields, grouping);
+      }
       addToast(`Successfully exported report as ${exportFormat}`, "success");
       onClose();
-    }, 1500);
+    } catch {
+      addToast("Failed to export report. Please try again.", "error");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const filteredStreams = useMemo(() => {
-    // In a real app we'd filter by dateRange and group by `grouping` here.
-    return streams.slice(0, 5); // Just show a few for preview
-  }, [streams, grouping]);
+    // Preview shows only the first few rows of the actual (date-filtered) export set.
+    return reportStreams.slice(0, 5);
+  }, [reportStreams]);
 
   const allFields: { key: Field; label: string }[] = [
     { key: "name", label: "Name" },

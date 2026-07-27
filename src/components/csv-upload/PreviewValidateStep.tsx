@@ -8,7 +8,7 @@ import { ConfirmModal } from '../common/ConfirmModal';
 export interface PreviewValidateStepProps {
   rows: CsvRow[];
   onRowsChange: (rows: CsvRow[]) => void;
-  onSubmit: (rows: CsvRow[]) => void;
+  onReview: () => void;
   onReplaceFile: () => void;
 }
 
@@ -287,7 +287,7 @@ const InlineEditRow: React.FC<InlineEditRowProps> = ({
 const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
   rows,
   onRowsChange,
-  onSubmit,
+  onReview,
   onReplaceFile,
 }) => {
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -593,9 +593,9 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
           className="btn btn-next csv-submit-btn"
           disabled={!canSubmit}
           aria-disabled={!canSubmit}
-          onClick={() => onSubmit(rows)}
+          onClick={onReview}
         >
-          Submit {submitCount} valid stream{submitCount !== 1 ? 's' : ''}
+          Review batch to dry-run preview
           <svg
             width="16"
             height="16"

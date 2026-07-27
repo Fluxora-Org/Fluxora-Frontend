@@ -25,6 +25,34 @@
         object-src  'none'          — block plugins (Flash, etc.)
         frame-ancestors 'none'      — prevent clickjacking (equivalent to X-Frame-Options: DENY)
         base-uri    'self'          — prevent base-tag hijacking
+
+      EMBED ROUTE EXCEPTION (/embed/streams/:streamId):
+        The /embed/streams/* route is designed to be loaded inside a host-site
+        iframe. This meta tag's frame-ancestors 'none' applies to ALL routes
+        served by this HTML shell and cannot be scoped per-route via a <meta>
+        tag — browsers only honour frame-ancestors from HTTP response headers.
+
+        For production deployment, the reverse-proxy / CDN must emit a
+        SEPARATE, ROUTE-SCOPED Content-Security-Policy response header that
+        overrides this value only for /embed/streams/* requests, e.g.:
+
+          # Nginx example
+          location /embed/streams/ {
+            add_header Content-Security-Policy
+              "frame-ancestors https://trusted-host.example https://another.example";
+          }
+          location / {
+            add_header Content-Security-Policy "frame-ancestors 'none'";
+          }
+
+        The allow-list MUST:
+          • Name specific HTTPS origins — never use frame-ancestors *
+          • Cover only /embed/* paths, leaving all other routes at 'none'
+          • Be updated in the server config whenever a new embedding host is approved
+
+        See docs/EMBEDDABLE_STREAM_WIDGET_SPEC.md §Content Security Policy for
+        full rationale, Nginx/Caddy/Vercel config snippets, and the audit log
+        requirements for adding new trusted origins.
     -->
     <meta
       http-equiv="Content-Security-Policy"

@@ -16,6 +16,7 @@ const mockStream: StreamRecord = {
   summary: "Monthly allocation for core developers",
   recipientName: "Alice",
   recipientAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+  treasuryName: "Treasury",
   treasuryAddress: "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF",
   depositAmount: 10000,
   streamedAmount: 4000,
@@ -30,6 +31,9 @@ const mockStream: StreamRecord = {
   healthNote: "Stream is running normally",
   asset: "USDC",
   progress: 40,
+  auditNote: "",
+  tags: [],
+  timeline: [],
 };
 
 describe("StreamDetail Page", () => {

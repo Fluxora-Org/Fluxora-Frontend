@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PreviewValidateStep from '../PreviewValidateStep';
 import type { CsvRow } from '../types';
@@ -29,17 +29,17 @@ function makeRow(overrides: Partial<CsvRow> = {}): CsvRow {
 
 function renderStep(rows: CsvRow[]) {
   const onRowsChange = vi.fn();
-  const onSubmit = vi.fn();
+  const onReview = vi.fn();
   const onReplaceFile = vi.fn();
   render(
     <PreviewValidateStep
       rows={rows}
       onRowsChange={onRowsChange}
-      onSubmit={onSubmit}
+      onReview={onReview}
       onReplaceFile={onReplaceFile}
     />,
   );
-  return { onRowsChange, onSubmit, onReplaceFile };
+  return { onRowsChange, onReview, onReplaceFile };
 }
 
 afterEach(() => {
@@ -59,7 +59,7 @@ describe('PreviewValidateStep', () => {
     });
 
     it('shows an error badge when there are needs-fix rows, hidden otherwise', () => {
-      const { rerender: _rerender } = renderStep([makeRow({ status: 'needs-fix', rowNumber: 1 })]);
+      renderStep([makeRow({ status: 'needs-fix', rowNumber: 1 })]);
       expect(screen.getByText('1 needs attention')).toBeInTheDocument();
     });
 
@@ -320,38 +320,37 @@ describe('PreviewValidateStep', () => {
     });
   });
 
-  describe('submit gating', () => {
-    it('disables submit when there are no valid or duplicate-recipient rows', () => {
+describe('review gating', () => {
+    it('disables the review button when there are no valid or duplicate-recipient rows', () => {
       renderStep([makeRow({ status: 'needs-fix' }), makeRow({ status: 'skipped' })]);
-      const submitButton = screen.getByRole('button', { name: /Submit 0 valid streams/ });
-      expect(submitButton).toBeDisabled();
-      expect(submitButton).toHaveAttribute('aria-disabled', 'true');
+      const reviewButton = screen.getByRole('button', { name: /Review batch to dry-run preview/ });
+      expect(reviewButton).toBeDisabled();
+      expect(reviewButton).toHaveAttribute('aria-disabled', 'true');
     });
 
-    it('enables submit and counts duplicate-recipient rows as submittable, with correct pluralisation', () => {
+    it('enables review when there are valid or duplicate-recipient rows', () => {
       renderStep([
         makeRow({ status: 'valid' }),
         makeRow({ status: 'duplicate-recipient', duplicateRows: [1] }),
       ]);
-      const submitButton = screen.getByRole('button', { name: /Submit 2 valid streams/ });
-      expect(submitButton).toBeEnabled();
-      expect(submitButton).toHaveAttribute('aria-disabled', 'false');
+      const reviewButton = screen.getByRole('button', { name: /Review batch to dry-run preview/ });
+      expect(reviewButton).toBeEnabled();
+      expect(reviewButton).toHaveAttribute('aria-disabled', 'false');
     });
 
-    it('uses singular "stream" wording for exactly one submittable row', () => {
+    it('uses "Review batch" wording for the action button', () => {
       renderStep([makeRow({ status: 'valid' })]);
-      expect(screen.getByRole('button', { name: 'Submit 1 valid stream' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Review batch to dry-run preview/ })).toBeInTheDocument();
     });
 
-    it('calls onSubmit with the current rows when clicked', async () => {
+    it('calls onReview when clicked', async () => {
       const user = userEvent.setup();
       const rows = [makeRow({ status: 'valid' })];
-      const { onSubmit } = renderStep(rows);
+      const { onReview } = renderStep(rows);
 
-      await user.click(screen.getByRole('button', { name: /Submit 1 valid stream/ }));
+      await user.click(screen.getByRole('button', { name: /Review batch to dry-run preview/ }));
 
-      expect(onSubmit).toHaveBeenCalledTimes(1);
-      expect(onSubmit).toHaveBeenCalledWith(rows);
+      expect(onReview).toHaveBeenCalledTimes(1);
     });
   });
 

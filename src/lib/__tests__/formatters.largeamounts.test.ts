@@ -34,7 +34,6 @@ import {
 const MAX = Number.MAX_SAFE_INTEGER; // 9_007_199_254_740_991
 const MAX_BIGINT = BigInt(MAX); // 9007199254740991n
 const BEYOND = MAX + 1; // 9_007_199_254_740_992 — NOT safely representable
-const BEYOND_BIGINT = MAX_BIGINT + 1n; // 9007199254740992n (exact in BigInt)
 const BEYOND_STR = "9007199254740992"; // same value as a string
 
 // ─── assertSafeInteger ────────────────────────────────────────────────────────

@@ -179,7 +179,7 @@ describe("StreamsTable", () => {
     const tbody = screen.getByRole("grid").querySelector("tbody")!;
     const cells = tbody.querySelectorAll("td");
 
-    cells.forEach((cell, i) => {
+    cells.forEach((cell) => {
       // The checkbox column (first, when compare is enabled) may have an empty data-label
       const dataLabel = cell.getAttribute("data-label");
       expect(dataLabel).not.toBeNull();

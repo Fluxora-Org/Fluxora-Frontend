@@ -303,12 +303,24 @@ describe("Soroban transaction layer (tx.ts)", () => {
     });
   });
 
-  it("should treat unknown signing error as generic rejected error", async () => {
+  it("should treat unknown signing error as unknown type", async () => {
     vi.mocked(freighter.signTransaction).mockRejectedValue(new Error("Some other error"));
     await expect(
       createStream(mockAddress, mockAddress, "1000", 100, 1000)
     ).rejects.toMatchObject({
-      type: "rejected",
+      type: "unknown",
+      message: expect.stringContaining("Freighter signing failed"),
+    });
+  });
+
+  it("should NOT classify a network-timeout error as rejected even if message contains 'cancel'", async () => {
+    vi.mocked(freighter.signTransaction).mockRejectedValue(
+      new Error("Request cancelled: network timeout")
+    );
+    await expect(
+      createStream(mockAddress, mockAddress, "1000", 100, 1000)
+    ).rejects.toMatchObject({
+      type: "unknown",
       message: expect.stringContaining("Freighter signing failed"),
     });
   });

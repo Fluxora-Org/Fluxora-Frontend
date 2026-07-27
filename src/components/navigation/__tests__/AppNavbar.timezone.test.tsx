@@ -86,7 +86,7 @@ describe("AppNavbar timezone-aware relative-time indicator", () => {
     // Hover
     fireEvent.mouseEnter(timeBtn);
     
-    const tooltip = screen.getByRole("tooltip", { id: "navbar-time-tooltip" });
+    const tooltip = screen.getByRole("tooltip");
     expect(tooltip).toBeInTheDocument();
     expect(tooltip).toHaveTextContent(/time details/i);
     expect(tooltip).toHaveTextContent(/iso timestamp/i);
@@ -117,7 +117,7 @@ describe("AppNavbar timezone-aware relative-time indicator", () => {
     // Focus trigger should update time immediately
     fireEvent.focus(timeBtn);
 
-    const tooltip = screen.getByRole("tooltip", { id: "navbar-time-tooltip" });
+    const tooltip = screen.getByRole("tooltip");
     expect(tooltip).toBeInTheDocument();
     
     // Verify tooltip contains the updated manual time

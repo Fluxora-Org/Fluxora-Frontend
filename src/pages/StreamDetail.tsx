@@ -37,7 +37,7 @@ import { PresenceBadge } from "../components/presence";
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { viewers } = usePresenceViewers(streamId);
+  const { viewers, isPresenceEnabled } = usePresenceViewers(streamId);
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");
@@ -244,11 +244,13 @@ export default function StreamDetail() {
       </div>
 
       {/* Presence Badge Container */}
-      <div style={{ position: "relative", zIndex: 30 }}>
-        <div style={{ position: "absolute", right: 0, top: "-54px" }}>
-          <PresenceBadge viewers={viewers} />
+      {isPresenceEnabled && (
+        <div style={{ position: "relative", zIndex: 30 }}>
+          <div style={{ position: "absolute", right: 0, top: "-54px" }}>
+            <PresenceBadge viewers={viewers} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Health badge */}
       <div style={{ marginBottom: "1.5rem" }}>

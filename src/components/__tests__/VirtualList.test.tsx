@@ -142,4 +142,98 @@ describe("VirtualList", () => {
     const button8 = screen.getByTestId("button-8");
     expect(document.activeElement).toBe(button8);
   });
+
+  it("scans and focuses the nearest mounted row with focusable elements if the closest one has none", () => {
+    const itemsWithSelectiveButtons = Array.from({ length: 30 }, (_, index) => ({
+      id: `item-${index}`,
+      name: `Stream ${index}`,
+    }));
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        className="streams-list"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={itemsWithSelectiveButtons}
+        overscan={1}
+        renderItem={(item, index) => (
+          <article>
+            <span>{item.name}</span>
+            {/* Index 8 has no focusable elements, index 9 does */}
+            {index !== 8 && <button data-testid={`button-${index}`}>Action {index}</button>}
+          </article>
+        )}
+        testId="virtual-streams"
+        threshold={5}
+      />,
+    );
+
+    const button0 = screen.getByTestId("button-0");
+    button0.focus();
+    expect(document.activeElement).toBe(button0);
+
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      writable: true,
+      value: 900,
+    });
+
+    act(() => {
+      fireEvent.scroll(window);
+    });
+
+    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
+
+    // Since index 8 has no button, focus should skip index 8 and land on the button at index 9!
+    const button9 = screen.getByTestId("button-9");
+    expect(document.activeElement).toBe(button9);
+  });
+
+  it("falls back to focusing the list container when no mounted rows contain focusable elements", () => {
+    const itemsWithSelectiveButtons = Array.from({ length: 30 }, (_, index) => ({
+      id: `item-${index}`,
+      name: `Stream ${index}`,
+    }));
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        className="streams-list"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={itemsWithSelectiveButtons}
+        overscan={1}
+        renderItem={(item, index) => (
+          <article>
+            <span>{item.name}</span>
+            {/* Only index 0 has a button; all other rows are non-focusable */}
+            {index === 0 && <button data-testid={`button-${index}`}>Action {index}</button>}
+          </article>
+        )}
+        testId="virtual-streams"
+        threshold={5}
+      />,
+    );
+
+    const button0 = screen.getByTestId("button-0");
+    button0.focus();
+    expect(document.activeElement).toBe(button0);
+
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      writable: true,
+      value: 900,
+    });
+
+    act(() => {
+      fireEvent.scroll(window);
+    });
+
+    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
+
+    // No mounted rows have buttons, so focus should land on the virtual list container
+    const container = screen.getByRole("list", { name: "Virtual streams" });
+    expect(document.activeElement).toBe(container);
+  });
 });

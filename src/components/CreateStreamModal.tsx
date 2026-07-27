@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
@@ -31,7 +31,11 @@ import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import { parseAndValidateCsv } from './csv-upload/csvParser';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
-import type { StreamDraftSnapshot } from '../lib/streamsSessionRecovery';
+import {
+  DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
+  DEFAULT_STREAM_DRAFT_DURATION,
+  type StreamDraftSnapshot,
+} from '../lib/streamsSessionRecovery';
 import {
   evaluateContrast,
   THEME_BACKGROUNDS,
@@ -203,12 +207,18 @@ export default function CreateStreamModal({
   const [bulkRows, setBulkRows] = useState<CsvRow[]>([]);
   const [bulkMapping, setBulkMapping] = useState<Partial<ColumnMapping>>({});
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const [bulkDryRunConfirmed, setBulkDryRunConfirmed] = useState(false);
+  const [bulkDryRunTotals, setBulkDryRunTotals] = useState<{
+    totalStreams: number;
+    totalDeposit: string;
+    estimatedFees: string;
+  } | null>(null);
 
   // ── Single-stream state ───────────────────────────────────────────────────
   const [recipient, setRecipient] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
-  const [accrualRate, setAccrualRate] = useState("38.62");
-  const [duration, setDuration] = useState("1");
+  const [accrualRate, setAccrualRate] = useState(DEFAULT_STREAM_DRAFT_ACCRUAL_RATE);
+  const [duration, setDuration] = useState(DEFAULT_STREAM_DRAFT_DURATION);
   const [startTimeOption, setStartTimeOption] = useState<"now" | "custom">(
     "now",
   );
@@ -667,6 +677,12 @@ export default function CreateStreamModal({
     if (recipientError || depositError || rateError || durationError || depositTooLarge || customDateError || cliffError) {
       return false;
     }
+
+    if (contrastState === 'AA-fail-blocked') {
+      setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
+      return false;
+    }
+
     return true;
   };
 
@@ -843,7 +859,9 @@ export default function CreateStreamModal({
   };
 
   const handleBulkBack = () => {
-    if (bulkStep === 'preview') {
+    if (bulkStep === 'dryRun') {
+      setBulkStep('preview');
+    } else if (bulkStep === 'preview') {
       if (bulkParseResult && !bulkParseResult.headersMatch) {
         setBulkStep('mapping');
       } else {
@@ -855,6 +873,260 @@ export default function CreateStreamModal({
       resetBulkState();
       setFlowMode('choose');
     }
+  };
+
+  // ── Dry-run review: calculate aggregate totals and transition to dry‑run confirmation ──
+
+  const handleBulkReview = useCallback(() => {
+    const validRows = bulkRows.filter(
+      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
+    );
+    if (validRows.length === 0) return;
+    const totalDeposit = validRows.reduce((sum, r) => {
+      return sum + (parseFloat(r.depositAmount.replace(/,/g, '')) || 0);
+    }, 0);
+    // Estimate fees as 100 micropoints (0.0001 XLM) per stream operation.
+    const estimatedFees = validRows.length * 0.0001;
+    setBulkDryRunTotals({
+      totalStreams: validRows.length,
+      totalDeposit: totalDeposit.toFixed(2),
+      estimatedFees: estimatedFees.toFixed(4),
+    });
+    setBulkStep('dryRun');
+  }, [bulkRows]);
+
+  const renderDryRunStep = () => {
+    const totals = bulkDryRunTotals;
+    const validCount = bulkRows.filter(
+      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
+    ).length;
+    const errorCount = bulkRows.filter(
+      (r) => r.status === 'needs-fix',
+    ).length;
+    const dupCount = bulkRows.filter(
+      (r) => r.status === 'duplicate-recipient',
+    ).length;
+    const skippedCount = bulkRows.filter(
+      (r) => r.status === 'skipped',
+    ).length;
+
+    return (
+      <>
+        <div className="modal-body-scroll">
+          <hr className="divider" />
+          <div className="section-header">
+            <h3>
+              {t("csvUpload.dryRun.title")}
+            </h3>
+            <p>
+              {t("csvUpload.dryRun.subtitle")}
+            </p>
+          </div>
+
+          {/* ── Aggregate summary card ── */}
+          <div
+            className="dry-run-summary"
+            role="region"
+            aria-labelledby="dry-run-summary-title"
+          >
+            <h4
+              id="dry-run-summary-title"
+              className="dry-run-summary__title"
+            >
+              {t("csvUpload.dryRun.outcome")}
+            </h4>
+            {totals ? (
+              <div className="dry-run-summary__cards">
+                <div className="dry-run-summary__card">
+                  <span className="dry-run-summary__label">
+                    {t("csvUpload.dryRun.totalStreams")}
+                  </span>
+                  <span className="dry-run-summary__value">
+                    {totals.totalStreams}
+                  </span>
+                </div>
+                <div className="dry-run-summary__card">
+                  <span className="dry-run-summary__label">
+                    {t("csvUpload.dryRun.totalDeposit")}
+                  </span>
+                  <span className="dry-run-summary__value">
+                    {totals.totalDeposit} USDC
+                  </span>
+                </div>
+                <div className="dry-run-summary__card">
+                  <span className="dry-run-summary__label">
+                    {t("csvUpload.dryRun.totalEstimatedFees")}
+                  </span>
+                  <span className="dry-run-summary__value">
+                    ~{totals.estimatedFees} XLM
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="dry-run-summary__calculating">
+                {t("csvUpload.dryRun.calculating")}
+              </div>
+            )}
+            <div className="dry-run-summary__counts">
+              <span className="csv-preview-badge csv-preview-badge--valid">
+                {t("csvUpload.dryRun.validRows")}: {validCount}
+              </span>
+              {skippedCount > 0 && (
+                <span className="csv-preview-badge csv-preview-badge--skipped">
+                  {t("csvUpload.dryRun.skippedRows")}: {skippedCount}
+                </span>
+              )}
+              {errorCount > 0 && (
+                <span className="csv-preview-badge csv-preview-badge--error">
+                  {t("csvUpload.dryRun.errorRows")}: {errorCount}
+                </span>
+              )}
+              {dupCount > 0 && (
+                <span className="csv-preview-badge csv-preview-badge--warning">
+                  {t("csvUpload.dryRun.duplicateRows")}: {dupCount}
+                </span>
+              )}
+            </div>
+
+            {/* ── Partial-failure risk preview ── */}
+            {errorCount > 0 && (
+              <div
+                className="dry-run-partial-warning"
+                role="alert"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>
+                  {t("csvUpload.dryRun.partialFailureWarning", {
+                    failed: errorCount,
+                    total: bulkRows.length,
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Per-row outcome list ── */}
+          <div
+            className="csv-preview-scroll"
+            role="region"
+            aria-label="Dry-run outcome list. Scroll horizontally to see all rows."
+            tabIndex={0}
+          >
+            <table
+              className="csv-preview-table"
+              role="table"
+              aria-label="Dry-run outcome per row"
+            >
+              <thead>
+                <tr>
+                  <th scope="col" className="csv-th csv-th--num">
+                    #
+                  </th>
+                  <th scope="col" className="csv-th csv-th--recipient">
+                    Recipient
+                  </th>
+                  <th scope="col" className="csv-th csv-th--amount">
+                    Deposit (USDC)
+                  </th>
+                  <th scope="col" className="csv-th csv-th--status">
+                    {t("csvUpload.dryRun.outcome")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {bulkRows.map((row) => {
+                  const statusLabel =
+                    row.status === 'valid'
+                      ? t("csvUpload.dryRun.statusSuccess")
+                      : row.status === 'duplicate-recipient'
+                        ? t("csvUpload.dryRun.statusWarning")
+                        : t("csvUpload.dryRun.statusError");
+                  return (
+                    <tr key={row.id}>
+                      <td className="csv-td csv-td--num">
+                        {row.rowNumber}
+                      </td>
+                      <td className="csv-td csv-td--recipient">
+                        <span
+                          className="csv-address"
+                          title={row.recipient}
+                        >
+                          {row.recipient
+                            ? `${row.recipient.slice(0, 8)}…${row.recipient.slice(-6)}`
+                            : <span className="csv-empty">—</span>}
+                        </span>
+                      </td>
+                      <td className="csv-td">
+                        {row.depositAmount || (
+                          <span className="csv-empty">—</span>
+                        )}
+                      </td>
+                      <td className="csv-td csv-td--status">
+                        {statusLabel}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Confirmation checkbox & submit ── */}
+        <div className="modal-footer">
+          <button
+            type="button"
+            className="btn btn-back"
+            onClick={() => setBulkStep('preview')}
+            disabled={isBulkSubmitting || bulkDryRunConfirmed}
+          >
+            {t("csvUpload.dryRun.back")}
+          </button>
+          <label
+            className="dry-run-confirmation-checkbox"
+            htmlFor="batch-confirm-checkbox"
+          >
+            <input
+              type="checkbox"
+              id="batch-confirm-checkbox"
+              className="dry-run-confirmation-checkbox__input"
+              checked={bulkDryRunConfirmed}
+              onChange={(e) => setBulkDryRunConfirmed(e.target.checked)}
+            />
+            <span>
+              {t("csvUpload.dryRun.confirmationLabel", {
+                count: validCount,
+              })}
+            </span>
+          </label>
+          <button
+            type="button"
+            className="btn btn-next"
+            disabled={!bulkDryRunConfirmed || isBulkSubmitting}
+            onClick={() => handleBulkSubmit(bulkRows)}
+            aria-busy={isBulkSubmitting}
+          >
+            {isBulkSubmitting
+              ? t("csvUpload.dryRun.submitting")
+              : t("csvUpload.dryRun.submitBtn", { count: validCount })}
+          </button>
+        </div>
+      </>
+    );
   };
 
   const handleBulkSubmit = async (rows: CsvRow[]) => {
@@ -969,7 +1241,7 @@ export default function CreateStreamModal({
             type="button"
             className="close-button"
             onClick={handleClose}
-            disabled={isBusyCreating || isBulkSubmitting}
+            disabled={isActivelySubmitting || isBulkSubmitting}
             aria-label={t("createStream.accessibility.closeLabel")}
           >
             <svg
@@ -1103,17 +1375,19 @@ export default function CreateStreamModal({
               )}
 
               {bulkStep === 'preview' && (
-                <PreviewValidateStep
-                  rows={bulkRows}
-                  onRowsChange={setBulkRows}
-                  onSubmit={handleBulkSubmit}
-                  onReplaceFile={handleBulkReplaceFile}
-                />
-              )}
+                  <PreviewValidateStep
+                    rows={bulkRows}
+                    onRowsChange={setBulkRows}
+                    onReview={handleBulkReview}
+                    onReplaceFile={handleBulkReplaceFile}
+                  />
+                )}
+
+                {bulkStep === 'dryRun' && renderDryRunStep()}
             </div>
 
             {/* Bulk footer — hidden on preview step (PreviewValidateStep has its own) */}
-            {bulkStep !== 'preview' && (
+            {bulkStep !== 'preview' && bulkStep !== 'dryRun' && (
               <div className="modal-footer">
                 <button
                   type="button"
@@ -1521,11 +1795,10 @@ export default function CreateStreamModal({
                         </div>
                       </div>
                     )}
-                  </div>
-                </InputField>
-                </>
-              );
-            })()}
+                      </div>
+                    </>
+                  );
+                })()}
             <div className="info-box" role="region" aria-labelledby="info-box-title">
               <div id="info-box-title" className="info-box-title">{t("createStream.step1.infoBoxTitle")}</div>
               <p className="info-box-text">

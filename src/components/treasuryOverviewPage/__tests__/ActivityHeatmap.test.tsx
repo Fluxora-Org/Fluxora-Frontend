@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import ActivityHeatmap from "../ActivityHeatmap";
+import ActivityHeatmap, { getActivityTone } from "../ActivityHeatmap";
 import type { Stream } from "../Stream";
 
 describe("ActivityHeatmap", () => {
@@ -497,6 +497,236 @@ describe("ActivityHeatmap", () => {
       // All cells should have no activity
       const cellsWithActivity = screen.queryAllByLabelText(/: \d+ stream event/);
       expect(cellsWithActivity.length).toBe(0);
+    });
+  });
+
+  describe("Activity classification (getActivityTone)", () => {
+    it("container exposes data-activity-tone='no-activity' when streams are empty", () => {
+      const { container } = render(<ActivityHeatmap streams={[]} />);
+      const root = container.querySelector(".activity-heatmap-container");
+      expect(root).toHaveAttribute("data-activity-tone", "no-activity");
+    });
+
+    it("container exposes data-activity-tone='sparse' for moderate activity in mockStreams", () => {
+      // mockStreams has 4 active days (21st L4, 22nd L3, 23rd L2, 24th L1).
+      // Days reaching level 3+ (>= 4 events) are 21st (8) and 22nd (4) — 2 days.
+      // 2/84 ≈ 0.024, below the 30% threshold → 'sparse'.
+      const { container } = render(<ActivityHeatmap streams={mockStreams} />);
+      const root = container.querySelector(".activity-heatmap-container");
+      expect(root).toHaveAttribute("data-activity-tone", "sparse");
+    });
+
+    it("container exposes data-activity-tone='dense' when > 30% of days are at level 3+", () => {
+      const denseStreams: Stream[] = [];
+      // 30 distinct days with >= 4 events each. 30/84 ≈ 0.357 → 'dense'.
+      for (let i = 0; i < 30; i++) {
+        const day = String(i + 1).padStart(2, "0");
+        for (let e = 0; e < 4; e++) {
+          denseStreams.push({
+            id: `STR-D-${i}-${e}`,
+            name: `Dense ${i}-${e}`,
+            recipient: "addr",
+            rate: "1",
+            status: "Active",
+            startDate: `2026-07-${day}`,
+          });
+        }
+      }
+      const { container } = render(<ActivityHeatmap streams={denseStreams} />);
+      const root = container.querySelector(".activity-heatmap-container");
+      expect(root).toHaveAttribute("data-activity-tone", "dense");
+    });
+
+    it("loading state force-sets data-activity-tone='loading' regardless of stream data", () => {
+      const { container } = render(<ActivityHeatmap streams={mockStreams} loading={true} />);
+      const root = container.querySelector(".activity-heatmap-container");
+      expect(root).toHaveAttribute("data-activity-tone", "loading");
+    });
+
+    it("getActivityTone utility classifies boundary cases directly", () => {
+      expect(getActivityTone({})).toBe("no-activity");
+      expect(getActivityTone({ "2026-07-21": 0 })).toBe("no-activity");
+
+      // 1 day at level 4 = 1/84 ≈ 0.012 < 0.30 → sparse.
+      expect(getActivityTone({ "2026-07-21": 8 })).toBe("sparse");
+
+      // Exactly at the boundary threshold (30% / 84 ≈ 0.357) → dense (> 0.30).
+      const denseCounts: Record<string, number> = {};
+      for (let i = 0; i < 30; i++) {
+        denseCounts[`2026-06-${String(i + 1).padStart(2, "0")}`] = 5;
+      }
+      expect(getActivityTone(denseCounts)).toBe("dense");
+
+      // 25 days / 84 ≈ 0.298 (< 0.30) → sparse.
+      const justSparseCounts: Record<string, number> = {};
+      for (let i = 0; i < 25; i++) {
+        justSparseCounts[`2026-05-${String(i + 1).padStart(2, "0")}`] = 7;
+      }
+      expect(getActivityTone(justSparseCounts)).toBe("sparse");
+    });
+
+    it("getActivityTone 30% boundary: 26/84 ≈ 0.310 (just above) → dense (strict >)", () => {
+      const justAbove: Record<string, number> = {};
+      for (let i = 0; i < 26; i++) {
+        justAbove[`2026-04-${String(i + 1).padStart(2, "0")}`] = 4;
+      }
+      expect(getActivityTone(justAbove)).toBe("dense");
+    });
+
+    it("getActivityTone 30% boundary: 25/84 ≈ 0.298 (just below) → sparse (strict >)", () => {
+      const justBelow: Record<string, number> = {};
+      for (let i = 0; i < 25; i++) {
+        justBelow[`2026-03-${String(i + 1).padStart(2, "0")}`] = 4;
+      }
+      expect(getActivityTone(justBelow)).toBe("sparse");
+    });
+  });
+
+  describe("A11y annotations: role=img + text-alternative data table + legend", () => {
+    it("wraps heatmap view in role='img' with a descriptive aria-label", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const wrapper = screen.getByRole("img", {
+        name: /Treasury Activity Heatmap.*trailing 12 weeks/i,
+      });
+      expect(wrapper).toBeInTheDocument();
+      // Container should expose table reference for AT.
+      expect(wrapper.getAttribute("aria-describedby")).toBe(
+        "treasury-activity-heatmap-data-table",
+      );
+    });
+
+    it("aria-label summarizes total events and active day count", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      // mockStreams = 15 events across 4 active days
+      const wrapper = screen.getByRole("img");
+      const label = wrapper.getAttribute("aria-label") ?? "";
+      expect(label).toMatch(/trailing 12 weeks/);
+      expect(label).toMatch(/ending Sunday/);
+      expect(label).toMatch(/15 events/);
+      expect(label).toMatch(/4 active days/);
+    });
+
+    it("aria-label uses singular grammar for a single event", () => {
+      const singleStream: Stream[] = [
+        {
+          id: "STR-ONE",
+          name: "Single",
+          recipient: "a",
+          rate: "1",
+          status: "Active",
+          startDate: "2026-07-24",
+        },
+      ];
+      render(<ActivityHeatmap streams={singleStream} />);
+      const wrapper = screen.getByRole("img");
+      const label = wrapper.getAttribute("aria-label") ?? "";
+      expect(label).toMatch(/1 event/);
+      expect(label).toMatch(/1 active day/);
+    });
+
+    it("always renders an sr-only data-table mirror with all 84 trailing days", () => {
+      const { container } = render(<ActivityHeatmap streams={mockStreams} />);
+      const dataTable = container.querySelector(
+        "#treasury-activity-heatmap-data-table",
+      );
+      expect(dataTable).toBeInTheDocument();
+      expect(dataTable?.classList.contains("sr-only")).toBe(true);
+      const tbody = dataTable?.querySelector("tbody");
+      expect(tbody?.querySelectorAll("tr").length).toBe(84);
+      // Both active and inactive days are present in the mirror.
+      expect(tbody?.textContent).toContain("2026-07-25"); // inactive day
+      expect(tbody?.textContent).toContain("2026-07-21"); // peak activity day
+    });
+
+    it("sr-only data table headers use scope='col' and label columns clearly", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const dataTable = document.getElementById(
+        "treasury-activity-heatmap-data-table",
+      );
+      expect(dataTable).not.toBeNull();
+      const headers = dataTable?.querySelectorAll("thead th");
+      expect(headers?.length).toBe(3);
+      expect(headers?.[0]?.textContent).toBe("Date");
+      expect(headers?.[1]?.textContent).toBe("Stream events");
+      expect(headers?.[2]?.textContent).toBe("Activity level");
+      headers?.forEach((h) => {
+        expect(h.getAttribute("scope")).toBe("col");
+      });
+      expect(dataTable?.querySelector("caption")).not.toBeNull();
+    });
+
+    it("legend is exposed as role='group' with a descriptive aria-label", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const legend = screen.getByRole("group", {
+        name: /Activity intensity legend.*less.*more/i,
+      });
+      expect(legend).toBeInTheDocument();
+      // The 5 legend tint squares live inside an aria-hidden container so AT
+      // reads the group label only and does not announce each tint publicly.
+      const cellsContainer = legend.querySelector(".legend-cells");
+      expect(cellsContainer).not.toBeNull();
+      expect(cellsContainer).toHaveAttribute("aria-hidden", "true");
+      // Confirm the 5 tint squares still exist inside (decorative, not removed).
+      expect(cellsContainer?.querySelectorAll(".legend-cell").length).toBe(5);
+    });
+
+    it("loading-state legend uses the loading variant aria-label", () => {
+      render(<ActivityHeatmap streams={[]} loading={true} />);
+      const legend = screen.getByRole("group", {
+        name: /Activity intensity legend \(loading\)/i,
+      });
+      expect(legend).toBeInTheDocument();
+    });
+
+    it("loading-state a11y: sr-only status announcement + grid aria-hidden + skeleton tabindex=-1", () => {
+      const { container } = render(<ActivityHeatmap streams={[]} loading={true} />);
+      // 1. Loading announcement lives in a role=status node so AT picks it up.
+      const statusNodes = container.querySelectorAll('[role="status"]');
+      const loadingStatus = Array.from(statusNodes).find((el) =>
+        (el.textContent ?? "").toLowerCase().includes("loading treasury activity"),
+      );
+      expect(loadingStatus).not.toBeUndefined();
+      // The announcement lives behind the .sr-only utility so it is visually hidden.
+      expect(loadingStatus?.classList.contains("sr-only")).toBe(true);
+
+      // 2. The 84 skeleton cells live inside an aria-hidden grid so AT does not
+      //    announce 84 phantom "Button, level 0" announcements.
+      const grid = container.querySelector(".heatmap-grid");
+      expect(grid).toHaveAttribute("aria-hidden", "true");
+
+      // 3. Skeleton buttons are removed from the tab order (focusable=false effective).
+      const skeletons = container.querySelectorAll(".heatmap-cell.skeleton-pulse");
+      expect(skeletons.length).toBe(84);
+      skeletons.forEach((b) => {
+        expect(b.getAttribute("tabindex")).toBe("-1");
+        expect(b.hasAttribute("disabled")).toBe(true);
+      });
+    });
+
+    it("successful render resets aria-hidden/tabindex on cells (skeleton-only attributes)", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const grid = document.querySelector(".heatmap-grid");
+      // No aria-hidden on the populated grid — each cell is independently a real
+      // button focusable for keyboard users.
+      expect(grid?.hasAttribute("aria-hidden")).toBe(false);
+      const firstCell = screen.getByLabelText("2026-07-24: 1 stream event");
+      expect(firstCell.hasAttribute("tabindex")).toBe(false);
+      expect(firstCell.hasAttribute("disabled")).toBe(false);
+    });
+
+    it("table mode does NOT render the role=img wrapper or the sr-only mirror", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      fireEvent.click(screen.getByRole("button", { name: "View as table" }));
+      // role=img summary wrapper is conditionally rendered only in heatmap mode.
+      expect(
+        screen.queryByRole("img", { name: /Treasury Activity Heatmap/i }),
+      ).not.toBeInTheDocument();
+      // The sr-only data table is replaced by the visible table in table mode.
+      expect(
+        document.getElementById("treasury-activity-heatmap-data-table"),
+      ).toBeNull();
+      // The visible semantic table is the active accessible surface.
+      expect(screen.getByRole("table")).toBeInTheDocument();
     });
   });
 });

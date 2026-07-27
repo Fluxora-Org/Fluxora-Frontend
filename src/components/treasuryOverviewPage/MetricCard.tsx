@@ -66,7 +66,6 @@ export default function MetricCard({
   onDragEnter = () => {},
   onDragLeave = () => {},
   onDrop = () => {},
-  isDragging = false,
   className = "",
   style = {},
   onResize,

@@ -105,10 +105,12 @@ describe('embedThemeParser', () => {
   describe('applyThemeConfigSafely', () => {
     let originalTheme: string | null;
     let originalAccentColor: string;
+    let originalFocusRing: string;
 
     beforeEach(() => {
       originalTheme = document.documentElement.getAttribute('data-theme');
       originalAccentColor = document.documentElement.style.getPropertyValue('--color-accent-primary');
+      originalFocusRing = document.documentElement.style.getPropertyValue('--interactive-focus-ring');
       
       // Clear for tests
       document.documentElement.removeAttribute('data-theme');
@@ -123,6 +125,9 @@ describe('embedThemeParser', () => {
       }
       if (originalAccentColor) {
         document.documentElement.style.setProperty('--color-accent-primary', originalAccentColor);
+      }
+      if (originalFocusRing) {
+        document.documentElement.style.setProperty('--interactive-focus-ring', originalFocusRing);
       }
     });
 
@@ -187,6 +192,7 @@ describe('embedThemeParser', () => {
       // Set some original state
       document.documentElement.setAttribute('data-theme', 'light');
       document.documentElement.style.setProperty('--color-accent-primary', '#000000');
+      document.documentElement.style.setProperty('--interactive-focus-ring', '#000000');
 
       const config: ThemeConfig = {
         theme: 'dark',
@@ -197,11 +203,13 @@ describe('embedThemeParser', () => {
 
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
       expect(document.documentElement.style.getPropertyValue('--color-accent-primary')).toBe('#FFFFFF');
+      expect(document.documentElement.style.getPropertyValue('--interactive-focus-ring')).toBe('#FFFFFF');
 
       cleanup();
 
       expect(document.documentElement.getAttribute('data-theme')).toBe('light');
       expect(document.documentElement.style.getPropertyValue('--color-accent-primary')).toBe('#000000');
+      expect(document.documentElement.style.getPropertyValue('--interactive-focus-ring')).toBe('#000000');
     });
 
     it('handles missing original state on cleanup', () => {
@@ -218,6 +226,24 @@ describe('embedThemeParser', () => {
 
       expect(document.documentElement.getAttribute('data-theme')).toBeNull();
       expect(document.documentElement.style.getPropertyValue('--color-accent-primary')).toBe('');
+      expect(document.documentElement.style.getPropertyValue('--interactive-focus-ring')).toBe('');
+    });
+
+    it('restores pre-existing --interactive-focus-ring value on cleanup', () => {
+      document.documentElement.style.setProperty('--interactive-focus-ring', '#ABCDEF');
+
+      const config: ThemeConfig = {
+        theme: null,
+        accentColor: '#FF0000'
+      };
+
+      const cleanup = applyThemeConfigSafely(config);
+
+      expect(document.documentElement.style.getPropertyValue('--interactive-focus-ring')).toBe('#FF0000');
+
+      cleanup();
+
+      expect(document.documentElement.style.getPropertyValue('--interactive-focus-ring')).toBe('#ABCDEF');
     });
   });
 });

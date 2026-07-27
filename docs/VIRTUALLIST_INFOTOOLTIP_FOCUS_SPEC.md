@@ -1,73 +1,100 @@
-# VirtualList and InfoTooltip Focus Specification
+# VirtualList & InfoTooltip Focus Design Specification
 
-This specification defines the UX and accessibility standards for keyboard focus-retention in `VirtualList` rows and focus-visible outlines in `InfoTooltip` role="dialog" popovers.
-
----
-
-## 1. Overview
-Virtualized lists and popover dialogs present unique accessibility challenges under WCAG 2.1 AA.
-- **VirtualList**: Dynamically unmounts off-screen elements. If an unmounted element held focus, the browser silently resets focus to `document.body`, disrupting keyboard navigation.
-- **InfoTooltip**: Houses interactive components (close button, links) that require visible focus indicators. Flipping layout positions can cause outlines to clip at viewport edges.
+This document specifies the focus retention fallback mechanism for the virtualized list (`VirtualList.tsx`) and the focus-visible outline treatment for the interactive popover (`InfoTooltip.tsx`), ensuring full compliance with WCAG 2.1 AA (specifically **WCAG 2.4.3 Focus Order** and **WCAG 2.4.7 Focus Visible**).
 
 ---
 
-## 2. Defined States
+## 1. VirtualList Focus Retention
 
-### `row-focused-in-viewport`
-- **Description**: An interactive element (e.g. a button, link, or input) inside a currently visible virtualized list row receives focus.
-- **UX Treatment**: A standard focus ring is rendered using the active theme's focus tokens.
-- **Contrast**: Sky Blue (`#0284c7`) in Light Theme ($\ge 3:1$ contrast against `#ffffff` through `#dfe5ed` surfaces) and Teal (`#00d4aa`) in Dark Theme ($\ge 3:1$ contrast).
+### The Problem
+In virtualized lists, elements are mounted and unmounted dynamically as the user scrolls. When a keyboard user focuses an interactive element inside a row, and that row is subsequently scrolled out of the viewport, the element is unmounted. 
+By default, the browser silently resets the focus to the `document.body`, causing:
+1. Keyboard navigation context loss.
+2. A reset of the screen reader position to the top of the page.
+3. A violation of WCAG 2.4.3 Focus Order.
 
-### `row-scrolled-out-while-focused`
-- **Description**: A focused element inside a virtualized list row is scrolled out of the viewport (either by wheel, touch, or page key scrolling), triggering the row's unmount.
-- **Focus Retention Fallback**: 
-  - Focus is intercepted *before* the browser defaults to `document.body`.
-  - The list determines the nearest still-mounted row index (`range.start` if scrolled down, `range.end - 1` if scrolled up).
-  - Focus is transferred to the equivalent control (by index) within that nearest row.
-  - Focus is called with `{ preventScroll: true }` to maintain scrolling smoothness.
+### Fallback Target Selection Flow
+When the focused row unmounts, the focus is programmatically intercepted and transferred to the nearest logical focusable control, searching outward from the unmounted index. If no controls are mounted, it falls back to the list container itself.
 
-### `tooltip-open-default-position`
-- **Description**: The tooltip popover opens at its preferred location (e.g., `bottom`).
-- **UX Treatment**: Focus automatically moves to the first interactive element (the close button). The popover's position is shifted to keep it at least `12px` from all viewport boundaries to prevent the close button's focus outline from clipping.
+```
+       [ Row scrolled out of view (unmounted) ]
+                         │
+        Is the row scrolled UP or DOWN?
+             /                      \
+      [ Scrolled UP ]          [ Scrolled DOWN ]
+            │                          │
+  Scan forward starting      Scan backward starting
+     from 'start' index         from 'end - 1' index
+            │                          │
+            └────────────┬─────────────┘
+                         │
+             Does row have focusables?
+              /                      \
+          (Yes)                      (No)
+            │                          │
+     Focus the control at        Continue scanning;
+      the target offset          if no rows have focusables:
+    (clamped to row limit)             │
+            │                  [ Focus Container ]
+            │                  - set tabIndex={-1}
+            │                  - prevents focus loss
+            ▼                          ▼
+     [ Focus Retained ]        [ Focus Retained ]
+```
 
-### `tooltip-open-flipped-position`
-- **Description**: The tooltip popover flips positions (e.g., from `bottom` to `top`, or `right` to `left`) because of insufficient screen space.
-- **Viewport Bounds Alignment**: The shifting logic runs on the flipped coordinates. The CSS translation aligns the tooltip box using custom properties `--tooltip-shift-x` and `--tooltip-shift-y` to maintain the `12px` safety padding, guaranteeing that the focus outline is never clipped by the screen edges.
+### Component State Specifications
+
+#### State: `row-focused-in-viewport`
+- **Description**: The user has focused an interactive element (e.g. Action Button) within a row inside the visible range.
+- **Attributes**:
+  - `focusedRowIndexRef.current` = Active index (e.g. `0`).
+  - `focusableOffsetRef.current` = Offset of active element within row (e.g. `0` for first button).
+  - Target row is fully mounted.
+
+#### State: `row-scrolled-out-while-focused`
+- **Description**: The viewport scrolls such that the active index is outside the mounted range `[start, end)`.
+- **Retention Rule**: 
+  - Find the nearest mounted row index with focusable elements.
+  - If scrolled UP, scan indices `start, start+1, start+2...` until a row with focusable elements is found.
+  - If scrolled DOWN, scan indices `end-1, end-2, end-3...` until a row with focusable elements is found.
+  - If a row is found, call `.focus({ preventScroll: true })` on the element matching `focusableOffsetRef.current` (clamped).
+  - If no mounted row contains focusable elements, call `container.focus({ preventScroll: true })`.
 
 ---
 
-## 3. Design Tokens
+## 2. InfoTooltip Focus-Visible Outline
 
-The following design tokens are utilized for the focus indicators:
+### Design System Tokens
+All interactive elements inside the tooltip dialog (including the trigger button, close button, and any custom links in the content) utilize the global design tokens defined in `src/design-tokens.css`:
 
-| Theme | Token | Value | Target Surface | Contrast Ratio |
-|---|---|---|---|---|
-| **Light** | `--focus-ring-color` | `#0284c7` (Sky Blue) | White / Sunken / Elevated / Raised / Highest (`#dfe5ed`) | $\ge 3.0:1$ (Minimum 3.24:1) |
-| **Dark** | `--focus-ring-color` | `#00d4aa` (Teal) | Dark Base / Sunken / Elevated / Raised / Highest (`#1e2c40`) | $\ge 6.2:1$ (Minimum 7.9:1) |
+| Token | Light Theme Value | Dark Theme Value | Contrast Ratio |
+|---|---|---|---|
+| `--focus-ring-color` | `#0284c7` (Sky Blue) | `#00d4aa` (Teal) | Light: $\ge$ 3.1:1 vs all surfaces <br> Dark: $\ge$ 6.9:1 vs all surfaces |
+| `--focus-ring-width` | `2px` | `2px` | - |
+| `--focus-ring-offset` | `2px` | `2px` | - |
+| `--focus-ring-shadow` | `0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--focus-ring-color)` | Uses `#0a0e17` and `#00d4aa` | Creates a dual-layer high contrast ring |
+
+### State Specifications
+
+#### State: `tooltip-open-default-position`
+- **Description**: Tooltip popover mounts at its preferred position (e.g. `bottom` or `top`).
+- **Focus Ring Protection**: The popover container is styled with `overflow: visible;`. Outlines are drawn outside the box model and are never clipped by the popover boundary.
+
+#### State: `tooltip-open-flipped-position`
+- **Description**: If there is insufficient viewport space in the preferred direction, the flip logic recalculates the position (e.g. bottom flips to top, right flips to left).
+- **Viewport Clipping Safeguard**:
+  - The popover layout calculation enforces a safety margin from all viewport edges:
+    $$\text{safetyMargin} = 12\text{px}$$
+  - The maximum size requirements of the outer-most edge of the dual-layer focus outline is:
+    $$\text{Width (2px)} + \text{Offset (2px)} + \text{Shadow spread (4px)} = 8\text{px}$$
+  - Since $12\text{px} > 8\text{px}$, the focus outline of any internal element (even if flush with the popover border) will **never** collide with or be clipped by the edge of the viewport.
 
 ---
 
-## 4. Accessibility Annotations
+## 3. Accessibility Compliance Matrix (WCAG 2.1 AA)
 
-### WCAG 2.4.3 Focus Order (Level A)
-- **Requirement**: If a Web page can be navigated sequentially and the navigation sequences affect meaning or operation, focusable components receive focus in an order that preserves meaning and operability.
-- **Annotation**: Focus-retention is a *required accessibility behavior*, not an optional enhancement. Transferring focus to the nearest still-mounted row on unmount prevents losing focus context.
-
-### WCAG 2.4.7 Focus Visible (Level AA)
-- **Requirement**: Any keyboard operable user interface has a mode of operation where the keyboard focus indicator is visible.
-- **Annotation**: All interactive elements in the `InfoTooltip` dialog (trigger, close button, content links) use `:focus-visible` with high-contrast rings (outline + box shadow).
-
-### WCAG 2.4.11 Focus Appearance (Level AA)
-- **Requirement**: The focus indicator area is $\ge 2\text{px}$ thick, and contrast is $\ge 3:1$ against adjacent colors.
-- **Annotation**: Using `--focus-ring-width: 2px` and a dual-layer box-shadow ensures visual prominence without viewport clipping.
-
----
-
-## 5. Technical Spec & Verification
-
-### Keyboard Walkthrough
-1. Tab to an item inside the `VirtualList`.
-2. Perform a scroll operation (e.g. mouse wheel or window resize) to push the focused item out of the virtualized window.
-3. Confirm that focus transitions seamlessly to the equivalent element in the top-most or bottom-most visible row, and sequential tabbing continues from there.
-4. Tab to the `InfoTooltip` trigger, press `Enter` to open the popover.
-5. Verify the close button is focused, showing a prominent outline with at least `12px` clearance from any viewport edge.
+| Success Criterion | Requirement | Implementation Details |
+|---|---|---|
+| **2.4.3 Focus Order** | Focus order must preserve meaning and operability. | Dynamic search ensures focus stays on the nearest active row control or list container when a virtual row is unmounted. |
+| **2.4.7 Focus Visible** | Any keyboard-focusable control must have a visible focus indicator. | High-contrast dual-layer focus ring (`--focus-ring-shadow`) applied using `:focus-visible` to interactive elements. |
+| **1.4.11 Non-text Contrast** | Visual focus indicators must have at least 3:1 contrast against adjacent backgrounds. | Light Sky Blue (`#0284c7`) and Dark Teal (`#00d4aa`) satisfy contrast ratios against all respective surfaces. |

@@ -15,11 +15,16 @@ describe("usePresenceViewers", () => {
   it("returns empty array initially", () => {
     const { result } = renderHook(() => usePresenceViewers("STR-123"));
     
-    // Test both tuple and object styles
     expect(result.current.viewers).toEqual([]);
-    expect(result.current[0]).toEqual([]);
     expect(result.current.viewerCount).toBe(0);
-    expect(result.current[2]).toBe(0);
+  });
+
+  it("exposes an explicit unavailable state for real stream IDs without mock viewers", () => {
+    const { result } = renderHook(() => usePresenceViewers("STR-123"));
+
+    expect(result.current.viewers).toEqual([]);
+    expect(result.current.isPresenceEnabled).toBe(false);
+    expect(result.current.presenceStatus).toBe("unavailable");
   });
 
   it("removes viewers after 30-second timeout", () => {

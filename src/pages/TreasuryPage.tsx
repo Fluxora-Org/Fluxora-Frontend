@@ -12,6 +12,7 @@ import {
   ColorBlindToggle,
 } from "../components/colorBlindSimulation";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { IS_DEV } from "../utils/env";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -52,7 +53,7 @@ export default function TreasuryPage() {
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
-          <ColorBlindToggle />
+          {IS_DEV && <ColorBlindToggle />}
           <Header />
           <div role="status" className="text-sm text-gray-500">
             Loading treasury overview...
@@ -68,7 +69,7 @@ export default function TreasuryPage() {
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
-          <ColorBlindToggle />
+          {IS_DEV && <ColorBlindToggle />}
           <Header />
           <div role="alert" className="text-sm text-red-600">
             {error}
@@ -87,7 +88,7 @@ export default function TreasuryPage() {
             so the entire Metrics and RecentStreams area is filtered.
             This component is not rendered in production end-user UI; it is
             intended for design review and QA sessions only. */}
-        <ColorBlindToggle />
+        {IS_DEV && <ColorBlindToggle />}
 
         <Header onExportClick={() => setShowReportBuilder(true)} />
         {showReportBuilder && (

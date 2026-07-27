@@ -5,11 +5,8 @@ import {
   ThemeProvider,
   useTheme,
   isTheme,
-  isFontMode,
   resolveInitialTheme,
-  resolveInitialFontMode,
   initTheme,
-  initFontMode,
   applyTheme,
   applyCustomTokens,
   clearCustomTokens,
@@ -96,7 +93,7 @@ const LOCKED_TOKEN_BRAND: CustomThemeDefinition = {
   label: "Locked Attempt",
   tokenOverrides: {
     "--focus-ring-color": "#ff0000",
-  },
+  } as Partial<Record<string, string>>,
 };
 
 /** Small consumer that surfaces all theme, font, and custom-theme context values. */

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { usePresenceViewers, Viewer } from "../../hooks/usePresenceViewers";
+import { Viewer } from "../../hooks/usePresenceViewers";
 import PresenceViewerList from "./PresenceViewerList";
 import "./Presence.css";
 
@@ -117,7 +117,7 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
       <button
         ref={triggerRef}
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-haspopup="list"
+        aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={`${totalCount} active viewers. Click to view list.`}
         className="presence-badge-trigger"

@@ -4,6 +4,7 @@ import CreateStreamModal from "../CreateStreamModal";
 import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
 import { useToast } from "../toast/ToastProvider";
 import { __resetOfflineQueueForTests } from "../../lib/offlineActionQueue";
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
@@ -38,6 +39,7 @@ function goOnline() {
 }
 
 function advanceToReview(container: HTMLElement) {
+  selectSingleStreamInContainer(container);
   fireEvent.change(
     container.querySelector("#create-stream-recipient") as HTMLInputElement,
     { target: { value: VALID_STELLAR } },

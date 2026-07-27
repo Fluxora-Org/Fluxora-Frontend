@@ -48,11 +48,16 @@ describe("StreamDetail Page Tests", () => {
     const mockStream: StreamRecord = {
       id: "stream/123",
       name: "Decoded Stream Name",
+      recipientName: "Alice",
+      recipientAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      treasuryName: "Treasury",
+      treasuryAddress: "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF",
       summary: "A test stream that needed decoding",
       status: "Active",
       health: "Healthy",
       healthNote: "All good",
       asset: "USDC",
+      monthlyRate: 1000,
       depositAmount: 10000,
       streamedAmount: 5000,
       withdrawableAmount: 3000,
@@ -60,6 +65,9 @@ describe("StreamDetail Page Tests", () => {
       progress: 50,
       startDate: "2026-07-01T00:00:00Z",
       endDate: "2026-07-31T00:00:00Z",
+      auditNote: "",
+      tags: [],
+      timeline: [],
     };
 
     vi.mocked(getStreamById).mockResolvedValue(mockStream);

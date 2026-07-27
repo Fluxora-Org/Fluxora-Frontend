@@ -76,7 +76,8 @@
   --interactive-bg-active: #dfe5ed;
   --interactive-bg-disabled: #fafbfc;
 
-  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ───
+     Applied globally, including VirtualList and InfoTooltip interactive elements */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --focus-ring-color: #0284c7; /* Sky Blue - >= 3:1 contrast vs all light surfaces (including surface-highest at #dfe5ed) */
@@ -517,11 +518,25 @@
     "Segoe UI", sans-serif;
   --font-family-dyslexic: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", Arial, sans-serif;
   --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+  --font-family-base: var(--font-family-default);
 
   /* ─── Line Height Tokens ─── */
   --line-height-base: 1.5;
   --line-height-relaxed: 1.625;
   --line-height-loose: 1.75;
+
+  --line-height-heading-1: 44px;
+  --line-height-heading-2: 32px;
+  --line-height-heading-3: 24px;
+  --line-height-heading-4: 20px;
+
+  --line-height-body-lg: 24px;
+  --line-height-body-md: 20px;
+  --line-height-body-sm: 16px;
+
+  --line-height-label-lg: 20px;
+  --line-height-label-md: 16px;
+  --line-height-label-sm: 14px;
 
   /* ─── Heading Scale ─── */
   --font-heading-1: 500 36px / var(--line-height-heading-1) var(--font-family-base);
@@ -628,12 +643,25 @@
   --shadow-cta-primary: var(--shadow-accent-primary);
   --shadow-cta-primary-hover: 0 8px 16px rgba(0, 184, 212, 0.3);
 
-  /* Persistent create-stream FAB */
+  /* Persistent create-stream FAB.
+     Offsets and inner paddings reference already-defined spacing tokens
+     (--space-xl == 24px, --space-md == 12px, --space-lg == 16px,
+     --space-sm == 8px).
+     An earlier revision aliased var(--space-2) / var(--space-3) /
+     var(--space-4) / var(--space-5) / var(--space-6) — none of which
+     are defined on :root and silently fell through to invalid token
+     values, leaving the FAB flush to the viewport edge and the menu
+     paddings collapsed. See docs/CREATE_STREAM_FAB_SPEC.md. */
   --fab-size: 56px;
-  --fab-bottom-offset: var(--space-6);
-  --fab-bottom-offset-mobile: 5.5rem;
-  --fab-side-offset: var(--space-6);
+  --fab-bottom-offset: var(--space-xl);
+  --fab-bottom-offset-mobile: 5.5rem; /* 88px — clears the mobile bottom-nav safe area */
+  --fab-side-offset: var(--space-xl);
   --fab-z-index: 900;
+  --fab-menu-gap: var(--space-sm);     /* 8px — vertical spacing between speed-dial items */
+  --fab-trigger-padding-x: var(--space-md); /* 12px — horizontal padding inside the pill */
+  --fab-menu-item-gap: var(--space-sm);   /* 8px — spacing between icon and label */
+  --fab-menu-item-padding-y: var(--space-sm);
+  --fab-menu-item-padding-x: var(--space-md);
 }
 
 /* Dark theme shadow adjustments */
@@ -1030,13 +1058,13 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--fab-menu-gap);
 }
 
 .create-stream-fab__button {
   min-width: var(--fab-size);
   min-height: var(--fab-size);
-  padding: 0 var(--space-5);
+  padding: 0 var(--fab-trigger-padding-x);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
 }
@@ -1064,15 +1092,15 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-2);
+  gap: var(--fab-menu-gap);
 }
 
 .create-stream-fab__menu-item {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--fab-menu-item-gap);
   min-height: 44px;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--fab-menu-item-padding-y) var(--fab-menu-item-padding-x);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-full);
   background: var(--color-bg-primary);
@@ -1095,7 +1123,7 @@
 
 @media (max-width: 860px) {
   .create-stream-fab {
-    right: max(var(--space-4), env(safe-area-inset-right));
+    right: max(var(--space-lg), env(safe-area-inset-right));
     bottom: max(var(--fab-bottom-offset-mobile), env(safe-area-inset-bottom));
   }
 }

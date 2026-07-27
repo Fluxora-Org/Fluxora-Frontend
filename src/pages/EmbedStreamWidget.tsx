@@ -1,18 +1,14 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import StreamTimeline from "../components/StreamTimeline";
 import { Skeleton } from "../components/Skeleton";
 import { useTickingNow } from "../hooks/useTickingNow";
-import { 
-  StreamRecord, 
-  StreamStatus, 
-  StreamHealth 
-} from "../data/streamRecords";
+import { StreamRecord } from "../data/streamRecords";
 import { getStreamById } from "../lib/api/streamsService";
-import { 
-  parseThemeFromQuery, 
+import {
+  parseThemeFromQuery,
   parseAccentColorFromQuery,
-  type ThemeConfig 
+  applyThemeConfigSafely,
+  type ThemeConfig
 } from "../lib/embedThemeParser";
 import { 
   EmbedWidgetLayoutCard,
@@ -59,26 +55,9 @@ export default function EmbedStreamWidget() {
            preset === "compact" ? "compact" : "card";
   }, [searchParams]);
   
-  // Apply theme configuration to document
+  // Apply theme configuration to document using shared helper
   useEffect(() => {
-    const html = document.documentElement;
-    
-    // Apply theme
-    if (themeConfig.theme) {
-      html.setAttribute("data-theme", themeConfig.theme);
-    }
-    
-    // Apply accent color via CSS variable if valid
-    if (themeConfig.accentColor) {
-      html.style.setProperty("--color-accent-primary", themeConfig.accentColor);
-      html.style.setProperty("--interactive-focus-ring", themeConfig.accentColor);
-    }
-    
-    return () => {
-      html.removeAttribute("data-theme");
-      html.style.removeProperty("--color-accent-primary");
-      html.style.removeProperty("--interactive-focus-ring");
-    };
+    return applyThemeConfigSafely(themeConfig);
   }, [themeConfig]);
   
   // Fetch stream data

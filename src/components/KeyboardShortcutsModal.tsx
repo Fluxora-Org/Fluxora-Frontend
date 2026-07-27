@@ -18,7 +18,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Search,
   X,
-  Command,
   ArrowRight,
   Sparkles,
   HelpCircle,

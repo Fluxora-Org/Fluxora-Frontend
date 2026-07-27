@@ -60,6 +60,7 @@ export default function CreateStreamFab({
 }: CreateStreamFabProps) {
   const [expanded, setExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hasActions = actions.length > 0;
 
   useEffect(() => {
@@ -72,6 +73,26 @@ export default function CreateStreamFab({
       ?.querySelector<HTMLButtonElement>("[role=menuitem]")
       ?.focus();
   }, [expanded, hasActions]);
+
+  // Click outside to dismiss the expanded action menu (Issue #942).
+  // Mirrors the pattern in PresenceBadge.tsx.
+  useEffect(() => {
+    if (!expanded) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [expanded]);
 
   if (hidden) return null;
 
@@ -111,7 +132,7 @@ export default function CreateStreamFab({
   };
 
   return (
-    <div className="create-stream-fab" data-expanded={expanded || undefined}>
+    <div ref={containerRef} className="create-stream-fab" data-expanded={expanded || undefined}>
       {expanded && hasActions ? (
         <div
           ref={menuRef}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupEmbedFocusManagement } from '../useEmbedAccessibility';
+import { setupEmbedFocusManagement, createAccessibleWidgetContainer } from '../useEmbedAccessibility';
 
 describe('setupEmbedFocusManagement', () => {
   let container: HTMLElement;
@@ -353,5 +353,141 @@ describe('setupEmbedFocusManagement', () => {
     expect(document.activeElement).toBe(link);
 
     preventDefaultSpy.mockRestore();
+  });
+});
+
+describe('createAccessibleWidgetContainer', () => {
+  let element: HTMLElement;
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    element = document.createElement('div');
+    document.body.appendChild(element);
+  });
+
+  afterEach(() => {
+    if (cleanup) {
+      cleanup();
+    }
+    if (element?.parentNode) {
+      element.parentNode.removeChild(element);
+    }
+    vi.restoreAllMocks();
+  });
+
+  it('should apply accessibility attributes', () => {
+    cleanup = createAccessibleWidgetContainer(element, {
+      role: 'region',
+      ariaLabel: 'Test Widget',
+      ariaDescribedby: 'desc-1',
+      tabIndex: 0,
+    });
+
+    expect(element.getAttribute('role')).toBe('region');
+    expect(element.getAttribute('aria-label')).toBe('Test Widget');
+    expect(element.getAttribute('aria-describedby')).toBe('desc-1');
+    expect(element.getAttribute('tabindex')).toBe('0');
+    expect(element.style.outline).toBe('none');
+  });
+
+  it('should restore original attributes on cleanup', () => {
+    element.setAttribute('role', 'navigation');
+    element.setAttribute('aria-label', 'Original');
+    element.setAttribute('tabindex', '-1');
+
+    cleanup = createAccessibleWidgetContainer(element, {
+      ariaLabel: 'Widget',
+      tabIndex: 0,
+    });
+
+    expect(element.getAttribute('role')).toBe('article');
+    expect(element.getAttribute('aria-label')).toBe('Widget');
+    expect(element.getAttribute('tabindex')).toBe('0');
+
+    cleanup();
+    cleanup = undefined;
+
+    expect(element.getAttribute('role')).toBe('navigation');
+    expect(element.getAttribute('aria-label')).toBe('Original');
+    expect(element.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('should register focus/blur listeners with the same function references used for removal', () => {
+    const addSpy = vi.spyOn(element, 'addEventListener');
+    const removeSpy = vi.spyOn(element, 'removeEventListener');
+
+    cleanup = createAccessibleWidgetContainer(element);
+
+    // Capture the handlers passed to addEventListener
+    const focusHandler = addSpy.mock.calls.find(([type]) => type === 'focus')?.[1];
+    const blurHandler = addSpy.mock.calls.find(([type]) => type === 'blur')?.[1];
+
+    expect(focusHandler).toBeDefined();
+    expect(blurHandler).toBeDefined();
+
+    // Check that addEventListener was called with real functions (not no-ops)
+    expect(focusHandler).not.toBe(blurHandler);
+
+    cleanup();
+
+    // Verify removeEventListener was called with the exact same references
+    expect(removeSpy).toHaveBeenCalledWith('focus', focusHandler);
+    expect(removeSpy).toHaveBeenCalledWith('blur', blurHandler);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
+  it('should no longer apply focus styling after cleanup when element receives focus', () => {
+    element.setAttribute('tabindex', '-1');
+    element.style.outline = 'initial';
+
+    cleanup = createAccessibleWidgetContainer(element);
+    cleanup();
+    cleanup = undefined;
+
+    // After cleanup, dispatch focus event on the element
+    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+    // The listener should have been removed, so style should NOT be set by our handler
+    expect(element.style.outline).not.toBe('2px solid var(--interactive-focus-ring, #007acc)');
+    expect(element.style.outlineOffset).not.toBe('2px');
+  });
+
+  it('should no longer apply blur styling changes after cleanup', () => {
+    element.setAttribute('tabindex', '-1');
+
+    cleanup = createAccessibleWidgetContainer(element);
+
+    // First, trigger focus to verify the listener works before cleanup
+    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+    expect(element.style.outline).toBe('2px solid var(--interactive-focus-ring, #007acc)');
+
+    cleanup();
+    cleanup = undefined;
+
+    // Reset the style for the post-cleanup test
+    element.style.outline = 'initial';
+
+    // After cleanup, dispatching blur should not change anything
+    element.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+    expect(element.style.outline).toBe('initial');
+  });
+
+  it('should handle cleanup with no options gracefully', () => {
+    cleanup = createAccessibleWidgetContainer(element);
+    const fn = cleanup;
+    expect(() => fn?.()).not.toThrow();
+  });
+
+  it('should remove aria attributes that were added when there was no original value', () => {
+    cleanup = createAccessibleWidgetContainer(element, { ariaLabel: 'Temporary' });
+
+    expect(element.getAttribute('aria-label')).toBe('Temporary');
+
+    cleanup();
+    cleanup = undefined;
+
+    expect(element.hasAttribute('aria-label')).toBe(false);
   });
 });

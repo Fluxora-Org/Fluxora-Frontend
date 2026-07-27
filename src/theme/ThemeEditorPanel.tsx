@@ -35,7 +35,6 @@ import {
   contrastRatio,
   isValidHex,
   normaliseHex,
-  ALLOWED_TOKEN_KEYS,
   LOCKED_TOKEN_KEYS,
   CONTRAST_PAIRS,
   type AllowedTokenKey,

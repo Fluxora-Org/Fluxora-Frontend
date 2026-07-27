@@ -233,6 +233,112 @@ describe('EmbedStreamWidget', () => {
     });
   });
 
+  describe('Theme Restoration', () => {
+    beforeEach(() => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+    });
+
+    it('restores prior data-theme and CSS custom properties on unmount', async () => {
+      const html = document.documentElement;
+
+      // Set pre-existing theme state on the document element
+      html.setAttribute('data-theme', 'light');
+      html.style.setProperty('--color-accent-primary', '#000000');
+      html.style.setProperty('--interactive-focus-ring', '#000000');
+
+      const { unmount } = renderEmbedWidget('STR-001', 'theme=dark&accent-color=%2300AEEF');
+
+      // Verify override was applied
+      await waitFor(() => {
+        expect(html.getAttribute('data-theme')).toBe('dark');
+        expect(html.style.getPropertyValue('--color-accent-primary')).toBe('#00AEEF');
+        expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('#00AEEF');
+      });
+
+      // Unmount the widget
+      unmount();
+
+      // Verify original values are restored
+      expect(html.getAttribute('data-theme')).toBe('light');
+      expect(html.style.getPropertyValue('--color-accent-primary')).toBe('#000000');
+      expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('#000000');
+    });
+
+    it('restores missing prior state to empty on unmount', async () => {
+      const html = document.documentElement;
+
+      // Ensure no pre-existing state
+      html.removeAttribute('data-theme');
+      html.style.removeProperty('--color-accent-primary');
+      html.style.removeProperty('--interactive-focus-ring');
+
+      const { unmount } = renderEmbedWidget('STR-001', 'theme=dark&accent-color=%2300AEEF');
+
+      // Verify override was applied
+      await waitFor(() => {
+        expect(html.getAttribute('data-theme')).toBe('dark');
+        expect(html.style.getPropertyValue('--color-accent-primary')).toBe('#00AEEF');
+        expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('#00AEEF');
+      });
+
+      // Unmount the widget
+      unmount();
+
+      // Verify state is cleared (no prior state to restore)
+      expect(html.getAttribute('data-theme')).toBeNull();
+      expect(html.style.getPropertyValue('--color-accent-primary')).toBe('');
+      expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('');
+    });
+
+    it('restores prior state when only accent color is overridden', async () => {
+      const html = document.documentElement;
+
+      // Set pre-existing accent only (no theme override)
+      html.setAttribute('data-theme', 'dark');
+      html.style.setProperty('--color-accent-primary', '#ff0000');
+      html.style.setProperty('--interactive-focus-ring', '#ff0000');
+
+      const { unmount } = renderEmbedWidget('STR-001', 'accent-color=%2300AEEF');
+
+      // Verify override was applied
+      await waitFor(() => {
+        expect(html.getAttribute('data-theme')).toBe('dark');
+        expect(html.style.getPropertyValue('--color-accent-primary')).toBe('#00AEEF');
+        expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('#00AEEF');
+      });
+
+      // Unmount the widget
+      unmount();
+
+      // Verify original values are restored (theme untouched, accent restored)
+      expect(html.getAttribute('data-theme')).toBe('dark');
+      expect(html.style.getPropertyValue('--color-accent-primary')).toBe('#ff0000');
+      expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('#ff0000');
+    });
+
+    it('cleans up theme when re-rendering with different themeConfig', async () => {
+      const html = document.documentElement;
+
+      // No pre-existing state
+      html.removeAttribute('data-theme');
+      html.style.removeProperty('--color-accent-primary');
+      html.style.removeProperty('--interactive-focus-ring');
+
+      const { unmount } = renderEmbedWidget('STR-001', 'theme=dark&accent-color=%2300AEEF');
+
+      await waitFor(() => {
+        expect(html.getAttribute('data-theme')).toBe('dark');
+      });
+
+      // Simulate re-render by unmounting and remounting with different params
+      unmount();
+
+      expect(html.getAttribute('data-theme')).toBeNull();
+      expect(html.style.getPropertyValue('--color-accent-primary')).toBe('');
+      expect(html.style.getPropertyValue('--interactive-focus-ring')).toBe('');
+    });
+  });
+
   describe('Accessibility', () => {
     beforeEach(() => {
       (getStreamById as any).mockResolvedValue(mockStream);

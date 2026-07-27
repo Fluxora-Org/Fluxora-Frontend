@@ -17,6 +17,8 @@ interface UseEmbedAccessibilityOptions {
   description?: string;
   /** Whether this is the main content of the page */
   isMainContent?: boolean;
+  /** Active locale (e.g., "en", "es") — used for the html lang attribute. */
+  locale?: string;
 }
 
 /**
@@ -25,7 +27,8 @@ interface UseEmbedAccessibilityOptions {
 export function useEmbedAccessibility({
   title,
   description,
-  isMainContent = true
+  isMainContent = true,
+  locale = "en",
 }: UseEmbedAccessibilityOptions) {
   useEffect(() => {
     // Set page title
@@ -46,10 +49,10 @@ export function useEmbedAccessibility({
       metaDescription.setAttribute('content', description);
     }
     
-    // Set lang attribute for screen readers
+    // Set lang attribute for screen readers, derived from the active locale.
     const html = document.documentElement;
     const originalLang = html.getAttribute('lang') || 'en';
-    html.setAttribute('lang', 'en');
+    html.setAttribute('lang', locale);
     
     // Announce widget load to screen readers using a per-instance announcer
     const cleanupAnnouncer = announceToScreenReader(`Widget loaded: ${title}`);
@@ -85,7 +88,7 @@ export function useEmbedAccessibility({
 
       cleanupAnnouncer();
     };
-  }, [title, description, isMainContent]);
+  }, [title, description, isMainContent, locale]);
 }
 
 /**
@@ -130,13 +133,15 @@ export function createAccessibleWidgetContainer(
   
   // Ensure proper focus styling
   element.style.outline = 'none';
-  element.addEventListener('focus', () => {
+  const handleFocus = () => {
     element.style.outline = '2px solid var(--interactive-focus-ring, #007acc)';
     element.style.outlineOffset = '2px';
-  });
-  element.addEventListener('blur', () => {
+  };
+  const handleBlur = () => {
     element.style.outline = 'none';
-  });
+  };
+  element.addEventListener('focus', handleFocus);
+  element.addEventListener('blur', handleBlur);
   
   // Return cleanup function
   return () => {
@@ -165,9 +170,9 @@ export function createAccessibleWidgetContainer(
       element.removeAttribute('tabindex');
     }
     
-    // Remove event listeners
-    element.removeEventListener('focus', () => {});
-    element.removeEventListener('blur', () => {});
+    // Remove event listeners with the same references
+    element.removeEventListener('focus', handleFocus);
+    element.removeEventListener('blur', handleBlur);
     element.style.outline = '';
   };
 }

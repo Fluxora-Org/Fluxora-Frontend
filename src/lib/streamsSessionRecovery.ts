@@ -51,6 +51,9 @@ export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {
   itemsPerPage: 10,
 };
 
+export const DEFAULT_STREAM_DRAFT_ACCRUAL_RATE = "38.62";
+export const DEFAULT_STREAM_DRAFT_DURATION = "1";
+
 function getLocalStorage(): Storage | null {
   if (typeof window === "undefined") {
     return null;
@@ -70,6 +73,8 @@ export function isDraftMeaningful(
   return (
     draft.recipient.trim() !== "" ||
     draft.depositAmount.trim() !== "" ||
+    draft.accrualRate.trim() !== DEFAULT_STREAM_DRAFT_ACCRUAL_RATE ||
+    draft.duration.trim() !== DEFAULT_STREAM_DRAFT_DURATION ||
     draft.cliffEnabled ||
     draft.customStartDate.trim() !== "" ||
     draft.startTimeOption === "custom"
@@ -133,8 +138,12 @@ function parseSnapshot(raw: string): StreamsSessionSnapshot | null {
       recipient: typeof d.recipient === "string" ? d.recipient : "",
       depositAmount:
         typeof d.depositAmount === "string" ? d.depositAmount : "",
-      accrualRate: typeof d.accrualRate === "string" ? d.accrualRate : "38.62",
-      duration: typeof d.duration === "string" ? d.duration : "1",
+      accrualRate:
+        typeof d.accrualRate === "string"
+          ? d.accrualRate
+          : DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
+      duration:
+        typeof d.duration === "string" ? d.duration : DEFAULT_STREAM_DRAFT_DURATION,
       startTimeOption: d.startTimeOption === "custom" ? "custom" : "now",
       customStartDate:
         typeof d.customStartDate === "string" ? d.customStartDate : "",

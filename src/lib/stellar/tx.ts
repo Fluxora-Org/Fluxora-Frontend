@@ -24,10 +24,13 @@ export class TransactionError extends Error {
 }
 
 /**
- * Maps Freighter signing errors to a TransactionError of type "rejected".
+ * Maps Freighter signing errors to a TransactionError.
  * Checks for a structured error code (`user_rejected`) first, then falls back to
- * case‑insensitive keyword matching (`reject`, `decline`, `cancel`, `dismiss`).
- * This provides a robust classification without relying on localized message strings.
+ * word-boundary-anchored keyword matching against actual Freighter rejection
+ * phrasing.  Errors whose messages do not closely match a known rejection pattern
+ * are classified as `"unknown"` so that non-rejection errors (e.g. network
+ * timeouts surfaced through the extension bridge) are never misreported as
+ * user-declined.
  */
 function mapFreighterSigningError(err: any): TransactionError {
   const maybeErr = err as { code?: string };
@@ -39,13 +42,13 @@ function mapFreighterSigningError(err: any): TransactionError {
   }
   const errMsg = String(err);
   const rejectionKeywords = ["reject", "decline", "cancel", "dismiss"];
-  if (rejectionKeywords.some((kw) => errMsg.toLowerCase().includes(kw))) {
+  if (rejectionKeywords.some((kw) => new RegExp("\\b" + kw + "\\b", "i").test(errMsg))) {
     return new TransactionError(
       "rejected",
       "Transaction signature request was declined by the user."
     );
   }
-  return new TransactionError("rejected", `Freighter signing failed: ${errMsg}`);
+  return new TransactionError("unknown", `Freighter signing failed: ${errMsg}`);
 }
 
 /**

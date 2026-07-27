@@ -153,8 +153,8 @@ export default function Input({
           placeholder={placeholder}
           required={required}
           {...(sharedProps as TextareaHTMLAttributes<HTMLTextAreaElement>)}
-          onCompositionStart={handleCompositionStart as CompositionEventHandler<HTMLTextAreaElement>}
-          onCompositionEnd={handleCompositionEnd as CompositionEventHandler<HTMLTextAreaElement>}
+          onCompositionStart={handleCompositionStart as unknown as CompositionEventHandler<HTMLTextAreaElement>}
+          onCompositionEnd={handleCompositionEnd as unknown as CompositionEventHandler<HTMLTextAreaElement>}
         />
       ) : type === "select" && options ? (
         /* Select */

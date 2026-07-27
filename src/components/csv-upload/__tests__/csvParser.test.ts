@@ -314,6 +314,56 @@ describe('markDuplicates', () => {
   });
 });
 
+describe('fuzzyMatch (via parseAndValidateCsv autoMapping)', () => {
+  it('auto-maps "Amount (USDC)" to deposit_amount', () => {
+    const csv = 'Amount (USDC),Rate/day,Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.autoMapping.deposit_amount).toBe('Amount (USDC)');
+  });
+
+  it('auto-maps "Rate/day" to accrual_rate_per_day', () => {
+    const csv = 'Amount (USDC),Rate/day,Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate/day');
+  });
+
+  it('auto-maps "Rate (USDC/day)" to accrual_rate_per_day', () => {
+    const csv = 'Amount,Rate (USDC/day),Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate (USDC/day)');
+  });
+
+  it('auto-maps "Deposit amount (USDC)" to deposit_amount', () => {
+    const csv = 'Deposit amount (USDC),Rate,Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.autoMapping.deposit_amount).toBe('Deposit amount (USDC)');
+  });
+
+  it('auto-maps all four parenthesised/slash headers and produces a valid parse', () => {
+    const csv = 'Deposit amount (USDC),Rate (USDC/day),Recipient address,Duration (days)\n' + `1000,38.62,${VALID_ADDR},30\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.headersMatch).toBe(true);
+    expect(result.autoMapping.deposit_amount).toBe('Deposit amount (USDC)');
+    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate (USDC/day)');
+    expect(result.autoMapping.recipient).toBe('Recipient address');
+    expect(result.autoMapping.duration_days).toBe('Duration (days)');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].status).toBe('valid');
+    expect(result.rows[0].depositAmount).toBe('1000');
+    expect(result.rows[0].accrualRatePerDay).toBe('38.62');
+  });
+
+  it('auto-maps headers matching FIELD_LABELS from ColumnMappingStep.tsx', () => {
+    const csv = 'Deposit amount (USDC),Rate (USDC/day),Recipient address,Duration (days)\n' + `2500,50,${VALID_ADDR},90\n`;
+    const result = parseAndValidateCsv(csv);
+    expect(result.headersMatch).toBe(true);
+    expect(result.rows[0].recipient).toBe(VALID_ADDR);
+    expect(result.rows[0].depositAmount).toBe('2500');
+    expect(result.rows[0].accrualRatePerDay).toBe('50');
+    expect(result.rows[0].durationDays).toBe('90');
+  });
+});
+
 describe('parseAndValidateCsv', () => {
   it('parses a CSV whose headers exactly match the canonical names', () => {
     const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${VALID_ADDR},1000,38.62,30\n`;

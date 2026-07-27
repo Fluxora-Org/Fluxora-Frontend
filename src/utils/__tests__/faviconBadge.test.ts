@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import {
   formatBadgeCount,
   generateFaviconDataUrl,
@@ -6,6 +7,7 @@ import {
   resetFaviconBadge,
   drawBaseIcon,
   drawBadgeOverlay,
+  useFaviconBadge,
 } from "../faviconBadge";
 
 describe("faviconBadge utility", () => {
@@ -116,6 +118,122 @@ describe("faviconBadge utility", () => {
 
       const link = document.querySelector("link#favicon") as HTMLLinkElement;
       expect(link.getAttribute("href")).toBe("/src/public/Icon.svg");
+    });
+  });
+
+  describe("useFaviconBadge hook", () => {
+    const mockCanvasContext = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arcTo: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      closePath: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+      clearRect: vi.fn(),
+      strokeStyle: "",
+      fillStyle: "",
+      lineWidth: 0,
+      lineCap: "",
+      lineJoin: "",
+      font: "",
+      textAlign: "",
+      textBaseline: "",
+    } as unknown as CanvasRenderingContext2D;
+
+    beforeEach(() => {
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(mockCanvasContext);
+      vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,fakedata");
+    });
+
+    it("updates favicon on mount with given count", () => {
+      document.head.innerHTML = "";
+      renderHook(() => useFaviconBadge(5));
+
+      const link = document.querySelector("link#favicon") as HTMLLinkElement;
+      expect(link).not.toBeNull();
+      expect(link.getAttribute("rel")).toBe("icon");
+    });
+
+    it("removes badge when count drops to 0", () => {
+      document.head.innerHTML = '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+      const { rerender } = renderHook(
+        ({ count }) => useFaviconBadge(count),
+        { initialProps: { count: 5 } },
+      );
+
+      const link = document.querySelector("link#favicon") as HTMLLinkElement;
+      const hrefAfterBadge = link?.getAttribute("href");
+      expect(hrefAfterBadge).toMatch(/^data:image\/png/);
+
+      act(() => {
+        rerender({ count: 0 });
+      });
+
+      expect(link.getAttribute("href")).toBe("/src/public/Icon.svg");
+    });
+
+    it("does not re-run effect when inline options object changes but values stay the same", () => {
+      document.head.innerHTML = '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+      const { rerender } = renderHook(
+        ({ count, options }) => useFaviconBadge(count, options),
+        { initialProps: { count: 3, options: { size: 32 } } },
+      );
+
+      const link = document.querySelector("link#favicon") as HTMLLinkElement;
+      const firstHref = link?.getAttribute("href");
+      expect(firstHref).toMatch(/^data:image\/png/);
+
+      act(() => {
+        rerender({ count: 3, options: { size: 32 } });
+      });
+
+      const secondHref = link?.getAttribute("href");
+      expect(secondHref).toBe(firstHref);
+    });
+
+    it("re-runs effect when count changes", () => {
+      document.head.innerHTML = '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+      const { rerender } = renderHook(
+        ({ count }) => useFaviconBadge(count),
+        { initialProps: { count: 1 } },
+      );
+
+      const link = document.querySelector("link#favicon") as HTMLLinkElement;
+      const firstHref = link?.getAttribute("href");
+      expect(firstHref).toMatch(/^data:image\/png/);
+
+      act(() => {
+        rerender({ count: 5 });
+      });
+
+      const secondHref = link?.getAttribute("href");
+      expect(secondHref).toMatch(/^data:image\/png/);
+    });
+
+    it("re-runs effect when an option value changes", () => {
+      const toDataURLSpy = vi.spyOn(HTMLCanvasElement.prototype, "toDataURL")
+        .mockReturnValue("data:image/png;base64,fakedata");
+      document.head.innerHTML = '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+      const { rerender } = renderHook(
+        ({ count, options }) => useFaviconBadge(count, options),
+        { initialProps: { count: 3, options: { size: 32 } } },
+      );
+
+      const callsAfterMount = toDataURLSpy.mock.calls.length;
+      expect(callsAfterMount).toBeGreaterThanOrEqual(1);
+
+      act(() => {
+        rerender({ count: 3, options: { size: 64 } });
+      });
+
+      expect(toDataURLSpy.mock.calls.length).toBeGreaterThan(callsAfterMount);
     });
   });
 });

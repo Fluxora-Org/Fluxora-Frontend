@@ -341,6 +341,38 @@ describe("streamsSessionRecovery", () => {
         }),
       ).toBe(true);
     });
+
+    it("is true when a non-default accrual rate is set with all other values default", () => {
+      expect(
+        isDraftMeaningful({
+          step: 1,
+          recipient: "",
+          depositAmount: "",
+          accrualRate: "40.00",
+          duration: "1",
+          startTimeOption: "now",
+          customStartDate: "",
+          cliffEnabled: false,
+          cliffDate: "",
+        }),
+      ).toBe(true);
+    });
+
+    it("is true when a non-default duration is set with all other values default", () => {
+      expect(
+        isDraftMeaningful({
+          step: 1,
+          recipient: "",
+          depositAmount: "",
+          accrualRate: "38.62",
+          duration: "2",
+          startTimeOption: "now",
+          customStartDate: "",
+          cliffEnabled: false,
+          cliffDate: "",
+        }),
+      ).toBe(true);
+    });
   });
 
   describe("isFilterSnapshotMeaningful", () => {

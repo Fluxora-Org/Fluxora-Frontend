@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
 import PresenceBadge, { getInitials } from "../PresenceBadge";
 import { Viewer } from "../../../hooks/usePresenceViewers";
 
@@ -59,7 +59,7 @@ describe("PresenceBadge", () => {
 
   it("renders avatar stack for 2-3 viewers", () => {
     // 2 other viewers (3 total viewers)
-    const { container } = render(
+    render(
       <PresenceBadge viewers={[mockViewer1, mockViewer2]} />
     );
 

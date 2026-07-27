@@ -62,9 +62,9 @@ describe('EmbedWidgetLayouts', () => {
       expect(screen.getByText('Test Stream')).toBeInTheDocument();
       expect(screen.getByText('Active')).toBeInTheDocument();
       expect(screen.getByTestId('stream-timeline')).toBeInTheDocument();
-      expect(screen.getByText('$5,000/month')).toBeInTheDocument();
-      expect(screen.getByText('$19,250')).toBeInTheDocument();
-      expect(screen.getByText('$28,750')).toBeInTheDocument();
+      expect(screen.getByText('5,000 USDC/month')).toBeInTheDocument();
+      expect(screen.getByText('19,250 USDC')).toBeInTheDocument();
+      expect(screen.getByText('28,750 USDC')).toBeInTheDocument();
       expect(screen.getByText('40%')).toBeInTheDocument();
       expect(screen.getByText('Powered by Fluxora')).toBeInTheDocument();
     });
@@ -100,9 +100,9 @@ describe('EmbedWidgetLayouts', () => {
     it('formats currency values correctly', () => {
       render(<EmbedWidgetLayoutCard {...commonProps} />);
 
-      expect(screen.getByText('$5,000/month')).toBeInTheDocument();
-      expect(screen.getByText('$19,250')).toBeInTheDocument();
-      expect(screen.getByText('$28,750')).toBeInTheDocument();
+      expect(screen.getByText('5,000 USDC/month')).toBeInTheDocument();
+      expect(screen.getByText('19,250 USDC')).toBeInTheDocument();
+      expect(screen.getByText('28,750 USDC')).toBeInTheDocument();
     });
   });
 
@@ -114,7 +114,7 @@ describe('EmbedWidgetLayouts', () => {
       expect(screen.getByText('Test Stream')).toBeInTheDocument();
       expect(screen.getByText('A')).toBeInTheDocument(); // Compact status badge
       expect(screen.getByTestId('stream-timeline')).toBeInTheDocument();
-      expect(screen.getByText('$5,000/mo')).toBeInTheDocument();
+      expect(screen.getByText('5,000 USDC/mo')).toBeInTheDocument();
       expect(screen.getByText('40%')).toBeInTheDocument();
       expect(screen.getByText('Progress')).toBeInTheDocument();
     });
@@ -251,6 +251,15 @@ describe('EmbedWidgetLayouts', () => {
   });
 
   describe('formatted values use shared formatters', () => {
+    it('renders non-USDC asset correctly', () => {
+      const ethStream = { ...mockStream, asset: 'ETH' };
+      render(<EmbedWidgetLayoutCard {...commonProps} stream={ethStream} />);
+
+      expect(screen.getByText('5,000 ETH/month')).toBeInTheDocument();
+      expect(screen.getByText('19,250 ETH')).toBeInTheDocument();
+      expect(screen.getByText('28,750 ETH')).toBeInTheDocument();
+    });
+
     it('renders large safe integer amounts without precision loss', () => {
       const largeStream = {
         ...mockStream,

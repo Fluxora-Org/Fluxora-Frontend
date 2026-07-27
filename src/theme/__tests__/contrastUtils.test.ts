@@ -14,6 +14,7 @@ import {
   CONTRAST_PAIRS,
   WCAG_AA_NORMAL,
   WCAG_AA_LARGE,
+  type TokenValidationError,
 } from "../contrastUtils";
 
 // ─── hexToRgb ─────────────────────────────────────────────────────────────────
@@ -207,20 +208,20 @@ describe("validateToken", () => {
   });
 
   it("rejects a locked token (focus-ring-color)", () => {
-    const result = validateToken("--focus-ring-color", "#ff0000");
+    const result = validateToken("--focus-ring-color", "#ff0000") as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("locked");
     expect(result.message).toMatch(/reserved for accessibility/i);
   });
 
   it("rejects a disallowed (unknown) token", () => {
-    const result = validateToken("--some-random-token", "#ffffff");
+    const result = validateToken("--some-random-token", "#ffffff") as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("disallowed");
   });
 
   it("rejects an invalid hex value", () => {
-    const result = validateToken("--color-accent-primary", "not-a-colour");
+    const result = validateToken("--color-accent-primary", "not-a-colour") as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("invalid-hex");
     expect(result.message).toMatch(/not a valid hex/i);
@@ -228,7 +229,7 @@ describe("validateToken", () => {
 
   it("rejects a contrast-fail when bg is provided", () => {
     // #00b8d4 on #ffffff ≈ 2.59:1 — fails AA for normal text.
-    const result = validateToken("--navbar-logo-color", "#00b8d4", "#ffffff");
+    const result = validateToken("--navbar-logo-color", "#00b8d4", "#ffffff") as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("contrast-fail");
     expect(result.ratio).toBeLessThan(WCAG_AA_NORMAL);

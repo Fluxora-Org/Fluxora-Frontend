@@ -76,12 +76,12 @@ export default function Home() {
       }}
     >
       <main id="main-content" style={{ flex: 1 }}>
-        <HeroSection theme={theme} />
+        <HeroSection theme={theme as "light" | "dark"} />
         <LazySection label="value proposition section">
           <ValuePropositionSection />
         </LazySection>
         <LazySection label="trust section">
-          <TrustSection theme={theme} />
+          <TrustSection theme={theme as "light" | "dark"} />
         </LazySection>
         <LazySection label="get started section">
           <section style={{ padding: "80px 20px" }} aria-label="Get started">

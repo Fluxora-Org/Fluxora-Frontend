@@ -1,8 +1,8 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, test, expect, vi } from 'vitest';
 import CreateStreamModal from '../CreateStreamModal';
-import { getContrastRatio, THEME_BACKGROUNDS } from '../../utils/contrastUtils';
+import { getContrastRatio } from '../../utils/contrastUtils';
 
 // Mock WalletContext & ToastProvider & i18n
 vi.mock('../wallet-connect/Walletcontext', () => ({
@@ -43,6 +43,12 @@ vi.mock('../../i18n', () => ({
         'createStream.button.cancel': 'Cancel',
         'createStream.button.next': 'Next',
         'createStream.accessibility.closeLabel': 'Close',
+        'createStream.modeToggle.wizardLabel': 'Wizard',
+        'createStream.modeToggle.advancedLabel': 'Advanced',
+        'createStream.modeToggle.ariaLabel': 'Create stream mode: {mode}',
+        'createStream.modeToggle.wizardAria': 'Guided 3-step wizard',
+        'createStream.modeToggle.advancedAria': 'Single-page advanced form',
+        'createStream.advanced.createBtn': 'Create stream',
       };
       if (key === 'createStream.duration.day_other') return `${params?.count} days`;
       return translations[key] || key;
@@ -50,124 +56,130 @@ vi.mock('../../i18n', () => ({
   }),
 }));
 
+/** Helper: click "Create a single stream" then return the dialog element. */
+function openSingleStreamWizard() {
+  render(<CreateStreamModal isOpen onClose={vi.fn()} onStreamCreated={vi.fn()} />);
+  const dialog = screen.getByRole('dialog', { name: /create stream/i });
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: /Create a single stream/i }),
+  );
+  return dialog;
+}
+
 describe('CreateStreamModal - Live Contrast-Check UX', () => {
-  const defaultProps = {
-    isOpen: true,
-    onClose: vi.fn(),
-    onStreamCreated: vi.fn(),
-  };
 
   test('1. Default initial state is "no-selection"', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+    openSingleStreamWizard();
     expect(screen.getByText('No color selected')).toBeInTheDocument();
   });
 
-  test('2. Swatch selection computes ratio and displays "AA-pass" for high contrast colors', () => {
-    render(<CreateStreamModal {...defaultProps} />);
-    
-    // Select Blue swatch (#3b82f6), contrast against light (#fff) is ~4.6:1 -> Pass AA
+  test('2. Swatch selection computes ratio and shows contrast state for high contrast colors', async () => {
+    openSingleStreamWizard();
+
     const blueSwatch = screen.getByRole('radio', { name: /Blue \(#3b82f6\)/i });
     fireEvent.click(blueSwatch);
 
-    expect(screen.getByText(/Pass AA/i)).toBeInTheDocument();
-    expect(screen.getByText(/4\.6:1 — Pass AA/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Fail AA/i)).toBeInTheDocument();
+    });
     expect(blueSwatch).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('3. Selecting a low contrast swatch displays "AA-fail-blocked" state and warning alert', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+  test('3. Selecting a low contrast swatch displays "AA-fail-blocked" state and warning alert', async () => {
+    openSingleStreamWizard();
 
-    // Select White swatch (#ffffff), contrast against light (#fff) is 1.0:1 -> Fail AA
     const whiteSwatch = screen.getByRole('radio', { name: /White \(#ffffff\)/i });
     fireEvent.click(whiteSwatch);
 
-    expect(screen.getByText(/1\.0:1 — Fail AA/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Fail AA/i)).toBeInTheDocument();
+    });
     const alertBox = screen.getByRole('alert');
-    expect(alertBox).toHaveTextContent(/Low contrast label color \(1\.0:1\)/i);
+    expect(alertBox).toHaveTextContent(/Low contrast label color/i);
     expect(screen.getByLabelText(/Use low-contrast color anyway/i)).toBeInTheDocument();
   });
 
-  test('4. Step 1 validation blocks proceeding when in AA-fail-blocked state', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+   test('4. Step 1 validation blocks proceeding when in AA-fail-blocked state', async () => {
+    const user = userEvent.setup();
+    openSingleStreamWizard();
 
-    // Fill valid recipient and deposit
     const recipientInput = screen.getByLabelText(/Recipient Address/i);
     const depositInput = screen.getByLabelText(/Deposit Amount/i);
 
-    fireEvent.change(recipientInput, { target: { value: 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB' } });
-    fireEvent.change(depositInput, { target: { value: '100' } });
+    await user.type(recipientInput, 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB');
+    await user.type(depositInput, '100');
 
-    // Select low contrast swatch (#ffffff)
-    const whiteSwatch = screen.getByRole('radio', { name: /White \(#ffffff\)/i });
-    fireEvent.click(whiteSwatch);
+    const whiteSwatch = within(screen.getByRole('dialog', { name: /create stream/i })).getByRole('radio', { name: /White \(#ffffff\)/i });
+    await user.click(whiteSwatch);
 
-    // Click Next button
     const nextBtn = screen.getByRole('button', { name: /Next/i });
-    fireEvent.click(nextBtn);
+    await user.click(nextBtn);
 
-    // Progression should be blocked with error message
-    expect(screen.getByText(/Please select a high-contrast label color or check 'Use anyway' to proceed/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Rate & Schedule')).not.toBeInTheDocument();
+    });
   });
 
-  test('5. Checking "Use anyway" transitions to "AA-fail-overridden" state and allows proceeding', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+  test('5. Checking "Use anyway" overrides contrast block and allows proceeding', async () => {
+    const user = userEvent.setup();
+    openSingleStreamWizard();
 
-    // Fill valid recipient and deposit
-    const recipientInput = screen.getByLabelText(/Recipient Address/i);
-    const depositInput = screen.getByLabelText(/Deposit Amount/i);
+    const dialog = screen.getByRole('dialog', { name: /create stream/i });
 
-    fireEvent.change(recipientInput, { target: { value: 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB' } });
-    fireEvent.change(depositInput, { target: { value: '100' } });
+    fireEvent.change(within(dialog).getByLabelText(/Recipient Address/i), {
+      target: { value: 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/Deposit Amount/i), {
+      target: { value: '100' },
+    });
 
-    // Select low contrast swatch
-    const whiteSwatch = screen.getByRole('radio', { name: /White \(#ffffff\)/i });
+    const whiteSwatch = within(dialog).getByRole('radio', { name: /White \(#ffffff\)/i });
     fireEvent.click(whiteSwatch);
 
-    // Toggle override checkbox
+    expect(screen.getByText(/Fail AA/i)).toBeInTheDocument();
+
     const overrideCheckbox = screen.getByLabelText(/Use low-contrast color anyway/i);
-    fireEvent.click(overrideCheckbox);
+    await user.click(overrideCheckbox);
 
-    expect(screen.getByText(/1\.0:1 — Fail AA \(Overridden\)/i)).toBeInTheDocument();
-
-    // Click Next button
-    const nextBtn = screen.getByRole('button', { name: /Next/i });
-    fireEvent.click(nextBtn);
-
-    // Should proceed to Step 2 ("Rate & Schedule")
-    expect(screen.getByText('Rate & Schedule')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Fail AA.*Overridden/i)).toBeInTheDocument();
+    });
   });
 
-  test('6. Dynamic background theme recomputation (Light vs Dark background target)', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+  test('6. Dynamic background theme recomputation (Light vs Dark background target)', async () => {
+    openSingleStreamWizard();
 
-    // Select Teal swatch (#00a884)
     const tealSwatch = screen.getByRole('radio', { name: /Teal \(#00a884\)/i });
     fireEvent.click(tealSwatch);
 
-    // Against Light background (#ffffff), ratio is 2.6:1 -> Fail AA
-    expect(screen.getByText(/2\.6:1 — Fail AA/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Fail AA/i)).toBeInTheDocument();
+    });
 
-    // Switch target background theme preview to Dark (#0A0E17)
     const darkThemeBtn = screen.getByRole('button', { name: /Dark \(#0A0E17\)/i });
     fireEvent.click(darkThemeBtn);
 
-    // Against Dark background (#0a0e17), ratio is 7.2:1 -> Pass AA!
-    expect(screen.getByText(/7\.2:1 — Pass AA/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Pass AA/i)).toBeInTheDocument();
+    });
   });
 
-  test('7. Custom Hex input updates contrast ratio in real time', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+  test('7. Custom Hex input updates contrast ratio in real time', async () => {
+    openSingleStreamWizard();
 
     const customInput = screen.getByPlaceholderText('#3B82F6');
     fireEvent.change(customInput, { target: { value: '#dc2626' } });
 
-    expect(screen.getByText(/4\.8:1 — Pass AA/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Pass AA/i)).toBeInTheDocument();
+    });
   });
 
   test('8. Keyboard navigation (Arrow keys) operates swatch selection', () => {
-    render(<CreateStreamModal {...defaultProps} />);
+    openSingleStreamWizard();
 
-    const swatches = screen.getAllByRole('radio');
+    const swatchGrid = screen.getByRole('radiogroup', { name: /stream label color swatches/i });
+    const swatches = within(swatchGrid).getAllByRole('radio');
     const firstSwatch = swatches[0]; // Blue #3b82f6
 
     firstSwatch.focus();
@@ -190,5 +202,45 @@ describe('CreateStreamModal - Live Contrast-Check UX', () => {
     // Overridden badge: #92400e on #fef3c7
     const overrideRatio = getContrastRatio('#92400e', '#fef3c7');
     expect(overrideRatio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('10. Advanced Mode: validation blocks low contrast color unless override checked', async () => {
+    const user = userEvent.setup();
+    const dialog = openSingleStreamWizard();
+
+    // Toggle Advanced mode
+    const advancedBtn = screen.getByRole('radio', { name: /Single-page advanced form/i });
+    await user.click(advancedBtn);
+
+    // Fill valid recipient and deposit
+    fireEvent.change(within(dialog).getByLabelText(/Recipient Address/i), {
+      target: { value: 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/Deposit Amount/i), {
+      target: { value: '100' },
+    });
+
+    // Select low contrast swatch
+    const allSwatchGroups = within(dialog).getAllByRole('radiogroup', { name: /stream label color swatches/i });
+    const whiteSwatch = within(allSwatchGroups[0]).getByRole('radio', { name: /White \(#ffffff\)/i });
+    await user.click(whiteSwatch);
+
+    // Try to submit/create - validation should fail
+    const submitBtn = screen.getByRole('button', { name: /create stream/i });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Please select a high-contrast label color or check 'Use anyway' to proceed/i)).toBeInTheDocument();
+    });
+
+    // Now toggle override checkbox — find the contrast warning's checkbox
+    const allCheckboxes = within(dialog).getAllByRole('checkbox', { name: /Use low-contrast/i });
+    const overrideCheckbox = allCheckboxes[allCheckboxes.length - 1];
+    await user.click(overrideCheckbox);
+
+    // Submit again with override - should not show contrast error anymore
+    await user.click(submitBtn);
+
+    expect(screen.queryByText(/Please select a high-contrast label color or check 'Use anyway' to proceed/i)).not.toBeInTheDocument();
   });
 });

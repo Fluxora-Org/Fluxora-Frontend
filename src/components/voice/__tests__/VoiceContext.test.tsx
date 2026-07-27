@@ -682,7 +682,7 @@ describe("VoiceContext — startListening: SpeechRecognition mock", () => {
   }
 
   it("transitions to listening when onstart fires", () => {
-    const { state, startListening, rec } = mountMocked((r) => r.fire.onstart());
+    const { state, startListening } = mountMocked((r) => r.fire.onstart());
     startListening();
     expect(state()).toBe("listening");
   });

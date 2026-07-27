@@ -103,6 +103,7 @@ export function applyThemeConfigSafely(config: ThemeConfig): () => void {
   const html = document.documentElement;
   const originalTheme = html.getAttribute("data-theme");
   const originalAccentColor = html.style.getPropertyValue("--color-accent-primary");
+  const originalFocusRing = html.style.getPropertyValue("--interactive-focus-ring");
   
   try {
     // Apply theme
@@ -135,6 +136,12 @@ export function applyThemeConfigSafely(config: ThemeConfig): () => void {
         html.style.setProperty("--color-accent-primary", originalAccentColor);
       } else {
         html.style.removeProperty("--color-accent-primary");
+      }
+
+      // Restore original focus ring
+      if (originalFocusRing) {
+        html.style.setProperty("--interactive-focus-ring", originalFocusRing);
+      } else {
         html.style.removeProperty("--interactive-focus-ring");
       }
     } catch (error) {

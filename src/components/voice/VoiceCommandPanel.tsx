@@ -246,10 +246,11 @@ export const VoiceCommandPanel: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   {catCmds.map((cmd) => (
-                    <div
+                    <button
                       key={cmd.id}
+                      type="button"
                       className={clsx(
-                        "p-2 rounded-lg border text-xs flex flex-col gap-0.5 transition-all cursor-pointer hover:border-[var(--color-accent-primary)]/50",
+                        "p-2 rounded-lg border text-xs flex flex-col gap-0.5 transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] hover:border-[var(--color-accent-primary)]/50",
                         recognizedCommand?.command.id === cmd.id
                           ? "bg-[var(--color-accent-primary)]/10 border-[var(--color-accent-primary)] text-[var(--text-vivid)]"
                           : "bg-[var(--surface-sunken)] border-[var(--border-subtle)] text-[var(--text-secondary)]"
@@ -271,7 +272,7 @@ export const VoiceCommandPanel: React.FC = () => {
                       <div className="text-[10px] text-[var(--text-disabled)] font-mono mt-0.5">
                         Aliases: {cmd.aliases.map((a) => `"${a}"`).join(", ")}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

@@ -30,7 +30,7 @@
  * - info:     #00b8d4 on rgba(0,184,212,0.10)
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { StreamStatus } from "./Stream";
 import {
   Play,

@@ -38,8 +38,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       const ext = file.name.split('.').pop()?.toLowerCase();
       const isCsv =
         ext === 'csv' ||
-        ACCEPTED_MIME.has(file.type) ||
-        file.type === '';
+        ACCEPTED_MIME.has(file.type);
       if (!isCsv) {
         setZoneState('parse-error');
         setParseError('Only .csv files are accepted.');

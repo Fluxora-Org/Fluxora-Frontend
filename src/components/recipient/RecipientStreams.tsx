@@ -353,6 +353,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
               className="px-3 py-1.5 text-xs font-semibold rounded-lg transition border"
               style={{
                 flexShrink: 0,
+                whiteSpace: "nowrap",
                 color: "var(--color-error-text)",
                 borderColor: "var(--color-error-border)",
                 backgroundColor: "transparent",

@@ -27,13 +27,6 @@ interface GraphNode {
   isTreasury: boolean;
 }
 
-interface GraphEdge {
-  source: string;
-  target: string;
-  rate: number;
-  width: number;
-}
-
 interface SimPositions {
   positions: Record<string, { x: number; y: number }>;
   settled: boolean;
@@ -88,7 +81,6 @@ function useSimulation(streams: Stream[], reduced: boolean): SimPositions {
     settled: true,
   });
   const raf = useRef<number | null>(null);
-  const tickRef = useRef(0);
 
   useEffect(() => {
     if (reduced) {
@@ -213,7 +205,6 @@ function GraphView({ streams }: { streams: Stream[] }) {
   const panStart = useRef({ x: 0, y: 0 });
 
   const recipientIds = useMemo(() => Array.from(new Set(streams.map((s) => s.recipient))), [streams]);
-  const recipientsSet = useMemo(() => new Set(recipientIds), [recipientIds]);
 
   const treasuryAmt = useMemo(
     () => streams.reduce((s, st) => s + (st.accruedAmount ?? 0), 0),
@@ -365,7 +356,6 @@ function GraphView({ streams }: { streams: Stream[] }) {
           );
         })}
         {nodeEls.map((n) => {
-          const hl = selNode && connected.has(n.id);
           const dim = selNode && !connected.has(n.id) && !n.isTreasury;
           return (
             <g

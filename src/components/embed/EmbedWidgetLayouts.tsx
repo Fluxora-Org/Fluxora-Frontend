@@ -1,4 +1,3 @@
-import React from "react";
 import StreamTimeline from "../StreamTimeline";
 import { StreamRecord, StreamStatus } from "../../data/streamRecords";
 import { ThemeConfig } from "../../lib/embedThemeParser";
@@ -61,18 +60,18 @@ export function EmbedWidgetLayoutCard({
         <div className="embed-widget-card__metrics">
           <MetricItem
             label="Payment Rate"
-            value={`$${formatNumber(stream.monthlyRate)}/month`}
-            ariaLabel={`Monthly payment rate: $${formatNumber(stream.monthlyRate)}`}
+            value={`${formatNumber(stream.monthlyRate)} ${stream.asset}/month`}
+            ariaLabel={`Monthly payment rate: ${formatNumber(stream.monthlyRate)} ${stream.asset}`}
           />
           <MetricItem
             label="Streamed"
-            value={`$${formatNumber(stream.streamedAmount)}`}
-            ariaLabel={`Amount streamed: $${formatNumber(stream.streamedAmount)}`}
+            value={`${formatNumber(stream.streamedAmount)} ${stream.asset}`}
+            ariaLabel={`Amount streamed: ${formatNumber(stream.streamedAmount)} ${stream.asset}`}
           />
           <MetricItem
             label="Remaining"
-            value={`$${formatNumber(stream.remainingAmount)}`}
-            ariaLabel={`Remaining amount: $${formatNumber(stream.remainingAmount)}`}
+            value={`${formatNumber(stream.remainingAmount)} ${stream.asset}`}
+            ariaLabel={`Remaining amount: ${formatNumber(stream.remainingAmount)} ${stream.asset}`}
           />
         </div>
         
@@ -170,9 +169,9 @@ export function EmbedWidgetLayoutBanner({
       <div className="embed-widget-banner__metrics">
         <MetricItem
           label="Rate"
-          value={`$${formatNumber(stream.monthlyRate)}/mo`}
+          value={`${formatNumber(stream.monthlyRate)} ${stream.asset}/mo`}
           compact
-          ariaLabel={`Monthly payment rate: $${formatNumber(stream.monthlyRate)}`}
+          ariaLabel={`Monthly payment rate: ${formatNumber(stream.monthlyRate)} ${stream.asset}`}
         />
         <div className="embed-widget-banner__progress">
           <span className="embed-widget-banner__progress-label">Progress</span>

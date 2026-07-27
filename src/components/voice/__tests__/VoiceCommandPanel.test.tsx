@@ -18,6 +18,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { VoiceCommandPanel } from "../VoiceCommandPanel";
 import * as VoiceContextModule from "../VoiceContext";
 import type { VoiceContextValue, VoiceState, VoiceCommandDef } from "../voiceTypes";
@@ -236,9 +237,21 @@ describe("VoiceCommandPanel — category filtering", () => {
       buildCtx({ availableCommands: [NAV_CMD], processSpokenPhrase })
     );
     render(<VoiceCommandPanel />);
-    // The command row has a title attribute
     const row = screen.getByTitle('Click to test phrase "Go to dashboard"');
     fireEvent.click(row);
+    expect(processSpokenPhrase).toHaveBeenCalledWith("Go to dashboard");
+  });
+
+  it("focusable command rows activate processSpokenPhrase with Enter key", async () => {
+    const processSpokenPhrase = vi.fn(() => true);
+    mockUseVoiceContext(
+      buildCtx({ availableCommands: [NAV_CMD], processSpokenPhrase })
+    );
+    render(<VoiceCommandPanel />);
+    const row = screen.getByTitle('Click to test phrase "Go to dashboard"');
+    row.focus();
+    expect(row).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
     expect(processSpokenPhrase).toHaveBeenCalledWith("Go to dashboard");
   });
 });

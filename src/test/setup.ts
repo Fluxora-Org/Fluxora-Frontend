@@ -75,6 +75,19 @@ if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
 }
 
+// jsdom 26 does not implement Blob.prototype.text / File.prototype.text
+// (added to the spec in 2022), so we polyfill it using FileReader.
+if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
+  Blob.prototype.text = function () {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
 import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
@@ -22,6 +23,7 @@ const VALID_STELLAR =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function advanceToReview(container: HTMLElement) {
+  selectSingleStreamInContainer(container);
   fireEvent.change(
     container.querySelector("#create-stream-recipient") as HTMLInputElement,
     { target: { value: VALID_STELLAR } },
@@ -111,6 +113,7 @@ describe("CreateStreamModal transaction confirmation", () => {
         onStreamCreated={onStreamCreated}
       />,
     );
+    selectSingleStreamInContainer(container);
 
     // Step 1: Recipient and deposit
     fireEvent.change(

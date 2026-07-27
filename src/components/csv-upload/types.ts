@@ -61,4 +61,4 @@ export type UploadZoneState =
   | 'parsed';
 
 /** Bulk-flow step identifiers. */
-export type BulkStep = 'upload' | 'mapping' | 'preview';
+export type BulkStep = 'upload' | 'mapping' | 'preview' | 'dryRun';

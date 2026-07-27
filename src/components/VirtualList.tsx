@@ -141,6 +141,11 @@ export default function VirtualList<T>({
 
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
+      if (target === container) {
+        focusedRowIndexRef.current = null;
+        focusableOffsetRef.current = null;
+        return;
+      }
       const rowEl = target.closest(".virtual-list-item");
       if (rowEl) {
         const indexStr = rowEl.getAttribute("data-virtual-index");
@@ -177,27 +182,65 @@ export default function VirtualList<T>({
 
     const { start, end } = range;
     if (focusedRowIndexRef.current < start || focusedRowIndexRef.current >= end) {
-      // Focused row was unmounted! Find nearest still-mounted row index
-      const targetIndex = focusedRowIndexRef.current < start ? start : end - 1;
-      
-      const targetRowEl = containerRef.current?.querySelector(
-        `[data-virtual-index="${targetIndex}"]`
-      ) as HTMLElement;
+      // Focused row was unmounted! Find nearest still-mounted row containing focusable elements.
+      const isScrolledUp = focusedRowIndexRef.current < start;
+      let targetIndex = -1;
+      let targetRowEl: HTMLElement | null = null;
+      let focusables: HTMLElement[] = [];
 
-      if (targetRowEl) {
-        const focusables = getFocusableElements(targetRowEl);
-        if (focusables.length > 0) {
-          const targetOffset = Math.min(
-            focusableOffsetRef.current,
-            focusables.length - 1
-          );
-          if (targetOffset >= 0 && focusables[targetOffset]) {
-            // Update tracking to the new focus target before focusing
-            focusedRowIndexRef.current = targetIndex;
-            focusableOffsetRef.current = targetOffset;
-            focusables[targetOffset].focus({ preventScroll: true });
+      if (isScrolledUp) {
+        // Scrolled upwards: search forward from 'start' to 'end - 1'
+        for (let i = start; i < end; i++) {
+          const el = containerRef.current?.querySelector(
+            `[data-virtual-index="${i}"]`
+          ) as HTMLElement;
+          if (el) {
+            const list = getFocusableElements(el);
+            if (list.length > 0) {
+              targetIndex = i;
+              targetRowEl = el;
+              focusables = list;
+              break;
+            }
           }
         }
+      } else {
+        // Scrolled downwards: search backward from 'end - 1' down to 'start'
+        for (let i = end - 1; i >= start; i--) {
+          const el = containerRef.current?.querySelector(
+            `[data-virtual-index="${i}"]`
+          ) as HTMLElement;
+          if (el) {
+            const list = getFocusableElements(el);
+            if (list.length > 0) {
+              targetIndex = i;
+              targetRowEl = el;
+              focusables = list;
+              break;
+            }
+          }
+        }
+      }
+
+      if (targetRowEl && focusables.length > 0) {
+        const targetOffset = Math.min(
+          focusableOffsetRef.current,
+          focusables.length - 1
+        );
+        if (targetOffset >= 0 && focusables[targetOffset]) {
+          // Update tracking to the new focus target before focusing
+          focusedRowIndexRef.current = targetIndex;
+          focusableOffsetRef.current = targetOffset;
+          focusables[targetOffset].focus({ preventScroll: true });
+          return;
+        }
+      }
+
+      // Fallback: focus the list container itself if no mounted row contains focusable elements
+      if (containerRef.current) {
+        containerRef.current.focus({ preventScroll: true });
+        focusedRowIndexRef.current = null;
+        focusableOffsetRef.current = null;
       }
     }
   }, [range]);
@@ -226,6 +269,8 @@ export default function VirtualList<T>({
       aria-label={ariaLabel}
       data-testid={testId}
       data-virtualized={shouldVirtualize ? "true" : "false"}
+      tabIndex={-1}
+      style={{ outline: "none" }}
     >
       {items.length === 0 ? (
         emptyState

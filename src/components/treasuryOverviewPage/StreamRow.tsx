@@ -50,7 +50,6 @@ export default function StreamRow({
   // Menu states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState({ x: 0, y: 0 });
-  const [openedViaTrigger, setOpenedViaTrigger] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
 
   // Long press / Touch states
@@ -65,7 +64,6 @@ export default function StreamRow({
 
   const openMenu = (x: number, y: number, viaTrigger: boolean) => {
     setIsMenuOpen(true);
-    setOpenedViaTrigger(viaTrigger);
     setFocusedIndex(0);
 
     let targetX = x;

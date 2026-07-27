@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
 import { createStream, getTransactionStatus } from '../../lib/stellar/tx';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 // The modal performs the on-chain create-stream call itself and only surfaces
 // failures via the review-step error box + onStreamError, so we drive the
@@ -49,6 +50,7 @@ afterEach(() => {
 });
 
 function advanceToStep3(container: HTMLElement) {
+  selectSingleStreamInContainer(container);
   const recipientInput = container.querySelector(
     '#create-stream-recipient',
   ) as HTMLInputElement;

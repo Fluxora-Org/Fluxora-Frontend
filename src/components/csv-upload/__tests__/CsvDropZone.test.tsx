@@ -18,10 +18,10 @@ const TWO_ROW_CSV =
   'GTESTRECIPIENT1111111111111111111111111111111111111111,200,5,60\n';
 
 describe('CsvDropZone', () => {
-  let onParsed: ReturnType<typeof vi.fn>;
+  let onParsed: ReturnType<typeof vi.fn> & ((result: ParseResult, fileName: string, rawText: string) => void);
 
   beforeEach(() => {
-    onParsed = vi.fn();
+    onParsed = vi.fn() as unknown as ReturnType<typeof vi.fn> & ((result: ParseResult, fileName: string, rawText: string) => void);
   });
 
   afterEach(() => {
@@ -79,6 +79,23 @@ describe('CsvDropZone', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+  });
+
+  it('rejects a file with an empty MIME type and non-.csv extension', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+    const badFile = makeFile('not a csv', 'notes.pdf', '');
+
+    fireEvent.change(input, { target: { files: [badFile] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only .csv files are accepted.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    expect(zone.className).toContain('csv-drop-zone--parse-error');
   });
 
   it('parses a valid CSV dropped onto the zone and calls onParsed', async () => {

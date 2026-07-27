@@ -2,8 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ReportBuilderPanel from "../ReportBuilderPanel";
 import { Stream } from "../Stream";
-import React from "react";
-
 // Mock the toast provider to prevent errors during rendering
 vi.mock("../../toast/ToastProvider", () => ({
   useToast: () => ({ addToast: vi.fn() }),

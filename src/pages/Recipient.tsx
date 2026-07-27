@@ -12,13 +12,12 @@ import { withdraw } from "../lib/stellar/tx";
 import { getStreamStatusNotificationContent } from "../components/ToastNotification";
 import { TransactionReceiptPreview } from "../components/receipt/TransactionReceiptPreview";
 import type { ReceiptData } from "../utils/receiptGenerator";
-import { X, CheckCircle2 } from "lucide-react";
+import { Shield, Fingerprint, Lock, Key, CheckCircle2, XCircle, AlertCircle, X } from "lucide-react";
 import RecipientMonthlySummary from "../components/recipient/RecipientMonthlySummary";
 import "./Streams.css";
 import "./Recipient.css";
-import { TRANSACTION_RESET_DELAY_MS } from "../lib/transactionConfig";
+import { useFaviconBadge } from "../utils/faviconBadge";
 import { useModalAccessibility } from "../components/useModalAccessibility";
-import { Shield, Fingerprint, Lock, Unlock, Key, CheckCircle2, XCircle, AlertCircle, X, Loader2 } from "lucide-react";
 
 // (Removed top-level timeoutRef and useEffect; will be added inside component)
 
@@ -101,7 +100,6 @@ export function getRecipientPageTitle(
 }
 
 export default function Recipient() {
-  const timeoutRef = useRef<number | null>(null);
   const wallet = useWallet();
   const { addToast } = useToast();
 
@@ -147,14 +145,14 @@ export default function Recipient() {
   const [enrollmentStep, setEnrollmentStep] = useState('check-support');
   const [pinValue, setPinValue] = useState("");
   const [confirmPinValue, setConfirmPinValue] = useState("");
-  const [enrollmentError, setEnrollmentError] = useState(null);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
   // Verification Modal States
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyState, setVerifyState] = useState('prompt-active');
   const [verifyPinValue, setVerifyPinValue] = useState("");
   const [verifyActionType, setVerifyActionType] = useState('withdraw');
-  const [verifyError, setVerifyError] = useState(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Refs for modal accessibility
   const enrollmentModalRef = useRef(null);
@@ -287,6 +285,8 @@ export default function Recipient() {
     );
   }, [isTabFocused, pendingWithdrawalCount]);
 
+  useFaviconBadge(pendingWithdrawalCount);
+
   const setStoredAlertsEnabled = (enabled: boolean) => {
     setAlertsEnabled(enabled);
     try {
@@ -383,7 +383,7 @@ export default function Recipient() {
             },
             timeout: 60000
           }
-        };
+        } as CredentialCreationOptions;
         await navigator.credentials.create(options);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -391,9 +391,10 @@ export default function Recipient() {
       localStorage.setItem("fluxora_biometric_enrolled", "true");
       setIsBiometricEnrolled(true);
       setEnrollmentStep("set-pin");
-    } catch (err) {
-      setEnrollmentError(err.message || "Failed to register biometrics.");
-    }
+} catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to register biometrics.";
+        setEnrollmentError(message);
+      }
   };
 
   const triggerBiometricVerification = async () => {
@@ -407,20 +408,21 @@ export default function Recipient() {
           publicKey: {
             challenge,
             timeout: 60000,
-            userVerification: "required"
+            userVerification: "required" as const
           }
-        };
+        } as CredentialRequestOptions;
         await navigator.credentials.get(options);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       handleVerificationSuccess();
-    } catch (err) {
-      if (err.name === "NotAllowedError" || err.name === "AbortError") {
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      if (error.name === "NotAllowedError" || error.name === "AbortError") {
         setVerifyState("prompt-cancelled");
       } else {
         setVerifyState("prompt-failed");
-        setVerifyError(err.message || "Biometric verification failed.");
+        setVerifyError(error.message || "Biometric verification failed.");
       }
     }
   };
@@ -445,7 +447,7 @@ export default function Recipient() {
     }
   }, [isVerifyModalOpen, verifyState]);
 
-  const handleEnrollPinKeyPress = (key) => {
+  const handleEnrollPinKeyPress = (key: string) => {
     setEnrollmentError(null);
     const activePin = enrollmentStep === "set-pin" ? pinValue : confirmPinValue;
     const setActivePin = enrollmentStep === "set-pin" ? setPinValue : setConfirmPinValue;
@@ -487,7 +489,7 @@ export default function Recipient() {
     }
   };
 
-  const handleVerifyPinKeyPress = (key) => {
+  const handleVerifyPinKeyPress = (key: string) => {
     setVerifyError(null);
     if (key === "backspace") {
       setVerifyPinValue(verifyPinValue.slice(0, -1));
@@ -564,10 +566,11 @@ export default function Recipient() {
       setShowReceiptModal(true);
       addToast("Withdrawal completed successfully on-chain!", "success");
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
-    } catch (err) {
+    } catch (err: unknown) {
+      const error = err as Error;
       setTxState("error");
-      setErrorMsg(err.message || "Withdrawal failed.");
-      addToast(`Withdrawal failed: ${err.message || err}`, "error");
+      setErrorMsg(error.message || "Withdrawal failed.");
+      addToast(`Withdrawal failed: ${error.message || error}`, "error");
     }
   };
 
@@ -601,6 +604,55 @@ export default function Recipient() {
           View your incoming streams and withdraw accrued USDC at any time.
         </p>
         <RecipientEmptyState walletConnected={walletConnected} />
+
+        {/* ── Local Security Gate (shown even without streams) ── */}
+        {walletConnected && (
+          <section className="security-gate-section" aria-labelledby="security-gate-title">
+            <div className="security-gate-card">
+              <div className="security-gate-card__header">
+                <div className="security-gate-icon-container">
+                  <Shield className="security-gate-icon" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 id="security-gate-title">Local Security Gate</h2>
+                  <p className="security-gate-description">
+                    Add an optional biometric or PIN confirmation step before each
+                    withdrawal. This is a local UX gate only and does not replace
+                    your wallet's cryptographic signing prompt.
+                  </p>
+                </div>
+              </div>
+              <div className="security-gate-card__actions">
+                <div className="security-gate-status">
+                  <span className="security-status-label">Status:</span>
+                  <span
+                    className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
+                    aria-live="polite"
+                  >
+                    {isSecurityGateEnabled ? "Active" : "Disabled"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={`streams-primary-button security-gate-toggle-btn ${isSecurityGateEnabled ? "danger" : ""}`}
+                  onClick={handleToggleSecurityGate}
+                >
+                  {isSecurityGateEnabled ? "Disable" : "Enable"}
+                </button>
+                {isSecurityGateEnabled && (
+                  <button
+                    type="button"
+                    className="security-gate-pin-btn"
+                    onClick={handleUpdatePIN}
+                    aria-label="Update backup PIN"
+                  >
+                    <Key size={14} aria-hidden="true" /> Update PIN
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
     );
   }
@@ -728,6 +780,423 @@ export default function Recipient() {
               <button type="button" className="recipient-alerts-primary" onClick={() => void enableNotifications()}>Allow stream alerts</button>
             </div>
           </section>
+        </div>
+      )}
+
+      {/* ── Local Security Gate Settings ── */}
+      <section className="security-gate-section" aria-labelledby="security-gate-title">
+        <div className="security-gate-card">
+          <div className="security-gate-card__header">
+            <div className="security-gate-icon-container">
+              <Shield className="security-gate-icon" aria-hidden="true" />
+            </div>
+            <div>
+              <h2 id="security-gate-title">Local Security Gate</h2>
+              <p className="security-gate-description">
+                Add an optional biometric or PIN confirmation step before each
+                withdrawal. This is a local UX gate only and does not replace
+                your wallet's cryptographic signing prompt.
+              </p>
+            </div>
+          </div>
+          <div className="security-gate-card__actions">
+            <div className="security-gate-status">
+              <span className="security-status-label">Status:</span>
+              <span
+                className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
+                aria-live="polite"
+              >
+                {isSecurityGateEnabled ? "Active" : "Disabled"}
+              </span>
+            </div>
+            <button
+              type="button"
+              className={`streams-primary-button security-gate-toggle-btn ${isSecurityGateEnabled ? "danger" : ""}`}
+              onClick={handleToggleSecurityGate}
+            >
+              {isSecurityGateEnabled ? "Disable" : "Enable"}
+            </button>
+            {isSecurityGateEnabled && (
+              <button
+                type="button"
+                className="security-gate-pin-btn"
+                onClick={handleUpdatePIN}
+                aria-label="Update backup PIN"
+              >
+                <Key size={14} aria-hidden="true" /> Update PIN
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Enrollment Modal ── */}
+      {isEnrollmentModalOpen && (
+        <div
+          className="security-modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setIsEnrollmentModalOpen(false);
+          }}
+        >
+          <div
+            className="security-modal"
+            ref={enrollmentModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="enrollment-modal-title"
+          >
+            <button
+              type="button"
+              className="security-modal__close-btn"
+              onClick={() => setIsEnrollmentModalOpen(false)}
+              aria-label="Close enrollment dialog"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="security-modal__header">
+              <span className="security-modal__badge">
+                {enrollmentStep === "success" ? "Complete" : "Setup"}
+              </span>
+              <h2 id="enrollment-modal-title">
+                {enrollmentStep === "check-support" && "Setup Security Gate"}
+                {enrollmentStep === "set-pin" && "Set Security PIN"}
+                {enrollmentStep === "confirm-pin" && "Confirm Security PIN"}
+                {enrollmentStep === "success" && "Setup Complete!"}
+              </h2>
+            </div>
+
+            <div className="security-modal__body">
+              {/* Step: check-support — biometric enrollment */}
+              {enrollmentStep === "check-support" && (
+                <>
+                  <div className="security-visual-container">
+                    <Fingerprint className="security-visual-icon security-visual-icon--pulse" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Register your device biometrics (Touch ID, Face ID, or Windows
+                    Hello) as an additional confirmation step before each withdrawal.
+                  </p>
+                  {enrollmentError && (
+                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                  )}
+                  <div className="security-modal__actions">
+                    <button
+                      type="button"
+                      className="streams-primary-button"
+                      onClick={triggerBiometricEnrollment}
+                    >
+                      <Fingerprint size={16} aria-hidden="true" /> Register Device Biometrics
+                    </button>
+                    <button
+                      type="button"
+                      className="streams-secondary-button"
+                      onClick={() => setEnrollmentStep("set-pin")}
+                    >
+                      Skip — use PIN only
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step: set-pin — first PIN entry */}
+              {enrollmentStep === "set-pin" && (
+                <>
+                  <div className="security-visual-container">
+                    <Lock className="security-visual-icon" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Set a 4-digit backup PIN. You can use this if biometrics are
+                    unavailable on your device.
+                  </p>
+                  {enrollmentError && (
+                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                  )}
+                  <div className="pin-display-dots" aria-label={`PIN entry: ${pinValue.length} of 4 digits entered`}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <span
+                        key={i}
+                        className={`pin-dot ${i < pinValue.length ? "pin-dot--filled" : ""}`}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </div>
+                  <div className="pin-keypad" role="group" aria-label="PIN keypad">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <button key={n} type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress(String(n))}>
+                        {n}
+                      </button>
+                    ))}
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("clear")} aria-label="Clear">Clear</button>
+                    <button type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress("0")}>0</button>
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("backspace")} aria-label="Backspace">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step: confirm-pin — verify PIN match */}
+              {enrollmentStep === "confirm-pin" && (
+                <>
+                  <div className="security-visual-container">
+                    <Key className="security-visual-icon" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Re-enter your 4-digit PIN to confirm.
+                  </p>
+                  {enrollmentError && (
+                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                  )}
+                  <div className="pin-display-dots" aria-label={`PIN confirmation: ${confirmPinValue.length} of 4 digits entered`}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <span
+                        key={i}
+                        className={`pin-dot ${i < confirmPinValue.length ? "pin-dot--filled" : ""}`}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </div>
+                  <div className="pin-keypad" role="group" aria-label="PIN confirmation keypad">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <button key={n} type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress(String(n))}>
+                        {n}
+                      </button>
+                    ))}
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("clear")} aria-label="Clear">Clear</button>
+                    <button type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress("0")}>0</button>
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("backspace")} aria-label="Backspace">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step: success */}
+              {enrollmentStep === "success" && (
+                <>
+                  <div className="security-visual-container">
+                    <CheckCircle2 className="security-visual-icon security-visual-icon--success" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Your local security gate is now active. You'll be asked to
+                    confirm with biometrics or your backup PIN before each withdrawal.
+                  </p>
+                  <div className="security-modal__actions">
+                    <button
+                      type="button"
+                      className="streams-primary-button"
+                      onClick={() => setIsEnrollmentModalOpen(false)}
+                    >
+                      Done
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <p className="security-modal__disclaimer">
+              This is a local UX gate only. Your private keys are never exposed.
+              The wallet's own signing prompt handles cryptographic transaction
+              authorization.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Verification Modal ── */}
+      {isVerifyModalOpen && (
+        <div
+          className="security-modal-overlay"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsVerifyModalOpen(false);
+              if (txState === "signing") setTxState("idle");
+            }
+          }}
+        >
+          <div
+            className="security-modal"
+            ref={verifyModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-modal-title"
+          >
+            <button
+              type="button"
+              className="security-modal__close-btn"
+              onClick={() => {
+                setIsVerifyModalOpen(false);
+                if (txState === "signing") setTxState("idle");
+              }}
+              aria-label="Close verification dialog"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="security-modal__header">
+              <span className="security-modal__badge">Verify Identity</span>
+              <h2 id="verify-modal-title">
+                {verifyState === "prompt-active" && "Authorize Withdrawal"}
+                {verifyState === "prompt-succeeded" && "Verification Passed"}
+                {verifyState === "prompt-failed" && "Verification Failed"}
+                {verifyState === "prompt-cancelled" && "Verification Cancelled"}
+                {verifyState === "unsupported-device-fallback" && "Enter Backup PIN"}
+              </h2>
+            </div>
+
+            <div className="security-modal__body">
+              {/* Biometric prompt — waiting for Touch ID / Face ID / Hello */}
+              {verifyState === "prompt-active" && (
+                <>
+                  <div className="security-visual-container">
+                    <Fingerprint className="security-visual-icon security-visual-icon--pulse" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Confirm your identity using your device biometrics.
+                  </p>
+                  <div className="security-modal__actions">
+                    <button
+                      type="button"
+                      className="streams-secondary-button"
+                      onClick={() => {
+                        setIsVerifyModalOpen(false);
+                        executeOnChainWithdraw();
+                      }}
+                    >
+                      Skip to Wallet signing
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Biometric succeeded */}
+              {verifyState === "prompt-succeeded" && (
+                <>
+                  <div className="security-visual-container">
+                    <CheckCircle2 className="security-visual-icon security-visual-icon--success" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Identity verified. Proceeding to withdrawal…
+                  </p>
+                </>
+              )}
+
+              {/* Biometric failed */}
+              {verifyState === "prompt-failed" && (
+                <>
+                  <div className="security-visual-container">
+                    <XCircle className="security-visual-icon security-visual-icon--error" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Biometric verification failed. You can try again or use your backup PIN.
+                  </p>
+                  {verifyError && (
+                    <div className="security-modal__error" role="alert">{verifyError}</div>
+                  )}
+                  <div className="security-modal__actions">
+                    <button
+                      type="button"
+                      className="streams-primary-button"
+                      onClick={() => triggerBiometricVerification()}
+                    >
+                      <Fingerprint size={16} aria-hidden="true" /> Try Again
+                    </button>
+                    <button
+                      type="button"
+                      className="streams-secondary-button"
+                      onClick={() => setVerifyState("unsupported-device-fallback")}
+                    >
+                      Use Backup PIN
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Biometric cancelled by user */}
+              {verifyState === "prompt-cancelled" && (
+                <>
+                  <div className="security-visual-container">
+                    <AlertCircle className="security-visual-icon security-visual-icon--warning" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Verification was cancelled. You can try again or use your backup PIN.
+                  </p>
+                  <div className="security-modal__actions">
+                    <button
+                      type="button"
+                      className="streams-primary-button"
+                      onClick={() => triggerBiometricVerification()}
+                    >
+                      <Fingerprint size={16} aria-hidden="true" /> Try Again
+                    </button>
+                    <button
+                      type="button"
+                      className="streams-secondary-button"
+                      onClick={() => setVerifyState("unsupported-device-fallback")}
+                    >
+                      Use Backup PIN
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* PIN fallback — unsupported device or user chose to skip */}
+              {verifyState === "unsupported-device-fallback" && (
+                <>
+                  <div className="security-visual-container">
+                    <Lock className="security-visual-icon" aria-hidden="true" />
+                  </div>
+                  <p className="security-modal__text">
+                    Enter your 4-digit backup PIN to confirm this withdrawal.
+                  </p>
+                  {verifyError && (
+                    <div className="security-modal__error" role="alert">{verifyError}</div>
+                  )}
+                  <div className="pin-display-dots" aria-label={`PIN entry: ${verifyPinValue.length} of 4 digits entered`}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <span
+                        key={i}
+                        className={`pin-dot ${i < verifyPinValue.length ? "pin-dot--filled" : ""}`}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </div>
+                  <div className="pin-keypad" role="group" aria-label="Backup PIN keypad">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <button key={n} type="button" className="pin-key" onClick={() => handleVerifyPinKeyPress(String(n))}>
+                        {n}
+                      </button>
+                    ))}
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleVerifyPinKeyPress("clear")} aria-label="Clear">Clear</button>
+                    <button type="button" className="pin-key" onClick={() => handleVerifyPinKeyPress("0")}>0</button>
+                    <button type="button" className="pin-key pin-key--util" onClick={() => handleVerifyPinKeyPress("backspace")} aria-label="Backspace">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    </button>
+                  </div>
+                  {isBiometricSupported && isBiometricEnrolled && (
+                    <button
+                      type="button"
+                      className="streams-secondary-button"
+                      onClick={() => {
+                        setVerifyState("prompt-active");
+                        triggerBiometricVerification();
+                      }}
+                    >
+                      <Fingerprint size={16} aria-hidden="true" /> Use Biometrics Instead
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            <p className="security-modal__disclaimer">
+              This is a local UX gate only. The wallet's own signing prompt handles
+              cryptographic transaction authorization.
+            </p>
+          </div>
         </div>
       )}
 

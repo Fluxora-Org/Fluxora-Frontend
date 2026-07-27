@@ -148,21 +148,6 @@ export function getStoredFontPreference(): boolean {
 }
 
 /**
- * Reads the persisted font mode, validating it against {@link isFontMode}.
- *
- * @returns The stored {@link FontMode}, or `null` when nothing valid is stored.
- */
-function getStoredFontMode(): FontMode | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = window.localStorage.getItem(FONT_STORAGE_KEY);
-    return isFontMode(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Resolves the current operating-system colour-scheme preference.
  *
  * @returns `"dark"` when the OS prefers a dark scheme, otherwise `"light"`.
@@ -516,19 +501,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggleEasyReadFont = useCallback(() => {
     setEasyReadFont(!easyReadFont);
   }, [easyReadFont, setEasyReadFont]);
-
-  const setFontMode = useCallback((next: FontMode) => {
-    try {
-      window.localStorage.setItem(FONT_STORAGE_KEY, next);
-    } catch {
-      // Ignore persistence failures; in-memory state still updates the UI.
-    }
-    setFontModeState(next);
-  }, []);
-
-  const toggleFontMode = useCallback(() => {
-    setFontMode(fontMode === "default" ? "dyslexic" : "default");
-  }, [fontMode, setFontMode]);
 
   // Follow the OS colour-scheme preference
   useEffect(() => {

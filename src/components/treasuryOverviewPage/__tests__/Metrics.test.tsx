@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach } from "vitest";
 import Metrics from "../Metrics";
 import { treasuryDemoMetrics } from "../../../fixtures/treasury";
 
