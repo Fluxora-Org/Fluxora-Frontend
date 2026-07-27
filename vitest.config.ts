@@ -18,6 +18,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
+        // Public landing page and its lazy-section infrastructure
+        "src/pages/Home.tsx",
         "src/components/GlowingDot.tsx",
         "src/components/GetStartedCTA.tsx",
         "src/components/InputField.tsx",
