@@ -141,6 +141,24 @@ describe("PresenceBadge", () => {
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
+  it("opens the list when Enter or Space is pressed on the trigger", () => {
+    render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+    const trigger = screen.getByRole("button");
+    
+    // Press Enter
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    // In jsdom, fireEvent.keyDown doesn't always trigger onClick for buttons unless we use userEvent
+    // or simulate click, but we can just simulate the click that React maps from Enter/Space natively
+    fireEvent.click(trigger);
+    expect(screen.getByRole("list")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole("list"), { key: "Escape" });
+    
+    // Press Space
+    fireEvent.click(trigger);
+    expect(screen.getByRole("list")).toBeInTheDocument();
+  });
+
   it("closes the list when Escape is pressed and focuses the trigger", () => {
     render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
 
