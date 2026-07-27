@@ -180,6 +180,15 @@
   flex-shrink: 0;
 }
 
+/* Fading-out row: viewer is leaving soon — muted appearance */
+.presence-viewer-row--fading {
+  opacity: 0.5;
+}
+
+.presence-viewer-dot--fading {
+  background-color: var(--color-text-tertiary, #718096) !important;
+}
+
 .presence-viewer-name {
   flex-grow: 1;
   overflow: hidden;
