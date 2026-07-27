@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './InfoTooltip.css';
 
 export interface InfoTooltipProps {
@@ -22,6 +22,7 @@ export interface InfoTooltipProps {
  * - Keyboard accessible (Enter/Space to toggle, ESC to close)
  * - Click outside to close
  * - Smart positioning (flips if insufficient space)
+ * - Non-clipped focus-visible outline for interactive elements (using theme tokens)
  * - Focus trap when open
  * - Mobile-friendly tap interactions
  * 
@@ -49,7 +50,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Calculate tooltip position based on available space
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current || !tooltipRef.current) return;
 
     const trigger = triggerRef.current.getBoundingClientRect();
@@ -87,6 +88,50 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     }
 
     setCalculatedPosition(bestPosition);
+
+    // Calculate unshifted coordinates relative to viewport
+    let tooltipLeft = 0;
+    let tooltipTop = 0;
+
+    if (viewport.width < 480) {
+      tooltipLeft = trigger.left + trigger.width / 2 - (viewport.width - 32) / 2;
+      tooltipTop = trigger.bottom + 8;
+    } else {
+      if (bestPosition === 'bottom') {
+        tooltipLeft = trigger.left + trigger.width / 2 - tooltipWidth / 2;
+        tooltipTop = trigger.bottom + 8;
+      } else if (bestPosition === 'top') {
+        tooltipLeft = trigger.left + trigger.width / 2 - tooltipWidth / 2;
+        tooltipTop = trigger.top - 8 - tooltipHeight;
+      } else if (bestPosition === 'left') {
+        tooltipLeft = trigger.left - 8 - tooltipWidth;
+        tooltipTop = trigger.top + trigger.height / 2 - tooltipHeight / 2;
+      } else if (bestPosition === 'right') {
+        tooltipLeft = trigger.right + 8;
+        tooltipTop = trigger.top + trigger.height / 2 - tooltipHeight / 2;
+      }
+    }
+
+    // Compute shifts needed to keep the tooltip inside viewport with safety margin
+    const safetyMargin = 12;
+    const currentWidth = viewport.width < 480 ? viewport.width - 32 : tooltipWidth;
+
+    let shiftX = 0;
+    if (tooltipLeft < safetyMargin) {
+      shiftX = safetyMargin - tooltipLeft;
+    } else if (tooltipLeft + currentWidth > viewport.width - safetyMargin) {
+      shiftX = viewport.width - safetyMargin - (tooltipLeft + currentWidth);
+    }
+
+    let shiftY = 0;
+    if (tooltipTop < safetyMargin) {
+      shiftY = safetyMargin - tooltipTop;
+    } else if (tooltipTop + tooltipHeight > viewport.height - safetyMargin) {
+      shiftY = viewport.height - safetyMargin - (tooltipTop + tooltipHeight);
+    }
+
+    tooltipRef.current.style.setProperty('--tooltip-shift-x', `${shiftX}px`);
+    tooltipRef.current.style.setProperty('--tooltip-shift-y', `${shiftY}px`);
   }, [isOpen, position]);
 
   // Toggle tooltip
@@ -133,13 +178,12 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  // Focus close button when tooltip opens
-  useEffect(() => {
-    if (isOpen && closeButtonRef.current) {
-      // Small delay to allow positioning to settle
-      setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 50);
+  // Focus close button when tooltip opens. Using a layout effect (which runs
+  // synchronously after the DOM mutation, before paint) gives reliable focus
+  // timing without the fragility of a setTimeout/raf deferral.
+  useLayoutEffect(() => {
+    if (isOpen) {
+      closeButtonRef.current?.focus();
     }
   }, [isOpen]);
 

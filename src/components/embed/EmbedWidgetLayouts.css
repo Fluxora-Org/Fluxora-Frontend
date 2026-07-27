@@ -1,0 +1,450 @@
+/**
+ * Embed Widget Layouts CSS
+ * 
+ * Responsive, accessible styling for embeddable stream widgets.
+ * WCAG 2.1 AA compliant with proper contrast ratios.
+ */
+
+/* ============================================================================
+   Shared Widget Styles
+   ============================================================================ */
+
+.embed-widget-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.embed-widget-status-badge.compact {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  min-width: 1.5rem;
+  justify-content: center;
+}
+
+.embed-widget-status-badge--active {
+  background-color: var(--color-success-bg, rgba(16, 185, 129, 0.1));
+  color: var(--color-success, #10b981);
+  border-color: var(--color-success, #10b981);
+}
+
+.embed-widget-status-badge--paused {
+  background-color: var(--color-warning-bg, rgba(245, 158, 11, 0.1));
+  color: var(--color-warning, #f59e0b);
+  border-color: var(--color-warning, #f59e0b);
+}
+
+.embed-widget-status-badge--completed {
+  background-color: var(--color-info-bg, rgba(59, 130, 246, 0.1));
+  color: var(--color-info, #3b82f6);
+  border-color: var(--color-info, #3b82f6);
+}
+
+/* Fallback badge for status values not yet recognised by the frontend */
+.embed-widget-status-badge--unknown {
+  background-color: var(--color-surface-elevated, #f0f3f7);
+  color: var(--color-text-secondary, #4a5565);
+  border-color: var(--color-border-default, #e0e6ed);
+}
+
+.embed-widget-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.embed-widget-metric.compact {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.embed-widget-metric__label {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary, #6b7a94);
+  font-weight: 500;
+}
+
+.embed-widget-metric.compact .embed-widget-metric__label {
+  font-size: 0.6875rem;
+}
+
+.embed-widget-metric__value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+}
+
+.embed-widget-metric.compact .embed-widget-metric__value {
+  font-size: 0.75rem;
+}
+
+/* Progress bar styling */
+[class*="embed-widget"] [class*="progress-bar"] {
+  height: 6px;
+  background-color: var(--color-surface-elevated, #f0f3f7);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+[class*="embed-widget"] [class*="progress-fill"] {
+  height: 100%;
+  background-color: var(--color-accent-primary, #00b8d4);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Focus states for accessibility */
+.embed-widget-status-badge:focus-visible,
+.embed-widget-metric:focus-visible {
+  outline: 2px solid var(--interactive-focus-ring, #007acc);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   Card Layout (300px-420px)
+   ============================================================================ */
+
+.embed-widget-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--color-surface-default, #fafbfc);
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  max-width: 420px;
+  /* min-width uses min() so it never exceeds the available container width.
+     At 300px+ the preferred floor applies; in very narrow embed iframes the
+     card flexes down to 100% instead of overflowing its parent. */
+  min-width: min(300px, 100%);
+  width: 100%;
+}
+
+.embed-widget-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.embed-widget-card__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.embed-widget-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.embed-widget-card__timeline {
+  margin: 0 -0.25rem;
+}
+
+.embed-widget-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.embed-widget-card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.embed-widget-card__progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #4a5565);
+}
+
+.embed-widget-card__progress-percentage {
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+}
+
+.embed-widget-card__footer {
+  border-top: 1px solid var(--color-border-default, #e0e6ed);
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.embed-widget-card__attribution {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary, #6b7a94);
+  justify-content: flex-end;
+}
+
+/* ============================================================================
+   Banner Layout (600px+)
+   ============================================================================ */
+
+.embed-widget-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-default, #fafbfc);
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  border-radius: 8px;
+  /* Preferred floor of 500px, but never wider than the container.
+     This lets the banner fit inside any embed iframe without triggering
+     horizontal scroll, while preserving the horizontal layout intention
+     at real 500px+ widths. The ≤640px media query below switches to
+     flex-direction: column and drops min-width entirely for very narrow frames. */
+  min-width: min(500px, 100%);
+  max-width: 800px;
+  width: 100%;
+}
+
+.embed-widget-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.embed-widget-banner__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.embed-widget-banner__timeline {
+  flex: 1;
+  min-width: 200px;
+}
+
+.embed-widget-banner__metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.embed-widget-banner__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.embed-widget-banner__progress-label {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary, #6b7a94);
+  min-width: 48px;
+}
+
+.embed-widget-banner__progress-bar {
+  flex: 1;
+  min-width: 60px;
+}
+
+.embed-widget-banner__progress-percentage {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ============================================================================
+   Compact Layout (200-300px)
+   ============================================================================ */
+
+.embed-widget-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--color-surface-default, #fafbfc);
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  border-radius: 8px;
+  /* Preferred floor of 200px, capped at 100% so the compact widget never
+     overflows its iframe container in very tight embed slots. */
+  min-width: min(200px, 100%);
+  max-width: 300px;
+  width: 100%;
+}
+
+.embed-widget-compact__main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.embed-widget-compact__progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.embed-widget-compact__progress-percentage {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1f36);
+  min-width: 28px;
+}
+
+.embed-widget-compact__progress-bar {
+  flex: 1;
+}
+
+.embed-widget-compact__attribution {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary, #6b7a94);
+  justify-content: flex-end;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .embed-widget-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    min-width: unset;
+    padding: 1rem;
+  }
+  
+  .embed-widget-banner__info,
+  .embed-widget-banner__metrics {
+    min-width: unset;
+  }
+  
+  .embed-widget-card {
+    padding: 1rem;
+  }
+  
+  .embed-widget-card__metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Small mobile adjustments */
+@media (max-width: 400px) {
+  .embed-widget-card__metrics {
+    grid-template-columns: 1fr;
+  }
+  
+  .embed-widget-card__title {
+    font-size: 0.875rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .embed-widget-card,
+  .embed-widget-banner,
+  .embed-widget-compact {
+    border-width: 2px;
+  }
+  
+  [class*="embed-widget"] [class*="progress-bar"] {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  [class*="embed-widget"] [class*="progress-fill"] {
+    transition: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .embed-widget-card,
+  .embed-widget-banner,
+  .embed-widget-compact {
+    border: 1px solid #000;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  
+  .embed-widget-card__attribution,
+  .embed-widget-compact__attribution {
+    color: #000;
+  }
+}
+
+/* ============================================================================
+   Banner Skeleton Layout
+   Mirrors the real banner's responsive structure so there is no layout shift
+   on load: stacked (column) by default, row at ≥640 px.
+   ============================================================================ */
+
+.embed-widget-banner-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--color-surface-default, #fafbfc);
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.embed-widget-banner-skeleton__info,
+.embed-widget-banner-skeleton__timeline,
+.embed-widget-banner-skeleton__metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 641px) {
+  .embed-widget-banner-skeleton {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .embed-widget-banner-skeleton__info {
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+
+  .embed-widget-banner-skeleton__timeline {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .embed-widget-banner-skeleton__metrics {
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+}

@@ -1,0 +1,97 @@
+/* ── StreamsTable 400%-zoom reflow ──────────────────────────
+ * WCAG 1.4.10 Reflow: at an effective 320px CSS-pixel viewport
+ * (400% zoom on 1280px), the table must reflow to a single-column
+ * stacked-card layout without horizontal scrolling.
+ *
+ * Strategy: container queries (@container) respond to the
+ * component's own width, not the viewport, so the reflow triggers
+ * correctly at any device width when zoom causes the container to
+ * shrink below the threshold.
+ *
+ * Breakpoint: 480px container width — chosen because at 400% zoom
+ * on a 1280px baseline viewport the effective width is 320px, and
+ * many real-world layouts have padding; 480px gives a comfortable
+ * margin while still catching all scenarios where the table would
+ * need horizontal scrolling.
+ * ─────────────────────────────────────────────────────────── */
+
+.streams-table-container {
+  container-type: inline-size;
+}
+
+/* ── Card layout at narrow container widths ──────────────── */
+@container (max-width: 480px) {
+  .streams-table-container .overflow-x-auto {
+    overflow-x: visible;
+  }
+
+  .streams-table-container thead {
+    display: none;
+  }
+
+  .streams-table-container tbody tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background: var(--color-surface-default);
+  }
+
+  .streams-table-container tbody tr:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: 2px;
+  }
+
+  .streams-table-container tbody td {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    border: none;
+  }
+
+  .streams-table-container tbody td::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+    min-width: 5.5rem;
+  }
+
+  .streams-table-container tbody td:first-child {
+    /* Checkbox column — hide the label, keep the control */
+    padding-top: 0;
+  }
+
+  .streams-table-container tbody td:last-child {
+    /* Action column — keep buttons accessible */
+    padding-bottom: 0;
+  }
+
+  /* Stream name row gets a visual header */
+  .streams-table-container tbody td[data-label="STREAM"] {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  .streams-table-container tbody td[data-label="STREAM"]::before {
+    content: "Stream";
+  }
+
+  .streams-table-container .stream-row__cell {
+    vertical-align: baseline;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .streams-table-container tbody tr {
+    transition: none;
+  }
+}

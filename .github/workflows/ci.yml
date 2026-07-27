@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # @stellar/stellar-sdk requires Node >= 22.
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (type-check + bundle)
+        run: npm run build
+
+      - name: Test
+        run: npm run test
+
+      # NOTE: `npm run lint` is intentionally not run here yet. The repo
+      # currently has ~68 pre-existing eslint errors (mostly
+      # @typescript-eslint/no-explicit-any) spread across ~15 files that
+      # predate this workflow. Fixing them is a real but separate cleanup
+      # effort, not something to fold into introducing CI. Once that debt
+      # is paid down, add a `run: npm run lint` step here.

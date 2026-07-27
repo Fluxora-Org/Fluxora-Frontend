@@ -1,12 +1,14 @@
 import React, { useState, useRef } from "react";
 import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
+import { copyToClipboard } from "../../hooks/useClipboard";
 
-import { ChevronDown, Copy, Check, ExternalLink, LogOut } from "lucide-react";
+import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
 
-function truncate(addr: string) {
+function truncate(addr?: string | null) {
+  if (!addr) return "";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
@@ -15,7 +17,9 @@ export default function WalletButton() {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const connectTriggerRef = useRef<HTMLButtonElement>(null);
 
   // The canonical ConnectWalletModal performs the Freighter connection and
   // error handling internally; WalletButton just closes once it succeeds.
@@ -27,11 +31,18 @@ export default function WalletButton() {
     setModalOpen(true);
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!address) return;
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(address);
+    if (success) {
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setCopyFailed(true);
+      setCopied(false);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   }
 
   function handleExplorer() {
@@ -43,6 +54,8 @@ export default function WalletButton() {
   function handleDisconnect() {
     disconnect();
     setDropdownOpen(false);
+    // Defer focus until the connected UI is replaced by the "Connect wallet" button
+    requestAnimationFrame(() => connectTriggerRef.current?.focus());
   }
 
   function handleDropdownKey(e: React.KeyboardEvent) {
@@ -54,6 +67,7 @@ export default function WalletButton() {
     return (
       <>
         <button
+          ref={connectTriggerRef}
           onClick={handleOpenModal}
           className="px-4 py-3 text-base font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
           style={{
@@ -91,8 +105,8 @@ export default function WalletButton() {
             className={cn(
               "px-2.5 py-1 text-[11px] font-bold tracking-widest rounded-lg select-none border",
               network === "PUBLIC"
-                ? "bg-green-500/10 text-green-300 border-green-500/30"
-                : "bg-[#7B33064D] text-[#FFB900] border-[#BB4D004D]",
+                ? "bg-[var(--status-success-bg)] text-[var(--status-success)] border-[var(--status-success-bg)]"
+                : "bg-[var(--status-warning-bg)] text-[var(--status-warning)] border-[var(--status-warning-bg)]",
             )}
           >
             {network}
@@ -106,18 +120,18 @@ export default function WalletButton() {
           aria-haspopup="true"
           aria-expanded={dropdownOpen}
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-[#0d1117] border cursor-pointer",
+            "flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium text-[var(--color-text-primary)] transition-all focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] focus:ring-offset-2 focus:ring-offset-[var(--color-bg-primary)] border cursor-pointer",
             dropdownOpen
-              ? "bg-white/10 border-cyan-500/45"
-              : "bg-[#1E2939] border-white/12 hover:bg-white/8",
+              ? "bg-[var(--interactive-bg-active)] border-[var(--focus-ring-color)]"
+              : "bg-[var(--color-surface-elevated)] border-[var(--color-border-default)] hover:bg-[var(--interactive-bg-hover)]",
           )}
         >
-          <span className="w-2 h-2 rounded-full bg-[#00C950] shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.9)]" />
+          <span className="w-2 h-2 rounded-full bg-[var(--status-success)] shrink-0 shadow-[0_0_6px_var(--status-success)]" />
           <span className="font-mono">{truncate(address!)}</span>
           <ChevronDown
             size={12}
             className={cn(
-              "text-gray-400 transition-transform duration-200",
+              "text-[var(--color-text-secondary)] transition-transform duration-200",
               dropdownOpen && "rotate-180",
             )}
           />
@@ -128,24 +142,26 @@ export default function WalletButton() {
           <div
             role="menu"
             onKeyDown={handleDropdownKey}
-            className="absolute right-0 top-full mt-2 w-72 rounded-2xl z-50 overflow-hidden bg-[#1E2939] border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+            className="absolute right-0 top-full mt-2 w-72 rounded-2xl z-50 overflow-hidden bg-[var(--color-surface-elevated)] border border-[var(--color-border-default)] shadow-[var(--shadow-xl)]"
           >
             {/* Address block */}
             <div className="px-4 pt-4 pb-3">
-              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-gray-500 mb-2">
+              <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--color-text-muted)] mb-2">
                 Connected Address
               </p>
               <div className="flex items-start gap-2">
-                <span className="font-mono text-[13px] text-gray-100 break-all leading-relaxed flex-1">
+                <span className="font-mono text-[13px] text-[var(--color-text-primary)] break-all leading-relaxed flex-1">
                   {address}
                 </span>
                 <button
                   onClick={handleCopy}
                   aria-label="Copy address"
-                  className="shrink-0 mt-0.5 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="shrink-0 mt-0.5 p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--interactive-bg-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)]"
                 >
                   {copied ? (
                     <Check size={15} className="text-emerald-400" />
+                  ) : copyFailed ? (
+                    <AlertCircle size={15} className="text-rose-400" />
                   ) : (
                     <Copy size={15} />
                   )}
@@ -153,38 +169,40 @@ export default function WalletButton() {
               </div>
             </div>
 
-            <div className="mx-4 h-px bg-white/8" />
+            <div className="mx-4 h-px bg-[var(--color-border-default)]" />
 
             {/* Actions */}
             <div className="py-1.5">
               <button
                 role="menuitem"
                 onClick={handleCopy}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/6 transition-colors focus:outline-none focus:bg-white/8"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--interactive-bg-hover)] transition-colors focus:outline-none focus:bg-[var(--interactive-bg-active)]"
               >
                 {copied ? (
                   <Check size={15} className="text-emerald-400" />
+                ) : copyFailed ? (
+                  <AlertCircle size={15} className="text-rose-400" />
                 ) : (
-                  <Copy size={15} className="text-gray-400" />
+                  <Copy size={15} className="text-[var(--color-text-muted)]" />
                 )}
-                {copied ? "Copied!" : "Copy address"}
+                {copied ? "Copied!" : copyFailed ? "Failed to copy!" : "Copy address"}
               </button>
 
               <button
                 role="menuitem"
                 onClick={handleExplorer}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/6 transition-colors focus:outline-none focus:bg-white/8"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--interactive-bg-hover)] transition-colors focus:outline-none focus:bg-[var(--interactive-bg-active)]"
               >
-                <ExternalLink size={15} className="text-gray-400" />
+                <ExternalLink size={15} className="text-[var(--color-text-muted)]" />
                 View on Stellar Explorer
               </button>
 
-              <div className="mx-4 my-1.5 h-px bg-white/8" />
+              <div className="mx-4 my-1.5 h-px bg-[var(--color-border-default)]" />
 
               <button
                 role="menuitem"
                 onClick={handleDisconnect}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors focus:outline-none focus:bg-red-500/10"
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--status-error)] hover:bg-[var(--status-error-bg)] transition-colors focus:outline-none focus:bg-[var(--status-error-bg)]"
               >
                 <LogOut size={15} />
                 Disconnect

@@ -3,6 +3,7 @@ import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { webcrypto, randomBytes } from 'node:crypto';
+import { en as mockEn } from '../i18n/en';
 
 // Polyfill Web Crypto API for Stellar SDK / @noble/ed25519 in test environment
 const customCrypto = {
@@ -15,6 +16,8 @@ const customCrypto = {
     return array;
   },
   subtle: webcrypto.subtle,
+  randomUUID: (): `${string}-${string}-${string}-${string}-${string}` =>
+    webcrypto.randomUUID(),
 };
 
 if (typeof window !== 'undefined') {
@@ -52,6 +55,75 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
+if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => ({
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arcTo: vi.fn(),
+      closePath: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      strokeStyle: '',
+      fillStyle: '',
+      lineWidth: 1,
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+    } as unknown as CanvasRenderingContext2D)),
+  });
+
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => 'data:image/png;base64,placeholder'),
+  });
+}
+
+// Mock localStorage and sessionStorage for jsdom tests. The guard keeps this
+// block side-effect free in pure node environments (e.g. `.test.ts` files that
+// opt out of jsdom via `// @vitest-environment node`) so loading the setup
+// file never throws `ReferenceError: window is not defined`.
+const createStorageMock = () => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value.toString(); }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+    key: vi.fn((index: number) => Object.keys(store)[index] || null),
+    length: 0,
+  } as unknown as Storage;
+};
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+}
+
+// jsdom 26 does not implement Blob.prototype.text / File.prototype.text
+// (added to the spec in 2022), so we polyfill it using FileReader.
+if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
+  Blob.prototype.text = function () {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -75,11 +147,70 @@ vi.mock('../components/wallet-connect/Walletcontext', () => {
 });
 
 vi.mock('../components/toast/ToastProvider', () => {
+  const ctx = {
+    addToast: vi.fn(),
+    removeToast: vi.fn(),
+    dismiss: vi.fn(),
+  };
   return {
-    useToast: () => ({
-      addToast: vi.fn(),
-      removeToast: vi.fn(),
-    }),
+    useToast: () => ctx,
+    useOptionalToast: () => ctx,
     ToastProvider: ({ children }: any) => children,
+  };
+});
+
+vi.mock('../i18n', () => {
+  return {
+    useI18n: () => ({
+      locale: 'en',
+      t: (key: any, params?: any) => {
+        let resolvedKey = key;
+        if (params && typeof params.count === 'number') {
+          const suffix = params.count === 1 ? '_one' : '_other';
+          const pluralKey = `${key}${suffix}`;
+          if (pluralKey in mockEn) {
+            resolvedKey = pluralKey;
+          }
+        }
+        let val = (mockEn as any)[resolvedKey];
+        if (!val) return resolvedKey;
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+          }
+        }
+        return val;
+      },
+      changeLocale: vi.fn(),
+    }),
+    I18nProvider: ({ children }: any) => children,
+  };
+});
+
+vi.mock('../i18n/index', () => {
+  return {
+    useI18n: () => ({
+      locale: 'en',
+      t: (key: any, params?: any) => {
+        let resolvedKey = key;
+        if (params && typeof params.count === 'number') {
+          const suffix = params.count === 1 ? '_one' : '_other';
+          const pluralKey = `${key}${suffix}`;
+          if (pluralKey in mockEn) {
+            resolvedKey = pluralKey;
+          }
+        }
+        let val = (mockEn as any)[resolvedKey];
+        if (!val) return resolvedKey;
+        if (params) {
+          for (const [k, v] of Object.entries(params)) {
+            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+          }
+        }
+        return val;
+      },
+      changeLocale: vi.fn(),
+    }),
+    I18nProvider: ({ children }: any) => children,
   };
 });

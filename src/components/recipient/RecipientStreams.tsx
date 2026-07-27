@@ -1,288 +1,432 @@
-import { useState } from "react";
-import {
-  mockRecipientStreams,
-  type RecipientStream,
-} from "../../fixtures/recipientStreams";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import EmptyState from "../EmptyState";
+import { Skeleton, SkeletonCard } from "../Skeleton";
+import "../skeleton.css";
 
-export type RecipientStreamsSortKey = "pinned" | "newest" | "rate";
-
-const STATUS_LABELS: Record<RecipientStream["status"], string> = {
-  active: "Active",
-  paused: "Paused",
-  completed: "Completed",
-};
-
-const STATUS_CLASSES: Record<RecipientStream["status"], string> = {
-  active: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
-  paused: "bg-amber-500/10 border-amber-500/30 text-amber-400",
-  completed: "bg-blue-500/10 border-blue-500/30 text-blue-400",
-};
-
-export function sortRecipientStreams(
-  streams: RecipientStream[],
-  sortKey: RecipientStreamsSortKey
-) {
-  return [...streams].sort((a, b) => {
-    if (a.isPinned !== b.isPinned) {
-      return a.isPinned ? -1 : 1;
-    }
-
-    if (sortKey === "newest") {
-      return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
-    }
-    if (sortKey === "rate") {
-      return b.rate - a.rate;
-    }
-    return 0;
-  });
+// Types matching stream properties across testing matrix & app contracts
+export interface Stream {
+  id: string;
+  sender?: string;
+  senderName?: string;
+  amount: string | number;
+  status: "active" | "paused" | "completed" | "Active" | "Paused" | "Completed";
+  isPinned?: boolean;
+  progress?: number;
+  rate?: number;
+  startTime?: string;
+  withdrawableAmount?: number;
+  streamedAmount?: number;
 }
 
-export default function RecipientStreams() {
-  const [streams, setStreams] = useState<RecipientStream[]>(mockRecipientStreams);
-  const [sortKey, setSortKey] = useState<RecipientStreamsSortKey>("pinned");
+export interface RecipientStreamsProps {
+  isLoading?: boolean;
+  streams?: Stream[];
+  error?: string | null;
+  onEmptyPrimaryAction?: () => void;
+  onRetry?: () => void;
+  fetchStreamsFn?: () => Promise<Stream[]>;
+  pollIntervalMs?: number;
+}
 
-  const togglePin = (id: string) => {
-    setStreams((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s))
-    );
+/**
+ * RecipientStreams handles real-time verification, state matrix representation
+ * (loading, empty, error, populated), and manual refresh of incoming stream assets.
+ *
+ * Error banner design:
+ * - role="alert" aria-live="assertive" — interrupts AT immediately on data-sync
+ *   failure (assertive is correct here because this is a foreground data failure
+ *   that blocks the recipient from seeing their streams, not a background poll
+ *   notification — see docs/RECIPIENT_STREAMS_ERROR_RETRY_SPEC.md §3).
+ * - Focus is programmatically moved to the Retry button on first error mount
+ *   so keyboard/AT users have an immediate recovery path without tabbing.
+ * - retryCount tracks repeated failures so the UI can surface an escalated
+ *   "persistent failure" message after two or more consecutive retries.
+ * - isRetrying disables the Retry button and shows an in-flight label while a
+ *   retry fetch is in progress to prevent double-submission.
+ * - borderColor uses var(--color-error-border) (not a hardcoded rgba) so both
+ *   light (#dc2626) and dark (#ef4444) themes resolve correctly.
+ */
+export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
+  isLoading: externalIsLoading,
+  streams: externalStreams,
+  error: externalError,
+  onEmptyPrimaryAction,
+  onRetry,
+  fetchStreamsFn,
+  pollIntervalMs = 10000,
+}) => {
+  const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
+  /** Tracks how many consecutive retry attempts have been made without a
+   *  successful response so the banner can escalate its message. */
+  const [retryCount, setRetryCount] = useState<number>(0);
+  /** True while a user-initiated retry fetch is in flight (distinct from the
+   *  background-poll isRefreshing so the button state is independently tracked). */
+  const [isRetrying, setIsRetrying] = useState<boolean>(false);
+
+  // Ref tracking to block concurrent overlapping requests
+  const isFetchingRef = useRef<boolean>(false);
+  /** Ref to the Retry button so focus can be moved to it when the error banner
+   *  first mounts (WCAG 2.4.3 Focus Order, 3.3.1 Error Identification). */
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+  /** Tracks the previous error value so we can detect the transition from
+   *  null → error (new error mount) without running focus logic on every render. */
+  const prevErrorRef = useRef<string | null>(null);
+
+  /**
+   * Main data worker executing secure background refresh calls.
+   */
+  const handleRefresh = useCallback(async () => {
+    if (!fetchStreamsFn || isFetchingRef.current) return;
+
+    isFetchingRef.current = true;
+    setIsRefreshing(true);
+    setInternalError(null);
+
+    try {
+      const updatedStreams = await fetchStreamsFn();
+
+      // Successful fetch resets the retry counter.
+      setRetryCount(0);
+      setInternalStreams((prevStreams) => {
+        const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
+        return updatedStreams.map((stream) => ({
+          ...stream,
+          isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false,
+        }));
+      });
+    } catch {
+      setInternalError("Failed to sync latest stream data. Please try again.");
+    } finally {
+      isFetchingRef.current = false;
+      setIsRefreshing(false);
+    }
+  }, [fetchStreamsFn]);
+
+  // Initial load hook when fetchStreamsFn is provided
+  useEffect(() => {
+    if (fetchStreamsFn) {
+      handleRefresh();
+    }
+  }, [fetchStreamsFn, handleRefresh]);
+
+  // Background interval polling hook
+  useEffect(() => {
+    if (!pollIntervalMs || !fetchStreamsFn) return;
+
+    const interval = setInterval(() => {
+      if (document.hidden) return;
+      handleRefresh();
+    }, pollIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [fetchStreamsFn, handleRefresh, pollIntervalMs]);
+
+  // Determine effective state inputs (external props take precedence if provided)
+  const isLoading = externalIsLoading ?? false;
+  const effectiveError = externalError ?? internalError;
+  const effectiveStreams = externalStreams ?? internalStreams;
+
+  /**
+   * Move focus to the Retry button when the error banner first appears.
+   * This runs only when effectiveError transitions from null/undefined to
+   * a truthy string so the focus shift does not repeat on re-renders while
+   * the banner is already visible.
+   */
+  useEffect(() => {
+    const hadError = Boolean(prevErrorRef.current);
+    const hasError = Boolean(effectiveError);
+
+    if (!hadError && hasError && retryButtonRef.current) {
+      retryButtonRef.current.focus();
+    }
+
+    prevErrorRef.current = effectiveError ?? null;
+  }, [effectiveError]);
+
+  /**
+   * Handles the Retry button click.
+   * Sets isRetrying while in flight so the button can show a loading state
+   * and increments retryCount to track repeated failures.
+   */
+  const handleRetryAction = async () => {
+    setRetryCount((c) => c + 1);
+
+    if (onRetry) {
+      onRetry();
+      return;
+    }
+
+    if (fetchStreamsFn) {
+      setIsRetrying(true);
+      try {
+        await handleRefresh();
+      } finally {
+        setIsRetrying(false);
+      }
+    }
   };
 
-  const sortedStreams = sortRecipientStreams(streams, sortKey);
+  const togglePin = (id: string) => {
+    if (externalStreams) {
+      setInternalStreams((prev) => {
+        const base = prev.length > 0 ? prev : externalStreams;
+        return base.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s));
+      });
+    } else {
+      setInternalStreams((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s))
+      );
+    }
+  };
 
-  return (
-    <div className="flex flex-col gap-6 w-full">
-      <div className="flex items-center justify-between">
-        <h2
-          className="text-xl font-bold"
-          style={{ color: "var(--text)" }}
-          id="streams-list-heading"
-        >
-          Your Incoming Streams
-        </h2>
+  // State 1: Loading state (skeleton composition consistent with RecipientLoading.tsx)
+  if (isLoading) {
+    return (
+      <div
+        role="status"
+        aria-label="Loading recipient portal"
+        aria-busy="true"
+        className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
+        style={{ backgroundColor: "var(--color-bg-primary)" }}
+      >
+        <span className="sr-only">Loading recipient portal…</span>
 
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="streams-sort"
-            className="text-xs font-medium text-slate-500 uppercase tracking-widest"
-          >
-            Sort by:
-          </label>
-          <select
-            id="streams-sort"
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as RecipientStreamsSortKey)}
-            className="bg-transparent border border-[var(--border)] text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            style={{ background: "var(--surface)", color: "var(--text)" }}
-          >
-            <option value="pinned">Priority (Pinned)</option>
-            <option value="newest">Newest First</option>
-            <option value="rate">Highest Rate</option>
-          </select>
+        <div className="flex justify-between items-center mb-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Skeleton width={180} height={24} borderRadius={8} />
+            <Skeleton width={260} height={14} borderRadius={6} />
+          </div>
+          {fetchStreamsFn && (
+            <Skeleton width={120} height={38} borderRadius={12} />
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <SkeletonCard
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "1rem",
+                borderRadius: "0.75rem",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Skeleton width={140} height={14} />
+                <Skeleton width={100} height={20} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Skeleton width={70} height={24} borderRadius={12} />
+                <Skeleton width={24} height={24} borderRadius={12} />
+              </div>
+            </SkeletonCard>
+          ))}
         </div>
       </div>
+    );
+  }
 
-      <div className="hidden md:grid grid-cols-[minmax(240px,1fr)_1fr_96px_96px] gap-6 px-5 text-xs font-bold text-slate-500 uppercase tracking-widest">
-        <span>From</span>
-        <span>Accrued</span>
-        <span>Rate</span>
-        <span>Status</span>
+  // Stable rendering sort strategy: pinned streams bubble up first
+  const sortedStreams = [...effectiveStreams].sort(
+    (a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+  );
+
+  /**
+   * Determine the banner message based on retry history.
+   * After two or more failed attempts we surface a more specific message
+   * so the recipient knows to check connectivity or contact support.
+   */
+  const errorMessage =
+    retryCount >= 2
+      ? "Still unable to load your streams. Check your connection or try again later."
+      : (effectiveError ?? "Failed to sync latest stream data. Please try again.");
+
+  return (
+    <div
+      className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
+      style={{ backgroundColor: "var(--color-bg-primary)" }}
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2
+            className="text-xl font-bold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Incoming Streams
+          </h2>
+          <p
+            className="text-sm"
+            style={{ color: "var(--color-text-tertiary)" }}
+          >
+            Real-time contract payment records
+          </p>
+        </div>
+        {fetchStreamsFn && (
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition"
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh Status"}
+          </button>
+        )}
       </div>
 
-      <ul
-        className="grid gap-4"
-        aria-labelledby="streams-list-heading"
-        role="list"
-      >
-        {sortedStreams.map((stream) => (
-          <li
-            key={stream.id}
-            className={`stream-card group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.01] ${
-              stream.isPinned ? "is-active" : ""
-            }`}
-            style={{
-              background: "var(--card-gradient)",
-              borderColor: "var(--border)",
-            }}
-          >
-            {stream.isPinned && (
-              <div
-                aria-hidden="true"
-                className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
-              />
-            )}
-
-            <article
-              aria-label={`Stream from ${stream.senderName}`}
-              className="p-5 flex flex-col md:flex-row md:items-center gap-6"
+      {/*
+       * State 2: Error banner
+       *
+       * role="alert" + aria-live="assertive" + aria-atomic="true":
+       *   Assertive is chosen over polite because this is a foreground data-sync
+       *   failure — the recipient cannot see their streams until it is resolved.
+       *   A background poll that silently retries would warrant polite.
+       *   aria-atomic="true" ensures the entire banner is announced as a unit
+       *   so screen readers do not speak a partial update.
+       *
+       * Visual tokens:
+       *   --color-error-bg    light #fef2f2  / dark rgba(220,38,38,0.1)
+       *   --color-error-text  light #b91c1c  / dark #fca5a5
+       *   --color-error-border light #dc2626 / dark #ef4444
+       *
+       * Repeated-failure state (retryCount >= 2):
+       *   Message escalates and the banner uses a slightly thicker border
+       *   (via box-shadow) to increase visual urgency without changing layout.
+       *
+       * Retry-in-flight state (isRetrying):
+       *   Button label changes to "Retrying…" and the button is disabled so
+       *   the recipient cannot trigger duplicate concurrent fetches.
+       *
+       * Recovery (auto-clear):
+       *   Once handleRefresh() succeeds it calls setInternalError(null) and
+       *   setRetryCount(0), which removes the banner from the DOM. No manual
+       *   dismiss is offered — success is the only exit so recipients are never
+       *   left in a silently-failed-but-dismissed state.
+       */}
+      {effectiveError && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          className="p-4 mb-6 text-sm rounded-xl flex items-start justify-between gap-3 border"
+          style={{
+            color: "var(--color-error-text)",
+            backgroundColor: "var(--color-error-bg)",
+            borderColor: "var(--color-error-border)",
+            /* Escalated persistent-failure ring: adds a subtle outer shadow on 3rd+ attempt */
+            boxShadow:
+              retryCount >= 2
+                ? "0 0 0 1px var(--color-error-border), var(--shadow-error-focus)"
+                : undefined,
+          }}
+        >
+          <div className="flex items-start gap-2" style={{ minWidth: 0 }}>
+            {/* Warning icon — aria-hidden because the role="alert" text conveys the meaning */}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+              focusable="false"
+              style={{ flexShrink: 0, marginTop: 1 }}
             >
-              <div className="flex items-center gap-4 min-w-[240px]">
-                <div
-                  aria-hidden="true"
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${
-                    stream.isPinned
-                      ? "bg-cyan-500 text-white"
-                      : "bg-slate-800 text-slate-400"
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M8 5v3.5M8 10.5v.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>{errorMessage}</span>
+          </div>
+          {(onRetry || fetchStreamsFn) && (
+            <button
+              ref={retryButtonRef}
+              onClick={handleRetryAction}
+              disabled={isRetrying}
+              aria-label="Retry loading recipient streams"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg transition border"
+              style={{
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+                color: "var(--color-error-text)",
+                borderColor: "var(--color-error-border)",
+                backgroundColor: "transparent",
+                opacity: isRetrying ? 0.65 : 1,
+                cursor: isRetrying ? "not-allowed" : "pointer",
+              }}
+            >
+              {isRetrying ? "Retrying…" : "Retry"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* State 3: Empty State (Shared EmptyState illustration pattern & Connect wallet CTA) */}
+      {!effectiveError && sortedStreams.length === 0 ? (
+        <EmptyState
+          variant="recipient"
+          walletConnected={false}
+          onPrimaryAction={onEmptyPrimaryAction}
+        />
+      ) : (
+        /* State 4: Populated State */
+        <div className="space-y-3">
+          {sortedStreams.map((stream) => (
+            <div
+              key={stream.id}
+              className="p-4 rounded-xl flex justify-between items-center"
+              style={{ border: "1px solid var(--color-border-default)" }}
+            >
+              <div>
+                <p
+                  className="font-medium text-sm"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  From: <span>{stream.senderName || stream.sender}</span>
+                </p>
+                <p className="text-lg font-bold">{stream.amount} XLM</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    stream.status?.toLowerCase() === "active"
+                      ? "status-badge--active"
+                      : "status-badge--paused"
                   }`}
+                  style={{
+                    backgroundColor:
+                      stream.status?.toLowerCase() === "active"
+                        ? "var(--color-success-bg)"
+                        : "var(--color-warning-bg)",
+                    color:
+                      stream.status?.toLowerCase() === "active"
+                        ? "var(--color-success)"
+                        : "var(--color-warning)",
+                  }}
                 >
-                  {stream.senderName.charAt(0)}
-                </div>
-                <div className="flex flex-col">
-                  <span
-                    className="text-sm font-bold"
-                    style={{ color: "var(--text)" }}
-                  >
-                    {stream.senderName}
-                  </span>
-                  <span
-                    className="text-xs tabular-nums font-mono"
-                    style={{ color: "var(--muted)" }}
-                  >
-                    {stream.sender}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex-1 flex flex-col gap-2">
-                <div className="flex justify-between items-end">
-                  <div className="flex items-baseline gap-1">
-                    <span
-                      className="text-lg font-bold"
-                      style={{ color: "var(--text)" }}
-                    >
-                      {stream.amount.toLocaleString()}
-                    </span>
-                    <span
-                      className="text-xs font-medium"
-                      style={{ color: "var(--muted)" }}
-                    >
-                      USDC Total
-                    </span>
-                  </div>
-                  <span
-                    className={`text-xs font-bold ${
-                      stream.isPinned ? "text-cyan-400" : "text-slate-400"
-                    }`}
-                    aria-label={`${stream.progress}% streamed`}
-                  >
-                    {stream.progress}%
-                  </span>
-                </div>
-
-                <div
-                  role="progressbar"
-                  aria-valuenow={stream.progress}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`${stream.senderName} stream progress: ${stream.progress}%`}
-                  className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"
+                  {stream.status}
+                </span>
+                <button
+                  onClick={() => togglePin(stream.id)}
+                  className="hover:text-yellow-500"
+                  style={{ color: "var(--color-text-tertiary)" }}
+                  aria-label="Pin stream"
                 >
-                  <div
-                    aria-hidden="true"
-                    className={`h-full rounded-full transition-all duration-1000 ${
-                      stream.isPinned
-                        ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                        : "bg-slate-600"
-                    }`}
-                    style={{ width: `${stream.progress}%` }}
-                  />
-                </div>
+                  {stream.isPinned ? "★" : "☆"}
+                </button>
               </div>
-
-              <div className="flex items-center gap-8 min-w-[200px] justify-between">
-                <dl className="flex flex-col gap-2">
-                  <div className="flex flex-col">
-                    <dt className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                      Rate
-                    </dt>
-                    <dd
-                      className="text-sm font-bold"
-                      style={{ color: "var(--text)" }}
-                    >
-                      {stream.rate} USDC/hr
-                    </dd>
-                  </div>
-                  <div className="flex flex-col">
-                    <dt className="sr-only">Status</dt>
-                    <dd>
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest ${STATUS_CLASSES[stream.status]}`}
-                        role="status"
-                        aria-label={`Stream status: ${STATUS_LABELS[stream.status]}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            stream.status === "active"
-                              ? "bg-emerald-400 animate-pulse"
-                              : stream.status === "paused"
-                                ? "bg-amber-400"
-                                : "bg-blue-400"
-                          }`}
-                        />
-                        {STATUS_LABELS[stream.status]}
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => togglePin(stream.id)}
-                    aria-pressed={stream.isPinned}
-                    aria-label={
-                      stream.isPinned
-                        ? `Unpin stream from ${stream.senderName}`
-                        : `Pin stream from ${stream.senderName}`
-                    }
-                    className={`p-2 rounded-lg border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
-                      stream.isPinned
-                        ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.1)]"
-                        : "bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600"
-                    }`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill={stream.isPinned ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  </button>
-
-                  <button
-                    aria-label={`View details for stream from ${stream.senderName}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 focus-visible:ring-offset-black"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      focusable="false"
-                    >
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </article>
-          </li>
-        ))}
-      </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default RecipientStreams;

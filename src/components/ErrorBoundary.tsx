@@ -7,9 +7,31 @@ interface ErrorFallbackProps {
   reset: () => void;
 }
 
+/**
+ * Called with the caught error and React's component stack whenever
+ * `ErrorBoundary.componentDidCatch` fires. Use this to forward errors to
+ * Sentry, LogRocket, a custom endpoint, or any other monitoring solution.
+ *
+ * The reporter must never throw — any exception it raises is silently swallowed
+ * to prevent infinite error loops inside the boundary.
+ */
+export type ErrorReporter = (error: Error, errorInfo: ErrorInfo) => void;
+
+/**
+ * Returns a reporter that logs errors to the browser console. Useful as the
+ * default during local development and integration tests.
+ */
+export function createConsoleReporter(): ErrorReporter {
+  return (error, errorInfo) => {
+    console.error('ErrorBoundary caught a route render error.', error, errorInfo);
+  };
+}
+
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: (props: ErrorFallbackProps) => ReactNode;
+  /** Optional reporter called on every caught error. Defaults to a no-op in production. */
+  onError?: ErrorReporter;
 }
 
 interface ErrorBoundaryState {
@@ -54,8 +76,13 @@ export default class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-      console.error('ErrorBoundary caught a route render error.', error, errorInfo);
+    const { onError } = this.props;
+    if (onError) {
+      try {
+        onError(error, errorInfo);
+      } catch {
+        // Never let the reporter throw — that would create an error loop.
+      }
     }
   }
 

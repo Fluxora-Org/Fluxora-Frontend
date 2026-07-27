@@ -43,6 +43,14 @@ export default tseslint.config(
       "no-script-url": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
       "react-refresh/only-export-components": [
         "warn",
         {
@@ -58,6 +66,17 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  // Node-built scripts (e.g. bundle-size report) need Node globals.
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+      },
     },
   },
 );

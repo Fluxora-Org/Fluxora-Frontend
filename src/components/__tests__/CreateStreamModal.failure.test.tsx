@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
 import { createStream, getTransactionStatus } from '../../lib/stellar/tx';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 // The modal performs the on-chain create-stream call itself and only surfaces
 // failures via the review-step error box + onStreamError, so we drive the
@@ -49,6 +50,7 @@ afterEach(() => {
 });
 
 function advanceToStep3(container: HTMLElement) {
+  selectSingleStreamInContainer(container);
   const recipientInput = container.querySelector(
     '#create-stream-recipient',
   ) as HTMLInputElement;
@@ -168,5 +170,38 @@ describe('CreateStreamModal submit failure handling', () => {
     fireEvent.click(createButton);
 
     expect(mockedCreateStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onStreamCreated or close modal when transaction status polling fails on-chain', async () => {
+    mockedCreateStream.mockResolvedValue({
+      status: 'SUCCESS',
+      txHash: 'tx-failed-hash-123',
+    } as any);
+    mockedGetTransactionStatus.mockResolvedValue('failed');
+
+    const onClose = vi.fn();
+    const onStreamCreated = vi.fn();
+
+    const { container } = render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={onClose}
+        onStreamCreated={onStreamCreated}
+      />,
+    );
+
+    advanceToStep3(container);
+    fireEvent.click(
+      within(container).getByRole('button', { name: /^create stream$/i }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Transaction failed before confirmation.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(onStreamCreated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

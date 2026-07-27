@@ -8,6 +8,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { signTransaction, getNetwork } from "@stellar/freighter-api";
 import { createConfig } from "../config";
+import { transactionConfig } from "../transactionConfig";
 
 /**
  * Custom error class for wrapping and mapping Stellar/Soroban errors.
@@ -20,6 +21,34 @@ export class TransactionError extends Error {
     super(message);
     this.name = "TransactionError";
   }
+}
+
+/**
+ * Maps Freighter signing errors to a TransactionError.
+ * Checks for a structured error code (`user_rejected`) first, then falls back to
+ * word-boundary-anchored keyword matching against actual Freighter rejection
+ * phrasing.  Errors whose messages do not closely match a known rejection pattern
+ * are classified as `"unknown"` so that non-rejection errors (e.g. network
+ * timeouts surfaced through the extension bridge) are never misreported as
+ * user-declined.
+ */
+function mapFreighterSigningError(err: any): TransactionError {
+  const maybeErr = err as { code?: string };
+  if (maybeErr.code && maybeErr.code === "user_rejected") {
+    return new TransactionError(
+      "rejected",
+      "Transaction signature request was declined by the user."
+    );
+  }
+  const errMsg = String(err);
+  const rejectionKeywords = ["reject", "decline", "cancel", "dismiss"];
+  if (rejectionKeywords.some((kw) => new RegExp("\\b" + kw + "\\b", "i").test(errMsg))) {
+    return new TransactionError(
+      "rejected",
+      "Transaction signature request was declined by the user."
+    );
+  }
+  return new TransactionError("unknown", `Freighter signing failed: ${errMsg}`);
 }
 
 /**
@@ -39,6 +68,7 @@ export function getNetworkPassphrase(networkName: string): string {
 
 /**
  * Encodes a string or numeric value to an ScVal u64.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for scaling rules and usage.
  */
 function encodeU64(val: string | number): xdr.ScVal {
   try {
@@ -50,6 +80,7 @@ function encodeU64(val: string | number): xdr.ScVal {
 
 /**
  * Encodes a Stellar address string to an ScVal Address.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI requirements.
  */
 function encodeAddress(addr: string): xdr.ScVal {
   try {
@@ -60,6 +91,50 @@ function encodeAddress(addr: string): xdr.ScVal {
 }
 
 /**
+ * Timeout duration (in milliseconds) for Freighter extension API calls.
+ * If the wallet extension does not respond within this window the call is
+ * rejected to prevent the create-stream submit flow from hanging indefinitely.
+ */
+export const FREIGHTER_NETWORK_TIMEOUT_MS = 5_000;
+
+/**
+ * Wraps a promise with a timeout.  If the promise does not settle within the
+ * given duration the returned promise rejects with a {@link TransactionError}
+ * whose `type` is `"timeout"`.  The internal timer is always cleared on
+ * settlement so no dangling timers remain.
+ *
+ * @param promise - The promise to wrap.
+ * @param ms - Timeout duration in milliseconds.
+ * @param label - Short description of the timed-out operation (included in the
+ *   error message).
+ * @returns A promise that settles with the original value or rejects with a
+ *   timeout error.
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  const timeoutResult = Symbol("timeout");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const result = await Promise.race([
+    promise,
+    new Promise<typeof timeoutResult>((resolve) => {
+      timer = setTimeout(() => resolve(timeoutResult), ms);
+    }),
+  ]);
+
+  clearTimeout(timer);
+
+  if (result === timeoutResult) {
+    throw new TransactionError("timeout", `${label} timed out after ${ms}ms.`);
+  }
+
+  return result as T;
+}
+
+/**
  * Validates that the wallet's current connected network matches the expected network.
  */
 async function validateNetwork(): Promise<void> {
@@ -67,8 +142,11 @@ async function validateNetwork(): Promise<void> {
   const expectedNet = appConfig.network;
   let connectedNetRes;
   try {
-    connectedNetRes = await getNetwork();
+    connectedNetRes = await withTimeout(getNetwork(), FREIGHTER_NETWORK_TIMEOUT_MS, "Freighter network check");
   } catch (err: any) {
+    if (err instanceof TransactionError) {
+      throw err;
+    }
     throw new TransactionError("rpc", `Freighter not connected or unavailable. Error: ${err.message || err}`);
   }
 
@@ -88,12 +166,21 @@ async function validateNetwork(): Promise<void> {
 
 /**
  * Helper to wait for a transaction to be confirmed on-chain by polling the Soroban RPC.
+ *
+ * Retry budget and inter-poll delay are read from {@link transactionConfig} so
+ * they can be tuned per environment via env vars without code edits:
+ * - `VITE_TX_CONFIRMATION_MAX_RETRIES` — maximum poll attempts (default: 15, clamped 1–300)
+ * - `VITE_TX_CONFIRMATION_DELAY_MS`    — ms between attempts (default: 1500, clamped 100–30000)
+ *
+ * **Maximum total wait** ≈ `confirmationMaxRetries × confirmationDelayMs`
+ *
+ * Safe defaults are applied in case `transactionConfig` values are somehow absent.
  */
 async function waitForTransaction(
   server: SorobanRpc.Server,
   hash: string,
-  maxRetries = 15,
-  delayMs = 1500
+  maxRetries = transactionConfig.confirmationMaxRetries ?? 15,
+  delayMs = transactionConfig.confirmationDelayMs ?? 1500
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -197,7 +284,7 @@ async function executeInvocation(
   const op = contract.call(functionName, ...args);
 
   const tx = new TransactionBuilder(account, {
-    fee: "100", // Placeholder, will be replaced by simulation results
+    fee: String(transactionConfig.baseFee),
     networkPassphrase: passphrase,
   })
     .addOperation(op)
@@ -228,16 +315,7 @@ async function executeInvocation(
     });
     signedXdr = signResult.signedTxXdr;
   } catch (err: any) {
-    const errMsg = String(err);
-    if (
-      errMsg.toLowerCase().includes("reject") ||
-      errMsg.toLowerCase().includes("decline") ||
-      errMsg.toLowerCase().includes("cancel") ||
-      errMsg.toLowerCase().includes("dismiss")
-    ) {
-      throw new TransactionError("rejected", "Transaction signature request was declined by the user.");
-    }
-    throw new TransactionError("rejected", `Freighter signing failed: ${errMsg}`);
+    throw mapFreighterSigningError(err);
   }
 
   // 6. Submit transaction to RPC
@@ -263,31 +341,43 @@ async function executeInvocation(
 
 /**
  * Creates a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications (types and 7-decimal scaling).
  * @param sender - The Stellar address of the sender.
  * @param recipient - The Stellar address of the recipient.
  * @param amount - The total amount to be deposited, as a string.
  * @param startTime - The unix timestamp (in seconds) when the stream starts.
  * @param endTime - The unix timestamp (in seconds) when the stream ends.
+ * @param cliffTime - The unix timestamp (in seconds) of the cliff date. Optional. If absent, defaults to startTime.
  */
 export async function createStream(
   sender: string,
   recipient: string,
   amount: string,
   startTime: number,
-  endTime: number
+  endTime: number,
+  cliffTime?: number
 ): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  let cliff = cliffTime ?? startTime;
+  if (cliff < startTime) {
+    cliff = startTime;
+  } else if (cliff > endTime) {
+    cliff = endTime;
+  }
+
   const args = [
     encodeAddress(sender),
     encodeAddress(recipient),
     encodeU64(amount),
     encodeU64(startTime),
     encodeU64(endTime),
+    encodeU64(cliff),
   ];
   return await executeInvocation("create_stream", args);
 }
 
 /**
  * Withdraws accrued funds from a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications (types and 7-decimal scaling).
  * @param recipient - The Stellar address of the recipient (withdrawer).
  * @param streamId - The ID of the stream to withdraw from.
  * @param amount - The amount to withdraw (as a string).
@@ -307,6 +397,7 @@ export async function withdraw(
 
 /**
  * Pauses a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
  * @param sender - The Stellar address of the sender/owner.
  * @param streamId - The ID of the stream to pause.
  */
@@ -323,6 +414,7 @@ export async function pauseStream(
 
 /**
  * Cancels a stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
  * @param sender - The Stellar address of the sender/owner.
  * @param streamId - The ID of the stream to cancel.
  */

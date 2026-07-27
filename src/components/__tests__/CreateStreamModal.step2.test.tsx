@@ -9,13 +9,16 @@ import * as fc from 'fast-check';
 import CreateStreamModal, {
   sanitizeDepositAmountInput,
 } from '../CreateStreamModal';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 const VALID_STELLAR = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
 function renderModal() {
-  return render(
+  const result = render(
     <CreateStreamModal isOpen={true} onClose={() => {}} />
   );
+  selectSingleStreamInContainer(result.container);
+  return result;
 }
 
 /** Advance from step 1 to step 2 with valid data, using container-scoped queries */
@@ -192,5 +195,23 @@ describe('Property 16: Blur marks field as touched and triggers validation displ
 
     const accrualContainer = accrualInput.closest('.input-container');
     expect(accrualContainer?.classList.contains('input-container--success')).toBe(true);
+  });
+});
+
+describe('CreateStreamModal internationalization integration', () => {
+  it('renders translated text from the i18n catalog', () => {
+    const { container } = renderModal();
+
+    // Check that step-1 header is translated using catalog values
+    expect(container.querySelector('.section-header h3')?.textContent).toBe('Recipient & amount');
+    expect(container.querySelector('.section-header p')?.textContent).toBe('Set who receives the stream and how much USDC to lock.');
+
+    // Check that input label is translated using catalog values
+    const recipientLabel = container.querySelector('label[for="create-stream-recipient"]');
+    expect(recipientLabel?.textContent).toContain('Recipient');
+
+    // Check that helper text is translated using catalog values
+    const helperText = container.querySelector('#create-stream-recipient-hint');
+    expect(helperText?.textContent).toBe('Enter a valid Stellar address (starts with G, 56 characters)');
   });
 });

@@ -1,13 +1,109 @@
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import HeroSection from "../components/landing-page/HeroSection";
-import TrustSection from "../components/landing-page/TrustSection";
-import ValuePropositionSection from "../components/ValuePropositionSection";
-import GetStartedCTA from "../components/GetStartedCTA";
-import NewsletterSection from "../components/NewsletterSection";
 import Footer from "../components/Footer";
+import { Skeleton } from "../components/Skeleton";
+import {
+  isMobileViewport,
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+} from "../lib/breakpoints";
 import { useTheme } from "../theme/ThemeProvider";
+
+// Below-the-fold landing sections are split into separate chunks via React.lazy
+// so first-time visitors don't pay the parse cost up front. Each section is only
+// imported once it nears the viewport (see LazySection / IntersectionObserver).
+const TrustSection = lazy(() => import("../components/landing-page/TrustSection"));
+const ValuePropositionSection = lazy(
+  () => import("../components/ValuePropositionSection"),
+);
+const GetStartedCTA = lazy(() => import("../components/GetStartedCTA"));
+const NewsletterSection = lazy(() => import("../components/NewsletterSection"));
+
+interface LazySectionProps {
+  children: React.ReactNode;
+  /** Accessible label for the placeholder region while the section loads. */
+  label: string;
+}
+
+/**
+ * Defers rendering (and therefore the dynamic import) of its children until the
+ * placeholder scrolls within 300px of the viewport. When IntersectionObserver is
+ * unavailable (older browsers, jsdom/SSR), it falls back to loading immediately.
+ */
+function LazySection({ children, label }: LazySectionProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [shouldLoad, setShouldLoad] = useState(
+    () => typeof IntersectionObserver === "undefined",
+  );
+
+  useEffect(() => {
+    if (shouldLoad) return;
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [shouldLoad]);
+
+  return (
+    <div ref={ref}>
+      {shouldLoad ? (
+        <Suspense fallback={<Skeleton height={240} aria-label={`Loading ${label}`} />}>
+          {children}
+        </Suspense>
+      ) : (
+        <Skeleton height={240} aria-label={`Loading ${label}`} />
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
   const { theme } = useTheme();
+  const [isMobileLayout, setIsMobileLayout] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return isMobileViewport();
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+
+    const handleResize = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        setIsMobileLayout(isMobileViewport());
+      }, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   return (
     <div
@@ -18,17 +114,26 @@ export default function Home() {
         flexDirection: "column",
       }}
     >
-      <main 
+      <main
         id="main-content"
+        data-mobile-layout={isMobileLayout ? "mobile" : "desktop"}
         style={{ flex: 1 }}
       >
-        <HeroSection theme={theme} />
-        <ValuePropositionSection />
-        <TrustSection theme={theme} />
-        <section style={{ padding: "80px 20px" }} aria-label="Get started">
-          <GetStartedCTA />
-        </section>
-        <NewsletterSection />
+        <HeroSection theme={theme as "light" | "dark"} />
+        <LazySection label="value proposition section">
+          <ValuePropositionSection />
+        </LazySection>
+        <LazySection label="trust section">
+          <TrustSection theme={theme as "light" | "dark"} />
+        </LazySection>
+        <LazySection label="get started section">
+          <section style={{ padding: "80px 20px" }} aria-label="Get started">
+            <GetStartedCTA />
+          </section>
+        </LazySection>
+        <LazySection label="newsletter section">
+          <NewsletterSection />
+        </LazySection>
       </main>
       <Footer />
     </div>

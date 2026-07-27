@@ -20,8 +20,11 @@
  *   • The action button meets 44×44 px minimum touch target.
  *   • All interactive elements expose focus-visible ring.
  */
+// ZeroAccrualBanner has its own stylesheet after being separated from StateDisplay.
+import "./zero-accrual-banner.css";
+import { formatLocalDate } from "../lib/formatters";
 
-import "./state-display.css";
+// ── Helpers ───────────────────────────────────────────────────────────
 
 export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
@@ -73,14 +76,6 @@ const REASON_CONFIG: Record<
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function formatEventDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(iso));
-}
 
 function nextEventLabel(reason: ZeroAccrualReason): string {
   switch (reason) {
@@ -159,6 +154,13 @@ export default function ZeroAccrualBanner({
 }: ZeroAccrualBannerProps) {
   const cfg = REASON_CONFIG[reason];
   const label = actionLabel ?? cfg.defaultActionLabel;
+  const formattedEventDate = nextEventDate
+    ? formatLocalDate(nextEventDate, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <div
@@ -178,10 +180,11 @@ export default function ZeroAccrualBanner({
         <p className="zero-accrual-banner__description">{cfg.description}</p>
 
         {/* Next event date chip */}
-        {nextEventDate && (
+        {formattedEventDate && (
           <span className="zero-accrual-banner__next-event">
             <CalendarIcon />
-            {nextEventLabel(reason)}: {formatEventDate(nextEventDate)}
+            {nextEventLabel(reason)}:{" "}
+            {formattedEventDate}
           </span>
         )}
       </div>

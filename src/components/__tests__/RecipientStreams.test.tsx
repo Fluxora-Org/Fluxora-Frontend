@@ -1,194 +1,116 @@
-import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import RecipientStreams, {
-  sortRecipientStreams,
-} from "../recipient/RecipientStreams";
-import {
-  mockRecipientStreams,
-  type RecipientStream,
-} from "../../fixtures/recipientStreams";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { RecipientStreams, type Stream } from "../recipient/RecipientStreams";
 
-function streamNames() {
-  return screen
-    .getAllByRole("article")
-    .map((article) =>
-      article.getAttribute("aria-label")?.replace("Stream from ", "")
-    );
-}
+const mockData: Stream[] = [
+  { id: "1", sender: "Alice", amount: "500", status: "active" },
+];
 
-describe("RecipientStreams structure", () => {
-  it("renders the streams list heading and labelled list", () => {
-    render(<RecipientStreams />);
+describe("RecipientStreams Testing Engine", () => {
+  it("shows safe recoverable loading elements on initial interaction", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockReturnValue(
+        new Promise((resolve) => setTimeout(() => resolve(mockData), 50)),
+      );
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: /your incoming streams/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: /your incoming streams/i })).toBeInTheDocument();
+    render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+    expect(screen.getByText("Refreshing...")).toBeInTheDocument();
   });
 
-  it("renders reusable fixture streams with ISO-8601 start times", () => {
-    render(<RecipientStreams />);
+  it("safely displays a secure error fallback upon network failure", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new Error("Database crash dump info"));
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(mockRecipientStreams.length);
-    mockRecipientStreams.forEach((stream) => {
-      expect(stream.startTime).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
-      expect(Date.parse(stream.startTime)).not.toBeNaN();
-      expect(
-        screen.getByRole("article", { name: `Stream from ${stream.senderName}` })
-      ).toBeInTheDocument();
+    render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+    const errorAlert = await screen.findByRole("alert");
+
+    expect(errorAlert).toBeInTheDocument();
+    expect(
+      screen.queryByText("Database crash dump info"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("guards against concurrent execution calls when double-clicked", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(() => {
+      callCount++;
+      return new Promise((resolve) => setTimeout(() => resolve(mockData), 100));
     });
+
+    render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+    const btn = screen.getByText("Refreshing...");
+
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+
+    // Initial load is in flight, so rapid clicks are blocked by the concurrency guard.
+    expect(callCount).toBe(1);
   });
 
-  it("renders From, Accrued, Rate, and Status column labels", () => {
-    render(<RecipientStreams />);
-
-    expect(screen.getByText(/^From$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Accrued$/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/^Rate$/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/^Status$/i).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders progress bars, status badges, pin buttons, and detail buttons", () => {
-    render(<RecipientStreams />);
-
-    expect(screen.getAllByRole("progressbar")).toHaveLength(mockRecipientStreams.length);
-    expect(screen.getAllByRole("status")).toHaveLength(mockRecipientStreams.length);
-    expect(
-      screen.getAllByRole("button", { name: /pin stream|unpin stream/i })
-    ).toHaveLength(mockRecipientStreams.length);
-    expect(
-      screen.getAllByRole("button", { name: /view details for stream from/i })
-    ).toHaveLength(mockRecipientStreams.length);
-  });
-});
-
-describe("RecipientStreams pin and sort behavior", () => {
-  it("defaults to pinned-first order", () => {
-    render(<RecipientStreams />);
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-      "Ecosystem Grant #42",
-    ]);
-  });
-
-  it("sorts unpinned streams by newest while keeping pinned streams first", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
-    );
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Ecosystem Grant #42",
-      "Fluxora DAO",
-    ]);
-  });
-
-  it("sorts unpinned streams by highest rate while keeping pinned streams first", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "rate"
-    );
-
-    expect(streamNames()).toEqual([
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-      "Ecosystem Grant #42",
-    ]);
-  });
-
-  it("moves a newly pinned stream into the pinned group", async () => {
-    const user = userEvent.setup();
-    render(<RecipientStreams />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /sort by/i }),
-      "newest"
-    );
-    await user.click(
-      screen.getByRole("button", { name: /pin stream from Ecosystem Grant #42/i })
-    );
-
-    expect(streamNames()).toEqual([
-      "Ecosystem Grant #42",
-      "Stellar Dev Foundation",
-      "Fluxora DAO",
-    ]);
-    expect(
-      screen.getByRole("button", { name: /unpin stream from Ecosystem Grant #42/i })
-    ).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("keeps same-key ties stable after pinned precedence", () => {
-    const streams: RecipientStream[] = [
-      {
-        ...mockRecipientStreams[1],
-        id: "unpinned-a",
-        senderName: "Unpinned A",
-        rate: 10,
-        startTime: "2024-04-01T00:00:00.000Z",
-      },
-      {
-        ...mockRecipientStreams[2],
-        id: "unpinned-b",
-        senderName: "Unpinned B",
-        rate: 10,
-        startTime: "2024-04-01T00:00:00.000Z",
-      },
-      {
-        ...mockRecipientStreams[0],
-        id: "pinned",
-        senderName: "Pinned",
-        rate: 1,
-        startTime: "2024-01-01T00:00:00.000Z",
-        isPinned: true,
-      },
-    ];
-
-    expect(sortRecipientStreams(streams, "rate").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
-    expect(sortRecipientStreams(streams, "newest").map((stream) => stream.senderName)).toEqual([
-      "Pinned",
-      "Unpinned A",
-      "Unpinned B",
-    ]);
-  });
-});
-
-describe("RecipientStreams accessibility details", () => {
-  it("labels sort options and pin state", () => {
-    render(<RecipientStreams />);
-
-    expect(screen.getByRole("option", { name: /priority/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /newest/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /highest rate/i })).toBeInTheDocument();
-
-    screen
-      .getAllByRole("button", { name: /pin stream|unpin stream/i })
-      .forEach((button) => expect(button).toHaveAttribute("aria-pressed"));
-  });
-
-  it("keeps each card's metric and SVG accessibility contracts", () => {
-    const { container } = render(<RecipientStreams />);
-
-    screen.getAllByRole("article").forEach((article) => {
-      expect(within(article).getByText(/USDC Total/i)).toBeInTheDocument();
-      expect(within(article).getByText(/USDC\/hr/i)).toBeInTheDocument();
+  describe("theme-aware styling via design tokens", () => {
+    beforeEach(() => {
+      document.documentElement.removeAttribute("data-theme");
     });
-    container.querySelectorAll("svg").forEach((svg) => {
-      expect(svg).toHaveAttribute("aria-hidden", "true");
+
+    it("renders with token-based colors independent of OS dark mode preference", async () => {
+      // Set data-theme explicitly to "dark" while jsdom matchMedia reports light
+      document.documentElement.setAttribute("data-theme", "dark");
+
+      const fetchMock = vi.fn().mockResolvedValue([
+        { id: "1", sender: "Alice", amount: "500", status: "active" },
+      ]);
+
+      render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+      const streams = await screen.findByText(/From:/);
+      expect(streams).toBeInTheDocument();
+
+      // Verify the outer card uses var() tokens, not Tailwind dark: classes
+      const card = streams.closest(".p-6");
+      expect(card).toBeInTheDocument();
+      expect(card?.getAttribute("style")).toContain("var(--color-bg-primary)");
+
+      // Verify heading uses theme token
+      const heading = screen.getByText(/Incoming Streams/i);
+      expect(heading.getAttribute("style")).toContain("var(--color-text-primary)");
+    });
+
+    it("renders correctly when app theme toggle (light) disagrees with OS dark preference", async () => {
+      // Simulate OS dark preference via matchMedia
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === "(prefers-color-scheme: dark)",
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      // But app explicitly sets data-theme="light"
+      document.documentElement.setAttribute("data-theme", "light");
+
+      const fetchMock = vi.fn().mockResolvedValue([
+        { id: "1", sender: "Alice", amount: "500", status: "active" },
+      ]);
+
+      render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+      const streams = await screen.findByText(/From:/);
+      expect(streams).toBeInTheDocument();
+
+      // Card should show light-theme token (var(--color-bg-primary) resolves to --surface-base which is white)
+      const card = streams.closest(".p-6");
+      expect(card?.getAttribute("style")).toContain("var(--color-bg-primary)");
+
+      // Verify error uses token colors
+      const errorFetchMock = vi.fn().mockRejectedValue(new Error("fail"));
+      document.documentElement.setAttribute("data-theme", "dark");
+      render(<RecipientStreams fetchStreamsFn={errorFetchMock} pollIntervalMs={0} />);
+      const errorAlert = await screen.findByRole("alert");
+      expect(errorAlert.getAttribute("style")).toContain("var(--color-error-text)");
+      expect(errorAlert.getAttribute("style")).toContain("var(--color-error-bg)");
     });
   });
 });

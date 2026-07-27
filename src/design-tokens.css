@@ -29,17 +29,17 @@
   --surface-raised: #e8ecf1;
   --surface-highest: #dfe5ed;
 
-/* Icon sizes */
---icon-size-xs: 16px;   /* inline */
---icon-size-sm: 20px;   /* button/label */
---icon-size-md: 24px;   /* standalone */
---icon-size-lg: 32px;   /* hero/empty-state */
+/* Icon sizes (relative to root font-size for zoom scaling) */
+--icon-size-xs: 1rem;       /* inline, 16px equivalent */
+--icon-size-sm: 1.25rem;    /* button/label, 20px equivalent */
+--icon-size-md: 1.5rem;     /* standalone, 24px equivalent */
+--icon-size-lg: 2rem;       /* hero/empty-state, 32px equivalent */
 
-/* Utility classes for icon sizing */
-.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); }
-.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); }
-.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); }
-.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+/* Utility classes for icon sizing and high-DPI crisp rendering */
+.icon-xs { width: var(--icon-size-xs); height: var(--icon-size-xs); stroke-width: 1.5; }
+.icon-sm { width: var(--icon-size-sm); height: var(--icon-size-sm); stroke-width: 2.4; }
+.icon-md { width: var(--icon-size-md); height: var(--icon-size-md); stroke-width: 2.0; }
+.icon-lg { width: var(--icon-size-lg); height: var(--icon-size-lg); stroke-width: 1.5; }
 
   /* ===== TEXT ===== */
   --text-vivid: #1a1f36;
@@ -60,39 +60,40 @@
   --status-warning: #ffa726;
   --status-info: #00b8d4;
 
-    /* ─── Component-friendly semantic status tokens (dark) ─── */
-    --status-success: var(--color-success);
-    --status-warning: var(--color-warning);
-    --status-error: var(--color-danger);
-    --status-info: var(--color-info);
+  /* ─── Component-friendly semantic status tokens (dark) ─── */
+  --status-success: var(--color-success);
+  --status-warning: var(--color-warning);
+  --status-error: var(--color-danger);
+  --status-info: var(--color-info);
 
-    --status-success-bg: var(--color-success-bg);
-    --status-warning-bg: var(--color-warning-bg);
-    --status-error-bg: var(--color-danger-bg);
-    --status-info-bg: var(--color-info-bg);
+  --status-success-bg: var(--color-success-bg);
+  --status-warning-bg: var(--color-warning-bg);
+  --status-error-bg: var(--color-danger-bg);
+  --status-info-bg: var(--color-info-bg);
   /* ===== INTERACTIVE ===== */
   --interactive-bg-default: #f0f3f7;
   --interactive-bg-hover: #e8ecf1;
   --interactive-bg-active: #dfe5ed;
   --interactive-bg-disabled: #fafbfc;
 
-  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ───
+     Applied globally, including VirtualList and InfoTooltip interactive elements */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
-  --focus-ring-color: #0ea5e9; /* Cyan - 5.1:1 contrast vs surface-elevated */
-  --focus-ring-halo: rgba(14, 165, 233, 0.1);
-  
+  --focus-ring-color: #0284c7; /* Sky Blue - >= 3:1 contrast vs all light surfaces (including surface-highest at #dfe5ed) */
+  --focus-ring-halo: rgba(2, 132, 199, 0.1);
+
   /* Dual-layer focus ring (outline + box-shadow for visibility) */
-  --focus-ring-shadow: 0 0 0 2px var(--color-bg-primary),
-                       0 0 0 4px var(--focus-ring-color);
-  
+  --focus-ring-shadow:
+    0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--focus-ring-color);
+
   /* Inset variant for overflow-clipped containers */
   --focus-ring-shadow-inset: inset 0 0 0 2px var(--focus-ring-color);
-  
+
   /* Input-specific focus (border + subtle glow) */
   --focus-ring-input-border: 2px solid var(--focus-ring-color);
   --focus-ring-input-shadow: 0 0 0 3px var(--focus-ring-halo);
-  
+
   /* Legacy aliases (backward compatibility) */
   --interactive-focus-ring: var(--focus-ring-color);
   --interactive-focus-ring-offset: var(--focus-ring-offset);
@@ -129,9 +130,9 @@
   --color-danger: #ef4444;
   --color-info: #3b82f6;
 
-  --color-error-border: #DC2626;
-  --color-error-text: #B91C1C;
-  --color-error-bg: #FEF2F2;
+  --color-error-border: #dc2626;
+  --color-error-text: #b91c1c;
+  --color-error-bg: #fef2f2;
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
   /* These keep existing components working without changes */
@@ -177,8 +178,8 @@
   --color-cta-secondary-text: var(--color-text-secondary);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.1);
-  --color-warning-bg: rgba(255, 167, 38, 0.1);
+  --color-success-bg: rgba(30, 201, 142, 0.3);
+  --color-warning-bg: rgba(255, 167, 38, 0.3);
   --color-danger-bg: rgba(255, 107, 107, 0.1);
   --color-info-bg: rgba(0, 184, 212, 0.1);
 
@@ -194,6 +195,69 @@
   --tooltip-text-color: var(--text-secondary);
   --tooltip-z-index: 1100;
 
+  /* ─── Connect Wallet Onboarding (theme-aware) ───
+     Issue #737: replaces previously hardcoded rgba/hex literals in
+     src/pages/ConnectWallet.tsx with theme-aware tokens so the page
+     adapts to the active `data-theme` automatically. */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    var(--surface-elevated) 0%,
+    var(--surface-sunken) 35%,
+    var(--surface-base) 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-raised) 92%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 96%, transparent) 100%
+  );
+  --connect-card-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 22%, transparent);
+  --connect-card-shadow: 0 20px 55px
+    color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+
+  --connect-eyebrow-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 32%, transparent);
+  --connect-eyebrow-bg: color-mix(
+    in srgb,
+    var(--border-interactive) 10%,
+    transparent
+  );
+  --connect-eyebrow-text: var(--status-info);
+
+  --connect-description-text: color-mix(
+    in srgb,
+    var(--text-secondary) 82%,
+    transparent
+  );
+
+  --connect-step-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-step-bg: color-mix(
+    in srgb,
+    var(--surface-raised) 82%,
+    transparent
+  );
+  --connect-step-text: color-mix(
+    in srgb,
+    var(--text-vivid) 92%,
+    transparent
+  );
+
+  --connect-helper-text: color-mix(
+    in srgb,
+    var(--text-muted) 74%,
+    transparent
+  );
+
+  --connect-cta-text: var(--color-text-inverse);
+  --connect-cta-shadow: 0 10px 25px
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px
+      color-mix(in srgb, var(--border-interactive) 26%, transparent);
+
   /* ─── Inline Unit Badge (for input suffixes) ─── */
   --input-badge-bg: var(--surface-neutral);
   --input-badge-color: var(--text-muted);
@@ -204,7 +268,7 @@
   --icon-info-default: var(--text-muted);
   --icon-info-hover: var(--accent);
   --icon-info-active: var(--accent-dim);
-  --icon-info-size: 16px;
+  --icon-info-size: var(--icon-size-xs);
 
   /* Navbar */
   --navbar-bg: #ffffff;
@@ -271,7 +335,7 @@
   /* ─── Focus Ring System (Dark Theme) ─── */
   --focus-ring-color: #00d4aa; /* Teal - 6.2:1 contrast vs surface-elevated */
   --focus-ring-halo: rgba(0, 212, 170, 0.15);
-  
+
   /* Legacy aliases (backward compatibility) */
   --interactive-focus-ring: var(--focus-ring-color);
   --interactive-focus-ring-offset: var(--focus-ring-offset);
@@ -308,8 +372,8 @@
   --color-danger: #ef4444;
   --color-info: #3b82f6;
 
-  --color-error-border: #EF4444;
-  --color-error-text: #FCA5A5;
+  --color-error-border: #ef4444;
+  --color-error-text: #fca5a5;
   --color-error-bg: rgba(220, 38, 38, 0.1);
 
   /* ===== LEGACY / COMPATIBILITY MAP ===== */
@@ -324,10 +388,44 @@
   --muted: var(--text-muted);
 
   /* ─── Status Background Tints ─── */
-  --color-success-bg: rgba(30, 201, 142, 0.15);
-  --color-warning-bg: rgba(255, 167, 38, 0.15);
+  --color-success-bg: rgba(30, 201, 142, 0.30);
+  --color-warning-bg: rgba(255, 167, 38, 0.30);
   --color-danger-bg: rgba(255, 107, 107, 0.15);
-  --color-info-bg: rgba(0, 184, 212, 0.15);
+  --color-info-bg: rgba(0, 184, 212, 0.30);
+
+  /* ─── Connect Wallet Onboarding (dark) ─── */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    #12375b 0%,
+    #071426 35%,
+    #06111f 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    rgba(20, 30, 48, 0.88) 0%,
+    rgba(10, 16, 28, 0.94) 100%
+  );
+  --connect-card-border: 1px solid rgba(34, 211, 238, 0.22);
+  --connect-card-shadow: 0 20px 55px rgba(0, 0, 0, 0.4);
+
+  --connect-eyebrow-border: 1px solid rgba(34, 211, 238, 0.32);
+  --connect-eyebrow-bg: rgba(34, 211, 238, 0.12);
+  --connect-eyebrow-text: #22d3ee;
+
+  --connect-description-text: rgba(231, 242, 255, 0.78);
+
+  --connect-step-border: 1px solid rgba(148, 195, 255, 0.2);
+  --connect-step-bg: rgba(16, 27, 44, 0.82);
+  --connect-step-text: rgba(231, 242, 255, 0.9);
+
+  --connect-helper-text: rgba(199, 220, 244, 0.68);
+
+  --connect-cta-text: #04131a;
+  --connect-cta-shadow: 0 10px 25px rgba(0, 184, 212, 0.26);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px rgba(0, 184, 212, 0.26);
 
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
@@ -366,30 +464,95 @@
   --recipient-body-text: var(--text-secondary);
 }
 
+/* Strictly opt-in Cyberpunk layer; target components opt in with data-skin. */
+[data-skin="cyberpunk"] {
+  --color-surface-default: #101827;
+  --color-border-default: #31506b;
+  --color-text-primary: #f4f7ff;
+  --color-text-vivid: #f4f7ff;
+  --color-text-secondary: #b4bfd1;
+  --color-focus: #ffe66d;
+  --cyber-accent-cyan: #65f6ff;
+  --cyber-accent-green: #62ffc9;
+  --cyber-accent-magenta: #ff75d8;
+  --cyber-accent-yellow: #ffe66d;
+  --cyber-surface: #070b12;
+  --cyber-panel: #101827;
+  --cyber-panel-raised: #152238;
+  --cyber-border: #31506b;
+}
+
+.cyberpunk-skin {
+  box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 24px rgba(101, 246, 255, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyberpunk-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(101, 246, 255, 0.06) 4px);
+}
+
+@keyframes cyberpunkGlow {
+  from { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 22px rgba(101, 246, 255, 0.16); }
+  to { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.28), 0 0 34px rgba(255, 117, 216, 0.22); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cyberpunk-skin { animation: cyberpunkGlow 4s ease-in-out infinite alternate; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. TYPOGRAPHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
 /* ═══════════════════════════════════════════════════════════
    3. TYPOGRAPHY TOKENS
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  --font-family-base: "Plus Jakarta Sans", system-ui, -apple-system,
+  --font-family-default: "Plus Jakarta Sans", system-ui, -apple-system,
     "Segoe UI", sans-serif;
+  --font-family-dyslexic: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", Arial, sans-serif;
   --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+  --font-family-base: var(--font-family-default);
+
+  /* ─── Line Height Tokens ─── */
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 1.75;
+
+  --line-height-heading-1: 44px;
+  --line-height-heading-2: 32px;
+  --line-height-heading-3: 24px;
+  --line-height-heading-4: 20px;
+
+  --line-height-body-lg: 24px;
+  --line-height-body-md: 20px;
+  --line-height-body-sm: 16px;
+
+  --line-height-label-lg: 20px;
+  --line-height-label-md: 16px;
+  --line-height-label-sm: 14px;
 
   /* ─── Heading Scale ─── */
-  --font-heading-1: 500 36px / 44px var(--font-family-base);
-  --font-heading-2: 600 24px / 32px var(--font-family-base);
-  --font-heading-3: 600 18px / 28px var(--font-family-base);
-  --font-heading-4: 600 16px / 24px var(--font-family-base);
+  --font-heading-1: 500 36px / var(--line-height-heading-1) var(--font-family-base);
+  --font-heading-2: 600 24px / var(--line-height-heading-2) var(--font-family-base);
+  --font-heading-3: 600 18px / var(--line-height-heading-3) var(--font-family-base);
+  --font-heading-4: 600 16px / var(--line-height-heading-4) var(--font-family-base);
 
   /* ─── Body Scale ─── */
-  --font-body-lg: 400 16px / 24px var(--font-family-base);
-  --font-body-md: 400 14px / 20px var(--font-family-base);
-  --font-body-sm: 400 12px / 16px var(--font-family-base);
+  --font-body-lg: 400 16px / var(--line-height-body-lg) var(--font-family-base);
+  --font-body-md: 400 14px / var(--line-height-body-md) var(--font-family-base);
+  --font-body-sm: 400 12px / var(--line-height-body-sm) var(--font-family-base);
 
   /* ─── Labels & Controls ─── */
-  --font-label-lg: 500 14px / 20px var(--font-family-base);
-  --font-label-md: 500 12px / 16px var(--font-family-base);
-  --font-label-sm: 500 11px / 14px var(--font-family-base);
+  --font-label-lg: 500 14px / var(--line-height-label-lg) var(--font-family-base);
+  --font-label-md: 500 12px / var(--line-height-label-md) var(--font-family-base);
+  --font-label-sm: 500 11px / var(--line-height-label-sm) var(--font-family-base);
 
   /* ─── Code / Monospace ─── */
   --font-mono-sm: 400 12px / 16px var(--font-family-mono);
@@ -398,6 +561,40 @@
   --letter-spacing-tight: -0.01em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.02em;
+}
+
+/* ─── Dyslexia-friendly typeface overrides (Opt-in) ─── */
+:root[data-font="easy-read"] {
+  --font-family-base: var(--font-family-dyslexic);
+
+  /* Looser letter spacing / tracking to prevent visual crowding */
+  --letter-spacing-tight: 0.02em;
+  --letter-spacing-normal: 0.05em;
+  --letter-spacing-wide: 0.08em;
+
+  /* Increased line spacing (approx 1.5 - 1.66x of font size) */
+  --line-height-heading-1: 54px; /* 36px * 1.5 = 54px */
+  --line-height-heading-2: 38px; /* 24px * 1.58 = 38px */
+  --line-height-heading-3: 30px; /* 18px * 1.66 = 30px */
+  --line-height-heading-4: 26px; /* 16px * 1.62 = 26px */
+
+  --line-height-body-lg: 26px;   /* 16px * 1.62 = 26px */
+  --line-height-body-md: 22px;   /* 14px * 1.57 = 22px */
+  --line-height-body-sm: 18px;   /* 12px * 1.5 = 18px */
+
+  --line-height-label-lg: 22px;  /* 14px * 1.57 = 22px */
+  --line-height-label-md: 18px;  /* 12px * 1.5 = 18px */
+  --line-height-label-sm: 17px;  /* 11px * 1.54 = 17px */
+}
+
+/* Smooth layout and typographic transition when toggling */
+:root[data-font-transitioning="true"],
+:root[data-font-transitioning="true"] * {
+  transition: font-family var(--transition-fast) ease-in-out,
+              line-height var(--transition-fast) ease-in-out,
+              letter-spacing var(--transition-fast) ease-in-out,
+              background-color var(--transition-fast) ease-in-out,
+              color var(--transition-fast) ease-in-out !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -436,9 +633,8 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --focus-ring: 0 0 0 2px var(--color-bg-primary),
-    0 0 0 4px var(--color-focus);
-    
+  --focus-ring: 0 0 0 2px var(--color-bg-primary), 0 0 0 4px var(--color-focus);
+
   --shadow-error-focus: 0 0 0 3px rgba(220, 38, 38, 0.2);
 
   /* ─── Accent-specific shadows ─── */
@@ -446,6 +642,26 @@
   --shadow-accent-secondary: 0 4px 12px rgba(0, 212, 170, 0.2);
   --shadow-cta-primary: var(--shadow-accent-primary);
   --shadow-cta-primary-hover: 0 8px 16px rgba(0, 184, 212, 0.3);
+
+  /* Persistent create-stream FAB.
+     Offsets and inner paddings reference already-defined spacing tokens
+     (--space-xl == 24px, --space-md == 12px, --space-lg == 16px,
+     --space-sm == 8px).
+     An earlier revision aliased var(--space-2) / var(--space-3) /
+     var(--space-4) / var(--space-5) / var(--space-6) — none of which
+     are defined on :root and silently fell through to invalid token
+     values, leaving the FAB flush to the viewport edge and the menu
+     paddings collapsed. See docs/CREATE_STREAM_FAB_SPEC.md. */
+  --fab-size: 56px;
+  --fab-bottom-offset: var(--space-xl);
+  --fab-bottom-offset-mobile: 5.5rem; /* 88px — clears the mobile bottom-nav safe area */
+  --fab-side-offset: var(--space-xl);
+  --fab-z-index: 900;
+  --fab-menu-gap: var(--space-sm);     /* 8px — vertical spacing between speed-dial items */
+  --fab-trigger-padding-x: var(--space-md); /* 12px — horizontal padding inside the pill */
+  --fab-menu-item-gap: var(--space-sm);   /* 8px — spacing between icon and label */
+  --fab-menu-item-padding-y: var(--space-sm);
+  --fab-menu-item-padding-x: var(--space-md);
 }
 
 /* Dark theme shadow adjustments */
@@ -454,7 +670,7 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-  
+
   --shadow-error-focus: 0 0 0 3px rgba(239, 68, 68, 0.25);
 
   --shadow-accent-primary: 0 4px 12px rgba(0, 184, 212, 0.25);
@@ -580,11 +796,7 @@
 }
 
 .ui-primary-cta:disabled {
-  background: color-mix(
-    in srgb,
-    var(--color-text-tertiary) 40%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--color-text-tertiary) 40%, transparent);
   color: var(--color-text-muted);
   cursor: not-allowed;
   box-shadow: none;
@@ -642,7 +854,11 @@
   --nav-primary-color-hover: var(--color-text-primary);
   --nav-primary-color-active: var(--color-accent-secondary);
   --nav-primary-bg-hover: var(--color-surface-raised);
-  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+  --nav-primary-bg-active: color-mix(
+    in srgb,
+    var(--color-accent-secondary) 12%,
+    transparent
+  );
   --nav-primary-font: var(--font-label-lg);
   --nav-primary-border-active: 2px solid var(--color-accent-secondary);
 
@@ -662,7 +878,11 @@
 }
 
 :root[data-theme="dark"] {
-  --nav-primary-bg-active: color-mix(in srgb, var(--color-accent-secondary) 15%, transparent);
+  --nav-primary-bg-active: color-mix(
+    in srgb,
+    var(--color-accent-secondary) 15%,
+    transparent
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -749,3 +969,253 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CUSTOM / BRANDED THEME
+   ───────────────────────────────────────────────────────────
+   Applied when ThemeProvider calls
+     document.documentElement.setAttribute("data-theme", "custom")
+   after writing --custom-* inline style properties via applyCustomTokens().
+
+   Each token falls back to the matching light-theme default so a partial
+   override (e.g. only accent colours) still renders a coherent UI.
+
+   Locked tokens (--focus-ring-*, status colours) are intentionally absent
+   from this block – they are never overridable via the registration API.
+
+   How slots work:
+     1. applyCustomTokens() writes  --custom-color-accent-primary: #RRGGBB
+        onto <html style="...">.
+     2. This block reads   var(--custom-color-accent-primary, <fallback>).
+     3. If the custom slot is unset, the fallback (Fluxora default) applies.
+   ═══════════════════════════════════════════════════════════ */
+
+:root[data-theme="custom"] {
+  /* ── Brand / accent ──────────────────────────────────────── */
+  --color-accent-primary:         var(--custom-color-accent-primary,         #00b8d4);
+  --color-accent-secondary:       var(--custom-color-accent-secondary,       #00d4aa);
+  --color-accent-primary-dark:    var(--custom-color-accent-primary-dark,    #0097a7);
+  --color-accent-secondary-dark:  var(--custom-color-accent-secondary-dark,  #00a884);
+  --color-accent-primary-darkest: var(--custom-color-accent-primary-darkest, #006f7a);
+
+  /* ── CTA ─────────────────────────────────────────────────── */
+  --color-cta-primary-bg:         var(--custom-color-cta-primary-bg,         var(--color-accent-primary));
+  --color-cta-primary-bg-hover:   var(--custom-color-cta-primary-bg-hover,   var(--color-accent-primary-dark));
+  --color-cta-primary-bg-active:  var(--custom-color-cta-primary-bg-active,  var(--color-accent-primary-darkest));
+  --color-cta-primary-text:       var(--custom-color-cta-primary-text,       #04131a);
+
+  /* ── Navbar ──────────────────────────────────────────────── */
+  --navbar-bg:          var(--custom-navbar-bg,          #ffffff);
+  --navbar-border:      var(--custom-navbar-border,      #e0e6ed);
+  --navbar-logo-color:  var(--custom-navbar-logo-color,  #1a1f36);
+  --navbar-link-color:  var(--custom-navbar-link-color,  #4a5565);
+  --navbar-icon-color:  var(--custom-navbar-icon-color,  #6b7a94);
+  --navbar-icon-border: var(--custom-navbar-icon-border, #d0d7e0);
+
+  /* ── Legacy CTA aliases ──────────────────────────────────── */
+  --cta-bg:     var(--custom-cta-bg,     var(--color-accent-secondary));
+  --cta-shadow: var(--custom-cta-shadow, 0 4px 12px rgba(0, 212, 170, 0.2));
+
+  /* ── Surfaces (optional org override) ───────────────────── */
+  --surface-base:     var(--custom-surface-base,     #ffffff);
+  --surface-sunken:   var(--custom-surface-sunken,   #f5f7fa);
+  --surface-neutral:  var(--custom-surface-neutral,  #fafbfc);
+  --surface-elevated: var(--custom-surface-elevated, #f0f3f7);
+
+  /* ── Text (optional org override) ───────────────────────── */
+  --text-vivid:     var(--custom-text-vivid,     #1a1f36);
+  --text-secondary: var(--custom-text-secondary, #4a5565);
+  --text-muted:     var(--custom-text-muted,     #6b7a94);
+
+  /* ── Re-derive semantic tokens from possibly-overridden primitives ── */
+  --color-bg-primary:       var(--surface-base);
+  --color-bg-secondary:     var(--surface-sunken);
+  --color-bg-tertiary:      var(--surface-elevated);
+  --color-surface-default:  var(--surface-neutral);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-text-primary:     var(--text-vivid);
+  --color-text-secondary:   var(--text-secondary);
+  --color-text-tertiary:    var(--text-muted);
+  --color-text-muted:       var(--text-muted);
+
+  /* ── accent legacy alias ─────────────────────────────────── */
+  --accent:     var(--color-accent-secondary);
+  --accent-dim: var(--color-accent-secondary-dark);
+  --primary:    var(--color-accent-primary);
+
+  /* ── Navigation tokens derived from custom navbar values ─── */
+  --nav-primary-color:        var(--navbar-link-color);
+  --nav-primary-color-active: var(--color-accent-secondary);
+  --nav-primary-bg-active:    color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+}
+
+/* Persistent action: stays above long lists without covering mobile navigation. */
+.create-stream-fab {
+  position: fixed;
+  right: max(var(--fab-side-offset), env(safe-area-inset-right));
+  bottom: max(var(--fab-bottom-offset), env(safe-area-inset-bottom));
+  z-index: var(--fab-z-index);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--fab-menu-gap);
+}
+
+.create-stream-fab__button {
+  min-width: var(--fab-size);
+  min-height: var(--fab-size);
+  padding: 0 var(--fab-trigger-padding-x);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+}
+
+.create-stream-fab__button:hover {
+  transform: translateY(-2px);
+}
+
+.create-stream-fab__button:active {
+  transform: translateY(1px);
+}
+
+.create-stream-fab__icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  flex: 0 0 auto;
+  transition: transform var(--transition-base);
+}
+
+.create-stream-fab__icon.is-rotated {
+  transform: rotate(45deg);
+}
+
+.create-stream-fab__menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--fab-menu-gap);
+}
+
+.create-stream-fab__menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-menu-item-gap);
+  min-height: 44px;
+  padding: var(--fab-menu-item-padding-y) var(--fab-menu-item-padding-x);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  font: var(--font-label-md);
+  font-weight: 600;
+}
+
+.create-stream-fab__menu-item:hover {
+  background: var(--color-surface-elevated);
+}
+
+.create-stream-fab__menu-icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  color: var(--color-accent-primary);
+}
+
+@media (max-width: 860px) {
+  .create-stream-fab {
+    right: max(var(--space-lg), env(safe-area-inset-right));
+    bottom: max(var(--fab-bottom-offset-mobile), env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .create-stream-fab__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .create-stream-fab__button {
+    width: var(--fab-size);
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-stream-fab__button,
+  .create-stream-fab__icon {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   12. COMPARE MODE
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Layout */
+  --compare-pane-min-width: 360px;
+  --compare-pane-gap: 0px; /* gap handled by divider */
+  --compare-header-height: 48px;
+  --compare-field-row-height: 56px;
+
+  /* Divider — must be ≥ 3:1 against white (#fff) surface.
+     #a0aab4 yields ~3.1:1. */
+  --compare-divider-color: #a0aab4;
+  --compare-divider-width: 1px;
+
+  /* Field-diff highlight (info-tinted background) */
+  --compare-field-highlight: rgba(14, 165, 233, 0.08);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.25);
+}
+
+[data-theme="dark"] {
+  --compare-divider-color: #4a5565;
+  --compare-field-highlight: rgba(14, 165, 233, 0.13);
+  --compare-field-highlight-border: rgba(14, 165, 233, 0.3);
+}
+
+/* -----------------------------------------------------------
+   13. STREAM STATUS TRANSITIONS
+   ----------------------------------------------------------- */
+
+:root {
+  --status-transition-duration: var(--motion-duration-stream-disclosure, 200ms);
+  --status-transition-ease: var(--transition-base, 200ms ease-in-out);
+}
+
+@keyframes pill-cross-fade {
+  0% { opacity: 0.5; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes highlight-ring-pulse {
+  0% { box-shadow: 0 0 0 0 var(--focus-ring-color); }
+  50% { box-shadow: 0 0 0 4px var(--focus-ring-color); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.status-pill-transition {
+  transition: background-color var(--status-transition-duration) ease-in-out,
+              color var(--status-transition-duration) ease-in-out;
+}
+
+.status-pill-animate .status-pill-label-enter {
+  animation: pill-cross-fade var(--status-transition-duration) ease-in-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill-transition {
+    transition: none !important;
+  }
+  .status-pill-animate .status-pill-label-enter {
+    animation: highlight-ring-pulse 500ms ease-out forwards;
+  }
+}
+

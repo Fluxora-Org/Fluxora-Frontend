@@ -1,5 +1,6 @@
 import {
   getExpectedStellarNetwork,
+  getNetworkExplorerPath,
   type StellarNetwork,
 } from "./stellarNetwork";
 
@@ -23,9 +24,83 @@ export interface AppConfig {
   useMocks: boolean;
 }
 
-function optionalString(value: string | undefined): string | null {
+export interface ConfigError {
+  field: string;
+  message: string;
+}
+
+/**
+ * Validates a URL string, ensuring it is parseable and uses an allowed protocol.
+ *
+ * Accepted protocols: `https:` for all hosts; `http:` is additionally permitted
+ * for `localhost` and `127.0.0.1` to support local development.
+ *
+ * Rejected: `javascript:`, `data:`, `ftp:`, and any other non-http/https scheme.
+ *
+ * @returns The trimmed URL string on success, or a `ConfigError` if invalid.
+ */
+export function validateUrl(
+  field: string,
+  value: string,
+): string | ConfigError {
+  const trimmed = value.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { field, message: `${field}: "${trimmed}" is not a valid URL` };
+  }
+
+  const isLocal =
+    parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+
+  if (parsed.protocol === "https:") return trimmed;
+  if (parsed.protocol === "http:" && isLocal) return trimmed;
+
+  return {
+    field,
+    message: `${field}: protocol "${parsed.protocol}" is not allowed; use https${isLocal ? " or http (localhost only)" : ""}`,
+  };
+}
+
+function optionalUrl(
+  field: string,
+  value: string | undefined,
+): string | null | ConfigError {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  if (!trimmed) return null;
+  return validateUrl(field, trimmed);
+}
+
+/**
+ * Stellar contract IDs are Strkey-encoded contract addresses: exactly 56
+ * characters, starting with 'C', using the base-32 alphabet A–Z and 2–7.
+ *
+ * Reference: https://developers.stellar.org/docs/learn/glossary#contract-id
+ */
+const STELLAR_CONTRACT_ID_RE = /^C[A-Z2-7]{55}$/;
+
+export function validateContractId(
+  field: string,
+  value: string,
+): string | ConfigError {
+  const trimmed = value.trim();
+  if (!STELLAR_CONTRACT_ID_RE.test(trimmed)) {
+    return {
+      field,
+      message: `${field}: "${trimmed}" is not a valid Stellar contract ID (expected a 56-character Strkey starting with 'C')`,
+    };
+  }
+  return trimmed;
+}
+
+function optionalContractId(
+  field: string,
+  value: string | undefined,
+): string | null | ConfigError {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return validateContractId(field, trimmed);
 }
 
 export function parseBooleanFlag(value: string | undefined): boolean {
@@ -40,16 +115,37 @@ export function getNetworkPassphrase(network: StellarNetwork): string {
   return NETWORK_PASSPHRASES[network];
 }
 
+export { getNetworkExplorerPath };
+
 export function createConfig(env: ImportMetaEnv): AppConfig {
   const network = getExpectedStellarNetwork(env.VITE_NETWORK);
 
+  const apiUrlResult = optionalUrl("apiUrl", env.VITE_API_URL);
+  const rpcUrlResult = optionalUrl("rpcUrl", env.VITE_RPC_URL);
+  const contractIdResult = optionalContractId(
+    "streamContractId",
+    env.VITE_STREAM_CONTRACT_ID,
+  );
+
+  const errors: ConfigError[] = [];
+  if (apiUrlResult && typeof apiUrlResult === "object")
+    errors.push(apiUrlResult);
+  if (rpcUrlResult && typeof rpcUrlResult === "object")
+    errors.push(rpcUrlResult);
+  if (contractIdResult && typeof contractIdResult === "object")
+    errors.push(contractIdResult);
+
+  if (errors.length > 0) {
+    throw new Error(errors.map((e) => e.message).join("; "));
+  }
+
   return {
-    apiUrl: optionalString(env.VITE_API_URL),
+    apiUrl: apiUrlResult as string | null,
     network,
     networkLabel: getNetworkLabel(network),
     networkPassphrase: getNetworkPassphrase(network),
-    rpcUrl: optionalString(env.VITE_RPC_URL),
-    streamContractId: optionalString(env.VITE_STREAM_CONTRACT_ID),
+    rpcUrl: rpcUrlResult as string | null,
+    streamContractId: contractIdResult as string | null,
     useMocks: parseBooleanFlag(env.VITE_USE_MOCKS),
   };
 }

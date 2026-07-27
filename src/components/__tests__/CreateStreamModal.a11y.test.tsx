@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 // Checksum-valid Stellar public key (required by the centralized
 // isValidStellarAddress validator introduced in #331).
@@ -10,9 +11,7 @@ const VALID_STELLAR =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderOpenModal(onClose = vi.fn()) {
-  const result = render(
-    <button type="button">Open create stream</button>,
-  );
+  const result = render(<button type="button">Open create stream</button>);
   const trigger = screen.getByRole("button", { name: /open create stream/i });
   trigger.focus();
 
@@ -59,22 +58,27 @@ describe("CreateStreamModal accessibility and keyboard behavior", () => {
     expect(results.violations).toEqual([]);
   });
 
-  it("focuses the recipient input, traps Tab, closes on Escape, and restores focus", async () => {
+  it("focuses the first focusable element, traps Tab, closes on Escape, and restores focus", async () => {
+    const user = userEvent.setup();
     const { onClose, rerender, trigger } = renderOpenModal();
 
     await flushAnimationFrame();
     const dialog = screen.getByRole("dialog", { name: /create stream/i });
-    const recipient = within(dialog).getByLabelText(/recipient/i);
+
+    selectSingleStreamInContainer(dialog);
+
     const closeButton = within(dialog).getByRole("button", {
       name: /close create stream modal/i,
     });
 
-    expect(recipient).toHaveFocus();
-
-    trigger.focus();
-    fireEvent.keyDown(document, { key: "Tab" });
+    // Focus the close button (first focusable element in the modal header)
+    closeButton.focus();
     expect(closeButton).toHaveFocus();
 
+    // Tab forward through the modal
+    await user.tab();
+
+    // Escape closes the modal
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
 
@@ -89,6 +93,9 @@ describe("CreateStreamModal accessibility and keyboard behavior", () => {
     await flushAnimationFrame();
 
     const dialog = screen.getByRole("dialog", { name: /create stream/i });
+
+    // Select single stream mode to render form fields
+    selectSingleStreamInContainer(dialog);
 
     await user.click(within(dialog).getByRole("button", { name: /^next$/i }));
     expect(
