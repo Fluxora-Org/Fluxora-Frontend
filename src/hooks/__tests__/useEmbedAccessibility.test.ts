@@ -412,5 +412,106 @@ describe("useEmbedAccessibility hook", () => {
 
       cleanup();
     });
+
+    it("handles case where no close button exists when Escape is pressed", () => {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      const escEvent = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      });
+      expect(() => container.dispatchEvent(escEvent)).not.toThrow();
+
+      cleanup();
+    });
+
+    it("does not cycle focus on Tab keypress when activeElement is not an edge element", () => {
+      const container = document.createElement("div");
+      const btn1 = document.createElement("button");
+      const btn2 = document.createElement("button");
+      const btn3 = document.createElement("button");
+      container.appendChild(btn1);
+      container.appendChild(btn2);
+      container.appendChild(btn3);
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      btn2.focus();
+
+      const tabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: false,
+        bubbles: true,
+      });
+      const tabSpy = vi.spyOn(tabEvent, "preventDefault");
+      container.dispatchEvent(tabEvent);
+
+      expect(tabSpy).not.toHaveBeenCalled();
+
+      const shiftTabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: true,
+        bubbles: true,
+      });
+      const shiftTabSpy = vi.spyOn(shiftTabEvent, "preventDefault");
+      container.dispatchEvent(shiftTabEvent);
+
+      expect(shiftTabSpy).not.toHaveBeenCalled();
+
+      cleanup();
+    });
+
+    it("ignores non-Tab and non-Escape key events", () => {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      const enterEvent = new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+      });
+      const spy = vi.spyOn(enterEvent, "preventDefault");
+      container.dispatchEvent(enterEvent);
+
+      expect(spy).not.toHaveBeenCalled();
+
+      cleanup();
+    });
+  });
+
+  describe("edge cases", () => {
+    it("handles case where no widget container exists in DOM", () => {
+      document.body.innerHTML = "";
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "No Container" })
+      );
+      expect(() => unmount()).not.toThrow();
+    });
+
+    it("createAccessibleWidgetContainer handles options without specific attributes", () => {
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+
+      const cleanup = createAccessibleWidgetContainer(el);
+
+      expect(el.getAttribute("role")).toBe("article");
+
+      cleanup();
+
+      expect(el.hasAttribute("role")).toBe(false);
+    });
+
+    it("announceToScreenReader returns noop cleanup when container evaluates to null", () => {
+      const spy = vi.spyOn(document, "body", "get").mockReturnValue(null as unknown as HTMLElement);
+      const cleanup = announceToScreenReader("test", "polite", { container: null });
+      expect(typeof cleanup).toBe("function");
+      expect(cleanup()).toBeUndefined();
+      spy.mockRestore();
+    });
   });
 });
