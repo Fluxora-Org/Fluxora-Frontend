@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Stream } from "./Stream";
 import { useToast } from "../toast/ToastProvider";
 import {
@@ -29,21 +29,35 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const { addToast } = useToast();
+  const mountedRef = useRef(true);
 
-  const handleFieldToggle = (field: Field) => {
+  // Track mounted state for safe async state updates
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const handleFieldToggle = useCallback((field: Field) => {
     setSelectedFields((prev) => {
       const next = new Set(prev);
       if (next.has(field)) next.delete(field);
       else next.add(field);
       return next;
     });
-  };
+  }, []);
 
-  // Simulate preview loading
+  // Deterministic preview loading: triggered on filter change, resolved
+  // at the next animation frame so the DOM can paint the loading overlay.
   useEffect(() => {
     setIsPreviewLoading(true);
-    const timer = setTimeout(() => setIsPreviewLoading(false), 400);
-    return () => clearTimeout(timer);
+    const rafId = requestAnimationFrame(() => {
+      if (mountedRef.current) {
+        setIsPreviewLoading(false);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [startDate, endDate, selectedFields, grouping]);
 
   const canExport = selectedFields.size > 0;
@@ -59,7 +73,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     [selectedFields]
   );
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     if (!canExport) return;
     setIsExporting(true);
     try {
@@ -73,12 +87,13 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     } catch {
       addToast("Failed to export report. Please try again.", "error");
     } finally {
-      setIsExporting(false);
+      if (mountedRef.current) {
+        setIsExporting(false);
+      }
     }
-  };
+  }, [canExport, exportFormat, reportStreams, orderedSelectedFields, grouping, addToast, onClose]);
 
   const filteredStreams = useMemo(() => {
-    // Preview shows only the first few rows of the actual (date-filtered) export set.
     return reportStreams.slice(0, 5);
   }, [reportStreams]);
 
