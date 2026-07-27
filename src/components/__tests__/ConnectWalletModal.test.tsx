@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import React from "react";
+import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ConnectWalletModal from "../ConnectWalletModal";
 import { getNetwork } from "@stellar/freighter-api";
@@ -293,6 +293,62 @@ describe("ConnectWalletModal", () => {
 
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
     });
+  });
+
+  describe("Edge Case Behaviors & States", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders loading state copy and disables options while connection is in flight", async () => {
+      let resolveNetwork: (value: any) => void;
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise((resolve) => {
+          resolveNetwork = resolve;
+        })
+      );
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
+      
+      fireEvent.click(freighterBtn);
+
+      expect(screen.getByText("Connecting...")).toBeInTheDocument();
+      expect(freighterBtn).toBeDisabled();
+
+      await act(async () => {
+        resolveNetwork({ network: "TESTNET" });
+      });
+    });
+
+    it("applies interactive styling when options are hovered or focused via keyboard", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      // Focus via keyboard
+      await userEvent.tab();
+      if (document.activeElement !== freighterBtn) {
+        freighterBtn.focus();
+      }
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Blur
+      freighterBtn.blur();
+      expect(freighterBtn.style.boxShadow).toBe("none");
+
+      // Hover via mouse
+      fireEvent.mouseEnter(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Mouse leave
+      fireEvent.mouseLeave(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toBe("none");
+    });
+  });
     // Accessibility tests
   describe('accessibility', () => {
     it('traps focus within the modal and wraps correctly', async () => {
@@ -340,14 +396,11 @@ describe("ConnectWalletModal", () => {
 });
 
 describe("unavailable wallet options (Albedo, WalletConnect)", () => {
-  // Skipped: pre-existing failure unrelated to CI setup — modal body content
-  // (Albedo/WalletConnect options) doesn't render in this test environment.
-  // Tracked as pre-existing test debt.
-  it.skip("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
+  it("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
     render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
 
-    const albedo = screen.getByRole("button", { name: "Albedo — coming soon" });
-    const wc = screen.getByRole("button", { name: "WalletConnect — coming soon" });
+    const albedo = screen.getByRole("listitem", { name: "Albedo — coming soon" });
+    const wc = screen.getByRole("listitem", { name: "WalletConnect — coming soon" });
 
     expect(albedo).toBeDisabled();
     expect(wc).toBeDisabled();
@@ -358,9 +411,7 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
     expect(screen.getAllByText("coming soon")).toHaveLength(2);
   });
 
-  // Skipped: pre-existing failure unrelated to CI setup (same root cause as
-  // above). Tracked as pre-existing test debt.
-  it.skip("enables Albedo when a handler is provided", () => {
+  it("enables Albedo when a handler is provided", () => {
     const onAlbedo = vi.fn();
     render(
       <ConnectWalletModal
@@ -371,7 +422,7 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
       />
     );
 
-    const albedo = screen.getByRole("button", { name: "Connect with Albedo" });
+    const albedo = screen.getByRole("listitem", { name: "Connect with Albedo" });
     expect(albedo).not.toBeDisabled();
     expect(screen.getAllByText("coming soon")).toHaveLength(1); // only WalletConnect
   });

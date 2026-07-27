@@ -29,7 +29,7 @@ import { useI18n } from '../i18n';
 import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
-import { parseAndValidateCsv } from './csv-upload/csvParser';
+import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
 import {
   DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
@@ -338,9 +338,14 @@ export default function CreateStreamModal({
                 ? t("createStream.button.next")
                 : t("createStream.button.create");
 
+  const guardedClose = useCallback(() => {
+    if (isActivelySubmitting) return;
+    onClose();
+  }, [isActivelySubmitting, onClose]);
+
   useModalAccessibility({
     isOpen,
-    onClose,
+    onClose: guardedClose,
     modalRef,
     initialFocusRef: recipientInputRef,
   });
@@ -936,7 +941,7 @@ export default function CreateStreamModal({
               {t("csvUpload.dryRun.outcome")}
             </h4>
             {totals ? (
-              <div className="dry-run-summary__cards">
+              <div className="dry-run-summary__cards" aria-live="polite">
                 <div className="dry-run-summary__card">
                   <span className="dry-run-summary__label">
                     {t("csvUpload.dryRun.totalStreams")}
@@ -1115,7 +1120,7 @@ export default function CreateStreamModal({
           </label>
           <button
             type="button"
-            className="btn btn-next"
+            className="btn btn-next dry-run-submit-btn"
             disabled={!bulkDryRunConfirmed || isBulkSubmitting}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}
@@ -1157,10 +1162,10 @@ export default function CreateStreamModal({
       try {
         const sender = wallet.address!;
         const amountStr = Math.floor(
-          (parseFloat(row.depositAmount.replace(/,/g, '')) || 0) * 10_000_000,
+          (parseCsvNumber(row.depositAmount) || 0) * 10_000_000,
         ).toString();
         const start = Math.floor(Date.now() / 1000);
-        const end = start + Math.floor(parseFloat(row.durationDays) * 86_400);
+        const end = start + Math.floor(parseCsvNumber(row.durationDays) * 86_400);
         await createStream(sender, row.recipient.trim(), amountStr, start, end);
         successCount++;
       } catch {
@@ -1598,6 +1603,12 @@ export default function CreateStreamModal({
                         if (error) setError(null);
                       }}
                       onBlur={() => handleBlur('depositAmount')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNext();
+                        }
+                      }}
                       placeholder={t("createStream.step1.depositPlaceholder")}
                     />
                   </InputField>
@@ -1892,10 +1903,17 @@ export default function CreateStreamModal({
                   value={accrualRate}
                   onChange={(e) => setAccrualRate(e.target.value)}
                   onBlur={() => handleBlur('accrualRate')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      document.getElementById('create-stream-duration')?.focus();
+                    }
+                  }}
                   placeholder="0.00"
                   hasError={Boolean(accrualRateError)}
                   aria-required="true"
                   aria-describedby={accrualRateError ? 'create-stream-accrual-rate-error' : 'create-stream-accrual-rate-hint'}
+                  keyboardHint="Enter ↵"
                 />
               </div>
               {accrualRateError && (
@@ -1945,10 +1963,17 @@ export default function CreateStreamModal({
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   onBlur={() => handleBlur('duration')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleNext();
+                    }
+                  }}
                   placeholder="1"
                   hasError={Boolean(durationError)}
                   aria-required="true"
                   aria-describedby={durationError ? 'create-stream-duration-error' : 'create-stream-duration-hint'}
+                  keyboardHint="Enter ↵"
                 />
               </div>
               {durationError && (
@@ -2569,6 +2594,12 @@ export default function CreateStreamModal({
                               if (error) setError(null);
                             }}
                             onBlur={() => handleBlur('depositAmount')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleNext();
+                              }
+                            }}
                             placeholder={t("createStream.step1.depositPlaceholder")}
                           />
                         </InputField>
@@ -2847,10 +2878,17 @@ export default function CreateStreamModal({
                               value={accrualRate}
                               onChange={(e) => setAccrualRate(e.target.value)}
                               onBlur={() => handleBlur('accrualRate')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  document.getElementById('advanced-duration')?.focus();
+                                }
+                              }}
                               placeholder="0.00"
                               hasError={Boolean(accrualRateError)}
                               aria-required="true"
                               aria-describedby={accrualRateError ? 'advanced-accrual-rate-error' : 'advanced-accrual-rate-hint'}
+                              keyboardHint="Enter ↵"
                             />
                           </div>
                           {accrualRateError && (
@@ -2895,10 +2933,17 @@ export default function CreateStreamModal({
                               value={duration}
                               onChange={(e) => setDuration(e.target.value)}
                               onBlur={() => handleBlur('duration')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleNext();
+                                }
+                              }}
                               placeholder="1"
                               hasError={Boolean(durationError)}
                               aria-required="true"
                               aria-describedby={durationError ? 'advanced-duration-error' : 'advanced-duration-hint'}
+                              keyboardHint="Enter ↵"
                             />
                           </div>
                           {durationError && (
@@ -3191,6 +3236,9 @@ export default function CreateStreamModal({
                 disabled={isBusyCreating}
                 aria-busy={isBusyCreating}
               >
+                {isBusyCreating && (
+                  <span className="btn-spinner" aria-hidden="true" data-testid="btn-spinner" />
+                )}
                 {t("createStream.advanced.createBtn")}
               </button>
             </>
@@ -3230,6 +3278,9 @@ export default function CreateStreamModal({
                 disabled={isBusyCreating}
                 aria-busy={isBusyCreating && currentStep === 3}
               >
+                {(isBusyCreating && currentStep === 3) && (
+                  <span className="btn-spinner" aria-hidden="true" data-testid="btn-spinner" />
+                )}
                 {submitButtonLabel}
               </button>
             </>

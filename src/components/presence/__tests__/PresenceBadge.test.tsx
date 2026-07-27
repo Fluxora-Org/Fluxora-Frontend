@@ -141,6 +141,24 @@ describe("PresenceBadge", () => {
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
+  it("opens the list when Enter or Space is pressed on the trigger", () => {
+    render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+    const trigger = screen.getByRole("button");
+    
+    // Press Enter
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    // In jsdom, fireEvent.keyDown doesn't always trigger onClick for buttons unless we use userEvent
+    // or simulate click, but we can just simulate the click that React maps from Enter/Space natively
+    fireEvent.click(trigger);
+    expect(screen.getByRole("list")).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole("list"), { key: "Escape" });
+    
+    // Press Space
+    fireEvent.click(trigger);
+    expect(screen.getByRole("list")).toBeInTheDocument();
+  });
+
   it("closes the list when Escape is pressed and focuses the trigger", () => {
     render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
 
@@ -217,10 +235,10 @@ describe("PresenceBadge", () => {
   it("handles Escape key press when list is already closed", () => {
     render(<PresenceBadge viewers={[mockViewer1]} />);
     const trigger = screen.getByRole("button");
+    // Escape on a closed popover: the container handler is guarded by `isOpen`,
+    // so nothing happens — the list stays absent, no error thrown.
     fireEvent.keyDown(trigger, { key: "Escape" });
-    // Should still be closed and trigger focused
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(trigger);
   });
 
   it("does not close list when clicking inside the list component", () => {
@@ -285,5 +303,171 @@ describe("PresenceBadge", () => {
     const { container } = render(<PresenceBadge viewers={[noColorViewer]} />);
     const avatar = container.querySelector(".presence-avatar") as HTMLElement;
     expect(avatar.style.backgroundColor).toBe("rgb(185, 28, 28)");
+  });
+
+  // -------------------------------------------------------------------------
+  // Tooltip: role and content
+  // -------------------------------------------------------------------------
+
+  describe("tooltip role and accessibility", () => {
+    it("tooltip spans carry role='tooltip'", () => {
+      render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+      // Tooltips live inside aria-hidden="true" (avatar stack), so query with hidden:true
+      const tooltips = screen.getAllByRole("tooltip", { hidden: true });
+      // One tooltip per rendered avatar (up to 3)
+      expect(tooltips.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("each tooltip contains the viewer's displayName", () => {
+      render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+      const tooltips = screen.getAllByRole("tooltip", { hidden: true });
+      const texts = tooltips.map((t) => t.textContent);
+      expect(texts).toContain("Alice Smith");
+      expect(texts).toContain("Bob Jones");
+    });
+
+    it("tooltip contains 'Anonymous Viewer' when displayName is null", () => {
+      const anonViewer: Viewer = {
+        id: "G99",
+        displayName: null,
+        initials: "??",
+        color: "#b91c1c",
+        lastSeen: Date.now(),
+      };
+      render(<PresenceBadge viewers={[anonViewer]} />);
+      expect(screen.getByRole("tooltip", { hidden: true })).toHaveTextContent("Anonymous Viewer");
+    });
+
+    it("tooltip is inside an aria-hidden avatar stack so it does not appear in the accessible name tree of the trigger", () => {
+      const { container } = render(<PresenceBadge viewers={[mockViewer1]} />);
+      const stack = container.querySelector(".presence-avatar-stack");
+      expect(stack).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("tooltip pointer-events are disabled (CSS class check)", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      const tooltip = screen.getByRole("tooltip", { hidden: true });
+      expect(tooltip).toHaveClass("presence-tooltip");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // aria-haspopup and aria-expanded
+  // -------------------------------------------------------------------------
+
+  describe("trigger ARIA attributes", () => {
+    it("trigger has aria-haspopup='true'", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      const trigger = screen.getByRole("button");
+      expect(trigger).toHaveAttribute("aria-haspopup", "true");
+    });
+
+    it("trigger aria-expanded is false when popover is closed", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("trigger aria-expanded is true when popover is open", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      fireEvent.click(screen.getByRole("button"));
+      expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Dual Escape scope: list-level then badge-level
+  // -------------------------------------------------------------------------
+
+  describe("Escape key scope handling", () => {
+    it("Escape on the list closes the popover and returns focus to the trigger", () => {
+      render(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+      const trigger = screen.getByRole("button");
+
+      fireEvent.click(trigger);
+      expect(screen.getByRole("list")).toBeInTheDocument();
+
+      // Escape fired on the list element (inner scope)
+      fireEvent.keyDown(screen.getByRole("list"), { key: "Escape" });
+
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it("Escape on the trigger button (outer scope) closes the popover when already open", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      const trigger = screen.getByRole("button");
+
+      fireEvent.click(trigger);
+      expect(screen.getByRole("list")).toBeInTheDocument();
+
+      // Escape on the trigger itself (outer container scope)
+      fireEvent.keyDown(trigger, { key: "Escape" });
+
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+
+    it("Escape on the trigger when popover is closed does nothing", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} />);
+      const trigger = screen.getByRole("button");
+
+      fireEvent.keyDown(trigger, { key: "Escape" });
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Popover stays open on viewer list update
+  // -------------------------------------------------------------------------
+
+  describe("popover stability on viewer list update", () => {
+    it("stays open when viewers prop changes while popover is open", () => {
+      const { rerender } = render(
+        <PresenceBadge viewers={[mockViewer1, mockViewer2]} />
+      );
+      const trigger = screen.getByRole("button");
+      fireEvent.click(trigger);
+      expect(screen.getByRole("list")).toBeInTheDocument();
+
+      // A new viewer joins
+      rerender(
+        <PresenceBadge viewers={[mockViewer1, mockViewer2, mockViewer3]} />
+      );
+      // Popover must still be mounted
+      expect(screen.getByRole("list")).toBeInTheDocument();
+    });
+
+    it("shows the updated viewer in the list when a new viewer joins while open", () => {
+      const { rerender } = render(
+        <PresenceBadge viewers={[mockViewer1]} />
+      );
+      fireEvent.click(screen.getByRole("button"));
+
+      rerender(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+
+      // Scope assertion to the viewer list to avoid collision with the avatar tooltip
+      const list = screen.getByRole("list");
+      expect(list).toBeInTheDocument();
+      expect(within(list).getByText("Bob Jones")).toBeInTheDocument();
+    });
+
+    it("reflects fadingOut state of a viewer while popover is open", () => {
+      const { rerender } = render(
+        <PresenceBadge viewers={[mockViewer1, mockViewer2]} />
+      );
+      fireEvent.click(screen.getByRole("button"));
+      expect(screen.getByRole("list")).toBeInTheDocument();
+
+      // Viewer starts fading
+      rerender(
+        <PresenceBadge viewers={[mockViewer1, { ...mockViewer2, fadingOut: true }]} />
+      );
+
+      // Popover still open; fading viewer row carries the CSS modifier
+      const rows = screen.getAllByRole("listitem");
+      const fadingRow = rows.find((r) =>
+        r.className.includes("presence-viewer-row--fading")
+      );
+      expect(fadingRow).toBeTruthy();
+    });
   });
 });

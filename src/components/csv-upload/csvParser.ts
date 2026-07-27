@@ -107,6 +107,14 @@ export function stripBom(text: string): string {
 }
 
 /**
+ * Parses a numeric CSV value by stripping thousands-separator commas first.
+ * Returns NaN for empty, whitespace-only, or non-numeric input.
+ */
+export function parseCsvNumber(value: string): number {
+  return parseFloat(value.replace(/,/g, ''));
+}
+
+/**
  * Normalises line endings to `\n` so we can split on a single character.
  */
 export function normaliseLineEndings(text: string): string {
@@ -132,7 +140,7 @@ export function validateRow(row: Omit<CsvRow, 'id' | 'rowNumber' | 'status' | 'f
   }
 
   // deposit_amount
-  const deposit = parseFloat(row.depositAmount);
+  const deposit = parseCsvNumber(row.depositAmount);
   if (!row.depositAmount.trim() || isNaN(deposit) || deposit <= 0) {
     errors.deposit_amount = 'Deposit must be a positive number';
   } else if (deposit > MAX_DEPOSIT_AMOUNT) {
@@ -146,7 +154,7 @@ export function validateRow(row: Omit<CsvRow, 'id' | 'rowNumber' | 'status' | 'f
   }
 
   // accrual_rate_per_day
-  const rate = parseFloat(row.accrualRatePerDay);
+  const rate = parseCsvNumber(row.accrualRatePerDay);
   if (!row.accrualRatePerDay.trim() || isNaN(rate) || rate <= 0) {
     errors.accrual_rate_per_day = 'Rate must be a positive number';
   } else if (rate > 100_000) {
@@ -154,7 +162,7 @@ export function validateRow(row: Omit<CsvRow, 'id' | 'rowNumber' | 'status' | 'f
   }
 
   // duration_days
-  const duration = parseFloat(row.durationDays);
+  const duration = parseCsvNumber(row.durationDays);
   if (!row.durationDays.trim() || isNaN(duration) || !Number.isInteger(duration) || duration < 1) {
     errors.duration_days = 'Duration must be 1–3,650 days';
   } else if (duration > 3_650) {

@@ -78,6 +78,7 @@ describe('EmbedStreamWidget', () => {
       expect(screen.getByRole('status')).toBeInTheDocument();
       expect(screen.getByLabelText('Loading stream widget')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-card');
     });
 
     it('shows card preset skeleton by default', () => {
@@ -87,6 +88,7 @@ describe('EmbedStreamWidget', () => {
       
       // Card skeleton has title skeleton and metrics grid
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-card');
     });
 
     it('shows banner preset skeleton', () => {
@@ -95,6 +97,7 @@ describe('EmbedStreamWidget', () => {
       renderEmbedWidget('STR-001', 'preset=banner');
       
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-banner-skeleton embed-widget-banner');
     });
 
     it('shows compact preset skeleton', () => {
@@ -103,6 +106,7 @@ describe('EmbedStreamWidget', () => {
       renderEmbedWidget('STR-001', 'preset=compact');
       
       expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveClass('embed-widget-compact');
     });
   });
 
@@ -114,6 +118,7 @@ describe('EmbedStreamWidget', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveClass('embed-widget-card');
         expect(screen.getByText(/Stream unavailable/)).toBeInTheDocument();
         expect(screen.getByText(/Powered by Fluxora/)).toBeInTheDocument();
       });
@@ -137,6 +142,7 @@ describe('EmbedStreamWidget', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveClass('embed-widget-compact');
         expect(screen.getByText(/Not found/)).toBeInTheDocument();
         // Compact shouldn't have "Powered by Fluxora" in the error
         expect(screen.queryByText(/Powered by Fluxora/)).not.toBeInTheDocument();
@@ -434,6 +440,511 @@ describe('EmbedStreamWidget', () => {
         const statusBadge = screen.getByText('Completed');
         expect(statusBadge).toHaveClass('embed-widget-status-badge--completed');
         expect(screen.getByText('100%')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Missing streamId (undefined) path
+  // -------------------------------------------------------------------------
+  describe('Missing streamId', () => {
+    it('shows error state immediately when streamId is absent — no fetch is attempted', async () => {
+      // Render the route without a :streamId segment
+      render(
+        <MemoryRouter initialEntries={['/embed/streams/']}>
+          <Routes>
+            {/* Route without :streamId — component receives undefined */}
+            <Route path="/embed/streams/" element={<EmbedStreamWidget />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByText(/Stream unavailable/)).toBeInTheDocument();
+      });
+
+      // getStreamById must not have been called
+      expect(getStreamById).not.toHaveBeenCalled();
+    });
+
+    it('does not show a retry button when streamId is absent', async () => {
+      render(
+        <MemoryRouter initialEntries={['/embed/streams/']}>
+          <Routes>
+            <Route path="/embed/streams/" element={<EmbedStreamWidget />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Retry button
+  // -------------------------------------------------------------------------
+  describe('Retry behaviour', () => {
+    it('shows a retry button after a fetch failure', async () => {
+      (getStreamById as any).mockRejectedValue(new Error('Network error'));
+
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+      });
+    });
+
+    it('retries the fetch when the retry button is clicked', async () => {
+      // First call fails, second call succeeds
+      (getStreamById as any)
+        .mockRejectedValueOnce(new Error('Temporary error'))
+        .mockResolvedValueOnce(mockStream);
+
+      const { userEvent: user } = await import('@testing-library/user-event').then(
+        (m) => ({ userEvent: m.default })
+      );
+      const ue = user.setup();
+
+      renderEmbedWidget('STR-001');
+
+      // Wait for error state
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      // Click retry
+      await ue.click(screen.getByRole('button', { name: /try again/i }));
+
+      // Widget should eventually show success
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+        expect(screen.getByText('Test Stream')).toBeInTheDocument();
+      });
+
+      expect(getStreamById).toHaveBeenCalledTimes(2);
+    });
+
+    it('compact error state does not show a retry button', async () => {
+      (getStreamById as any).mockRejectedValue(new Error('Not found'));
+
+      renderEmbedWidget('STR-001', 'preset=compact');
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      // Compact error state intentionally hides the retry button
+      expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // currentDate is stable / deterministic across rerenders
+  // -------------------------------------------------------------------------
+  describe('currentDate stability', () => {
+    it('passes a stable YYYY-MM-DD string to the widget layout on rerenders', async () => {
+      // useTickingNow is mocked to return a fixed date, so currentDate should
+      // never change between renders within the same test.
+      (getStreamById as any).mockResolvedValue(mockStream);
+
+      const { rerender } = renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+      });
+
+      // Force a rerender
+      rerender(
+        <MemoryRouter initialEntries={['/embed/streams/STR-001']}>
+          <Routes>
+            <Route path="/embed/streams/:streamId" element={<EmbedStreamWidget />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      // Stream should still be rendered (no extra fetches)
+      expect(screen.getByRole('article')).toBeInTheDocument();
+      // getStreamById called exactly once — no spurious re-fetches
+      expect(getStreamById).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Skeleton variants
+  // -------------------------------------------------------------------------
+  describe('Skeleton data-testid attributes', () => {
+    it('card skeleton has data-testid="embed-skeleton-card"', () => {
+      (getStreamById as any).mockImplementation(() => new Promise(() => {}));
+      renderEmbedWidget('STR-001');
+      expect(screen.getByTestId('embed-skeleton-card')).toBeInTheDocument();
+    });
+
+    it('banner skeleton has data-testid="embed-skeleton-banner"', () => {
+      (getStreamById as any).mockImplementation(() => new Promise(() => {}));
+      renderEmbedWidget('STR-001', 'preset=banner');
+      expect(screen.getByTestId('embed-skeleton-banner')).toBeInTheDocument();
+    });
+
+    it('compact skeleton has data-testid="embed-skeleton-compact"', () => {
+      (getStreamById as any).mockImplementation(() => new Promise(() => {}));
+      renderEmbedWidget('STR-001', 'preset=compact');
+      expect(screen.getByTestId('embed-skeleton-compact')).toBeInTheDocument();
+    });
+
+    it('banner skeleton structure mirrors the stacked banner layout', () => {
+      (getStreamById as any).mockImplementation(() => new Promise(() => {}));
+      renderEmbedWidget('STR-001', 'preset=banner');
+
+      const skeleton = screen.getByTestId('embed-skeleton-banner');
+      // Three structural sub-sections present
+      expect(skeleton.querySelector('.embed-widget-banner-skeleton__info')).toBeInTheDocument();
+      expect(skeleton.querySelector('.embed-widget-banner-skeleton__timeline')).toBeInTheDocument();
+      expect(skeleton.querySelector('.embed-widget-banner-skeleton__metrics')).toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Error state data-testid
+  // -------------------------------------------------------------------------
+  describe('Error state data-testid', () => {
+    it('error state has data-testid="embed-error-state"', async () => {
+      (getStreamById as any).mockRejectedValue(new Error('Server error'));
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('embed-error-state')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Preset attribute on container
+  // -------------------------------------------------------------------------
+  describe('Container preset attribute', () => {
+    it.each([
+      ['card', undefined],
+      ['banner', 'preset=banner'],
+      ['compact', 'preset=compact'],
+    ] as const)('%s preset sets data-widget-preset="%s"', async (preset, qs) => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', qs);
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-widget-preset', preset);
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Progress boundary values — 0% and 100%
+  // -------------------------------------------------------------------------
+  describe('Progress boundary values', () => {
+    it('card preset renders 0% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 0 });
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+        expect(screen.getByText('0%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+      // The fill element should have width: 0%
+      const fill = progressBar.querySelector('[class*="progress-fill"]');
+      expect(fill).toHaveStyle({ width: '0%' });
+    });
+
+    it('card preset renders 100% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 100 });
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByText('100%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+      const fill = progressBar.querySelector('[class*="progress-fill"]');
+      expect(fill).toHaveStyle({ width: '100%' });
+    });
+
+    it('banner preset renders 0% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 0 });
+      renderEmbedWidget('STR-001', 'preset=banner');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+        expect(screen.getByText('0%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+    });
+
+    it('banner preset renders 100% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 100 });
+      renderEmbedWidget('STR-001', 'preset=banner');
+
+      await waitFor(() => {
+        expect(screen.getByText('100%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+    });
+
+    it('compact preset renders 0% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 0 });
+      renderEmbedWidget('STR-001', 'preset=compact');
+
+      await waitFor(() => {
+        expect(screen.getByText('0%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+    });
+
+    it('compact preset renders 100% progress correctly', async () => {
+      (getStreamById as any).mockResolvedValue({ ...mockStream, progress: 100 });
+      renderEmbedWidget('STR-001', 'preset=compact');
+
+      await waitFor(() => {
+        expect(screen.getByText('100%')).toBeInTheDocument();
+      });
+
+      const progressBar = screen.getByRole('progressbar', { name: /stream progress/i });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // cliffDate absent — optional field should not crash any preset
+  // -------------------------------------------------------------------------
+  describe('Stream without cliffDate', () => {
+    const streamWithoutCliff = { ...mockStream, cliffDate: undefined as unknown as string };
+
+    it('card preset renders without crashing when cliffDate is undefined', async () => {
+      (getStreamById as any).mockResolvedValue(streamWithoutCliff);
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+        expect(screen.getByText('Test Stream')).toBeInTheDocument();
+      });
+    });
+
+    it('banner preset renders without crashing when cliffDate is undefined', async () => {
+      (getStreamById as any).mockResolvedValue(streamWithoutCliff);
+      renderEmbedWidget('STR-001', 'preset=banner');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+        expect(screen.getByText('Test Stream')).toBeInTheDocument();
+      });
+    });
+
+    it('compact preset renders without crashing when cliffDate is undefined', async () => {
+      (getStreamById as any).mockResolvedValue(streamWithoutCliff);
+      renderEmbedWidget('STR-001', 'preset=compact');
+
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Unknown / unrecognised preset defaults to card
+  // -------------------------------------------------------------------------
+  describe('Preset fallback for unrecognised values', () => {
+    it('unknown preset falls back to card layout', async () => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', 'preset=unknown');
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        // Defaults to card
+        expect(container).toHaveAttribute('data-widget-preset', 'card');
+        // Card-specific content is rendered
+        expect(screen.getByText('Powered by Fluxora')).toBeInTheDocument();
+      });
+    });
+
+    it('empty preset string falls back to card layout', async () => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', 'preset=');
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-widget-preset', 'card');
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Case-insensitive preset parameter
+  // -------------------------------------------------------------------------
+  describe('Case-insensitive preset parameter', () => {
+    it.each([
+      ['BANNER', 'banner'],
+      ['Banner', 'banner'],
+      ['COMPACT', 'compact'],
+      ['Compact', 'compact'],
+      ['CARD', 'card'],
+      ['Card', 'card'],
+    ])('preset=%s resolves to %s', async (inputPreset, expectedPreset) => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', `preset=${inputPreset}`);
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-widget-preset', expectedPreset);
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // data-accent-color="default" when no accent is provided
+  // -------------------------------------------------------------------------
+  describe('data-accent-color attribute', () => {
+    it('sets data-accent-color="default" when no accent-color param is provided', async () => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-accent-color', 'default');
+      });
+    });
+
+    it('sets data-accent-color="default" when accent-color param is invalid', async () => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', 'accent-color=not-a-hex');
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-accent-color', 'default');
+      });
+    });
+
+    it('sets data-accent-color="custom" when a valid hex accent-color is provided', async () => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+      renderEmbedWidget('STR-001', 'accent-color=%2300b8d4');
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container).toHaveAttribute('data-accent-color', 'custom');
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // AbortController / fetch cancellation on unmount
+  // -------------------------------------------------------------------------
+  describe('AbortController on unmount', () => {
+    it('aborts in-flight fetch when the component unmounts during loading', async () => {
+      let capturedSignal: AbortSignal | undefined;
+
+      (getStreamById as any).mockImplementation(
+        (_id: string, signal: AbortSignal) => {
+          capturedSignal = signal;
+          // Never resolves — simulates a slow network request
+          return new Promise(() => {});
+        }
+      );
+
+      const { unmount } = renderEmbedWidget('STR-001');
+
+      // Skeleton should be showing
+      expect(screen.getByTestId('embed-skeleton-card')).toBeInTheDocument();
+
+      // Unmount while the fetch is still in flight
+      unmount();
+
+      // The signal passed to getStreamById should now be aborted
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal!.aborted).toBe(true);
+    });
+
+    it('does not update state after unmount (no setState after abort)', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error');
+
+      let resolveRequest!: (value: typeof mockStream) => void;
+      (getStreamById as any).mockImplementation(() =>
+        new Promise<typeof mockStream>((res) => {
+          resolveRequest = res;
+        })
+      );
+
+      const { unmount } = renderEmbedWidget('STR-001');
+
+      // Unmount before the fetch resolves
+      unmount();
+
+      // Resolve after unmount — should not trigger a React setState warning
+      resolveRequest(mockStream);
+
+      // Give React a tick to process
+      await new Promise((r) => setTimeout(r, 50));
+
+      // No "Can't perform a React state update on an unmounted component" errors
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('unmounted component')
+      );
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Responsive container CSS class stabilisation
+  // -------------------------------------------------------------------------
+  describe('Responsive layout CSS classes', () => {
+    beforeEach(() => {
+      (getStreamById as any).mockResolvedValue(mockStream);
+    });
+
+    it('card layout root has class embed-widget-card', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toHaveClass('embed-widget-card');
+      });
+    });
+
+    it('banner layout root has class embed-widget-banner', async () => {
+      renderEmbedWidget('STR-001', 'preset=banner');
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toHaveClass('embed-widget-banner');
+      });
+    });
+
+    it('compact layout root has class embed-widget-compact', async () => {
+      renderEmbedWidget('STR-001', 'preset=compact');
+      await waitFor(() => {
+        expect(screen.getByRole('article')).toHaveClass('embed-widget-compact');
+      });
+    });
+
+    it('container always renders with width:100% inline style', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container') as HTMLElement;
+        expect(container.style.width).toBe('100%');
+      });
+    });
+
+    it('container always renders with isolation:isolate inline style', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container') as HTMLElement;
+        expect(container.style.isolation).toBe('isolate');
       });
     });
   });

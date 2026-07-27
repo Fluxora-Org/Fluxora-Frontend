@@ -127,6 +127,45 @@ describe("useWidgetLayout hook", () => {
     consoleWarnSpy.mockRestore();
   });
 
+  it("recovers from localStorage.setItem failure in saveLayout", () => {
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const setItemSpy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+
+    const { result } = renderHook(() => useWidgetLayout(mockMetrics));
+
+    // reorderWidgets should update in-memory state without throwing
+    act(() => {
+      const reordered = [
+        result.current.layout.widgets[2],
+        result.current.layout.widgets[0],
+        result.current.layout.widgets[1],
+      ];
+      expect(() => result.current.reorderWidgets(reordered)).not.toThrow();
+    });
+    expect(result.current.layout.widgets[0].id).toBe("pending-claims");
+
+    // updateWidgetSize should update in-memory state without throwing
+    act(() => {
+      expect(() =>
+        result.current.updateWidgetSize("total-balance", "2x1")
+      ).not.toThrow();
+    });
+    expect(result.current.layout.widgets[1].size).toBe("2x1");
+
+    // resetLayout should also not throw
+    act(() => {
+      expect(() => result.current.resetLayout()).not.toThrow();
+    });
+    expect(result.current.layout.widgets[0].id).toBe("total-balance");
+
+    expect(consoleWarnSpy).toHaveBeenCalled();
+
+    consoleWarnSpy.mockRestore();
+    setItemSpy.mockRestore();
+  });
+
   it("merges incoming new metrics that are missing from stored layout", () => {
     // Stored layout only has 2 of the widgets
     const storedLayout = {

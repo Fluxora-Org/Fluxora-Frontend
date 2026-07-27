@@ -6,6 +6,7 @@ export interface ActivityHeatmapProps {
   streams: Stream[];
   loading?: boolean;
   error?: string | null;
+  onRetry?: () => void;
 }
 
 interface HeatmapTooltipProps {
@@ -185,7 +186,7 @@ const Legend: React.FC<LegendProps> = ({ skeleton = false }) => (
   </div>
 );
 
-export default function ActivityHeatmap({ streams, loading, error }: ActivityHeatmapProps) {
+export default function ActivityHeatmap({ streams, loading, error, onRetry }: ActivityHeatmapProps) {
   const [viewMode, setViewMode] = useState<"heatmap" | "table">("heatmap");
   const [hoveredCell, setHoveredCell] = useState<{
     element: HTMLButtonElement;
@@ -208,24 +209,36 @@ export default function ActivityHeatmap({ streams, loading, error }: ActivityHea
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-600" style={{ color: "var(--color-danger)" }}>
-        {error}
-      </p>
+      <div className="activity-heatmap-container" data-activity-tone="error">
+        <div className="activity-heatmap-header">
+          <h3 className="activity-heatmap-title">Treasury Activity</h3>
+          <button disabled className="ui-secondary-control text-xs" style={{ opacity: 0.5 }}>
+            View as table
+          </button>
+        </div>
+        <div className="heatmap-error-content" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem 0" }}>
+          <p role="alert" className="text-sm text-red-600" style={{ color: "var(--color-danger)", marginBottom: onRetry ? "1rem" : 0 }}>
+            {error}
+          </p>
+          {onRetry && (
+            <button onClick={onRetry} type="button" className="ui-secondary-control text-xs">
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
-  // Generate date range for the trailing 12 weeks (84 days) ending on the Sunday of this week
+  // Generate date range for the trailing 12 weeks (84 days) ending today
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + daysToSunday);
-  endOfWeek.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
+  const endDate = new Date(today);
+  endDate.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
 
   const dates: Date[] = [];
   for (let i = 83; i >= 0; i--) {
-    const d = new Date(endOfWeek);
-    d.setDate(endOfWeek.getDate() - i);
+    const d = new Date(endDate);
+    d.setDate(endDate.getDate() - i);
     dates.push(d);
   }
 
@@ -287,8 +300,8 @@ export default function ActivityHeatmap({ streams, loading, error }: ActivityHea
     .filter((day) => day.count > 0);
 
   const totalEvents = activeDays.reduce((sum, day) => sum + day.count, 0);
-  const endDateStr = formatDate(endOfWeek);
-  const heatmapAriaLabel = `Treasury Activity Heatmap: trailing 12 weeks of stream-creation and withdrawal events ending Sunday ${endDateStr}. ${totalEvents} ${totalEvents === 1 ? "event" : "events"} across ${activeDays.length} ${activeDays.length === 1 ? "active day" : "active days"}. Use Tab to focus each day cell, or use the View as table toggle for a sortable list.`;
+  const endDateStr = formatDate(endDate);
+  const heatmapAriaLabel = `Treasury Activity Heatmap: trailing 12 weeks of stream-creation and withdrawal events ending ${endDateStr}. ${totalEvents} ${totalEvents === 1 ? "event" : "events"} across ${activeDays.length} ${activeDays.length === 1 ? "active day" : "active days"}. Use Tab to focus each day cell, or use the View as table toggle for a sortable list.`;
 
   return (
     <div className="activity-heatmap-container" data-activity-tone={tone}>

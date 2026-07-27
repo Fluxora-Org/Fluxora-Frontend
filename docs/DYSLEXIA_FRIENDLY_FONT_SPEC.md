@@ -34,19 +34,21 @@ The toggle is exposed as an accessible control placed directly adjacent to the t
 
 ### Typography Comparison Sheet
 
-| Attribute | Default Font Mode (`default`) | Easy-Read Font Mode (`dyslexic`) |
+| Attribute | Default Font Mode (`default`) | Easy-Read Font Mode (`easy-read`) |
 |---|---|---|
 | **Font Family** | `"Plus Jakarta Sans", system-ui, sans-serif` | `"OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", Arial, sans-serif` |
-| **Letter Spacing (Tight)** | `-0.01em` | `0em` |
-| **Letter Spacing (Normal)**| `0` | `0.03em` |
-| **Letter Spacing (Wide)**  | `0.02em` | `0.06em` |
-| **Line Height (Base)**   | `1.5` (24px on 16px body) | `1.6` (28px on 16px body) |
+| **Letter Spacing (Tight)** | `-0.01em` | `0.02em` |
+| **Letter Spacing (Normal)**| `0` | `0.05em` |
+| **Letter Spacing (Wide)**  | `0.02em` | `0.08em` |
+| **Line Height (Base)**   | `1.5` (24px on 16px body) | `1.625` (26px on 16px body) |
 | **Line Height (Relaxed)**| `1.625` | `1.75` |
 | **Line Height (Loose)**  | `1.75` | `1.85` |
-| **Heading 1 Scale** | `500 36px / 44px` | `500 36px / 48px` |
-| **Heading 2 Scale** | `600 24px / 32px` | `600 24px / 36px` |
-| **Body Scale (lg)** | `400 16px / 24px` | `400 16px / 28px` |
-| **Body Scale (md)** | `400 14px / 20px` | `400 14px / 24px` |
+| **Heading 1 Scale** | `500 36px / 44px` | `500 36px / 54px` |
+| **Heading 2 Scale** | `600 24px / 32px` | `600 24px / 38px` |
+| **Heading 3 Scale** | `600 18px / 24px` | `600 18px / 30px` |
+| **Heading 4 Scale** | `600 16px / 20px` | `600 16px / 26px` |
+| **Body Scale (lg)** | `400 16px / 24px` | `400 16px / 26px` |
+| **Body Scale (md)** | `400 14px / 20px` | `400 14px / 22px` |
 | **Body Scale (sm)** | `400 12px / 16px` | `400 12px / 18px` |
 
 ---
@@ -55,16 +57,16 @@ The toggle is exposed as an accessible control placed directly adjacent to the t
 
 | State Name | Trigger / Condition | DOM Attribute | Storage State |
 |---|---|---|---|
-| `default-font` | Initial visit or toggle off | `data-font="default"` (or omitted) | `localStorage.getItem("font-mode") === "default"` |
-| `easy-read-font` | User activates toggle | `data-font="dyslexic"` | `localStorage.getItem("font-mode") === "dyslexic"` |
-| `toggle-mid-transition` | Moment during toggle click | `transition: font-family, letter-spacing, line-height 200ms ease-in-out` | Immediate in-memory state update |
+| `default-font` | Initial visit or toggle off | `data-font="default"` | `localStorage.getItem("easy-read-font") === "false"` |
+| `easy-read-font` | User activates toggle | `data-font="easy-read"` | `localStorage.getItem("easy-read-font") === "true"` |
+| `toggle-mid-transition` | Moment during toggle click | `data-font-transitioning="true"` | Immediate in-memory state update |
 
 ---
 
 ## 5. Storage Persistence & Security Pattern
 
-- **Storage Key**: `FONT_STORAGE_KEY = "font-mode"`
-- **Validation Gate**: `isFontMode(value: unknown): value is FontMode` checks string equals `"default"` or `"dyslexic"`.
+- **Storage Key**: `FONT_STORAGE_KEY = "easy-read-font"`
+- **Validation Gate**: `isEasyReadFont(value: unknown): value is boolean` checks boolean or boolean string (`"true"` / `"false"`).
 - **Security**: Corrupted, null, or untrusted strings arriving via `localStorage` or cross-tab `storage` events are rejected before DOM attribute modification, preventing attribute injection vulnerabilities.
 - **Cross-Tab Synchronization**: Listens on `window.addEventListener("storage", ...)` for `FONT_STORAGE_KEY` and updates React context state immediately.
 

@@ -7,6 +7,7 @@ export interface Viewer {
   color: string;
   lastSeen: number;
   fadingOut?: boolean;
+  cursorY?: number;
 }
 
 /**
@@ -89,11 +90,24 @@ export function usePresenceViewers(
     );
   }, []);
 
+  const updateCursor = useCallback((y: number) => {
+    const now = Date.now();
+    setViewers(prev =>
+      prev.map(v => ({
+        ...v,
+        cursorY: y,
+        lastSeen: now,
+        fadingOut: false,
+      }))
+    );
+  }, []);
+
   const viewerCount = viewers.filter(v => !v.fadingOut).length;
 
   return {
     viewers,
     markActive,
+    updateCursor,
     viewerCount,
     isPresenceEnabled,
     presenceStatus,

@@ -18,6 +18,8 @@ export interface InputWithUnitProps extends React.InputHTMLAttributes<HTMLInputE
    * overridden so that `hasError` and the AT-visible state stay in sync.
    */
   hasError?: boolean;
+  /** Optional keyboard hint label displayed as a chip next to the unit badge (e.g., "Enter ↵") */
+  keyboardHint?: string;
 }
 
 /**
@@ -48,10 +50,12 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
   unit,
   id,
   hasError,
+  keyboardHint,
   className,
   ...inputProps
 }) => {
   const unitId = `${id}-unit`;
+  const hintId = keyboardHint ? `${id}-keyboard-hint` : undefined;
 
   return (
     <div className={`input-with-unit ${hasError ? 'input-with-unit--error' : ''}`}>
@@ -59,12 +63,17 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
         {...inputProps}
         id={id}
         className={`input-with-unit__field ${className || ''}`.trim()}
-        aria-describedby={unitId}
+        aria-describedby={keyboardHint ? `${unitId} ${hintId}` : unitId}
         aria-invalid={hasError || undefined}
       />
       <span id={unitId} className="input-with-unit__badge" aria-label={`Unit: ${unit}`}>
         {unit}
       </span>
+      {keyboardHint && (
+        <span id={hintId} className="keyboard-hint-chip" aria-label={`Press ${keyboardHint} to continue`}>
+          {keyboardHint}
+        </span>
+      )}
     </div>
   );
 };

@@ -518,11 +518,25 @@
     "Segoe UI", sans-serif;
   --font-family-dyslexic: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", Arial, sans-serif;
   --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+  --font-family-base: var(--font-family-default);
 
   /* ─── Line Height Tokens ─── */
   --line-height-base: 1.5;
   --line-height-relaxed: 1.625;
   --line-height-loose: 1.75;
+
+  --line-height-heading-1: 44px;
+  --line-height-heading-2: 32px;
+  --line-height-heading-3: 24px;
+  --line-height-heading-4: 20px;
+
+  --line-height-body-lg: 24px;
+  --line-height-body-md: 20px;
+  --line-height-body-sm: 16px;
+
+  --line-height-label-lg: 20px;
+  --line-height-label-md: 16px;
+  --line-height-label-sm: 14px;
 
   /* ─── Heading Scale ─── */
   --font-heading-1: 500 36px / var(--line-height-heading-1) var(--font-family-base);

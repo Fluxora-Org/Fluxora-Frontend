@@ -12,6 +12,7 @@ import { withdraw } from "../lib/stellar/tx";
 import { getStreamStatusNotificationContent } from "../components/ToastNotification";
 import { TransactionReceiptPreview } from "../components/receipt/TransactionReceiptPreview";
 import type { ReceiptData } from "../utils/receiptGenerator";
+import { config } from "../lib/config";
 import { Shield, Fingerprint, Lock, Key, CheckCircle2, XCircle, AlertCircle, X } from "lucide-react";
 import RecipientMonthlySummary from "../components/recipient/RecipientMonthlySummary";
 import "./Streams.css";
@@ -234,7 +235,10 @@ export default function Recipient() {
   ];
 
   const liveStreams = recipientStreams.streams;
-  const hasLiveStreams = liveStreams.length > 0;
+  // A service error means we cannot confirm the recipient has no streams —
+  // treat it the same as "no streams yet" so we show the error+retry path
+  // instead of silently falling through to demo balance values.
+  const hasLiveStreams = liveStreams.length > 0 && !recipientStreams.error;
 
   const demoWithdrawStream: WithdrawStreamCandidate = {
     id: "1",
@@ -560,7 +564,7 @@ export default function Recipient() {
         timestamp: new Date().toISOString(),
         txHash: typeof txRes === "string" ? txRes : null,
         status: typeof txRes === "string" ? "confirmed" : "pending",
-        network: wallet.network || "Stellar Testnet",
+        network: config.networkLabel,
       };
       setReceiptData(newReceipt);
       setShowReceiptModal(true);
@@ -591,7 +595,12 @@ export default function Recipient() {
 
   if (loading) return <RecipientLoading />;
 
-  if (!walletConnected || !hasStreams) {
+  // Show empty-state path when:
+  //   - wallet is disconnected, OR
+  //   - no active streams for the connected wallet (including service errors,
+  //     where we must not silently fall through to demo-balance values)
+  const serviceError = walletConnected ? recipientStreams.error : null;
+  if (!walletConnected || !hasStreams || serviceError) {
     return (
       <main aria-labelledby="recipient-page-title">
         <h1
@@ -603,7 +612,12 @@ export default function Recipient() {
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
           View your incoming streams and withdraw accrued USDC at any time.
         </p>
-        <RecipientEmptyState walletConnected={walletConnected} />
+        <RecipientEmptyState
+          walletConnected={walletConnected}
+          loading={walletConnected ? recipientStreams.loading : false}
+          error={walletConnected ? recipientStreams.error : null}
+          onRetry={walletConnected ? recipientStreams.refetch : undefined}
+        />
 
         {/* ── Local Security Gate (shown even without streams) ── */}
         {walletConnected && (

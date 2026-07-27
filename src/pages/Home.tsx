@@ -2,6 +2,10 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import HeroSection from "../components/landing-page/HeroSection";
 import Footer from "../components/Footer";
 import { Skeleton } from "../components/Skeleton";
+import {
+  isMobileViewport,
+  VIEWPORT_RESIZE_DEBOUNCE_MS,
+} from "../lib/breakpoints";
 import { useTheme } from "../theme/ThemeProvider";
 
 // Below-the-fold landing sections are split into separate chunks via React.lazy
@@ -96,6 +100,41 @@ function LazySection({ children, label, "data-testid": testId }: LazySectionProp
 
 export default function Home() {
   const { theme } = useTheme();
+  const [isMobileLayout, setIsMobileLayout] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return isMobileViewport();
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+
+    const handleResize = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        setIsMobileLayout(isMobileViewport());
+      }, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   return (
     <div
@@ -106,7 +145,11 @@ export default function Home() {
         flexDirection: "column",
       }}
     >
-      <main id="main-content" style={{ flex: 1 }}>
+      <main
+        id="main-content"
+        data-mobile-layout={isMobileLayout ? "mobile" : "desktop"}
+        style={{ flex: 1 }}
+      >
         <HeroSection theme={theme as "light" | "dark"} />
         <LazySection
           label="value proposition section"

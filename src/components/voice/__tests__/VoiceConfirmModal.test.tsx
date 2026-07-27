@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VoiceConfirmModal } from "../VoiceConfirmModal";
 import { VoiceContextValue, VoiceCommandDef } from "../voiceTypes";
@@ -117,14 +117,41 @@ describe("VoiceConfirmModal", () => {
       cancelDestructiveAction: cancelFn,
     });
     const { unmount } = render(<VoiceConfirmModal />);
-    // First Escape while mounted � should fire
+    // First Escape while mounted — should fire
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(cancelFn).toHaveBeenCalledTimes(1);
 
     unmount();
-    // Second Escape after unmount � should not fire
+    // Second Escape after unmount — should not fire
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(cancelFn).toHaveBeenCalledTimes(1);
+  });
+
+  // -- Initial focus on Cancel button (safe default) ---------------------
+
+  it("focuses the Cancel button when the modal opens", async () => {
+    vi.useFakeTimers();
+    mockContext = buildContext({
+      state: "confirming-destructive",
+      pendingDestructiveCommand: destructiveCmd,
+    });
+
+    render(<VoiceConfirmModal />);
+
+    // The modal uses a setTimeout(..., 50) to focus the Cancel button
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    const cancelButton = screen.getByRole("button", { name: /^Cancel$/i });
+    expect(cancelButton).toHaveFocus();
+
+    // Confirm Action should still be reachable via Tab
+    const confirmButton = screen.getByRole("button", { name: /confirm action/i });
+    expect(confirmButton).toBeInTheDocument();
+    expect(confirmButton).not.toHaveFocus();
+
+    vi.useRealTimers();
   });
 
   // -- Confirm/Cancel buttons --------------------------------------------
@@ -154,13 +181,19 @@ describe("VoiceConfirmModal", () => {
   });
 
   it("wraps focus between the dialog actions when tabbing forward and backward", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup();
+
     mockContext = buildContext({
       state: "confirming-destructive",
       pendingDestructiveCommand: destructiveCmd,
     });
 
     render(<VoiceConfirmModal />);
+
+    // advanceTimersByTimeAsync flushes microtasks between each tick,
+    // so the auto-focus setTimeout fires deterministically before we start
+    await vi.advanceTimersByTimeAsync(100);
 
     const dialog = screen.getByRole("dialog");
     const closeButton = screen.getByRole("button", { name: /cancel destructive action/i });
@@ -189,5 +222,7 @@ describe("VoiceConfirmModal", () => {
     expect(closeButton).toHaveFocus();
 
     expect(dialog as HTMLElement).toContainElement(document.activeElement as HTMLElement);
+
+    vi.useRealTimers();
   });
 });
