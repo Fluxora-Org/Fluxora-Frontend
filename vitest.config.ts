@@ -64,6 +64,7 @@ export default defineConfig({
         "src/components/presence/PresenceBadge.tsx",
         "src/components/presence/PresenceViewerList.tsx",
         "src/hooks/usePresenceViewers.ts",
+        "src/hooks/useEmbedAccessibility.ts",
         // CSV bulk-upload feature
         "src/components/csv-upload/csvParser.ts",
         "src/components/csv-upload/CsvDropZone.tsx",

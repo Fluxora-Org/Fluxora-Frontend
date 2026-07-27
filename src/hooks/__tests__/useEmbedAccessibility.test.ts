@@ -1,493 +1,416 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupEmbedFocusManagement, createAccessibleWidgetContainer } from '../useEmbedAccessibility';
+import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  useEmbedAccessibility,
+  createAccessibleWidgetContainer,
+  announceToScreenReader,
+  setupEmbedFocusManagement,
+} from "../useEmbedAccessibility";
 
-describe('setupEmbedFocusManagement', () => {
-  let container: HTMLElement;
-  let cleanup: () => void;
+describe("useEmbedAccessibility hook", () => {
+  let originalTitle: string;
+  let originalLang: string | null;
 
   beforeEach(() => {
-    // Create a container element
-    container = document.createElement('div');
-    document.body.appendChild(container);
+    vi.useFakeTimers();
+    originalTitle = document.title;
+    originalLang = document.documentElement.getAttribute("lang");
+
+    const existingMeta = document.querySelector('meta[name="description"]');
+    if (existingMeta) {
+      existingMeta.remove();
+    }
   });
 
   afterEach(() => {
-    // Clean up the focus trap
-    if (cleanup) {
-      cleanup();
+    document.title = originalTitle;
+    if (originalLang !== null) {
+      document.documentElement.setAttribute("lang", originalLang);
+    } else {
+      document.documentElement.removeAttribute("lang");
     }
-    // Remove container from DOM
-    if (container && container.parentNode) {
-      container.parentNode.removeChild(container);
+    const existingMeta = document.querySelector('meta[name="description"]');
+    if (existingMeta) {
+      existingMeta.remove();
     }
-  });
-
-  it('should create and remove event listener correctly', () => {
-    const addEventListenerSpy = vi.spyOn(container, 'addEventListener');
-    const removeEventListenerSpy = vi.spyOn(container, 'removeEventListener');
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
-
-    cleanup();
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
-
-    addEventListenerSpy.mockRestore();
-    removeEventListenerSpy.mockRestore();
-  });
-
-  it('should cycle from last focusable element to first on Tab', () => {
-    // Create focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-    container.appendChild(button3);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the last element
-    button3.focus();
-    expect(document.activeElement).toBe(button3);
-
-    // Press Tab while on last element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should cycle to first element
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(button1);
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should cycle from first focusable element to last on Shift+Tab', () => {
-    // Create focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-    container.appendChild(button3);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the first element
-    button1.focus();
-    expect(document.activeElement).toBe(button1);
-
-    // Press Shift+Tab while on first element
-    const shiftTabEvent = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      shiftKey: true,
-      bubbles: true,
-    });
-    const preventDefaultSpy = vi.spyOn(shiftTabEvent, 'preventDefault');
-
-    container.dispatchEvent(shiftTabEvent);
-
-    // Should cycle to last element
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(button3);
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should support dynamic content - newly added focusable elements are included in the cycle', () => {
-    // Create initial focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the last element
-    button2.focus();
-    expect(document.activeElement).toBe(button2);
-
-    // Add a new focusable element AFTER setup (simulating async content)
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-    container.appendChild(button3);
-
-    // Focus the newly added element (the new last element)
-    button3.focus();
-    expect(document.activeElement).toBe(button3);
-
-    // Press Tab while on the new last element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should cycle to first element because the dynamic element is now included in the trap
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(button1);
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should handle dynamically added focusable elements during Shift+Tab', () => {
-    // Create initial focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the first element
-    button1.focus();
-    expect(document.activeElement).toBe(button1);
-
-    // Add a new focusable element AFTER setup (simulating async content)
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-    container.appendChild(button3);
-
-    // Press Shift+Tab while on the first element
-    const shiftTabEvent = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      shiftKey: true,
-      bubbles: true,
-    });
-    const preventDefaultSpy = vi.spyOn(shiftTabEvent, 'preventDefault');
-
-    container.dispatchEvent(shiftTabEvent);
-
-    // Should cycle to the new last element (button3)
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(button3);
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should not prevent default Tab behavior when not on first/last element', () => {
-    // Create focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-    container.appendChild(button3);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the middle element
-    button2.focus();
-    expect(document.activeElement).toBe(button2);
-
-    // Press Tab while on middle element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should not prevent default (browser handles normal tab)
-    expect(preventDefaultSpy).not.toHaveBeenCalled();
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should handle Escape key to trigger close button', () => {
-    // Create focusable elements and a close button
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const closeButton = document.createElement('button');
-    closeButton.setAttribute('aria-label', 'Close');
-    closeButton.textContent = 'Close';
-
-    container.appendChild(button1);
-    container.appendChild(closeButton);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Spy on close button click
-    const clickSpy = vi.spyOn(closeButton, 'click');
-
-    // Dispatch Escape key
-    const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
-    container.dispatchEvent(escapeEvent);
-
-    expect(clickSpy).toHaveBeenCalled();
-
-    clickSpy.mockRestore();
-  });
-
-  it('should work with custom focusable selector', () => {
-    // Create elements with custom selector targets
-    const customFocusable1 = document.createElement('div');
-    customFocusable1.className = 'custom-focusable';
-    customFocusable1.setAttribute('tabindex', '0');
-    customFocusable1.textContent = 'Custom 1';
-
-    const customFocusable2 = document.createElement('div');
-    customFocusable2.className = 'custom-focusable';
-    customFocusable2.setAttribute('tabindex', '0');
-    customFocusable2.textContent = 'Custom 2';
-
-    container.appendChild(customFocusable1);
-    container.appendChild(customFocusable2);
-
-    // Use custom selector
-    cleanup = setupEmbedFocusManagement(container, '.custom-focusable');
-
-    // Focus the last element
-    customFocusable2.focus();
-    expect(document.activeElement).toBe(customFocusable2);
-
-    // Press Tab while on last element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should cycle to first element
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(customFocusable1);
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should handle empty container gracefully', () => {
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Should not throw when Tab is pressed on empty container
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-
-    expect(() => {
-      container.dispatchEvent(tabEvent);
-    }).not.toThrow();
-  });
-
-  it('should handle removed focusable elements correctly', () => {
-    // Create focusable elements
-    const button1 = document.createElement('button');
-    button1.textContent = 'Button 1';
-    const button2 = document.createElement('button');
-    button2.textContent = 'Button 2';
-    const button3 = document.createElement('button');
-    button3.textContent = 'Button 3';
-
-    container.appendChild(button1);
-    container.appendChild(button2);
-    container.appendChild(button3);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the last element
-    button3.focus();
-    expect(document.activeElement).toBe(button3);
-
-    // Remove the last element (simulating async content unmount)
-    container.removeChild(button3);
-
-    // Press Tab while previously on (now removed) last element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should cycle to first because button3 is no longer in DOM
-    // The old activeElement (button3) is still document.activeElement but not in container
-    // So the condition won't match and normal Tab will proceed
-
-    preventDefaultSpy.mockRestore();
-  });
-
-  it('should preserve focus cycling behavior with mixed focusable element types', () => {
-    // Create mixed focusable elements
-    const link = document.createElement('a');
-    link.href = '#';
-    link.textContent = 'Link';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Input';
-
-    const button = document.createElement('button');
-    button.textContent = 'Button';
-
-    container.appendChild(link);
-    container.appendChild(input);
-    container.appendChild(button);
-
-    cleanup = setupEmbedFocusManagement(container);
-
-    // Focus the last element (button)
-    button.focus();
-    expect(document.activeElement).toBe(button);
-
-    // Press Tab while on last element
-    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const preventDefaultSpy = vi.spyOn(tabEvent, 'preventDefault');
-
-    container.dispatchEvent(tabEvent);
-
-    // Should cycle to first element (link)
-    expect(preventDefaultSpy).toHaveBeenCalled();
-    expect(document.activeElement).toBe(link);
-
-    preventDefaultSpy.mockRestore();
-  });
-});
-
-describe('createAccessibleWidgetContainer', () => {
-  let element: HTMLElement;
-  let cleanup: (() => void) | undefined;
-
-  beforeEach(() => {
-    element = document.createElement('div');
-    document.body.appendChild(element);
-  });
-
-  afterEach(() => {
-    if (cleanup) {
-      cleanup();
-    }
-    if (element?.parentNode) {
-      element.parentNode.removeChild(element);
-    }
+    document.body.innerHTML = "";
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  it('should apply accessibility attributes', () => {
-    cleanup = createAccessibleWidgetContainer(element, {
-      role: 'region',
-      ariaLabel: 'Test Widget',
-      ariaDescribedby: 'desc-1',
-      tabIndex: 0,
+  describe("document.title lifecycle", () => {
+    it("saves initial title on mount and restores it on unmount", () => {
+      document.title = "Initial Page Title";
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Treasury Stream" })
+      );
+
+      expect(document.title).toBe("Treasury Stream - Fluxora Widget");
+
+      unmount();
+
+      expect(document.title).toBe("Initial Page Title");
+    });
+  });
+
+  describe("meta[name='description'] lifecycle", () => {
+    it("creates meta element when absent on mount and removes it on unmount", () => {
+      expect(document.querySelector('meta[name="description"]')).toBeNull();
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          description: "Widget Description Meta",
+        })
+      );
+
+      const meta = document.querySelector<HTMLMetaElement>(
+        'meta[name="description"]'
+      );
+      expect(meta).not.toBeNull();
+      expect(meta?.getAttribute("content")).toBe("Widget Description Meta");
+
+      unmount();
+
+      expect(document.querySelector('meta[name="description"]')).toBeNull();
     });
 
-    expect(element.getAttribute('role')).toBe('region');
-    expect(element.getAttribute('aria-label')).toBe('Test Widget');
-    expect(element.getAttribute('aria-describedby')).toBe('desc-1');
-    expect(element.getAttribute('tabindex')).toBe('0');
-    expect(element.style.outline).toBe('none');
-  });
+    it("restores original meta content on unmount when meta tag existed prior to mount", () => {
+      const preExistingMeta = document.createElement("meta");
+      preExistingMeta.name = "description";
+      preExistingMeta.setAttribute("content", "Original site description");
+      document.head.appendChild(preExistingMeta);
 
-  it('should restore original attributes on cleanup', () => {
-    element.setAttribute('role', 'navigation');
-    element.setAttribute('aria-label', 'Original');
-    element.setAttribute('tabindex', '-1');
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          description: "Widget Override Description",
+        })
+      );
 
-    cleanup = createAccessibleWidgetContainer(element, {
-      ariaLabel: 'Widget',
-      tabIndex: 0,
+      const meta = document.querySelector<HTMLMetaElement>(
+        'meta[name="description"]'
+      );
+      expect(meta?.getAttribute("content")).toBe("Widget Override Description");
+
+      unmount();
+
+      const restoredMeta = document.querySelector<HTMLMetaElement>(
+        'meta[name="description"]'
+      );
+      expect(restoredMeta).not.toBeNull();
+      expect(restoredMeta?.getAttribute("content")).toBe(
+        "Original site description"
+      );
     });
 
-    expect(element.getAttribute('role')).toBe('article');
-    expect(element.getAttribute('aria-label')).toBe('Widget');
-    expect(element.getAttribute('tabindex')).toBe('0');
+    it("does not mutate or touch meta tag if description is undefined", () => {
+      const preExistingMeta = document.createElement("meta");
+      preExistingMeta.name = "description";
+      preExistingMeta.setAttribute("content", "Existing site description");
+      document.head.appendChild(preExistingMeta);
 
-    cleanup();
-    cleanup = undefined;
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+        })
+      );
 
-    expect(element.getAttribute('role')).toBe('navigation');
-    expect(element.getAttribute('aria-label')).toBe('Original');
-    expect(element.getAttribute('tabindex')).toBe('-1');
+      const meta = document.querySelector<HTMLMetaElement>(
+        'meta[name="description"]'
+      );
+      expect(meta?.getAttribute("content")).toBe("Existing site description");
+
+      unmount();
+
+      expect(meta?.getAttribute("content")).toBe("Existing site description");
+    });
   });
 
-  it('should register focus/blur listeners with the same function references used for removal', () => {
-    const addSpy = vi.spyOn(element, 'addEventListener');
-    const removeSpy = vi.spyOn(element, 'removeEventListener');
+  describe("lang attribute lifecycle", () => {
+    it("sets lang attribute from locale prop (or default 'en') and restores pre-existing lang on unmount", () => {
+      document.documentElement.setAttribute("lang", "fr");
 
-    cleanup = createAccessibleWidgetContainer(element);
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          locale: "es",
+        })
+      );
 
-    // Capture the handlers passed to addEventListener
-    const focusHandler = addSpy.mock.calls.find(([type]) => type === 'focus')?.[1];
-    const blurHandler = addSpy.mock.calls.find(([type]) => type === 'blur')?.[1];
+      expect(document.documentElement.getAttribute("lang")).toBe("es");
 
-    expect(focusHandler).toBeDefined();
-    expect(blurHandler).toBeDefined();
+      unmount();
 
-    // Check that addEventListener was called with real functions (not no-ops)
-    expect(focusHandler).not.toBe(blurHandler);
+      expect(document.documentElement.getAttribute("lang")).toBe("fr");
+    });
 
-    cleanup();
+    it("falls back to 'en' when lang attribute was absent before mount, and restores 'en' on unmount", () => {
+      document.documentElement.removeAttribute("lang");
 
-    // Verify removeEventListener was called with the exact same references
-    expect(removeSpy).toHaveBeenCalledWith('focus', focusHandler);
-    expect(removeSpy).toHaveBeenCalledWith('blur', blurHandler);
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+        })
+      );
 
-    addSpy.mockRestore();
-    removeSpy.mockRestore();
+      expect(document.documentElement.getAttribute("lang")).toBe("en");
+
+      unmount();
+
+      expect(document.documentElement.getAttribute("lang")).toBe("en");
+    });
   });
 
-  it('should no longer apply focus styling after cleanup when element receives focus', () => {
-    element.setAttribute('tabindex', '-1');
-    element.style.outline = 'initial';
+  describe("widget container focus & tabindex lifecycle", () => {
+    it("applies tabindex='-1' and focus to main element when isMainContent is true, and removes tabindex on unmount", () => {
+      const main = document.createElement("main");
+      document.body.appendChild(main);
 
-    cleanup = createAccessibleWidgetContainer(element);
-    cleanup();
-    cleanup = undefined;
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          isMainContent: true,
+        })
+      );
 
-    // After cleanup, dispatch focus event on the element
-    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+      expect(main.getAttribute("tabindex")).toBe("-1");
+      expect(document.activeElement).toBe(main);
 
-    // The listener should have been removed, so style should NOT be set by our handler
-    expect(element.style.outline).not.toBe('2px solid var(--interactive-focus-ring, #007acc)');
-    expect(element.style.outlineOffset).not.toBe('2px');
+      unmount();
+
+      expect(main.hasAttribute("tabindex")).toBe(false);
+    });
+
+    it("applies tabindex='-1' and focus to role='article' container when available", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          isMainContent: true,
+        })
+      );
+
+      expect(article.getAttribute("tabindex")).toBe("-1");
+      expect(document.activeElement).toBe(article);
+
+      unmount();
+
+      expect(article.hasAttribute("tabindex")).toBe(false);
+    });
+
+    it("does not set tabindex or focus when isMainContent is false", () => {
+      const main = document.createElement("main");
+      document.body.appendChild(main);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({
+          title: "Widget Title",
+          isMainContent: false,
+        })
+      );
+
+      expect(main.hasAttribute("tabindex")).toBe(false);
+      expect(document.activeElement).not.toBe(main);
+
+      unmount();
+
+      expect(main.hasAttribute("tabindex")).toBe(false);
+    });
   });
 
-  it('should no longer apply blur styling changes after cleanup', () => {
-    element.setAttribute('tabindex', '-1');
+  describe("createAccessibleWidgetContainer helper", () => {
+    it("applies accessibility attributes and restores original attributes on cleanup", () => {
+      const el = document.createElement("div");
+      el.setAttribute("role", "section");
+      el.setAttribute("aria-label", "Old Label");
+      el.setAttribute("aria-describedby", "old-desc");
+      el.setAttribute("tabindex", "0");
+      document.body.appendChild(el);
 
-    cleanup = createAccessibleWidgetContainer(element);
+      const cleanup = createAccessibleWidgetContainer(el, {
+        role: "article",
+        ariaLabel: "New Label",
+        ariaDescribedby: "new-desc",
+        tabIndex: -1,
+      });
 
-    // First, trigger focus to verify the listener works before cleanup
-    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
-    expect(element.style.outline).toBe('2px solid var(--interactive-focus-ring, #007acc)');
+      expect(el.getAttribute("role")).toBe("article");
+      expect(el.getAttribute("aria-label")).toBe("New Label");
+      expect(el.getAttribute("aria-describedby")).toBe("new-desc");
+      expect(el.getAttribute("tabindex")).toBe("-1");
 
-    cleanup();
-    cleanup = undefined;
+      el.focus();
+      expect(el.style.outline).toBe(
+        "2px solid var(--interactive-focus-ring, #007acc)"
+      );
 
-    // Reset the style for the post-cleanup test
-    element.style.outline = 'initial';
+      el.blur();
+      expect(el.style.outline).toBe("none");
 
-    // After cleanup, dispatching blur should not change anything
-    element.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-    expect(element.style.outline).toBe('initial');
+      cleanup();
+
+      expect(el.getAttribute("role")).toBe("section");
+      expect(el.getAttribute("aria-label")).toBe("Old Label");
+      expect(el.getAttribute("aria-describedby")).toBe("old-desc");
+      expect(el.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("removes applied attributes on cleanup if none existed originally", () => {
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+
+      const cleanup = createAccessibleWidgetContainer(el, {
+        ariaLabel: "Added Label",
+        ariaDescribedby: "added-desc",
+        tabIndex: 0,
+      });
+
+      expect(el.getAttribute("role")).toBe("article");
+      expect(el.getAttribute("aria-label")).toBe("Added Label");
+      expect(el.getAttribute("aria-describedby")).toBe("added-desc");
+      expect(el.getAttribute("tabindex")).toBe("0");
+
+      cleanup();
+
+      expect(el.hasAttribute("role")).toBe(false);
+      expect(el.hasAttribute("aria-label")).toBe(false);
+      expect(el.hasAttribute("aria-describedby")).toBe(false);
+      expect(el.hasAttribute("tabindex")).toBe(false);
+    });
   });
 
-  it('should handle cleanup with no options gracefully', () => {
-    cleanup = createAccessibleWidgetContainer(element);
-    const fn = cleanup;
-    expect(() => fn?.()).not.toThrow();
+  describe("announceToScreenReader helper", () => {
+    it("creates live region div, announces message, and clears after timeout", () => {
+      const cleanup = announceToScreenReader("Test message", "assertive");
+
+      const announcer = document.querySelector('[aria-live="assertive"]');
+      expect(announcer).not.toBeNull();
+      expect(announcer?.textContent).toBe("Test message");
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(announcer?.textContent).toBe("");
+
+      cleanup();
+
+      expect(document.querySelector('[aria-live="assertive"]')).toBeNull();
+    });
+
+    it("updates existing live region if announcer id exists", () => {
+      const cleanup1 = announceToScreenReader("First message", "polite", {
+        id: "custom-announcer",
+      });
+
+      const announcer = document.getElementById("custom-announcer");
+      expect(announcer?.textContent).toBe("First message");
+
+      const cleanup2 = announceToScreenReader("Second message", "assertive", {
+        id: "custom-announcer",
+      });
+
+      expect(announcer?.textContent).toBe("Second message");
+      expect(announcer?.getAttribute("aria-live")).toBe("assertive");
+
+      cleanup1();
+      cleanup2();
+    });
+
+    it("returns noop cleanup if container is null", () => {
+      const cleanup = announceToScreenReader("Test", "polite", {
+        container: null,
+      });
+
+      expect(typeof cleanup).toBe("function");
+      expect(() => cleanup()).not.toThrow();
+    });
   });
 
-  it('should remove aria attributes that were added when there was no original value', () => {
-    cleanup = createAccessibleWidgetContainer(element, { ariaLabel: 'Temporary' });
+  describe("setupEmbedFocusManagement helper", () => {
+    it("traps Tab and Shift+Tab focus navigation within container", () => {
+      const container = document.createElement("div");
+      const btn1 = document.createElement("button");
+      const btn2 = document.createElement("button");
+      container.appendChild(btn1);
+      container.appendChild(btn2);
+      document.body.appendChild(container);
 
-    expect(element.getAttribute('aria-label')).toBe('Temporary');
+      const cleanup = setupEmbedFocusManagement(container);
 
-    cleanup();
-    cleanup = undefined;
+      btn2.focus();
+      const tabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: false,
+        bubbles: true,
+      });
+      const tabSpy = vi.spyOn(tabEvent, "preventDefault");
+      container.dispatchEvent(tabEvent);
 
-    expect(element.hasAttribute('aria-label')).toBe(false);
+      expect(tabSpy).toHaveBeenCalled();
+      expect(document.activeElement).toBe(btn1);
+
+      btn1.focus();
+      const shiftTabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: true,
+        bubbles: true,
+      });
+      const shiftTabSpy = vi.spyOn(shiftTabEvent, "preventDefault");
+      container.dispatchEvent(shiftTabEvent);
+
+      expect(shiftTabSpy).toHaveBeenCalled();
+      expect(document.activeElement).toBe(btn2);
+
+      cleanup();
+    });
+
+    it("triggers close button click when Escape key is pressed", () => {
+      const container = document.createElement("div");
+      const closeBtn = document.createElement("button");
+      closeBtn.setAttribute("aria-label", "Close modal");
+      const clickSpy = vi.fn();
+      closeBtn.addEventListener("click", clickSpy);
+      container.appendChild(closeBtn);
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      const escEvent = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      });
+      container.dispatchEvent(escEvent);
+
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+
+      cleanup();
+    });
+
+    it("triggers data-close button click when Escape key is pressed", () => {
+      const container = document.createElement("div");
+      const closeBtn = document.createElement("button");
+      closeBtn.setAttribute("data-close", "");
+      const clickSpy = vi.fn();
+      closeBtn.addEventListener("click", clickSpy);
+      container.appendChild(closeBtn);
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      const escEvent = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      });
+      container.dispatchEvent(escEvent);
+
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+
+      cleanup();
+    });
   });
 });
