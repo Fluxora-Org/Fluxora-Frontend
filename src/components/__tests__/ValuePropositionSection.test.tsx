@@ -1,6 +1,15 @@
+import React from 'react';
 import { render, screen } from "@testing-library/react";
 import ValuePropositionSection from "../ValuePropositionSection";
+import { vi } from 'vitest';
 
+// Mock lucide-react icons
+vi.mock('lucide-react', () => ({
+  Clock: () => <svg data-testid="icon" />,
+  Settings: () => <svg data-testid="icon" />,
+  PauseCircle: () => <svg data-testid="icon" />,
+  Star: () => <svg data-testid="icon" />, 
+}));
 describe("ValuePropositionSection", () => {
   test("renders headline, subhead and all feature cards", () => {
     render(<ValuePropositionSection />);
@@ -28,9 +37,8 @@ describe("ValuePropositionSection", () => {
       "Native Stellar infrastructure. Soroban smart contracts",
     ];
     descriptions.forEach((desc) => {
-      expect(screen.getByText((content, element) => {
-        return element?.textContent?.includes(desc);
-      })).toBeInTheDocument();
+      const matches = screen.getAllByText((content, element) => element?.textContent?.includes(desc));
+      expect(matches.length).toBeGreaterThan(0);
     });
   });
 });
