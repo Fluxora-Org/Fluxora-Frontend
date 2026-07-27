@@ -211,8 +211,6 @@ modal. Wallet entry points, including `WalletButton`, should route Freighter,
 Albedo, and WalletConnect actions through this component so error states and
 focus management stay consistent.
 
-# The ConnectWalletModal example file has been removed.
-
 ## App route guard
 
 The `/app` route subtree is wrapped in `RequireWallet`, which reads the shared
