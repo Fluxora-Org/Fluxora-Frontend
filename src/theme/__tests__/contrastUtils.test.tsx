@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { initTheme, THEME_STORAGE_KEY, ThemeProvider, useTheme } from "../ThemeProvider";
+import { initTheme, THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, ThemeProvider, useTheme } from "../ThemeProvider";
 
 function currentDataTheme(): string | null {
   return document.documentElement.getAttribute("data-theme");
@@ -76,5 +76,91 @@ describe("contrast regression theme snapshots", () => {
 
     expect(screen.getByTestId("theme")).toHaveTextContent("dark");
     expect(currentDataTheme()).toBe("dark");
+  });
+});
+
+// ─── Edge-case: empty / missing localStorage ───────────────────────────────
+
+describe("contrast regression theme snapshots — empty storage", () => {
+  it("defaults to light when no theme is stored", () => {
+    expect(initTheme()).toBe("light");
+    expect(currentDataTheme()).toBe("light");
+  });
+
+  it("defaults to light when localStorage has an invalid theme value", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "invalid-value");
+    expect(initTheme()).toBe("light");
+  });
+});
+
+// ─── Edge-case: corrupted custom theme storage ─────────────────────────────
+
+describe("contrast regression theme snapshots — corrupted custom theme", () => {
+  it("falls back to default when custom theme JSON is malformed", () => {
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, "{not-valid-json");
+    expect(initTheme()).toBe("light");
+    expect(currentDataTheme()).toBe("light");
+  });
+
+  it("falls back to default when custom theme JSON is missing required fields", () => {
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify({ id: "test" }));
+    expect(initTheme()).toBe("light");
+  });
+
+  it("falls back to default when custom theme JSON is an array", () => {
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify([1, 2, 3]));
+    expect(initTheme()).toBe("light");
+  });
+});
+
+// ─── Edge-case: provider remounting ────────────────────────────────────────
+
+describe("contrast regression theme snapshots — remounting", () => {
+  it("preserves theme after unmount and remount", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+
+    const { unmount } = render(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+
+    unmount();
+
+    render(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+    expect(currentDataTheme()).toBe("dark");
+  });
+
+  it("applies cyperpunk theme correctly", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "cyberpunk");
+
+    render(
+      <ThemeProvider>
+        <ThemeProbe />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("theme")).toHaveTextContent("cyberpunk");
+    expect(currentDataTheme()).toBe("cyberpunk");
+  });
+});
+
+// ─── Edge-case: THEME_STORAGE_KEY constant ─────────────────────────────────
+
+describe("contrast regression theme snapshots — storage key stability", () => {
+  it("THEME_STORAGE_KEY is 'theme'", () => {
+    expect(THEME_STORAGE_KEY).toBe("theme");
+  });
+
+  it("initTheme is a function", () => {
+    expect(typeof initTheme).toBe("function");
   });
 });
