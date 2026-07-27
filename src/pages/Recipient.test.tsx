@@ -178,6 +178,12 @@ describe("Recipient wallet source", () => {
 
     renderRecipient();
 
+    // jsdom's document.hasFocus() is environment-dependent. Dispatch a focus
+    // event first to guarantee isTabFocused=true before asserting the clean title.
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
     expect(document.title).toBe("Fluxora — Recipient portal");
 
     act(() => {
