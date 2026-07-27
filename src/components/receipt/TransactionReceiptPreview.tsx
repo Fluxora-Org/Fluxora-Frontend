@@ -8,7 +8,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp } from "../../utils/receiptGenerator";
+import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp, buildReceiptExplorerUrl } from "../../utils/receiptGenerator";
 import { clsx } from "clsx";
 
 export interface TransactionReceiptPreviewProps {
@@ -159,7 +159,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
             <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-[var(--color-accent-primary)] truncate">
               <span className="truncate">{data.txHash}</span>
               <a
-                href={`https://stellar.expert/explorer/testnet/tx/${data.txHash}`}
+                href={buildReceiptExplorerUrl(data.txHash!, data.network)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"

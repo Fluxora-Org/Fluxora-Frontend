@@ -97,8 +97,15 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
   const totalCount = activeCount + 1; // including local user
   const viewersToRender = viewers.slice(0, 3);
 
+  // The container listens for Escape so that closing the popover via the
+  // outer badge container still returns focus to the trigger. The list
+  // component handles its own inner Escape scope first (and calls onClose),
+  // which in turn calls setIsOpen(false) + focus(). This handler covers the
+  // case where focus is on the trigger button itself and the popover is open
+  // (e.g., the user re-focuses the trigger after opening but before moving
+  // into the list).
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && isOpen) {
       setIsOpen(false);
       triggerRef.current?.focus();
     }
@@ -117,7 +124,7 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
       <button
         ref={triggerRef}
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-haspopup="listbox"
+        aria-haspopup="true"
         aria-expanded={isOpen}
         aria-label={`${totalCount} active viewers. Click to view list.`}
         className="presence-badge-trigger"

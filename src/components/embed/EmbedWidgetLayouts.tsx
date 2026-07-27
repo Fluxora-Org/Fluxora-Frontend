@@ -264,30 +264,43 @@ interface StatusBadgeProps {
   compact?: boolean;
 }
 
-function StatusBadge({ status, compact = false }: StatusBadgeProps) {
-  const statusConfig = {
-    Active: {
-      label: "Active",
-      className: "embed-widget-status-badge--active",
-      ariaLabel: "Stream status: Active"
-    },
-    Paused: {
-      label: "Paused",
-      className: "embed-widget-status-badge--paused",
-      ariaLabel: "Stream status: Paused"
-    },
-    Completed: {
-      label: "Completed",
-      className: "embed-widget-status-badge--completed",
-      ariaLabel: "Stream status: Completed"
-    }
-  };
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; className: string; ariaLabel: string }
+> = {
+  Active: {
+    label: "Active",
+    className: "embed-widget-status-badge--active",
+    ariaLabel: "Stream status: Active"
+  },
+  Paused: {
+    label: "Paused",
+    className: "embed-widget-status-badge--paused",
+    ariaLabel: "Stream status: Paused"
+  },
+  Completed: {
+    label: "Completed",
+    className: "embed-widget-status-badge--completed",
+    ariaLabel: "Stream status: Completed"
+  }
+};
 
-  const config = statusConfig[status];
+/**
+ * StatusBadge renders a labelled pill for a stream status.
+ *
+ * Unknown status values fall back to a neutral "Unknown" badge so the widget
+ * never crashes if the API introduces a new status the frontend hasn't seen yet.
+ */
+function StatusBadge({ status, compact = false }: StatusBadgeProps) {
+  const config = STATUS_CONFIG[status] ?? {
+    label: String(status),
+    className: "embed-widget-status-badge--unknown",
+    ariaLabel: `Stream status: ${String(status)}`
+  };
 
   return (
     <span
-      className={`embed-widget-status-badge ${config.className} ${compact ? 'compact' : ''}`}
+      className={`embed-widget-status-badge ${config.className} ${compact ? "compact" : ""}`}
       role="status"
       aria-label={config.ariaLabel}
     >

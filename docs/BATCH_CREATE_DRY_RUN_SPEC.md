@@ -1,6 +1,6 @@
 # Batch Dry-Run Confirmation Spec
 
-Owner: Netty-kun | Issue: #1025 | Status: In Progress
+Owner: Netty-kun | Issue: #849 | Status: Done
 
 ## Overview
 
@@ -75,6 +75,22 @@ During submission, shows "Submitting batch…" with `aria-busy`.
 ## Responsive Behavior
 
 On mobile: the aggregate summary card stacks above the per-row list. Totals remain visible without truncation. The table scrolls horizontally within its container.
+
+Implemented in `CreateStreamModal.css` under `@media (max-width: 640px)`: the
+`.dry-run-summary__cards` flex row collapses to a single column, and the
+footer (checkbox + submit) stacks vertically instead of sharing a row with
+the back button.
+
+## Contrast — Disabled vs. Enabled Submit
+
+The global `.btn:disabled` rule (`opacity: 0.7`) is not sufficient on its own
+per WCAG 2.1 AA guidance against relying on opacity/color alone to convey
+state. `.dry-run-submit-btn:disabled` overrides it with a dashed border and a
+muted, non-gradient surface fill (`var(--surface-elevated)` / `var(--muted)`
+text), verified against `contrastUtils.ts` to remain >= 3:1 (UI component
+threshold) against the modal surface. The enabled state keeps the existing
+teal CTA gradient — the two states differ in border style and fill, not
+just opacity.
 
 ## Flow Integration
 

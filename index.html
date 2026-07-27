@@ -59,7 +59,15 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
     />
 
-    <!-- Open Graph link previews -->
+    <!--
+      Site-Wide Default Open Graph & Twitter link previews
+      PER-ROUTE OVERRIDE PATTERN:
+      For single stream detail routes (/app/streams/:streamId), src/components/MetaTags.tsx
+      dynamically overrides og:title, og:description, og:url, og:image, and og:image:alt via
+      react-helmet-async to reference per-stream auto-generated 1200x630 cards
+      (e.g., https://fluxora.app/og-image/:streamId.png?v=:updatedAtTimestamp).
+      See docs/STREAM_OG_IMAGE_TEMPLATE_SPEC.md for full specifications.
+    -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Fluxora" />
     <meta property="og:title" content="Fluxora - Continuous Capital" />
@@ -85,6 +93,7 @@
       name="twitter:image"
       content="https://fluxora.app/freighter-wallet.jpeg"
     />
+    <meta name="twitter:image:alt" content="Fluxora Stellar wallet preview" />
   </head>
   <body>
     <div id="root"></div>

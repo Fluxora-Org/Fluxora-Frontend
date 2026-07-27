@@ -46,6 +46,34 @@ describe("TransactionReceiptPreview component", () => {
     expect(screen.getByText(/pending rpc confirmation/i)).toBeInTheDocument();
   });
 
+  it("renders explorer link with testnet network segment when network is TESTNET", () => {
+    const testnetData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Testnet",
+    };
+    render(<TransactionReceiptPreview data={testnetData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/testnet/tx/${mockConfirmedData.txHash}`,
+    );
+  });
+
+  it("renders explorer link with public network segment when network is PUBLIC", () => {
+    const publicData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Public Network (Mainnet)",
+    };
+    render(<TransactionReceiptPreview data={publicData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/public/tx/${mockConfirmedData.txHash}`,
+    );
+  });
+
   it("triggers download action when 'Download Receipt' button is clicked", async () => {
     const handleDownloaded = vi.fn();
     render(

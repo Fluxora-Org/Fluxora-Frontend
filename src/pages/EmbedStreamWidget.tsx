@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Skeleton } from "../components/Skeleton";
 import { useTickingNow } from "../hooks/useTickingNow";
@@ -27,7 +27,7 @@ import { useEmbedAccessibility } from "../hooks/useEmbedAccessibility";
  * - Three responsive widget presets
  * - Theme query parameter support
  * - Accessible document structure
- * - All UI states (loading, live, paused, completed, error)
+ * - All UI states (loading, live, paused, completed, error, retry)
  * 
  * Security:
  * - Validates theme/accent query parameters
@@ -40,8 +40,22 @@ export default function EmbedStreamWidget() {
   const [stream, setStream] = useState<StreamRecord | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentDate = useTickingNow();
-  
+  // retryCount is bumped by the retry button and used as a useEffect dependency
+  // so a re-fetch is triggered without remounting the component.
+  const [retryCount, setRetryCount] = useState(0);
+
+  const tickingNow = useTickingNow();
+
+  /**
+   * Derive a stable YYYY-MM-DD date string from the ticking timestamp.
+   * Memoized so the value only changes when the underlying date actually
+   * crosses a day boundary — not on every render.
+   */
+  const currentDate = useMemo(
+    () => new Date(tickingNow).toISOString().split("T")[0],
+    [tickingNow]
+  );
+
   // Parse theme configuration from query parameters
   const themeConfig = useMemo<ThemeConfig>(() => ({
     theme: parseThemeFromQuery(searchParams.get("theme")),
@@ -59,8 +73,13 @@ export default function EmbedStreamWidget() {
   useEffect(() => {
     return applyThemeConfigSafely(themeConfig);
   }, [themeConfig]);
+
+  // Stable retry callback — does not close over changing state.
+  const handleRetry = useCallback(() => {
+    setRetryCount((n) => n + 1);
+  }, []);
   
-  // Fetch stream data
+  // Fetch stream data; re-runs when streamId changes or user clicks retry.
   useEffect(() => {
     if (!streamId) {
       setStream(null);
@@ -95,7 +114,9 @@ export default function EmbedStreamWidget() {
       cancelled = true;
       controller.abort();
     };
-  }, [streamId]);
+    // retryCount intentionally included so clicking retry re-runs the fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamId, retryCount]);
   
   // Setup embed accessibility
   useEmbedAccessibility({
@@ -112,22 +133,24 @@ export default function EmbedStreamWidget() {
     );
   }
   
-  // Error state (invalid stream ID)
+  // Error state (invalid stream ID or network error)
   if (error || !stream) {
     return (
       <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
         <EmbedWidgetErrorState 
           error={error || "Stream not found"}
           widgetPreset={widgetPreset}
+          // Only offer a retry when we have a streamId to retry against.
+          onRetry={streamId ? handleRetry : undefined}
         />
       </EmbedWidgetContainer>
     );
   }
   
-  // Success state - render appropriate widget layout
+  // Success state — render appropriate widget layout
   const widgetProps = {
     stream,
-    currentDate: new Date(currentDate).toISOString().split("T")[0],
+    currentDate,
     themeConfig
   };
   
@@ -144,13 +167,24 @@ export default function EmbedStreamWidget() {
   );
 }
 
-// Container component for embed widget
+// ---------------------------------------------------------------------------
+// Container
+// ---------------------------------------------------------------------------
+
 interface EmbedWidgetContainerProps {
   children: React.ReactNode;
   widgetPreset: "card" | "banner" | "compact";
   themeConfig: ThemeConfig;
 }
 
+/**
+ * Outer wrapper for every widget state (loading / error / success).
+ *
+ * Width constraints are intentionally kept in CSS (EmbedWidgetLayouts.css) so
+ * that media-query overrides work correctly.  Only non-dimension, non-layout
+ * properties that can't be expressed in static CSS are applied here as inline
+ * styles.
+ */
 function EmbedWidgetContainer({ 
   children, 
   widgetPreset, 
@@ -160,19 +194,15 @@ function EmbedWidgetContainer({
     <div 
       className="embed-widget-container"
       data-widget-preset={widgetPreset}
-      data-theme={themeConfig.theme}
+      data-theme={themeConfig.theme ?? undefined}
       data-accent-color={themeConfig.accentColor ? "custom" : "default"}
       style={{
-        // Ensure container is at least as wide as the widget needs
-        minWidth: widgetPreset === "card" ? "300px" : 
-                  widgetPreset === "compact" ? "200px" : "500px",
-        // Allow responsive scaling
+        // width: 100% lets the inner layout element own its own min/max-width
+        // rules via CSS, avoiding inline-style vs. stylesheet specificity fights.
         width: "100%",
         height: "auto",
-        // Apply theme-aware background
         backgroundColor: "var(--color-bg-primary, #ffffff)",
         color: "var(--color-text-primary, #1a1f36)",
-        // Ensure proper isolation
         isolation: "isolate"
       }}
     >
@@ -181,15 +211,32 @@ function EmbedWidgetContainer({
   );
 }
 
+// ---------------------------------------------------------------------------
 // Skeleton loading state
+// ---------------------------------------------------------------------------
+
 interface EmbedWidgetSkeletonProps {
   widgetPreset: "card" | "banner" | "compact";
 }
 
+/**
+ * Skeleton placeholders that mirror the real layout's structure so there is no
+ * visible layout shift on load.
+ *
+ * The banner preset stacks vertically on narrow screens (≤640 px) in CSS, so
+ * the skeleton matches that stacked structure by default and lets CSS handle
+ * the flex-row reflow at wider widths — the same strategy the real banner uses.
+ */
 function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
   if (widgetPreset === "compact") {
     return (
-      <div role="status" aria-label="Loading stream widget" aria-busy="true">
+      <div
+        role="status"
+        aria-label="Loading stream widget"
+        aria-busy="true"
+        data-testid="embed-skeleton-compact"
+        className="embed-widget-compact"
+      >
         <Skeleton width="100%" height={80} borderRadius={8} />
       </div>
     );
@@ -197,12 +244,29 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
   
   if (widgetPreset === "banner") {
     return (
-      <div role="status" aria-label="Loading stream widget" aria-busy="true">
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <Skeleton width={120} height={20} />
-          <Skeleton width={80} height={20} />
+      <div
+        role="status"
+        aria-label="Loading stream widget"
+        aria-busy="true"
+        data-testid="embed-skeleton-banner"
+        // Stack vertically by default; CSS widens to a flex-row at ≥640 px,
+        // matching the real banner's responsive behaviour.
+        className="embed-widget-banner-skeleton embed-widget-banner"
+        style={{ padding: "1rem", backgroundColor: "var(--color-surface-default, #fafbfc)" }}
+      >
+        {/* Info column */}
+        <div className="embed-widget-banner-skeleton__info">
+          <Skeleton width="60%" height={14} />
+          <Skeleton width={40} height={20} borderRadius={9999} />
+        </div>
+        {/* Timeline column */}
+        <div className="embed-widget-banner-skeleton__timeline">
           <Skeleton width="100%" height={40} />
-          <Skeleton width={60} height={20} />
+        </div>
+        {/* Metrics column */}
+        <div className="embed-widget-banner-skeleton__metrics">
+          <Skeleton width={80} height={14} />
+          <Skeleton width="100%" height={6} borderRadius={3} />
         </div>
       </div>
     );
@@ -210,7 +274,13 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
   
   // Card preset (default)
   return (
-    <div role="status" aria-label="Loading stream widget" aria-busy="true">
+    <div
+      role="status"
+      aria-label="Loading stream widget"
+      aria-busy="true"
+      data-testid="embed-skeleton-card"
+      className="embed-widget-card"
+    >
       <Skeleton width="80%" height={24} style={{ marginBottom: "0.75rem" }} />
       <Skeleton width="60%" height={16} style={{ marginBottom: "1.5rem" }} />
       <Skeleton width="100%" height={80} style={{ marginBottom: "1rem" }} />
@@ -223,25 +293,34 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
   );
 }
 
-// Error state component
+// ---------------------------------------------------------------------------
+// Error state
+// ---------------------------------------------------------------------------
+
 interface EmbedWidgetErrorStateProps {
   error: string;
   widgetPreset: "card" | "banner" | "compact";
+  /** When provided, a retry button is rendered. */
+  onRetry?: () => void;
 }
 
-function EmbedWidgetErrorState({ error, widgetPreset }: EmbedWidgetErrorStateProps) {
+function EmbedWidgetErrorState({ error, widgetPreset, onRetry }: EmbedWidgetErrorStateProps) {
   const isCompact = widgetPreset === "compact";
   
   return (
     <div 
       role="alert" 
       aria-live="assertive"
+      data-testid="embed-error-state"
+      className={`embed-widget-${widgetPreset}`}
       style={{
-        padding: isCompact ? "0.5rem" : "1rem",
         backgroundColor: "var(--color-error-bg, #fef2f2)",
-        border: "1px solid var(--color-error-border, #dc2626)",
-        borderRadius: "8px",
-        color: "var(--color-error-text, #b91c1c)"
+        borderColor: "var(--color-error-border, #dc2626)",
+        color: "var(--color-error-text, #b91c1c)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "flex-start",
       }}
     >
       <div style={{ 
@@ -263,9 +342,32 @@ function EmbedWidgetErrorState({ error, widgetPreset }: EmbedWidgetErrorStatePro
         </svg>
         <span>Stream unavailable: {error}</span>
       </div>
+
+      {/* Retry button — only shown when a retry handler is provided */}
+      {onRetry && !isCompact && (
+        <div style={{ marginTop: "0.75rem" }}>
+          <button
+            onClick={onRetry}
+            className="embed-widget-metric"
+            style={{
+              padding: "0.375rem 0.75rem",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              borderRadius: "6px",
+              border: "1px solid var(--color-error-border, #dc2626)",
+              backgroundColor: "transparent",
+              color: "var(--color-error-text, #b91c1c)",
+              cursor: "pointer",
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {!isCompact && (
         <div style={{ 
-          marginTop: "0.5rem", 
+          marginTop: onRetry ? "0.25rem" : "0.5rem",
           fontSize: "0.875rem",
           opacity: 0.8 
         }}>
