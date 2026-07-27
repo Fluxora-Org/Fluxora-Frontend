@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X, Moon, Sun, Search } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
+import KeyboardShortcutsModal from "../KeyboardShortcutsModal";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -134,12 +135,28 @@ export default function AppNavbar({
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   // Simulate a brief "connecting" state on first mount when wallet restores session
   useEffect(() => {
     setConnecting(true);
     const t = setTimeout(() => setConnecting(false), 600);
     return () => clearTimeout(t);
+  }, []);
+
+  const openPalette = useCallback(() => setIsPaletteOpen(true), []);
+  const closePalette = useCallback(() => setIsPaletteOpen(false), []);
+
+  // Global Cmd/Ctrl+K shortcut
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsPaletteOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
 const location = useLocation();
@@ -218,6 +235,19 @@ const location = useLocation();
 
         {/* Right: Actions (desktop) */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Command palette trigger */}
+          <button
+            onClick={openPalette}
+            aria-label="Open command palette"
+            className="flex items-center gap-2 h-[44px] px-3 rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-sm"
+          >
+            <Search size={14} aria-hidden="true" />
+            <span className="hidden lg:inline">Search</span>
+            <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--surface-elevated)] border border-[var(--border-neutral)] leading-none opacity-60">
+              {navigator.platform.toUpperCase().indexOf("MAC") >= 0 ? "⌘" : "Ctrl"}+K
+            </kbd>
+          </button>
+
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -340,6 +370,9 @@ const location = useLocation();
           </div>
         </div>
       )}
+
+      {/* Command Palette — rendered inside header but uses fixed positioning */}
+      <KeyboardShortcutsModal isOpen={isPaletteOpen} onClose={closePalette} />
     </header>
   );
 }

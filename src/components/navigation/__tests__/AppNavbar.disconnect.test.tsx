@@ -33,6 +33,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: "/app" }),
+  useNavigate: () => vi.fn(),
 }));
 
 function renderNavbar() {
