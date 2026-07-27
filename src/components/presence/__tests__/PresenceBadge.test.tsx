@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import PresenceBadge, { getInitials } from "../PresenceBadge";
 import { Viewer } from "../../../hooks/usePresenceViewers";
 
@@ -50,6 +50,10 @@ const mockViewerSimpleId: Viewer = {
   color: "#7c3aed",
   lastSeen: Date.now(),
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Existing test suite (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("PresenceBadge", () => {
   it("renders nothing with 0 viewers", () => {
@@ -285,5 +289,186 @@ describe("PresenceBadge", () => {
     const { container } = render(<PresenceBadge viewers={[noColorViewer]} />);
     const avatar = container.querySelector(".presence-avatar") as HTMLElement;
     expect(avatar.style.backgroundColor).toBe("rgb(185, 28, 28)");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New edge-case tests: polling, fading, timer cleanup, totalCount, simultaneous
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("PresenceBadge — edge cases", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // ── totalCount is deterministic when all peers are fading ─────────────────
+
+  it("shows '1 viewing' and keeps the badge visible when every peer is fading out", () => {
+    // All viewers are in the fading-out state; only the local user remains active.
+    const fadingViewer1: Viewer = { ...mockViewer1, fadingOut: true };
+    const fadingViewer2: Viewer = { ...mockViewer2, fadingOut: true };
+
+    render(<PresenceBadge viewers={[fadingViewer1, fadingViewer2]} />);
+
+    // Badge must still render (CSS fade animation is in progress).
+    expect(screen.getByRole("button")).toBeInTheDocument();
+    // activeCount = 0, totalCount = 0 + 1 = 1.
+    expect(screen.getByText("1 viewing")).toBeInTheDocument();
+  });
+
+  it("totalCount counts only non-fading peers plus local user", () => {
+    // 1 active + 1 fading peer → activeCount=1, totalCount=2
+    const fadingViewer: Viewer = { ...mockViewer1, fadingOut: true };
+    render(<PresenceBadge viewers={[fadingViewer, mockViewer2]} />);
+    expect(screen.getByText("2 viewing")).toBeInTheDocument();
+  });
+
+  // ── aria-label reflects deterministic totalCount ──────────────────────────
+
+  it("aria-label on the trigger uses deterministic totalCount", () => {
+    const fadingViewer: Viewer = { ...mockViewer1, fadingOut: true };
+    render(<PresenceBadge viewers={[fadingViewer, mockViewer2]} />);
+    const trigger = screen.getByRole("button");
+    // 1 active peer + local user = 2
+    expect(trigger).toHaveAttribute(
+      "aria-label",
+      "2 active viewers. Click to view list."
+    );
+  });
+
+  // ── fading-out viewer triggers "left" announcement ────────────────────────
+
+  it("announces left when a viewer transitions to fadingOut", () => {
+    const { rerender } = render(
+      <PresenceBadge viewers={[mockViewer1, mockViewer2]} />
+    );
+    const liveRegion = screen.getByRole("status", { hidden: true });
+
+    // Viewer2 transitions to fading — should be announced as left.
+    const fadingViewer2: Viewer = { ...mockViewer2, fadingOut: true };
+    rerender(<PresenceBadge viewers={[mockViewer1, fadingViewer2]} />);
+
+    expect(liveRegion).toHaveTextContent("Bob Jones left");
+  });
+
+  it("does not re-announce a viewer that was already fading on the previous render", () => {
+    const fadingViewer2: Viewer = { ...mockViewer2, fadingOut: true };
+
+    // Start with viewer2 already fading.
+    const { rerender } = render(
+      <PresenceBadge viewers={[mockViewer1, fadingViewer2]} />
+    );
+    const liveRegion = screen.getByRole("status", { hidden: true });
+
+    // Rerender with same fading state — no new departure event.
+    rerender(<PresenceBadge viewers={[mockViewer1, fadingViewer2]} />);
+    expect(liveRegion).not.toHaveTextContent("Bob Jones left");
+  });
+
+  // ── announcement timer is cleared on component unmount ───────────────────
+
+  it("clears the announcement timer on unmount (no setState after unmount)", () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    const { rerender, unmount } = render(
+      <PresenceBadge viewers={[mockViewer1]} />
+    );
+
+    // Trigger an announcement (viewer2 joins).
+    rerender(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+
+    const callsBefore = clearTimeoutSpy.mock.calls.length;
+    unmount();
+
+    // At least one clearTimeout call should have happened at or after unmount.
+    expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it("announcement is cleared after 3 seconds", () => {
+    const { rerender } = render(<PresenceBadge viewers={[mockViewer1]} />);
+    const liveRegion = screen.getByRole("status", { hidden: true });
+
+    rerender(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+    expect(liveRegion).toHaveTextContent("Bob Jones joined");
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(liveRegion).toHaveTextContent("");
+  });
+
+  it("announcement timer resets when a new event fires before the previous 3 s expires", () => {
+    // Start with viewer1 already present so the component renders (viewers.length > 0
+    // is required for PresenceBadge to mount and show the aria-live region).
+    const { rerender } = render(<PresenceBadge viewers={[mockViewer1]} />);
+    const liveRegion = screen.getByRole("status", { hidden: true });
+
+    // Viewer2 joins — starts a 3-second clear timer.
+    rerender(<PresenceBadge viewers={[mockViewer1, mockViewer2]} />);
+    expect(liveRegion).toHaveTextContent("Bob Jones joined");
+
+    // 2 seconds later, viewer3 also joins — the previous 3-second timer is
+    // cancelled and a fresh 3-second timer starts.
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    rerender(<PresenceBadge viewers={[mockViewer1, mockViewer2, mockViewer3]} />);
+    expect(liveRegion).toHaveTextContent("Charlie joined");
+
+    // 2 more seconds — the original 3-second timer would have fired at t=3 but
+    // was cancelled. The new timer still has 1 second remaining.
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(liveRegion).toHaveTextContent("Charlie joined");
+
+    // 1 more second — the second timer fires, clearing the region.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(liveRegion).toHaveTextContent("");
+  });
+
+  // ── simultaneous join + leave in one rerender ─────────────────────────────
+
+  it("announces join and leave together when both happen in the same render", () => {
+    const { rerender } = render(
+      <PresenceBadge viewers={[mockViewer1]} />
+    );
+    const liveRegion = screen.getByRole("status", { hidden: true });
+
+    // Viewer1 leaves, viewer2 joins simultaneously.
+    rerender(<PresenceBadge viewers={[mockViewer2]} />);
+
+    expect(liveRegion).toHaveTextContent("Bob Jones joined");
+    expect(liveRegion).toHaveTextContent("Alice Smith left");
+  });
+
+  // ── fading viewer not announced as a new join ─────────────────────────────
+
+  it("does not announce a fading viewer as joined on first render", () => {
+    // A viewer that arrives already in fadingOut state (e.g. stale initial data)
+    // should NOT trigger a "joined" announcement because it is not active.
+    const fadingViewer: Viewer = { ...mockViewer1, fadingOut: true };
+    render(<PresenceBadge viewers={[fadingViewer]} />);
+
+    const liveRegion = screen.getByRole("status", { hidden: true });
+    expect(liveRegion).not.toHaveTextContent("Alice Smith joined");
+  });
+
+  // ── overflow pill stays correct when fading viewers occupy visible slots ──
+
+  it("overflow pill count is based on all viewers in the array, not just active ones", () => {
+    // 3 visible + 1 fading = 4 total in array; pill says +1 more regardless of fading state.
+    const fadingViewer4: Viewer = { ...mockViewer4, fadingOut: true };
+    render(
+      <PresenceBadge viewers={[mockViewer1, mockViewer2, mockViewer3, fadingViewer4]} />
+    );
+    expect(screen.getByText("+1 more")).toBeInTheDocument();
   });
 });

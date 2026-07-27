@@ -32,12 +32,20 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
   const [announcement, setAnnouncement] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // prevIdsRef tracks only non-fading viewers so that a viewer whose fadingOut
+  // flag transitions to true is correctly announced as "left" instead of
+  // silently disappearing when the eviction interval removes them.
   const prevIdsRef = useRef<string[]>([]);
   const nameCacheRef = useRef<Record<string, string>>({});
 
-  // Track join/leave events for aria-live announcements
+  // Track join/leave events for aria-live announcements.
+  //
+  // "Joined" — present in current render, not in prev, and not already fading.
+  // "Left"   — was in prev (non-fading), not in current non-fading set.
+  //             This covers both hard removals by the eviction interval AND the
+  //             fadingOut transition, so every departure is announced exactly once.
   useEffect(() => {
-    // Cache display names
+    // Cache display names so we can announce the name even after removal.
     viewers.forEach((v) => {
       if (v.displayName) {
         nameCacheRef.current[v.id] = v.displayName;
@@ -45,15 +53,20 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
     });
 
     const prevIds = prevIdsRef.current;
-    const currentIds = viewers.map((v) => v.id);
+    // Only track non-fading viewers; fading viewers are treated as "left".
+    const currentActiveIds = viewers
+      .filter((v) => !v.fadingOut)
+      .map((v) => v.id);
 
-    // Update ref for next render
-    prevIdsRef.current = currentIds;
+    // Update ref for next render — only the non-fading set.
+    prevIdsRef.current = currentActiveIds;
 
-    // Join: in current, not in prev, and not fadingOut
-    const joined = viewers.filter((v) => !prevIds.includes(v.id) && !v.fadingOut);
-    // Leave: in prev, not in current
-    const leftIds = prevIds.filter((id) => !currentIds.includes(id));
+    // Join: in current non-fading set, not in prev.
+    const joined = viewers.filter(
+      (v) => !v.fadingOut && !prevIds.includes(v.id)
+    );
+    // Left: was in prev non-fading set, not in current non-fading set.
+    const leftIds = prevIds.filter((id) => !currentActiveIds.includes(id));
 
     const events: string[] = [];
 
@@ -68,9 +81,17 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
 
     if (events.length > 0) {
       setAnnouncement(events.join(", "));
+      // Return the cleanup so the timer is cancelled on every re-run,
+      // not only on unmount. Without this the previous 3-second timer
+      // would still fire and clear an announcement that was set by a
+      // subsequent render.
       const timer = setTimeout(() => setAnnouncement(""), 3000);
       return () => clearTimeout(timer);
     }
+
+    // Explicit no-op return for the else path makes the cleanup contract
+    // clear: there is nothing to clean up when no announcement was made.
+    return undefined;
   }, [viewers]);
 
   // Click outside to close list
@@ -94,7 +115,12 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
   }
 
   const activeCount = viewers.filter((v) => !v.fadingOut).length;
-  const totalCount = activeCount + 1; // including local user
+  // totalCount = active peers + local user (always 1).
+  // When every peer is fading out activeCount is 0, so totalCount is 1
+  // (just the local user). The badge stays visible during the CSS fade-out
+  // transition so avatars can animate away smoothly before viewers.length
+  // drops to 0 and the component unmounts.
+  const totalCount = activeCount + 1;
   const viewersToRender = viewers.slice(0, 3);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
