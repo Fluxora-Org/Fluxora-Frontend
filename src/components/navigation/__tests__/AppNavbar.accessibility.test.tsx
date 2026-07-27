@@ -43,6 +43,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: "/" }),
+  useNavigate: () => vi.fn(),
 }));
 
 beforeEach(() => {

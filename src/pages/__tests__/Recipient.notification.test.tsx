@@ -8,7 +8,12 @@ vi.mock("../../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({ connected: true, address: "GABC", network: "TESTNET", isNetworkMismatch: false, expectedNetworkLabel: "Testnet" }),
 }));
 vi.mock("../../components/treasuryOverviewPage/useTreasury", () => ({
-  useRecipientStreams: () => ({ streams: [{ id: "1", status: "Active", withdrawableAmount: 10, streamedAmount: 20 }]}),
+  useRecipientStreams: () => ({
+    streams: [{ id: "1", status: "Active", withdrawableAmount: 10, streamedAmount: 20 }],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock("../../lib/stellar/tx", () => ({ withdraw: vi.fn() }));
 
@@ -35,10 +40,12 @@ describe("Recipient notification permission UX", () => {
     act(() => vi.advanceTimersByTime(2000));
 
     expect(requestPermission).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole("button", { name: "Notify me" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    // Component is fully rendered after the timer flush — use synchronous getByRole
+    fireEvent.click(screen.getByRole("button", { name: "Notify me" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(requestPermission).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole("button", { name: /allow stream alerts/i }));
+    fireEvent.click(screen.getByRole("button", { name: /allow stream alerts/i }));
+    await act(async () => { await Promise.resolve(); });
     expect(requestPermission).toHaveBeenCalledTimes(1);
   });
 
@@ -57,12 +64,15 @@ describe("Recipient notification permission UX", () => {
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
     expect(screen.queryByRole("dialog")).toBeNull();
 
+    // Open priming dialog again, then allow — dialog must open before the allow button is accessible
+    fireEvent.click(screen.getByRole("button", { name: "Notify me" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
     await act(async () => {
-      fireEvent.click(await screen.findByRole("button", { name: "Notify me" }));
-      fireEvent.click(await screen.findByRole("button", { name: /allow stream alerts/i }));
+      fireEvent.click(screen.getByRole("button", { name: /allow stream alerts/i }));
       await Promise.resolve();
     });
 
-    expect(await screen.findByText(/Permission is blocked by your browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/Permission is blocked by your browser/i)).toBeInTheDocument();
   });
 });

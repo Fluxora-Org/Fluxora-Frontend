@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Viewer } from "../../hooks/usePresenceViewers";
 import { maskAddress } from "../../lib/stellar";
 import { useTickingNow } from "../../hooks/useTickingNow";
@@ -6,9 +6,29 @@ import { useTickingNow } from "../../hooks/useTickingNow";
 interface PresenceViewerListProps {
   viewers: Viewer[];
   onClose: () => void;
+  /**
+   * When true, the list container receives focus on mount so that the
+   * keyboard Escape handler is reachable without any extra clicks.
+   * PresenceBadge sets this whenever it opens the popover.
+   */
+  autoFocus?: boolean;
 }
 
-export default function PresenceViewerList({ viewers, onClose }: PresenceViewerListProps) {
+export default function PresenceViewerList({
+  viewers,
+  onClose,
+  autoFocus = true,
+}: PresenceViewerListProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus the container so the Escape key handler is live immediately
+  // after the popover opens, without requiring the user to tab into the list.
+  useEffect(() => {
+    if (autoFocus) {
+      listRef.current?.focus();
+    }
+  }, [autoFocus]);
+
   // Reactive "now" timestamp that ticks on a coarse cadence (useTickingNow)
   // so the "last seen N seconds ago" text stays live while the list is open
   // without requiring a viewers prop change (Issue #955).
@@ -33,13 +53,22 @@ export default function PresenceViewerList({ viewers, onClose }: PresenceViewerL
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
+      // Stop the event here so parent Escape handlers do not fire a second
+      // time (PresenceBadge also listens on the container). Both would close
+      // the popover, but a double call is confusing and the list owns the
+      // inner Escape scope.
+      e.stopPropagation();
       onClose();
     }
   };
 
   return (
     <div
+      ref={listRef}
       role="list"
+      // tabIndex makes the container programmatically focusable so the
+      // keyboard Escape handler is reachable as soon as the popover opens.
+      tabIndex={-1}
       className="presence-viewer-list"
       aria-label="Current active viewers"
       onKeyDown={handleKeyDown}
@@ -51,10 +80,15 @@ export default function PresenceViewerList({ viewers, onClose }: PresenceViewerL
           <div
             key={viewer.id}
             role="listitem"
-            className="presence-viewer-row"
+            className={`presence-viewer-row${viewer.fadingOut ? " presence-viewer-row--fading" : ""}`}
+            aria-label={
+              viewer.fadingOut
+                ? `${getDisplayName(viewer)}, leaving`
+                : getDisplayName(viewer)
+            }
           >
             <span
-              className="presence-viewer-dot"
+              className={`presence-viewer-dot${viewer.fadingOut ? " presence-viewer-dot--fading" : ""}`}
               style={{ backgroundColor: viewer.color }}
               aria-hidden="true"
             />

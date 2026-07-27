@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import ReportBuilderPanel from "../ReportBuilderPanel";
 import type { Stream } from "../Stream";
+import { downloadReportCSV } from "../../../utils/reportExporter";
 
 // Mock the report exporter utilities to avoid browser API dependencies
 vi.mock("../../../utils/reportExporter", () => ({
@@ -258,5 +259,100 @@ describe("ReportBuilderPanel", () => {
     renderPanel();
     expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
     expect(screen.getByLabelText("End Date")).toBeInTheDocument();
+  });
+
+  // ── Date validation ────────────────────────────────────────────────────
+
+  it("shows date error when end date is before start date", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-10" } });
+    expect(screen.getByText("End date must be on or after the start date.")).toBeInTheDocument();
+  });
+
+  it("hides date error when dates are valid", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-10" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-15" } });
+    expect(screen.queryByText("End date must be on or after the start date.")).not.toBeInTheDocument();
+  });
+
+  it("disables Export button when date error is present", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-10" } });
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
+  });
+
+  it("does not show date error when only one date is set", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    expect(screen.queryByText("End date must be on or after the start date.")).not.toBeInTheDocument();
+  });
+
+  // ── Keyboard handling ──────────────────────────────────────────────────
+
+  it("calls onClose when Escape key is pressed", () => {
+    const { onClose } = renderPanel();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onClose on other key presses", () => {
+    const { onClose } = renderPanel();
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // ── Export retry ───────────────────────────────────────────────────────
+
+  it("shows retry button when export fails", () => {
+    vi.mocked(downloadReportCSV).mockImplementationOnce(() => {
+      throw new Error("Export failed");
+    });
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+    expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
+  });
+
+  it("hides retry button after retry succeeds", () => {
+    vi.mocked(downloadReportCSV)
+      .mockImplementationOnce(() => { throw new Error("Export failed"); })
+      .mockImplementationOnce(() => {});
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+    expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Retry Export/i }));
+    expect(screen.queryByRole("button", { name: /Retry Export/i })).not.toBeInTheDocument();
+  });
+
+  // ── ARIA attributes ───────────────────────────────────────────────────
+
+  it("renders with correct dialog ARIA attributes", () => {
+    renderPanel();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("aria-label", "Export Treasury Report");
+  });
+
+  it("marks date inputs as invalid when date error is present", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-10" } });
+    expect(screen.getByLabelText("Start Date")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("End Date")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("sets aria-busy on preview region during loading", () => {
+    renderPanel();
+    const previewRegion = screen.getByRole("region", { name: /Live Preview/i });
+    expect(previewRegion).toHaveAttribute("aria-busy");
+  });
+
+  it("renders alert role for date error message", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-10" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("End date must be on or after the start date.");
   });
 });
