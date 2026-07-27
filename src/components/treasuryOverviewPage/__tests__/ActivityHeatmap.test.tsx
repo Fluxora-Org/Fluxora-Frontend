@@ -187,10 +187,21 @@ describe("ActivityHeatmap", () => {
     expect(skeletons.length).toBe(84);
   });
 
-  it("error state renders error message", () => {
-    render(<ActivityHeatmap streams={[]} error="Failed to fetch heatmap data" />);
+  it("error state renders error message and container layout", () => {
+    const { container } = render(<ActivityHeatmap streams={[]} error="Failed to fetch heatmap data" />);
+    const root = container.querySelector(".activity-heatmap-container");
+    expect(root).toHaveAttribute("data-activity-tone", "error");
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("Failed to fetch heatmap data");
+  });
+
+  it("error state renders a retry button if onRetry is provided", () => {
+    const handleRetry = vi.fn();
+    render(<ActivityHeatmap streams={[]} error="Failed" onRetry={handleRetry} />);
+    const retryBtn = screen.getByRole("button", { name: "Retry" });
+    expect(retryBtn).toBeInTheDocument();
+    fireEvent.click(retryBtn);
+    expect(handleRetry).toHaveBeenCalledTimes(1);
   });
 
   it('"View as table" toggle hides the grid and shows the table', () => {

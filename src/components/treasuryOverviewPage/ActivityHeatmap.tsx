@@ -6,6 +6,7 @@ export interface ActivityHeatmapProps {
   streams: Stream[];
   loading?: boolean;
   error?: string | null;
+  onRetry?: () => void;
 }
 
 interface HeatmapTooltipProps {
@@ -185,7 +186,7 @@ const Legend: React.FC<LegendProps> = ({ skeleton = false }) => (
   </div>
 );
 
-export default function ActivityHeatmap({ streams, loading, error }: ActivityHeatmapProps) {
+export default function ActivityHeatmap({ streams, loading, error, onRetry }: ActivityHeatmapProps) {
   const [viewMode, setViewMode] = useState<"heatmap" | "table">("heatmap");
   const [hoveredCell, setHoveredCell] = useState<{
     element: HTMLButtonElement;
@@ -208,9 +209,24 @@ export default function ActivityHeatmap({ streams, loading, error }: ActivityHea
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-600" style={{ color: "var(--color-danger)" }}>
-        {error}
-      </p>
+      <div className="activity-heatmap-container" data-activity-tone="error">
+        <div className="activity-heatmap-header">
+          <h3 className="activity-heatmap-title">Treasury Activity</h3>
+          <button disabled className="ui-secondary-control text-xs" style={{ opacity: 0.5 }}>
+            View as table
+          </button>
+        </div>
+        <div className="heatmap-error-content" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem 0" }}>
+          <p role="alert" className="text-sm text-red-600" style={{ color: "var(--color-danger)", marginBottom: onRetry ? "1rem" : 0 }}>
+            {error}
+          </p>
+          {onRetry && (
+            <button onClick={onRetry} type="button" className="ui-secondary-control text-xs">
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
