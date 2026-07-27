@@ -57,6 +57,21 @@ export default function StreamCreatedModal({
 
   if (!isOpen) return null;
 
+  /**
+   * Copies the stream URL to the clipboard or invokes the native Web Share
+   * API when available. Delegates all clipboard and share logic to the
+   * shared {@link useClipboard} hook so that copy, share, status feedback,
+   * and environment feature detection are handled consistently.
+   *
+   * - Web Share API (mobile / supported browsers): opens the native
+   *   share sheet. Falls back to clipboard copy when the user cancels or
+   *   the API is unsupported.
+   * - Clipboard: uses {@link useClipboard.copy} which prefers the async
+   *   Clipboard API and falls back to {@code document.execCommand("copy")}
+   *   in older or insecure contexts.
+   * - Announcements are set via {@code setAnnouncement} and cleared with
+   *   automatic timeouts.
+   */
   const handleShareOrCopy = async () => {
     if (status === "sharing") return;
 

@@ -1,10 +1,14 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StreamCreatedModal from "../StreamCreatedModal";
+import { defaultStreamCreatedModalProps } from "./testUtils";
 
-// Mock the CSS module
-vi.mock("../StreamCreatedModal.module.css", () => {
-  return {
+/**
+ * CSS module mock must be hoisted so vitest can resolve it before the
+ * hoisted vi.mock call tries to reference the imported value.
+ */
+const { mockCss } = vi.hoisted(() => ({
+  mockCss: {
     default: {
       overlay: "overlay",
       modal: "modal",
@@ -40,17 +44,13 @@ vi.mock("../StreamCreatedModal.module.css", () => {
       btnSecondary: "btnSecondary",
       btnPrimary: "btnPrimary",
     },
-  };
-});
+  },
+}));
+
+vi.mock("../StreamCreatedModal.module.css", () => mockCss);
 
 describe("StreamCreatedModal", () => {
-  const defaultProps = {
-    isOpen: true,
-    onClose: vi.fn(),
-    streamId: "STR-123",
-    streamUrl: "https://fluxora.io/stream/STR-123",
-    onCreateAnother: vi.fn(),
-  };
+  const defaultProps = { ...defaultStreamCreatedModalProps };
 
   beforeEach(() => {
     vi.clearAllMocks();
