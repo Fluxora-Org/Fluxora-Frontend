@@ -69,7 +69,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^active$/i);
+    const badge = await screen.findByText(/^active$/i, { selector: 'span' });
     expect(badge).toBeInTheDocument();
     // The badge must use the semantic success token, not a hardcoded colour.
     expect(badge.getAttribute("style")).toContain("var(--color-success-bg)");
@@ -82,7 +82,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^paused$/i);
+    const badge = await screen.findByText(/^paused$/i, { selector: 'span' });
     expect(badge).toBeInTheDocument();
     expect(badge.getAttribute("style")).toContain("var(--color-warning-bg)");
   });
@@ -95,7 +95,7 @@ describe("RecipientStreams — status badge rendering", () => {
       />,
     );
     // 'Completed' lowercases to !== 'active' so the warning-bg branch applies.
-    const badge = await screen.findByText(/^Completed$/);
+    const badge = await screen.findByText(/^Completed$/, { selector: 'span' });
     expect(badge).toBeInTheDocument();
     expect(badge.getAttribute("style")).toContain("var(--color-warning-bg)");
   });
@@ -108,7 +108,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^Active$/);
+    const badge = await screen.findByText(/^Active$/, { selector: 'span' });
     expect(badge.getAttribute("style")).toContain("var(--color-success-bg)");
   });
 });

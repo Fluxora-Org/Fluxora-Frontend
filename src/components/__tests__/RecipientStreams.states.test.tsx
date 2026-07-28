@@ -23,6 +23,14 @@ const sampleStream: Stream = {
   isPinned: false,
 };
 
+const pausedStream: Stream = {
+  id: "stream-2",
+  sender: "GBX...123",
+  amount: "500",
+  status: "paused",
+  isPinned: false,
+};
+
 function renderWith(fetchStreamsFn: () => Promise<Stream[]>) {
   return render(
     <RecipientStreams fetchStreamsFn={fetchStreamsFn} pollIntervalMs={0} />,
@@ -233,4 +241,66 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
       expect(fetchStreamsFn.mock.calls.length).toBe(callsBefore);
     },
   );
+
+  describe("Stream Filters", () => {
+    it("filters streams by status when clicking filter buttons", async () => {
+      const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream, pausedStream]);
+      renderWith(fetchStreamsFn);
+      
+      const amountActive = new RegExp(`${String(sampleStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
+      const amountPaused = new RegExp(`${String(pausedStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
+      
+      // Wait for both streams to render initially
+      await waitFor(() => {
+        expect(screen.getByText(amountActive)).toBeInTheDocument();
+        expect(screen.getByText(amountPaused)).toBeInTheDocument();
+      });
+
+      // Click "Active" filter
+      const activeFilter = screen.getByRole("button", { name: "Active" });
+      await userEvent.click(activeFilter);
+      
+      expect(screen.getByText(amountActive)).toBeInTheDocument();
+      expect(screen.queryByText(amountPaused)).not.toBeInTheDocument();
+
+      // Click "Paused" filter
+      const pausedFilter = screen.getByRole("button", { name: "Paused" });
+      await userEvent.click(pausedFilter);
+      
+      expect(screen.queryByText(amountActive)).not.toBeInTheDocument();
+      expect(screen.getByText(amountPaused)).toBeInTheDocument();
+      
+      // Click "All" filter
+      const allFilter = screen.getByRole("button", { name: "All" });
+      await userEvent.click(allFilter);
+      
+      expect(screen.getByText(amountActive)).toBeInTheDocument();
+      expect(screen.getByText(amountPaused)).toBeInTheDocument();
+    });
+
+    it("displays specific empty state when a filter returns no streams and allows clearing filters", async () => {
+      const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream]);
+      renderWith(fetchStreamsFn);
+      
+      const amountActive = new RegExp(`${String(sampleStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
+      await waitFor(() => expect(screen.getByText(amountActive)).toBeInTheDocument());
+
+      // Click "Paused" filter which should yield no results
+      const pausedFilter = screen.getByRole("button", { name: "Paused" });
+      await userEvent.click(pausedFilter);
+      
+      // The stream is hidden and the empty state is shown
+      expect(screen.queryByText(amountActive)).not.toBeInTheDocument();
+      expect(screen.getByText("No paused streams found.")).toBeInTheDocument();
+
+      // Click "Clear Filters"
+      const clearBtn = screen.getByRole("button", { name: "Clear Filters" });
+      await userEvent.click(clearBtn);
+
+      // The active stream should reappear and "All" should be selected
+      expect(screen.queryByText("No paused streams found.")).not.toBeInTheDocument();
+      expect(screen.getByText(amountActive)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    });
+  });
 });
