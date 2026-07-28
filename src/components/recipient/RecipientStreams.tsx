@@ -297,8 +297,9 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
               <button
                 key={status}
                 onClick={() => setFilter(status)}
+                disabled={isRefreshing || isRetrying}
                 aria-pressed={filter === status}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
                   filter === status
                     ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
                     : "bg-transparent text-gray-600 border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-800"
@@ -416,7 +417,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           </p>
           <button
             onClick={() => setFilter("All")}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            disabled={isRefreshing || isRetrying}
+            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Clear Filters
           </button>
@@ -461,7 +463,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 </span>
                 <button
                   onClick={() => togglePin(stream.id)}
-                  className="hover:text-yellow-500"
+                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
                   style={{ color: "var(--color-text-tertiary)" }}
                   aria-label="Pin stream"
                 >

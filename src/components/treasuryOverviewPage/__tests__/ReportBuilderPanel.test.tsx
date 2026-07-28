@@ -298,6 +298,37 @@ describe("ReportBuilderPanel", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("includes streams without startDate regardless of date filter", () => {
+    const streamsWithMissingDates: Stream[] = [
+      ...fixtureStreams,
+      {
+        id: "4",
+        name: "Stream No Date",
+        recipient: "GCCCCC",
+        rate: "75 USDC",
+        status: "Active",
+      },
+    ];
+    renderPanel(streamsWithMissingDates);
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2027-01-01" } });
+    expect(screen.getByText("Stream No Date")).toBeInTheDocument();
+    expect(screen.queryByText("Stream Alpha")).not.toBeInTheDocument();
+  });
+
+  it("sets aria-describedby on date inputs when date error is present", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-06-15" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-06-10" } });
+    expect(screen.getByLabelText("Start Date")).toHaveAttribute("aria-describedby", "date-error");
+    expect(screen.getByLabelText("End Date")).toHaveAttribute("aria-describedby", "date-error");
+  });
+
+  it("does not set aria-describedby on date inputs when no error", () => {
+    renderPanel();
+    expect(screen.getByLabelText("Start Date")).not.toHaveAttribute("aria-describedby");
+    expect(screen.getByLabelText("End Date")).not.toHaveAttribute("aria-describedby");
+  });
+
   // ── Real export trigger path ──────────────────────────────────────────
 
   it("exports CSV with the date-filtered streams, selected fields, and grouping", () => {
@@ -381,6 +412,52 @@ describe("ReportBuilderPanel", () => {
     expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Retry Export/i }));
     expect(screen.queryByRole("button", { name: /Retry Export/i })).not.toBeInTheDocument();
+  });
+
+  it("shows retry button again when retry fails", () => {
+    vi.mocked(downloadReportCSV)
+      .mockImplementationOnce(() => {
+        throw new Error("Export failed");
+      })
+      .mockImplementationOnce(() => {
+        throw new Error("Retry also failed");
+      });
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+    expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Retry Export/i }));
+    expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
+    expect(addToast).toHaveBeenCalledWith("Failed to export report. Please try again.", "error");
+  });
+
+  it("export succeeds with empty streams array", () => {
+    const { onClose } = renderPanel([]);
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+    expect(downloadReportCSV).toHaveBeenCalledWith([], expect.any(Array), "None");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders an aria-live region for export status announcements", () => {
+    renderPanel();
+    const liveRegion = document.querySelector('[aria-live="polite"]');
+    expect(liveRegion).toBeInTheDocument();
+    expect(liveRegion).toHaveClass("sr-only");
+  });
+
+  it("displays accrued amount as dash when value is undefined", () => {
+    const streamsWithUndefinedAccrued: Stream[] = [
+      {
+        id: "5",
+        name: "Stream No Accrued",
+        recipient: "GDDDDD",
+        rate: "30 USDC",
+        status: "Active",
+        startDate: "2026-02-01",
+      },
+    ];
+    renderPanel(streamsWithUndefinedAccrued);
+    fireEvent.click(screen.getByLabelText("Accrued Amount"));
+    expect(screen.getByText("-")).toBeInTheDocument();
   });
 
   // ── ARIA attributes ───────────────────────────────────────────────────

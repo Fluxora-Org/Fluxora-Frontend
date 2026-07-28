@@ -318,6 +318,36 @@ describe("RecipientStreams — keyboard accessibility", () => {
     const pinBtn = await screen.findByRole("button", { name: /pin stream/i });
     expect(pinBtn).toHaveAttribute("aria-label", "Pin stream");
   });
+
+  it("filter buttons are disabled during refresh operations", async () => {
+    // Need a deferred fetch to keep it "in flight"
+    const deferreds: { resolve: (v: Stream[]) => void }[] = [];
+    const fetchFn = vi.fn().mockImplementation(() => {
+      return new Promise<Stream[]>((resolve) => deferreds.push({ resolve }));
+    });
+    
+    render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
+    
+    // Initial fetch is in flight, so buttons shouldn't even render if streams are empty.
+    // So let's provide streams externally while internal is refreshing, or resolve initial
+    // then trigger a refresh.
+    deferreds[0].resolve([activeStream]);
+    
+    const activeBtn = await screen.findByRole("button", { name: "Active" });
+    expect(activeBtn).not.toBeDisabled();
+    
+    // Trigger refresh
+    const refreshBtn = screen.getByRole("button", { name: /refresh status/i });
+    await userEvent.click(refreshBtn);
+    
+    // While refresh is in flight, filter buttons should be disabled
+    expect(activeBtn).toBeDisabled();
+    
+    // Resolve refresh
+    deferreds[1].resolve([activeStream]);
+    
+    await waitFor(() => expect(activeBtn).not.toBeDisabled());
+  });
 });
 
 // ─── 7. Loading skeleton ARIA ──────────────────────────────────────────────────

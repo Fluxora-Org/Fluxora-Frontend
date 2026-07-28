@@ -201,6 +201,9 @@ export default function MetricCard({
           <div style={{ position: "relative" }}>
             <button
               className="keyboard-move-btn"
+              aria-label={`Move ${label} widget`}
+              aria-haspopup="menu"
+              aria-expanded={isMoveMenuOpen}
               onClick={(e) => {
                 e.stopPropagation();
                 setIsMoveMenuOpen(!isMoveMenuOpen);

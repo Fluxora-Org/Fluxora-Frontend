@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import ConnectWalletModal from "../ConnectWalletModal";
+import ConnectWalletModal, { type ConnectWalletModalProps } from "../ConnectWalletModal";
 import { getNetwork } from "@stellar/freighter-api";
 import { BREAKPOINT_MD, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../../lib/breakpoints";
 vi.mock("@stellar/freighter-api", () => {
@@ -675,5 +675,113 @@ describe("ConnectWalletModal — mobile detection via shared breakpoint helper (
     act(() => {
       vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Copy stability tests (issue #1156) — ensure copy is deterministic across
+// refreshes, rerenders, and state transitions.
+// ---------------------------------------------------------------------------
+
+describe("ConnectWalletModal — copy stability", () => {
+  it("renders the same default view title and description text after a rerender", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal isOpen={true} onClose={onClose} />
+    );
+
+    const titleBefore = screen.getByText("Choose your wallet");
+    const subtitleBefore = screen.getByText(
+      /Select a provider below to connect/
+    );
+
+    rerender(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    const titleAfter = screen.getByText("Choose your wallet");
+    const subtitleAfter = screen.getByText(
+      /Select a provider below to connect/
+    );
+
+    expect(titleBefore.textContent).toBe(titleAfter.textContent);
+    expect(subtitleBefore.textContent).toBe(subtitleAfter.textContent);
+  });
+
+  it("preserves exact error state copy on rerender", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={onClose}
+        errorState="network_mismatch"
+      />
+    );
+
+    const titleBefore = screen.getByText("Wrong Stellar Network");
+    rerender(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={onClose}
+        errorState="network_mismatch"
+      />
+    );
+    const titleAfter = screen.getByText("Wrong Stellar Network");
+
+    expect(titleBefore.textContent).toBe(titleAfter.textContent);
+  });
+
+it("preserves exact heading copy on rerender for all error states", () => {
+    const errorStates: Array<NonNullable<ConnectWalletModalProps["errorState"]>> = [
+      "not_installed",
+      "rejected",
+      "network_mismatch",
+      "network_timeout",
+      "device-searching",
+      "device-found-selecting",
+      "awaiting-device-confirmation",
+      "device-locked-error",
+      "wrong-app-error",
+      "unplugged-error",
+      "mobile-unsupported",
+    ];
+
+    const onClose = vi.fn();
+
+    for (const state of errorStates) {
+      const { rerender } = render(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState={state} />
+      );
+
+      const heading = screen.getByRole("heading", { level: 2 });
+
+      rerender(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState={state} />
+      );
+
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        heading.textContent
+      );
+
+      cleanup();
+    }
+  });
+
+  it("does not change the wallet list copy when the modal re-renders due to hover state change", async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />
+    );
+
+    const freighterTextBefore = screen.getAllByText("Freighter")[0].textContent;
+    const albedoTextBefore = screen.getAllByText("Albedo")[0].textContent;
+
+    // Trigger a hover on the Freighter option to change internal state
+    const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+    fireEvent.mouseEnter(freighterBtn);
+
+    const freighterTextAfter = screen.getAllByText("Freighter")[0].textContent;
+    const albedoTextAfter = screen.getAllByText("Albedo")[0].textContent;
+
+    expect(freighterTextBefore).toBe(freighterTextAfter);
+    expect(albedoTextBefore).toBe(albedoTextAfter);
   });
 });
