@@ -17,10 +17,11 @@
  * <Input label="Password" type="password" required disabled />
  */
 
-import type {
-  InputHTMLAttributes,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
+import {
+  useId,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
 import styles from "./Input.module.css";
 import { ValidationMessage } from "./ValidationMessage";
@@ -82,8 +83,9 @@ export default function Input({
   placeholder,
   ...props
 }: InputProps) {
+  const generatedId = useId();
   // Generate ID if not provided
-  const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+  const inputId = id ?? generatedId;
 
   // Determine if input has error
   const hasError = Boolean(error);
