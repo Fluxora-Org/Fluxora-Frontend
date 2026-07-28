@@ -64,7 +64,7 @@ export default function ThemeSegmentedControl() {
                 : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] bg-transparent"
             }`}
           >
-            <Icon className="icon-xs" aria-hidden="true" />
+            <Icon className="icon-sm" aria-hidden="true" />
             <span className="sr-only md:not-sr-only font-sans text-xs font-semibold">
               {opt.label}
             </span>
