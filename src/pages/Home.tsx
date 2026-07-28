@@ -69,37 +69,43 @@ function LazySection({ children, label }: LazySectionProps) {
 
 export default function Home() {
   const { theme } = useTheme();
-  const [isMobileLayout, setIsMobileLayout] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return isMobileViewport();
-  });
+  // Initialise synchronously from the live viewport so the very first render
+  // already uses the correct layout tier. Falls back to `false` (desktop) in
+  // non-browser / SSR environments so the component is still renderable.
+  const [isMobileLayout, setIsMobileLayout] = useState<boolean>(() =>
+    typeof window !== "undefined" ? isMobileViewport() : false,
+  );
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    // Skip the listener entirely in non-browser environments (SSR / tests that
+    // do not expose `window`).
+    if (typeof window === "undefined") return;
 
     let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
 
+    // Debounced handler — collapses rapid resize / orientationchange events
+    // into a single state update so re-renders are kept to a minimum.
     const handleResize = () => {
-      if (timeoutId) {
+      if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
-
       timeoutId = window.setTimeout(() => {
+        timeoutId = undefined;
         setIsMobileLayout(isMobileViewport());
       }, VIEWPORT_RESIZE_DEBOUNCE_MS);
     };
 
-    handleResize();
+    // orientationchange fires on mobile before innerWidth has updated, so we
+    // listen to both events and let the debounce coalesce them into one read.
     window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      if (timeoutId) {
+      window.removeEventListener("orientationchange", handleResize);
+      // Cancel any in-flight debounce so unmounting components can never
+      // trigger a state update on an already-unmounted tree.
+      if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
     };
