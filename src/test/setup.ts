@@ -55,6 +55,75 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
+if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => ({
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arcTo: vi.fn(),
+      closePath: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      strokeStyle: '',
+      fillStyle: '',
+      lineWidth: 1,
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+    } as unknown as CanvasRenderingContext2D)),
+  });
+
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => 'data:image/png;base64,placeholder'),
+  });
+}
+
+// Mock localStorage and sessionStorage for jsdom tests. The guard keeps this
+// block side-effect free in pure node environments (e.g. `.test.ts` files that
+// opt out of jsdom via `// @vitest-environment node`) so loading the setup
+// file never throws `ReferenceError: window is not defined`.
+const createStorageMock = () => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value.toString(); }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+    key: vi.fn((index: number) => Object.keys(store)[index] || null),
+    length: 0,
+  } as unknown as Storage;
+};
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+}
+
+// jsdom 26 does not implement Blob.prototype.text / File.prototype.text
+// (added to the spec in 2022), so we polyfill it using FileReader.
+if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
+  Blob.prototype.text = function () {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
+
 afterEach(() => {
   cleanup();
 });

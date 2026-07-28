@@ -1,59 +1,72 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StreamCreatedModal from "../StreamCreatedModal";
+import {
+  defaultStreamCreatedModalProps,
+  setClipboard,
+  setShare,
+} from "./testUtils";
 
-vi.mock("../StreamCreatedModal.module.css", () => ({
-  default: {
-    overlay: "overlay",
-    modal: "modal",
-    closeButton: "closeButton",
-    successIconWrapper: "successIconWrapper",
-    successIconImg: "successIconImg",
-    title: "title",
-    description: "description",
-    streamInfoCard: "streamInfoCard",
-    streamIdRow: "streamIdRow",
-    streamIdLabel: "streamIdLabel",
-    streamIdValue: "streamIdValue",
-    urlContainer: "urlContainer",
-    urlBar: "urlBar",
-    copyButton: "copyButton",
-    copied: "copied",
-    nextStepsBox: "nextStepsBox",
-    nextStepsText: "nextStepsText",
-    nextStepsTitle: "nextStepsTitle",
-    actions: "actions",
-    btn: "btn",
-    btnSecondary: "btnSecondary",
-    btnPrimary: "btnPrimary",
+/**
+ * CSS module mock must be hoisted so vitest can resolve it before the
+ * hoisted vi.mock call tries to reference the imported value.
+ */
+const { mockCss } = vi.hoisted(() => ({
+  mockCss: {
+    default: {
+      overlay: "overlay",
+      modal: "modal",
+      closeButton: "closeButton",
+      successIconWrapper: "successIconWrapper",
+      successIconImg: "successIconImg",
+      title: "title",
+      description: "description",
+      streamInfoCard: "streamInfoCard",
+      streamIdRow: "streamIdRow",
+      streamIdLabel: "streamIdLabel",
+      streamIdValue: "streamIdValue",
+      urlContainer: "urlContainer",
+      urlBar: "urlBar",
+      copyButton: "copyButton",
+      copied: "copied",
+      nextStepsBox: "nextStepsBox",
+      nextStepsText: "nextStepsText",
+      nextStepsTitle: "nextStepsTitle",
+      shareSection: "shareSection",
+      shareSectionTitle: "shareSectionTitle",
+      shareGroup: "shareGroup",
+      shareButton: "shareButton",
+      shareButtonActive: "shareButtonActive",
+      sharePreviewCard: "sharePreviewCard",
+      sharePreviewHeader: "sharePreviewHeader",
+      sharePreviewLabel: "sharePreviewLabel",
+      sharePreviewBody: "sharePreviewBody",
+      shareConnectState: "shareConnectState",
+      shareStatusBadge: "shareStatusBadge",
+      actions: "actions",
+      btn: "btn",
+      btnSecondary: "btnSecondary",
+      btnPrimary: "btnPrimary",
+    },
   },
 }));
 
+vi.mock("../StreamCreatedModal.module.css", () => mockCss);
+
 const STREAM_URL = "https://fluxora.io/stream/STR-123";
 
-const defaultProps = {
-  isOpen: true,
-  onClose: vi.fn(),
-  streamId: "STR-123",
-  streamUrl: STREAM_URL,
-  onCreateAnother: vi.fn(),
-};
-
-function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: writeText ? { writeText } : undefined,
-  });
-}
+const defaultProps = { ...defaultStreamCreatedModalProps };
 
 describe("StreamCreatedModal copy button", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setShare(undefined);
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    setShare(undefined);
   });
 
   it("sets copied state only after clipboard write resolves and resets after 2000ms", async () => {
@@ -79,6 +92,26 @@ describe("StreamCreatedModal copy button", () => {
     });
 
     expect(copyBtn).not.toHaveClass("copied");
+  });
+
+  it("uses the Web Share API when available for stream links", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    setShare(share);
+    setClipboard(undefined);
+
+    render(<StreamCreatedModal {...defaultProps} />);
+    const shareBtn = screen.getByRole("button", { name: /share stream url/i });
+
+    fireEvent.click(shareBtn);
+
+    await waitFor(() =>
+      expect(share).toHaveBeenCalledWith({
+        title: "Stream created",
+        text: "View my Stellar stream and withdraw funds.",
+        url: STREAM_URL,
+      }),
+    );
+    expect(screen.getByText("Stream URL shared")).toBeInTheDocument();
   });
 
   it("announces failure when clipboard write rejects and does not show copied state", async () => {
@@ -191,6 +224,6 @@ describe("StreamCreatedModal copy button", () => {
     setClipboard(undefined);
     render(<StreamCreatedModal {...defaultProps} />);
 
-    expect(screen.getByText(STREAM_URL)).toBeInTheDocument();
+    expect(screen.getAllByText(STREAM_URL).length).toBeGreaterThan(0);
   });
 });

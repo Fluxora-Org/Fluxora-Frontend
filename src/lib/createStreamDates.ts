@@ -7,6 +7,8 @@
  * Duration is expressed in months (matching the UI's "stream duration" field).
  */
 
+import { createDateTimeFormat } from "./formatters";
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Approximate milliseconds in one calendar month (30 days). */
 const MS_PER_MONTH = 30 * MS_PER_DAY;
@@ -81,5 +83,13 @@ export function isBeforeLocalDateTime(
 /** Formats a local datetime string for the review step without changing zones. */
 export function formatLocalDateTime(value: string): string {
   const parsed = parseLocalDateTime(value);
-  return parsed ? parsed.toLocaleString() : "-";
+  return parsed
+    ? createDateTimeFormat({
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+      }).format(parsed)
+    : "-";
 }

@@ -1,7 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { axe } from "vitest-axe";
 
 // Recipient gates the withdraw flow on a connected wallet on the matching
 // network. The global test setup stubs the wallet as disconnected, so provide a
@@ -159,3 +159,70 @@ describe("Recipient page accessibility", () => {
     expect(within(summary).getByText(/22,600 usdc/i)).toBeInTheDocument();
   });
 });
+
+describe("Recipient page empty state", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders RecipientEmptyState component when wallet is disconnected", async () => {
+    mockWalletState.connected = false;
+    render(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Connect wallet" })
+    ).toBeInTheDocument();
+
+    // Reset back for other test blocks
+    mockWalletState.connected = true;
+  });
+});
+
+describe("Recipient large-amount formatting", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function renderLoadedRecipient() {
+    const view = render(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    return view;
+  }
+
+  it("renders large safe integer balances via formatAssetAmount", async () => {
+    await renderLoadedRecipient();
+
+    // DEMO_BALANCE = 22600, DEMO_TOTAL_ACCRUED = 43250, DEMO_TOTAL_WITHDRAWN = 20650
+    expect(screen.getByText("22,600 USDC")).toBeInTheDocument();
+    expect(screen.getByText("43,250 USDC")).toBeInTheDocument();
+    expect(screen.getByText("20,650 USDC")).toBeInTheDocument();
+  });
+});
+

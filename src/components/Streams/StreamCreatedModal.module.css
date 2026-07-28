@@ -10,6 +10,68 @@
   padding: 1rem;
 }
 
+.cyberpunkSkin {
+  --cyber-bg: #070b12;
+  --cyber-panel: #101827;
+  --cyber-panel-raised: #152238;
+  --cyber-border: #31506b;
+  --cyber-text: #f4f7ff;
+  --cyber-text-secondary: #b4bfd1;
+  --cyber-cyan: #65f6ff;
+  --cyber-green: #62ffc9;
+  --cyber-yellow: #ffe66d;
+  background: rgba(3, 6, 11, 0.88);
+}
+
+.cyberpunkSkin::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(101, 246, 255, 0.045) 4px);
+}
+
+.cyberpunkSkin .modal {
+  background: var(--cyber-bg);
+  border-color: var(--cyber-border);
+  box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 28px rgba(101, 246, 255, 0.2), 0 20px 40px rgba(0, 0, 0, 0.55);
+}
+
+.cyberpunkSkin .title { color: var(--cyber-text); text-shadow: 0 0 16px rgba(101, 246, 255, 0.35); }
+.cyberpunkSkin .description { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .streamInfoCard { background: var(--cyber-panel); border-color: var(--cyber-border); }
+.cyberpunkSkin .streamIdLabel, .cyberpunkSkin .urlBar { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .streamIdValue { color: var(--cyber-cyan); text-shadow: 0 0 12px rgba(101, 246, 255, 0.4); }
+.cyberpunkSkin .urlBar { background: var(--cyber-bg); border-color: var(--cyber-border); }
+.cyberpunkSkin .copyButton { background: var(--cyber-panel-raised); color: var(--cyber-cyan); }
+.cyberpunkSkin .copyButton:hover { background: var(--cyber-border); }
+.cyberpunkSkin .copyButton.copied { background: var(--cyber-green); color: var(--cyber-bg); }
+.cyberpunkSkin .nextStepsBox { background: var(--cyber-panel); border: 1px solid var(--cyber-border); }
+.cyberpunkSkin .nextStepsTitle { color: var(--cyber-yellow); }
+.cyberpunkSkin .nextStepsText { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .btnSecondary { background: var(--cyber-panel-raised); color: var(--cyber-text); border: 1px solid var(--cyber-border); }
+.cyberpunkSkin .btnSecondary:hover { background: var(--cyber-border); }
+.cyberpunkSkin .btnPrimary { background: var(--cyber-cyan); color: var(--cyber-bg); box-shadow: 0 0 16px rgba(101, 246, 255, 0.35); }
+.cyberpunkSkin .btnPrimary:hover { background: var(--cyber-green); }
+.cyberpunkSkin .closeButton { color: var(--cyber-text-secondary); }
+.cyberpunkSkin .closeButton:hover { color: var(--cyber-text); background: rgba(101, 246, 255, 0.1); }
+.cyberpunkSkin .fallbackLink { color: var(--cyber-cyan); }
+.cyberpunkSkin .fallbackLink:hover { color: var(--cyber-green); }
+
+.cyberpunkSkin :is(button, a):focus-visible {
+  outline-color: var(--cyber-yellow);
+  box-shadow: 0 0 0 2px var(--cyber-bg), 0 0 0 4px var(--cyber-yellow);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cyberpunkSkin .modal { animation: cyberpunkGlow 4s ease-in-out infinite alternate; }
+}
+
+@keyframes cyberpunkGlow {
+  from { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 22px rgba(101, 246, 255, 0.16), 0 20px 40px rgba(0, 0, 0, 0.55); }
+  to { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.28), 0 0 34px rgba(255, 117, 216, 0.22), 0 20px 40px rgba(0, 0, 0, 0.55); }
+}
+
 .modal {
   background: #0d1421;
   border: 1px solid #1e2d42;
@@ -152,6 +214,11 @@
   background: #2a3d58;
 }
 
+.copyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #0d1421, 0 0 0 4px #00b8d4;
+}
+
 .copyButton.copied {
   background: #00d4aa;
   color: #ffffff;
@@ -177,6 +244,88 @@
   color: #8ec5ff;
   font-size: 0.875rem;
   line-height: 1.5;
+}
+
+.shareSection {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.shareSectionTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.75rem;
+}
+
+.shareGroup {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.shareButton {
+  flex: 1;
+  padding: 0.75rem 0.875rem;
+  border-radius: 10px;
+  border: 1px solid #2a3d58;
+  background: #141e30;
+  color: #e8ecf4;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shareButton:hover,
+.shareButton:focus-visible {
+  border-color: #00b8d4;
+  outline: none;
+}
+
+.shareButtonActive {
+  background: rgba(0, 184, 212, 0.18);
+  border-color: #00b8d4;
+}
+
+.sharePreviewCard {
+  border: 1px solid #1e2d42;
+  border-radius: 12px;
+  background: #0d1421;
+  padding: 0.9rem;
+}
+
+.sharePreviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sharePreviewLabel {
+  color: #6b7a94;
+  font-size: 0.825rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shareStatusBadge {
+  color: #8ec5ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sharePreviewBody {
+  color: #e8ecf4;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.shareConnectState {
+  margin-top: 0.75rem;
+  color: #99a1af;
+  font-size: 0.8125rem;
 }
 
 .actions {
@@ -222,6 +371,9 @@
   .modal {
     padding: 1.5rem;
   }
+  .shareGroup {
+    flex-direction: column;
+  }
   .actions {
     flex-direction: column;
   }
@@ -252,3 +404,15 @@
   color: #93c5fd;
 }
 
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

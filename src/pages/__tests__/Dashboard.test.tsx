@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ONBOARDING_DISMISSED_STORAGE_KEY } from "../../lib/onboarding";
@@ -9,14 +10,16 @@ vi.mock("@stellar/freighter-api", () => ({
   getAddress: vi.fn(),
 }));
 
+const mockUseTreasury = vi.fn(() => ({
+  metrics: [],
+  streams: [],
+  loading: false,
+  error: null,
+  refetch: vi.fn(),
+}));
+
 vi.mock("../../components/treasuryOverviewPage/useTreasury", () => ({
-  useTreasury: () => ({
-    metrics: [],
-    streams: [],
-    loading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  useTreasury: () => mockUseTreasury(),
   useRecipientStreams: () => ({
     streams: [],
     loading: false,
@@ -33,10 +36,15 @@ describe("Dashboard page accessibility and announcements", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   async function renderLoadedDashboard() {
-    const view = render(<Dashboard />);
+    const view = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -78,6 +86,22 @@ describe("Dashboard page accessibility and announcements", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders the Total Streaming figure as the sum of active streams depositAmount", async () => {
+    mockUseTreasury.mockReturnValue({
+      metrics: [],
+      streams: [
+        { status: "Active", depositAmount: 10000 },
+        { status: "Active", depositAmount: 25000 },
+        { status: "Paused", depositAmount: 5000 },
+      ] as any,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    await renderLoadedDashboard();
+    expect(screen.getByText("35,000.00 USDC")).toBeInTheDocument();
+  });
+
   it("uses the shared onboarding dismissal key across onboarding and dashboard rendering", async () => {
     const firstRender = await renderLoadedDashboard();
 
@@ -105,7 +129,11 @@ describe("Dashboard page accessibility - landmarks and heading hierarchy", () =>
   });
 
   async function renderLoadedDashboard() {
-    const view = render(<Dashboard />);
+    const view = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -155,6 +183,23 @@ describe("Dashboard page accessibility - landmarks and heading hierarchy", () =>
         expect(currentLevel - previousLevel).toBeLessThanOrEqual(1);
       }
     }
+  });
+
+  it("renders large safe integer amounts via formatters instead of bare toLocaleString", async () => {
+    // Override wallet to be connected so withdrawable is non-null and
+    // the announcement uses formatAssetAmount.
+    mockUseTreasury.mockReturnValue({
+      metrics: [],
+      streams: [
+        { status: "Active", depositAmount: Number.MAX_SAFE_INTEGER },
+      ] as any,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    await renderLoadedDashboard();
+    // Total Streaming card uses the useMemo-derived value formatted via formatUsdc
+    expect(screen.getByText(/9,007,199,254,740,991/)).toBeInTheDocument();
   });
 
   it("passes automated accessibility checks for landmark structure", async () => {

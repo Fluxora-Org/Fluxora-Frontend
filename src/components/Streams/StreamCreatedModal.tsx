@@ -2,6 +2,10 @@ import { useRef, useState, useEffect } from "react";
 import styles from "./StreamCreatedModal.module.css";
 import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
+import { useOptionalTheme } from "../../theme/ThemeProvider";
+import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview";
+import { useClipboard } from "../../hooks/useClipboard";
+import { config } from "../../lib/config";
 
 interface StreamCreatedModalProps {
   isOpen: boolean;
@@ -9,6 +13,11 @@ interface StreamCreatedModalProps {
   streamId: string;
   streamUrl: string;
   onCreateAnother: () => void;
+  txHash?: string;
+  amount?: string;
+  rate?: string;
+  sender?: string;
+  recipient?: string;
 }
 
 export default function StreamCreatedModal({
@@ -17,8 +26,14 @@ export default function StreamCreatedModal({
   streamId,
   streamUrl,
   onCreateAnother,
+  txHash,
+  amount = "10,000.00 USDC",
+  rate = "0.0261 USDC/sec",
+  sender = "GAB...TREASURY",
+  recipient = "GCD...RECIPIENT",
 }: StreamCreatedModalProps) {
-  const [copied, setCopied] = useState(false);
+  const { theme } = useOptionalTheme();
+  const { copy, share, status, support } = useClipboard();
   const [announcement, setAnnouncement] = useState("");
   const [isPopupBlocked, setIsPopupBlocked] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -42,54 +57,49 @@ export default function StreamCreatedModal({
 
   if (!isOpen) return null;
 
-  const fallbackCopy = (): boolean => {
-    const textarea = document.createElement("textarea");
-    textarea.value = streamUrl;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-
-    try {
-      return document.execCommand("copy");
-    } finally {
-      document.body.removeChild(textarea);
-    }
-  };
-
-  const writeToClipboard = async (): Promise<boolean> => {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(streamUrl);
-      return true;
-    }
-
-    return fallbackCopy();
-  };
-
   /**
-   * Copies the stream URL to the clipboard and toggles the copied visual state on success.
+   * Copies the stream URL to the clipboard or invokes the native Web Share
+   * API when available. Delegates all clipboard and share logic to the
+   * shared {@link useClipboard} hook so that copy, share, status feedback,
+   * and environment feature detection are handled consistently.
    *
-   * Uses the async Clipboard API when available. In insecure contexts where
-   * `navigator.clipboard` is undefined, falls back to a temporary textarea
-   * with `document.execCommand("copy")`. The URL bar remains visible and
-   * selectable as a manual fallback.
-   *
-   * On failure (permission denied or fallback copy failure), announces an
-   * accessible error via the modal's aria-live region without logging the URL.
-   * The 2s reset timer applies only to the success checkmark state.
+   * - Web Share API (mobile / supported browsers): opens the native
+   *   share sheet. Falls back to clipboard copy when the user cancels or
+   *   the API is unsupported.
+   * - Clipboard: uses {@link useClipboard.copy} which prefers the async
+   *   Clipboard API and falls back to {@code document.execCommand("copy")}
+   *   in older or insecure contexts.
+   * - Announcements are set via {@code setAnnouncement} and cleared with
+   *   automatic timeouts.
    */
-  const handleCopy = async () => {
-    try {
-      const didCopy = await writeToClipboard();
-      if (!didCopy) {
-        throw new Error("Fallback copy command failed");
+  const handleShareOrCopy = async () => {
+    if (status === "sharing") return;
+
+    if (support.share) {
+      const outcome = await share({
+        title: "Stream created",
+        text: "View my Stellar stream and withdraw funds.",
+        url: streamUrl,
+      });
+
+      if (outcome === "shared") {
+        setAnnouncement("Stream URL shared");
+        setTimeout(() => setAnnouncement(""), 2000);
+        return;
       }
 
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
+      if (outcome === "cancelled") {
+        setAnnouncement("Share cancelled");
+        setTimeout(() => setAnnouncement(""), 2000);
+        return;
+      }
+    }
+
+    const didCopy = await copy(streamUrl);
+    if (didCopy) {
+      setAnnouncement("Stream URL copied");
+      setTimeout(() => setAnnouncement(""), 2000);
+    } else {
       setAnnouncement(
         "Could not copy stream URL. Please select and copy the URL manually.",
       );
@@ -109,7 +119,7 @@ export default function StreamCreatedModal({
         console.error("Invalid URL scheme. Only https is allowed.");
         return;
       }
-    } catch (e) {
+    } catch {
       console.error("Invalid URL provided.");
       return;
     }
@@ -124,7 +134,7 @@ export default function StreamCreatedModal({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={`${styles.overlay}${theme === "cyberpunk" ? ` ${styles.cyberpunkSkin}` : ""}`} onClick={onClose} data-skin={theme === "cyberpunk" ? "cyberpunk" : undefined}>
       <div
         className={styles.modal}
         ref={modalRef}
@@ -185,12 +195,14 @@ export default function StreamCreatedModal({
           <div className={styles.urlContainer}>
             <div className={styles.urlBar}>{streamUrl}</div>
             <button
-              className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
-              onClick={() => void handleCopy()}
+              className={`${styles.copyButton} ${(status === "copied" || status === "shared") ? styles.copied : ""}`}
+              onClick={() => void handleShareOrCopy()}
               type="button"
-              aria-label="Copy stream URL"
+              disabled={status === "sharing"}
+              aria-busy={status === "sharing"}
+              aria-label={`${status === "sharing" ? "Sharing" : (status === "copied" || status === "shared") ? "Copied" : support.share ? "Share" : "Copy"} stream URL`}
             >
-              {copied ? (
+              {(status === "copied" || status === "shared") ? (
                 <svg
                   width="20"
                   height="20"
@@ -202,6 +214,35 @@ export default function StreamCreatedModal({
                   strokeLinejoin="round"
                 >
                   <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              ) : status === "sharing" ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={styles.spinning}
+                >
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="10"></circle>
+                </svg>
+              ) : support.share ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                  <polyline points="16 6 12 2 8 6"></polyline>
+                  <line x1="12" y1="2" x2="12" y2="15"></line>
                 </svg>
               ) : (
                 <svg
@@ -228,6 +269,48 @@ export default function StreamCreatedModal({
             stream link with your recipient. They can view real-time accrual and
             withdraw funds from the Recipient portal.
           </p>
+        </div>
+
+        <div className={styles.shareSection} role="region" aria-label="Share stream">
+          <h3 className={styles.shareSectionTitle}>Share with your team</h3>
+          <div className={styles.shareGroup}>
+            <button type="button" className={styles.shareButton}>
+              Share to Slack
+            </button>
+            <button type="button" className={styles.shareButton}>
+              Share to Teams
+            </button>
+          </div>
+          <div className={styles.sharePreviewCard}>
+            <div className={styles.sharePreviewHeader}>
+              <span className={styles.sharePreviewLabel}>Preview</span>
+              <span className={styles.shareStatusBadge}>Ready to share</span>
+            </div>
+            <p className={styles.sharePreviewBody}>
+              {streamUrl}
+            </p>
+            <p className={styles.shareConnectState}>
+              Share sheet available on supported devices.
+            </p>
+          </div>
+        </div>
+
+        {/* Transaction Receipt Preview & Download Button */}
+        <div className="my-4">
+          <TransactionReceiptPreview
+            data={{
+              streamId,
+              type: "Creation",
+              sender,
+              recipient,
+              amount,
+              rate,
+              timestamp: new Date().toISOString(),
+              txHash: txHash || null,
+              status: txHash ? "confirmed" : "pending",
+              network: config.networkLabel,
+            }}
+          />
         </div>
 
         {isPopupBlocked && (

@@ -18,11 +18,17 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
-        "src/components/ConnectButton.tsx",
+        // Public landing page and its lazy-section infrastructure
+        "src/pages/Home.tsx",
         "src/components/GlowingDot.tsx",
+        "src/components/GetStartedCTA.tsx",
         "src/components/InputField.tsx",
         "src/components/InputWithUnit.tsx",
+        "src/components/NewsletterSection.tsx",
+        "src/components/ZeroAccrualBanner.tsx",
+        "src/components/useModalAccessibility.ts",
         "src/components/navigation/NavLink.tsx",
+        "src/components/navigation/ThemeSegmentedControl.tsx",
         "src/components/RecentStreams.tsx",
         "src/components/StreamsLoading.tsx",
         "src/components/ToastNotification.tsx",
@@ -34,13 +40,44 @@ export default defineConfig({
         "src/components/treasuryOverviewPage/RecentStreams.tsx",
         "src/components/treasuryOverviewPage/StreamRow.tsx",
         "src/components/treasuryOverviewPage/useTreasury.ts",
+        "src/components/wallet-connect/Walletbutton.tsx",
         "src/data/streamRecords.ts",
         "src/fixtures/malformedStreamRecords.ts",
         "src/lib/formatters.ts",
+        "src/lib/config.ts",
+        "src/lib/stellarNetwork.ts",
+        "src/lib/stellar.ts",
+        "src/lib/api/newsletterService.ts",
         "src/lib/recentStreamMapper.ts",
+        "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
+        // Colour-blind simulation module
+        "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
+        "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
+        // Contrast utilities
+        "src/utils/contrastUtils.ts",
+        // Dynamic favicon badge
+        "src/utils/faviconBadge.ts",
+        // Activity Heatmap
+        "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
+        // Treasury flow Sankey diagram
+        "src/components/treasuryOverviewPage/TreasuryFlowSankey.tsx",
+        // Presence feature
+        "src/components/presence/PresenceBadge.tsx",
+        "src/components/presence/PresenceViewerList.tsx",
+        "src/hooks/usePresenceViewers.ts",
+        "src/hooks/useEmbedAccessibility.ts",
+        // CSV bulk-upload feature
+        "src/components/csv-upload/csvParser.ts",
+        "src/components/csv-upload/CsvDropZone.tsx",
+        "src/components/csv-upload/ColumnMappingStep.tsx",
+        "src/components/csv-upload/PreviewValidateStep.tsx",
       ],
-      exclude: ["src/components/**/*.test.tsx", "src/theme/**/__tests__/**"],
+      exclude: [
+        "src/components/**/*.test.tsx",
+        "src/theme/**/__tests__/**",
+        "src/components/colorBlindSimulation/__tests__/**",
+      ],
       thresholds: {
         lines: 95,
         functions: 95,

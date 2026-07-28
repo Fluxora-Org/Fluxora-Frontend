@@ -2,27 +2,49 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import ToastNotification from "../ToastNotification";
-import type { ToastVariant } from "../ToastNotification";
+import ToastNotification, {
+  getStoredToastSoundPreference,
+  isToastSoundPreference,
+  playToastSound,
+  TOAST_SOUND_STORAGE_KEY,
+  type ToastSoundPreference,
+  type ToastVariant,
+} from "../ToastNotification";
 
-export type { ToastVariant };
+export type { ToastVariant, ToastSoundPreference };
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
   timeout: number;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
   /** Add a toast to the queue. Returns the generated id. */
-  addToast: (message: string, variant: ToastVariant, timeout?: number) => string;
+  addToast: (
+    message: string,
+    variant: ToastVariant,
+    timeout?: number,
+    action?: ToastAction,
+  ) => string;
   /** Manually dismiss a toast by id. */
   dismiss: (id: string) => void;
+  /** Current sound preference. */
+  soundPreference: ToastSoundPreference;
+  /** Toggle sound preference between enabled and muted. */
+  toggleSoundPreference: () => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -42,32 +64,122 @@ const DEFAULT_TIMEOUT = 4000;
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [soundPreference, setSoundPreference] = useState<ToastSoundPreference>(
+    getStoredToastSoundPreference,
+  );
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Listen for storage changes across tabs
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === TOAST_SOUND_STORAGE_KEY) {
+        setSoundPreference(
+          isToastSoundPreference(event.newValue) ? event.newValue : "muted",
+        );
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const toggleSoundPreference = useCallback(() => {
+    setSoundPreference((prev) => {
+      const next: ToastSoundPreference = prev === "enabled" ? "muted" : "enabled";
+      try {
+        window.localStorage.setItem(TOAST_SOUND_STORAGE_KEY, next);
+      } catch {
+        // Ignore quota/storage errors
+      }
+      return next;
+    });
+  }, []);
+
   const dismiss = useCallback((id: string) => {
-    clearTimeout(timers.current.get(id));
-    timers.current.delete(id);
+    const timer = timers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timers.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const addToast = useCallback(
-    (message: string, variant: ToastVariant, timeout = DEFAULT_TIMEOUT): string => {
+    (
+      message: string,
+      variant: ToastVariant,
+      timeout = DEFAULT_TIMEOUT,
+      action?: ToastAction,
+    ): string => {
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, variant, timeout }]);
-      const timer = setTimeout(() => dismiss(id), timeout);
-      timers.current.set(id, timer);
+      setToasts((prev) => [...prev, { id, message, variant, timeout, action }]);
+      playToastSound(variant, soundPreference);
       return id;
     },
-    [dismiss],
+    [soundPreference],
   );
 
   const visible = toasts.slice(-MAX_VISIBLE);
   const overflow = toasts.length - MAX_VISIBLE;
 
+  useEffect(() => {
+    const visibleIds = new Set(visible.map((t) => t.id));
+
+    // Clear timers for toasts that are no longer visible
+    for (const [id, timer] of timers.current.entries()) {
+      if (!visibleIds.has(id)) {
+        clearTimeout(timer);
+        timers.current.delete(id);
+      }
+    }
+
+    // Start timers for visible toasts that don't have an active timer
+    for (const toast of visible) {
+      if (!timers.current.has(toast.id)) {
+        const timer = setTimeout(() => dismiss(toast.id), toast.timeout);
+        timers.current.set(toast.id, timer);
+      }
+    }
+  }, [visible, dismiss]);
+
+  useEffect(() => {
+    return () => {
+      for (const timer of timers.current.values()) {
+        clearTimeout(timer);
+      }
+      timers.current.clear();
+    };
+  }, []);
+
   return (
-    <ToastContext.Provider value={{ addToast, dismiss }}>
+    <ToastContext.Provider
+      value={{ addToast, dismiss, soundPreference, toggleSoundPreference }}
+    >
       {children}
       <div className="toast-stack" aria-label="Notifications">
+        <div className="toast-stack__controls">
+          <button
+            type="button"
+            className="toast-stack__sound-toggle"
+            onClick={toggleSoundPreference}
+            aria-label={
+              soundPreference === "enabled"
+                ? "Mute sound alerts"
+                : "Enable sound alerts"
+            }
+          >
+            <span aria-hidden="true">
+              {soundPreference === "enabled" ? "🔊" : "🔇"}
+            </span>
+            {soundPreference === "enabled"
+              ? "Mute sound alerts"
+              : "Enable sound alerts"}
+          </button>
+          <p className="toast-stack__sound-hint">
+            {soundPreference === "enabled"
+              ? "Sound alerts are enabled for this browser."
+              : "Sound alerts are off by default."}
+          </p>
+        </div>
         {overflow > 0 && (
           <div className="toast-stack__overflow" aria-live="polite">
             +{overflow} more notification{overflow > 1 ? "s" : ""}
@@ -79,6 +191,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             message={toast.message}
             variant={toast.variant}
             onClose={() => dismiss(toast.id)}
+            actionLabel={toast.action?.label}
+            onAction={toast.action?.onClick}
           />
         ))}
       </div>

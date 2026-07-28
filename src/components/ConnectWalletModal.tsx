@@ -1,11 +1,12 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
-import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2 } from "lucide-react";
+import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
+import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -32,7 +33,19 @@ interface ConnectWalletModalProps {
   onConnectAlbedo?: () => void;
   onConnectWalletConnect?: () => void;
   // Optional controlled error state to drive the modal view from a parent component
-  errorState?: "not_installed" | "rejected" | "network_mismatch" | "network_timeout" | null;
+  errorState?:
+    | "not_installed"
+    | "rejected"
+    | "network_mismatch"
+    | "network_timeout"
+    | "device-searching"
+    | "device-found-selecting"
+    | "awaiting-device-confirmation"
+    | "device-locked-error"
+    | "wrong-app-error"
+    | "unplugged-error"
+    | "mobile-unsupported"
+    | null;
   // Handler for retrying connection
   onRetryConnection?: () => void;
   // Handler for downloading extension
@@ -69,6 +82,7 @@ export default function ConnectWalletModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const customPathInputRef = useRef<HTMLInputElement>(null);
   
   // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
@@ -80,11 +94,105 @@ export default function ConnectWalletModal({
 
   // Internal error state for uncontrolled usage/simulation
   const [internalErrorState, setInternalErrorState] = useState<
-    "not_installed" | "rejected" | "network_mismatch" | "network_timeout" | null
+    | "not_installed"
+    | "rejected"
+    | "network_mismatch"
+    | "network_timeout"
+    | "device-searching"
+    | "device-found-selecting"
+    | "awaiting-device-confirmation"
+    | "device-locked-error"
+    | "wrong-app-error"
+    | "unplugged-error"
+    | "mobile-unsupported"
+    | null
   >(null);
 
   // Determine active state (controlled prop takes priority over internal state)
   const currentErrorState = errorState !== undefined ? errorState : internalErrorState;
+
+  // Hardware wallet configuration states
+  const [selectedDevice, setSelectedDevice] = useState<"ledger" | "trezor">("ledger");
+  const [derivationPath, setDerivationPath] = useState<string>("m/44'/148'/0'");
+  const [customPath, setCustomPath] = useState<string>("m/44'/148'/0'");
+  const [pathError, setPathError] = useState<string | null>(null);
+
+ const [isMobile, setIsMobile] = useState(() => isMobileViewport());
+  const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
+
+  useEffect(() => {
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+
+    const syncMobileState = () => {
+      const mobile = isMobileViewport();
+      setIsMobile((prev) => (prev === mobile ? prev : mobile));
+    };
+
+    const handleResize = () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(syncMobileState, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(debounceId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+  
+  const handleCustomPathChange = (val: string) => {
+    setCustomPath(val);
+    const regex = /^m\/44'\/148'\/[0-9]+'?$/;
+    if (!regex.test(val)) {
+      setPathError("Invalid Stellar derivation path format (e.g. m/44'/148'/0')");
+    } else {
+      setPathError(null);
+    }
+  };
+
+  useEffect(() => {
+    if (derivationPath === "custom") {
+      const timer = setTimeout(() => {
+        customPathInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [derivationPath]);
+
+  // Simulate desktop scanning transition
+  useEffect(() => {
+    if (currentErrorState === "device-searching" && isSimulatingHardwareFlow) {
+      const timer = setTimeout(() => {
+        setInternalErrorState("device-found-selecting");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentErrorState, isSimulatingHardwareFlow]);
+
+  // Simulate on-device approval confirmation transition
+  useEffect(() => {
+    if (currentErrorState === "awaiting-device-confirmation" && isSimulatingHardwareFlow) {
+      const timer = setTimeout(() => {
+        connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+        setIsSimulatingHardwareFlow(false);
+        if (onConnectFreighter) {
+          onConnectFreighter();
+        }
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentErrorState, isSimulatingHardwareFlow, connect, onClose, onConnectFreighter]);
+
+  const handleHardwareClick = () => {
+    setIsSimulatingHardwareFlow(true);
+    if (isMobile) {
+      setInternalErrorState("mobile-unsupported");
+    } else {
+      setInternalErrorState("device-searching");
+    }
+  };
 
   // Handle Freighter selection: perform actual connection and network verification
   const handleFreighterClick = async () => {
@@ -259,6 +367,14 @@ export default function ConnectWalletModal({
       iconSrc: "/src/assets/images/walletconnect.svg",
       action: onConnectWalletConnect ?? (() => {}),
       disabled: !onConnectWalletConnect,
+    },
+    {
+      id: "hardware",
+      name: "Hardware Wallet",
+      description: "Connect via Ledger or Trezor device.",
+      icon: "🛠️",
+      iconSrc: "/src/assets/images/hardware.svg",
+      action: handleHardwareClick,
     },
   ];
 
@@ -611,6 +727,387 @@ export default function ConnectWalletModal({
           </div>
         )}
 
+        {/* HARDWARE WALLET: Device Searching */}
+        {currentErrorState === "device-searching" && (
+          <div className={styles.errorContainer} data-testid="error-state-device-searching">
+            <div className={styles.radarContainer} aria-hidden="true">
+              <div className={styles.radarRing}></div>
+              <div className={styles.radarRing2}></div>
+              <div className={styles.pulseDot}></div>
+            </div>
+
+            <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
+              Scanning for connected hardware wallets...
+            </div>
+
+            <span className={styles.badge} id="badge-device-searching">Step 1 of 3</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Connect via USB
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Searching for connected hardware wallets... Please plug in your Ledger or Trezor device via USB, unlock it with your PIN, and ensure the Stellar app is open.
+            </p>
+
+            <div className={styles.actionGroup}>
+              {showStateSwitcher && (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => setInternalErrorState("device-found-selecting")}
+                  aria-label="Simulate device detected"
+                >
+                  Simulate Found
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Device Found & Selection */}
+        {currentErrorState === "device-found-selecting" && (
+          <div className={styles.errorContainer} data-testid="error-state-device-found-selecting">
+            <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
+              <Cpu size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-device-found-selecting">Step 2 of 3</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Configure Device
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Select your hardware wallet and choose a derivation path configuration.
+            </p>
+
+            <div
+              className={styles.deviceList}
+              role="radiogroup"
+              aria-label="Select USB hardware wallet device"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selectedDevice === "ledger"}
+                className={`${styles.deviceOption} ${
+                  selectedDevice === "ledger" ? styles.deviceOptionActive : ""
+                }`}
+                onClick={() => setSelectedDevice("ledger")}
+                aria-label="Ledger Nano X or S"
+              >
+                <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
+                  L
+                </div>
+                <div className={styles.walletInfo}>
+                  <div className={styles.walletName}>Ledger Nano X / S</div>
+                  <div className={styles.walletDescription}>Connect via USB and confirm public key.</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selectedDevice === "trezor"}
+                className={`${styles.deviceOption} ${
+                  selectedDevice === "trezor" ? styles.deviceOptionActive : ""
+                }`}
+                onClick={() => setSelectedDevice("trezor")}
+                aria-label="Trezor Model T or One"
+              >
+                <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
+                  T
+                </div>
+                <div className={styles.walletInfo}>
+                  <div className={styles.walletName}>Trezor Model T / One</div>
+                  <div className={styles.walletDescription}>Connect via USB and unlock via screen.</div>
+                </div>
+              </button>
+            </div>
+
+            <div className={styles.derivationPathContainer}>
+              <label htmlFor="derivation-path-select" className={styles.derivationPathLabel}>
+                Derivation Path
+              </label>
+              <select
+                id="derivation-path-select"
+                className={styles.selectInput}
+                value={derivationPath}
+                onChange={(e) => {
+                  setDerivationPath(e.target.value);
+                  if (e.target.value !== "custom") {
+                    setPathError(null);
+                  }
+                }}
+              >
+                <option value="m/44'/148'/0'">Stellar Standard (m/44'/148'/0')</option>
+                <option value="m/44'/148'/1'">Stellar Secondary (m/44'/148'/1')</option>
+                <option value="custom">Custom Derivation Path...</option>
+              </select>
+
+              {derivationPath === "custom" && (
+                <div>
+                  <input
+                    type="text"
+                    ref={customPathInputRef}
+                    id="custom-derivation-path-input"
+                    className={styles.customPathInput}
+                    value={customPath}
+                    onChange={(e) => handleCustomPathChange(e.target.value)}
+                    placeholder="m/44'/148'/0'"
+                    aria-label="Enter custom Stellar derivation path"
+                    aria-invalid={pathError !== null}
+                    aria-describedby={pathError ? "custom-path-error" : undefined}
+                  />
+                  {pathError && (
+                    <span
+                      id="custom-path-error"
+                      style={{
+                        color: "var(--status-error)",
+                        fontSize: "0.85em",
+                        marginTop: "4px",
+                        display: "block",
+                      }}
+                    >
+                      {pathError}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={derivationPath === "custom" && pathError !== null}
+                onClick={() => setInternalErrorState("awaiting-device-confirmation")}
+                aria-label="Confirm selection and connect"
+              >
+                <Check size={18} />
+                Confirm & Connect
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setInternalErrorState("device-searching")}
+                aria-label="Back to device scanning"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Awaiting Device Confirmation */}
+        {currentErrorState === "awaiting-device-confirmation" && (
+          <div className={styles.errorContainer} data-testid="error-state-awaiting-device-confirmation">
+            <div className={styles.radarContainer} aria-hidden="true">
+              <div className={styles.radarRing} style={{ animationDuration: "1.5s" }}></div>
+              <div className={styles.pulseDot} style={{ background: "var(--status-info)", boxShadow: "0 0 8px var(--status-info)" }}></div>
+            </div>
+
+            <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
+              Confirm Connection on Device... Please review public key on your hardware wallet.
+            </div>
+
+            <span className={styles.badge} id="badge-awaiting-device-confirmation">Step 3 of 3</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Confirm on Device
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Please review and approve the public key connection request on your physical hardware wallet screen. Ensure the Stellar app is active.
+            </p>
+
+            <div className={styles.actionGroup}>
+              {showStateSwitcher && (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => {
+                    connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+                    if (onConnectFreighter) onConnectFreighter();
+                    onClose();
+                  }}
+                  aria-label="Simulate successful connection"
+                >
+                  Simulate Success
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setInternalErrorState("device-found-selecting")}
+                aria-label="Cancel confirmation and go back to configure"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Device Locked Error */}
+        {currentErrorState === "device-locked-error" && (
+          <div className={styles.errorContainer} data-testid="error-state-device-locked-error">
+            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
+              <Lock size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-device-locked">Device Locked</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Hardware Wallet Locked
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              Your hardware wallet is locked. Please enter your PIN on the physical device to unlock it and try again.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => setInternalErrorState("device-searching")}
+                aria-label="Retry connection scan"
+              >
+                <RefreshCw size={18} />
+                Retry Connection
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Wrong App Error */}
+        {currentErrorState === "wrong-app-error" && (
+          <div className={styles.errorContainer} data-testid="error-state-wrong-app-error">
+            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
+              <AlertTriangle size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-wrong-app">Stellar App Closed</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Stellar App Not Open
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              The Stellar application is not open on your device. Please open the Stellar application on your Ledger or Trezor device before continuing.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => setInternalErrorState("device-searching")}
+                aria-label="Retry connection scan"
+              >
+                <RefreshCw size={18} />
+                Retry Connection
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Unplugged Error */}
+        {currentErrorState === "unplugged-error" && (
+          <div className={styles.errorContainer} data-testid="error-state-unplugged-error">
+            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
+              <PowerOff size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-unplugged">Disconnected</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Device Disconnected
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              The hardware wallet was unplugged or disconnected mid-flow. Please check your USB cable and reconnect the device.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => setInternalErrorState("device-searching")}
+                aria-label="Scan for hardware wallet again"
+              >
+                <RefreshCw size={18} />
+                Scan for Device
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* HARDWARE WALLET: Mobile Fallback */}
+        {currentErrorState === "mobile-unsupported" && (
+          <div className={styles.errorContainer} data-testid="error-state-mobile-unsupported">
+            <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
+              <Smartphone size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-mobile-unsupported">Mobile Fallback</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Device Unsupported on Mobile
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              USB hardware wallet connections are not supported on mobile web browsers. Please connect using a supported mobile-friendly wallet instead.
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => {
+                  setInternalErrorState(null);
+                  if (onConnectWalletConnect) onConnectWalletConnect();
+                }}
+                aria-label="Connect using WalletConnect mobile flow"
+              >
+                Connect via WalletConnect
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label="Back to wallet selection list"
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                Back to wallet list
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* DESIGN QA PREVIEW TOOLBAR - Rendered exclusively for Design Review & Verification */}
         {showStateSwitcher && (
           <div className={styles.previewToolbar} data-testid="design-qa-toolbar">
@@ -621,7 +1118,10 @@ export default function ConnectWalletModal({
                 className={`${styles.previewButton} ${
                   currentErrorState === null ? styles.previewButtonActive : ""
                 }`}
-                onClick={() => setInternalErrorState(null)}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState(null);
+                }}
                 aria-pressed={currentErrorState === null}
               >
                 Default View
@@ -631,7 +1131,10 @@ export default function ConnectWalletModal({
                 className={`${styles.previewButton} ${
                   currentErrorState === "not_installed" ? styles.previewButtonActive : ""
                 }`}
-                onClick={() => setInternalErrorState("not_installed")}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("not_installed");
+                }}
                 aria-pressed={currentErrorState === "not_installed"}
               >
                 Not Installed
@@ -641,7 +1144,10 @@ export default function ConnectWalletModal({
                 className={`${styles.previewButton} ${
                   currentErrorState === "rejected" ? styles.previewButtonActive : ""
                 }`}
-                onClick={() => setInternalErrorState("rejected")}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("rejected");
+                }}
                 aria-pressed={currentErrorState === "rejected"}
               >
                 Rejected
@@ -651,7 +1157,10 @@ export default function ConnectWalletModal({
                 className={`${styles.previewButton} ${
                   currentErrorState === "network_mismatch" ? styles.previewButtonActive : ""
                 }`}
-                onClick={() => setInternalErrorState("network_mismatch")}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("network_mismatch");
+                }}
                 aria-pressed={currentErrorState === "network_mismatch"}
               >
                 Wrong Network
@@ -661,14 +1170,109 @@ export default function ConnectWalletModal({
                 className={`${styles.previewButton} ${
                   currentErrorState === "network_timeout" ? styles.previewButtonActive : ""
                 }`}
-                onClick={() => setInternalErrorState("network_timeout")}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("network_timeout");
+                }}
                 aria-pressed={currentErrorState === "network_timeout"}
               >
                 Timed Out
               </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "device-searching" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("device-searching");
+                }}
+                aria-pressed={currentErrorState === "device-searching"}
+              >
+                HW: Search
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "device-found-selecting" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("device-found-selecting");
+                }}
+                aria-pressed={currentErrorState === "device-found-selecting"}
+              >
+                HW: Select
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "awaiting-device-confirmation" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("awaiting-device-confirmation");
+                }}
+                aria-pressed={currentErrorState === "awaiting-device-confirmation"}
+              >
+                HW: Confirm
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "device-locked-error" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("device-locked-error");
+                }}
+                aria-pressed={currentErrorState === "device-locked-error"}
+              >
+                HW: Locked
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "wrong-app-error" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("wrong-app-error");
+                }}
+                aria-pressed={currentErrorState === "wrong-app-error"}
+              >
+                HW: Wrong App
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "unplugged-error" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("unplugged-error");
+                }}
+                aria-pressed={currentErrorState === "unplugged-error"}
+              >
+                HW: Unplugged
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  currentErrorState === "mobile-unsupported" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  setInternalErrorState("mobile-unsupported");
+                }}
+                aria-pressed={currentErrorState === "mobile-unsupported"}
+              >
+                HW: Mobile Unsupported
+              </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

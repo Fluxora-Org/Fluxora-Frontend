@@ -2,17 +2,82 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, it, expect, vi, type Mock } from 'vitest';
 import TreasuryPage from '../../pages/TreasuryPage';
+import type { Metric } from '../../components/treasuryOverviewPage/Metric';
+import type { Stream } from '../../components/treasuryOverviewPage/Stream';
 
+
+// Mock IS_DEV to allow testing production-gated features
+vi.mock("../../utils/env", () => ({
+  get IS_DEV() {
+    return (globalThis as any).mockIsDev !== false;
+  },
+}));
 
 // Mock child components to keep the tests focused on TreasuryPage logic
 vi.mock('../../components/treasuryOverviewPage/DemoBanner', () => ({ default: () => <div data-testid="demo-banner" /> }));
 vi.mock('../../components/treasuryOverviewPage/Header', () => ({ default: () => <header data-testid="header" /> }));
-vi.mock('../../components/treasuryOverviewPage/Metrics', () => ({ default: (props: any) => (
-  <div data-testid="metrics">Metrics: {JSON.stringify(props.metrics)}</div>
-) }));
-vi.mock('../../components/treasuryOverviewPage/RecentStreams', () => ({ default: (props: any) => (
-  <div data-testid="streams">Streams: {JSON.stringify(props.streams)}</div>
-) }));
+interface MetricsPropsMock {
+  metrics: Metric[];
+  loading?: boolean;
+  error?: string | null;
+}
+vi.mock('../../components/treasuryOverviewPage/Metrics', () => ({
+  default: (props: MetricsPropsMock) => (
+    <div data-testid="metrics">Metrics: {JSON.stringify(props.metrics)}</div>
+  ),
+}));
+interface RecentStreamsPropsMock {
+  streams: Stream[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  walletConnected?: boolean;
+}
+vi.mock('../../components/treasuryOverviewPage/RecentStreams', () => ({
+  default: (props: RecentStreamsPropsMock) => {
+    const summary = `Streams: ${JSON.stringify(props.streams)} | walletConnected: ${String(props.walletConnected ?? false)}`;
+    return <div data-testid="streams">{summary}</div>;
+  },
+}));
+
+interface ActivityHeatmapPropsMock {
+  streams: Stream[];
+  loading?: boolean;
+  error?: string | null;
+}
+vi.mock('../../components/treasuryOverviewPage/ActivityHeatmap', () => ({
+  default: (props: ActivityHeatmapPropsMock) => (
+    <div data-testid="activity-heatmap">Heatmap: {JSON.stringify(props.streams)}</div>
+  ),
+}));
+
+interface TreasuryFlowSankeyPropsMock {
+  streams: Stream[];
+  loading?: boolean;
+  error?: string | null;
+}
+vi.mock('../../components/treasuryOverviewPage/TreasuryFlowSankey', () => ({
+  default: (props: TreasuryFlowSankeyPropsMock) => (
+    <div data-testid="treasury-flow-sankey">Sankey: {JSON.stringify(props.streams)}</div>
+  ),
+}));
+
+// TreasuryPage now reads wallet connection state to thread into RecentStreams.
+const walletState = vi.hoisted(() => ({ connected: false }));
+vi.mock('../../components/wallet-connect/Walletcontext', () => ({
+  useWallet: () => ({
+    connected: walletState.connected,
+    address: null,
+    network: null,
+    loading: false,
+    error: null,
+    expectedNetwork: 'TESTNET',
+    expectedNetworkLabel: 'Testnet',
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
 
 // Mock the data hook – we will change its implementation per test
 vi.mock('../../components/treasuryOverviewPage/useTreasuryOverviewData', () => ({
@@ -22,6 +87,10 @@ import { useTreasuryOverviewData } from '../../components/treasuryOverviewPage/u
 const mockHook = useTreasuryOverviewData as unknown as Mock;
 
 describe('TreasuryPage', () => {
+  beforeEach(() => {
+    (globalThis as any).mockIsDev = true;
+  });
+
   afterEach(() => {
     vi.resetAllMocks();
   });
@@ -32,6 +101,8 @@ describe('TreasuryPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading treasury overview...');
     expect(screen.queryByTestId('metrics')).toBeNull();
     expect(screen.queryByTestId('streams')).toBeNull();
+    expect(screen.queryByTestId('activity-heatmap')).toBeNull();
+    expect(screen.queryByTestId('treasury-flow-sankey')).toBeNull();
   });
 
   it('renders error message and hides content — no fallback to demo data', () => {
@@ -42,6 +113,8 @@ describe('TreasuryPage', () => {
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByTestId('metrics')).toBeNull();
     expect(screen.queryByTestId('streams')).toBeNull();
+    expect(screen.queryByTestId('activity-heatmap')).toBeNull();
+    expect(screen.queryByTestId('treasury-flow-sankey')).toBeNull();
     // DemoBanner must NOT render on fetch failure — no silent demo-data fallback
     expect(screen.queryByTestId('demo-banner')).toBeNull();
   });
@@ -53,9 +126,13 @@ describe('TreasuryPage', () => {
     render(<TreasuryPage />);
     expect(screen.getByTestId('metrics')).toHaveTextContent(JSON.stringify(fakeMetrics));
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
+    expect(screen.getByTestId('activity-heatmap')).toHaveTextContent(JSON.stringify(fakeStreams));
+    expect(screen.getByTestId('treasury-flow-sankey')).toHaveTextContent(JSON.stringify(fakeStreams));
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByTestId('demo-banner')).toBeNull();
+    // Lock in the walletConnected threading from useWallet through to RecentStreams.
+    expect(screen.getByTestId('streams')).toHaveTextContent('walletConnected: false');
   });
 
   it('renders DemoBanner alongside content in demo mode', () => {
@@ -66,13 +143,79 @@ describe('TreasuryPage', () => {
     expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
     expect(screen.getByTestId('metrics')).toHaveTextContent(JSON.stringify(fakeMetrics));
     expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify(fakeStreams));
+    expect(screen.getByTestId('activity-heatmap')).toHaveTextContent(JSON.stringify(fakeStreams));
+    expect(screen.getByTestId('treasury-flow-sankey')).toHaveTextContent(JSON.stringify(fakeStreams));
   });
 
-  it('shows empty‑state fallback when data is undefined and not loading/error', () => {
+  it('renders DemoBanner when isDemoMode is true during loading', () => {
+    mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: true, loading: true, error: null });
+    render(<TreasuryPage />);
+    expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading treasury overview...');
+  });
+
+  it('renders DemoBanner when isDemoMode is true during error', () => {
+    mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: true, loading: false, error: 'Error' });
+    render(<TreasuryPage />);
+    expect(screen.getByTestId('demo-banner')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Error');
+  });
+
+  it('renders Metrics/RecentStreams with empty data when undefined and not loading/error', () => {
+    // The empty/loading/error states for "no data yet" now live inside
+    // Metrics/RecentStreams themselves (see their own test coverage), not as
+    // a page-level fallback — the page always renders them once past its own
+    // loading/error states, passing an empty array when data is undefined.
     mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: null });
     render(<TreasuryPage />);
-    expect(screen.getByRole('status')).toHaveTextContent('No treasury data available.');
-    expect(screen.queryByTestId('metrics')).toBeNull();
-    expect(screen.queryByTestId('streams')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByTestId('metrics')).toHaveTextContent(JSON.stringify([]));
+    expect(screen.getByTestId('streams')).toHaveTextContent(JSON.stringify([]));
+    expect(screen.getByTestId('activity-heatmap')).toHaveTextContent(JSON.stringify([]));
+    expect(screen.getByTestId('treasury-flow-sankey')).toHaveTextContent(JSON.stringify([]));
+  });
+
+  describe('ColorBlindToggle gating', () => {
+    it('renders ColorBlindToggle in loading state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: true, error: null });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in loading state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: true, error: null });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
+
+    it('renders ColorBlindToggle in error state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: 'err' });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in error state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: undefined, streams: undefined, isDemoMode: false, loading: false, error: 'err' });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
+
+    it('renders ColorBlindToggle in success state when IS_DEV is true', () => {
+      (globalThis as any).mockIsDev = true;
+      mockHook.mockReturnValue({ metrics: [{ total: 100 }], streams: [{ id: 1 }], isDemoMode: false, loading: false, error: null });
+      render(<TreasuryPage />);
+      expect(screen.getByTestId('colorblind-toggle')).toBeInTheDocument();
+    });
+
+    it('hides ColorBlindToggle in success state when IS_DEV is false', () => {
+      (globalThis as any).mockIsDev = false;
+      mockHook.mockReturnValue({ metrics: [{ total: 100 }], streams: [{ id: 1 }], isDemoMode: false, loading: false, error: null });
+      render(<TreasuryPage />);
+      expect(screen.queryByTestId('colorblind-toggle')).toBeNull();
+    });
   });
 });

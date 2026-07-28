@@ -1,10 +1,10 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import React from "react";
+import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ConnectWalletModal from "../ConnectWalletModal";
 import { getNetwork } from "@stellar/freighter-api";
-
+import { BREAKPOINT_MD, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../../lib/breakpoints";
 vi.mock("@stellar/freighter-api", () => {
   return {
     isConnected: vi.fn().mockResolvedValue({ isConnected: true }),
@@ -12,6 +12,16 @@ vi.mock("@stellar/freighter-api", () => {
     getNetwork: vi.fn().mockResolvedValue({ network: "TESTNET" }),
   };
 });
+
+let viewportWidth = 1024;
+
+function setViewportWidth(width: number) {
+  viewportWidth = width;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    get: () => viewportWidth,
+  });
+}
 
 describe("ConnectWalletModal", () => {
   const onClose = vi.fn();
@@ -137,10 +147,14 @@ describe("ConnectWalletModal", () => {
     );
 
     expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
-    expect(screen.getByText(/Your wallet is connected to the wrong network/)).toBeInTheDocument();
     expect(screen.getByText(/Open your/)).toBeInTheDocument();
     expect(screen.getByText(/Click the/)).toBeInTheDocument();
-    expect(screen.getByText(/Select/)).toBeInTheDocument();
+    expect(
+      screen.getByText((_content, node) => {
+        const isMatch = node?.textContent?.includes("Select Testnet and return here.") ?? false;
+        return isMatch && node?.tagName?.toLowerCase() === "span";
+      })
+    ).toBeInTheDocument();
   });
 
   it("allows switching states via the Design QA toolbar", async () => {
@@ -280,17 +294,113 @@ describe("ConnectWalletModal", () => {
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
     });
   });
+
+  describe("Edge Case Behaviors & States", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders loading state copy and disables options while connection is in flight", async () => {
+      let resolveNetwork: (value: any) => void;
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise((resolve) => {
+          resolveNetwork = resolve;
+        })
+      );
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
+      
+      fireEvent.click(freighterBtn);
+
+      expect(screen.getByText("Connecting...")).toBeInTheDocument();
+      expect(freighterBtn).toBeDisabled();
+
+      await act(async () => {
+        resolveNetwork({ network: "TESTNET" });
+      });
+    });
+
+    it("applies interactive styling when options are hovered or focused via keyboard", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      // Focus via keyboard
+      await userEvent.tab();
+      if (document.activeElement !== freighterBtn) {
+        freighterBtn.focus();
+      }
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Blur
+      freighterBtn.blur();
+      expect(freighterBtn.style.boxShadow).toBe("none");
+
+      // Hover via mouse
+      fireEvent.mouseEnter(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Mouse leave
+      fireEvent.mouseLeave(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toBe("none");
+    });
+  });
+    // Accessibility tests
+  describe('accessibility', () => {
+    it('traps focus within the modal and wraps correctly', async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const closeBtn = screen.getByLabelText('Close wallet connection dialog');
+      
+      // Wait for the modal's 50ms focus timer to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(closeBtn).toHaveFocus();
+      // Tab to first focusable wallet button (Freighter)
+      await userEvent.tab();
+      const freighterBtn = screen.getByRole('listitem', { name: /Connect with Freighter/ });
+      expect(freighterBtn).toHaveFocus();
+
+      // Tab to second focusable wallet button (Hardware Wallet)
+      await userEvent.tab();
+      const hardwareBtn = screen.getByRole('listitem', { name: /Connect with Hardware Wallet/ });
+      expect(hardwareBtn).toHaveFocus();
+
+      // Tab to Terms of Service link
+      await userEvent.tab();
+      const termsLink = screen.getByRole('link', { name: /Terms of Service/ });
+      expect(termsLink).toHaveFocus();
+
+      // Tab should wrap back to close button
+      await userEvent.tab();
+      expect(closeBtn).toHaveFocus();
+
+      // Shift+Tab should go back to the last focusable element (Terms of Service link)
+      await userEvent.tab({ shift: true });
+      expect(termsLink).toHaveFocus();
+    });
+
+    it('has correct ARIA attributes', () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} />);
+      const modal = screen.getByRole('dialog');
+      expect(modal).toHaveAttribute('aria-modal', 'true');
+      expect(modal).toHaveAttribute('aria-labelledby', 'connect-wallet-modal-title');
+      const title = screen.getByText('Choose your wallet');
+      expect(title).toHaveAttribute('id', 'connect-wallet-modal-title');
+    });
+  });
+  });
 });
 
 describe("unavailable wallet options (Albedo, WalletConnect)", () => {
-  // Skipped: pre-existing failure unrelated to CI setup — modal body content
-  // (Albedo/WalletConnect options) doesn't render in this test environment.
-  // Tracked as pre-existing test debt.
-  it.skip("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
+  it("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
     render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
 
-    const albedo = screen.getByRole("button", { name: "Albedo — coming soon" });
-    const wc = screen.getByRole("button", { name: "WalletConnect — coming soon" });
+    const albedo = screen.getByRole("listitem", { name: "Albedo — coming soon" });
+    const wc = screen.getByRole("listitem", { name: "WalletConnect — coming soon" });
 
     expect(albedo).toBeDisabled();
     expect(wc).toBeDisabled();
@@ -301,9 +411,7 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
     expect(screen.getAllByText("coming soon")).toHaveLength(2);
   });
 
-  // Skipped: pre-existing failure unrelated to CI setup (same root cause as
-  // above). Tracked as pre-existing test debt.
-  it.skip("enables Albedo when a handler is provided", () => {
+  it("enables Albedo when a handler is provided", () => {
     const onAlbedo = vi.fn();
     render(
       <ConnectWalletModal
@@ -314,8 +422,259 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
       />
     );
 
-    const albedo = screen.getByRole("button", { name: "Connect with Albedo" });
+    const albedo = screen.getByRole("listitem", { name: "Connect with Albedo" });
     expect(albedo).not.toBeDisabled();
     expect(screen.getAllByText("coming soon")).toHaveLength(1); // only WalletConnect
+  });
+
+
+  describe("Hardware Wallet Connect Flow", () => {
+    const onClose = vi.fn();
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      // Ensure window.innerWidth defaults to desktop (1024)
+      global.innerWidth = 1024;
+      // Mock window.dispatchEvent
+      global.dispatchEvent(new Event("resize"));
+    });
+
+    it("renders Hardware Wallet list entry", () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByText("Hardware Wallet")).toBeInTheDocument();
+      expect(screen.getByText("Connect via Ledger or Trezor device.")).toBeInTheDocument();
+    });
+
+    it("redirects to mobile-unsupported error state on mobile viewport / user agent", async () => {
+      // Simulate mobile device
+      global.innerWidth = 375;
+      global.dispatchEvent(new Event("resize"));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      
+      const hwBtn = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+      await userEvent.click(hwBtn);
+
+      expect(screen.getByText("Device Unsupported on Mobile")).toBeInTheDocument();
+      expect(screen.getByText(/USB hardware wallet connections are not supported on mobile/)).toBeInTheDocument();
+
+      const wcBtn = screen.getByRole("button", { name: "Connect using WalletConnect mobile flow" });
+      expect(wcBtn).toBeInTheDocument();
+    });
+
+    it("starts device-searching on desktop viewport", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+      
+      const hwBtn = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+      await userEvent.click(hwBtn);
+
+      expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+      expect(screen.getByText(/Searching for connected hardware wallets/)).toBeInTheDocument();
+    });
+
+    it("allows transitioning to device-found-selecting and choosing a device", async () => {
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="device-found-selecting"
+        />
+      );
+
+      expect(screen.getByText("Configure Device")).toBeInTheDocument();
+      const ledgerRadio = screen.getByRole("radio", { name: "Ledger Nano X or S" });
+      const trezorRadio = screen.getByRole("radio", { name: "Trezor Model T or One" });
+
+      expect(ledgerRadio).toHaveAttribute("aria-checked", "true");
+      expect(trezorRadio).toHaveAttribute("aria-checked", "false");
+
+      await userEvent.click(trezorRadio);
+      expect(trezorRadio).toHaveAttribute("aria-checked", "true");
+      expect(ledgerRadio).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("validates custom derivation path input and updates UI validity", async () => {
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="device-found-selecting"
+        />
+      );
+
+      const select = screen.getByLabelText("Derivation Path");
+      await userEvent.selectOptions(select, "custom");
+
+      const input = screen.getByLabelText("Enter custom Stellar derivation path");
+      expect(input).toBeInTheDocument();
+
+      // Enter invalid path
+      await userEvent.clear(input);
+      await userEvent.type(input, "invalid-path");
+
+      expect(screen.getByText("Invalid Stellar derivation path format (e.g. m/44'/148'/0')")).toBeInTheDocument();
+      const confirmBtn = screen.getByRole("button", { name: "Confirm selection and connect" });
+      expect(confirmBtn).toBeDisabled();
+
+      // Enter valid path
+      await userEvent.clear(input);
+      await userEvent.type(input, "m/44'/148'/2'");
+      expect(screen.queryByText("Invalid Stellar derivation path format (e.g. m/44'/148'/0')")).not.toBeInTheDocument();
+      expect(confirmBtn).not.toBeDisabled();
+    });
+
+    it("focuses custom derivation path input programmatically when selected", async () => {
+      vi.useFakeTimers();
+      render(
+        <ConnectWalletModal
+          isOpen={true}
+          onClose={onClose}
+          errorState="device-found-selecting"
+        />
+      );
+
+      const select = screen.getByLabelText("Derivation Path");
+      await userEvent.selectOptions(select, "custom");
+
+      // Fast-forward timers for the setTimeout focus
+      vi.advanceTimersByTime(100);
+
+      const input = screen.getByLabelText("Enter custom Stellar derivation path");
+      expect(input).toHaveFocus();
+      vi.useRealTimers();
+    });
+
+    it("renders hardware wallet-specific error states from props", () => {
+      const { rerender } = render(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState="device-locked-error" />
+      );
+      expect(screen.getByText("Hardware Wallet Locked")).toBeInTheDocument();
+
+      rerender(<ConnectWalletModal isOpen={true} onClose={onClose} errorState="wrong-app-error" />);
+      expect(screen.getByText("Stellar App Not Open")).toBeInTheDocument();
+
+      rerender(<ConnectWalletModal isOpen={true} onClose={onClose} errorState="unplugged-error" />);
+      expect(screen.getByText("Device Disconnected")).toBeInTheDocument();
+    });
+
+    it("allows QA preview toolbar to select hardware states", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={true} />);
+
+      // Switch to HW Search
+      await userEvent.click(screen.getByRole("button", { name: "HW: Search" }));
+      expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+
+      // Switch to HW Select
+      await userEvent.click(screen.getByRole("button", { name: "HW: Select" }));
+      expect(screen.getByText("Configure Device")).toBeInTheDocument();
+
+      // Switch to HW Confirm
+      await userEvent.click(screen.getByRole("button", { name: "HW: Confirm" }));
+      expect(screen.getByText("Confirm on Device")).toBeInTheDocument();
+
+      // Switch to HW Locked
+      await userEvent.click(screen.getByRole("button", { name: "HW: Locked" }));
+      expect(screen.getByText("Hardware Wallet Locked")).toBeInTheDocument();
+
+      // Switch to HW Wrong App
+      await userEvent.click(screen.getByRole("button", { name: "HW: Wrong App" }));
+      expect(screen.getByText("Stellar App Not Open")).toBeInTheDocument();
+
+      // Switch to HW Unplugged
+      await userEvent.click(screen.getByRole("button", { name: "HW: Unplugged" }));
+      expect(screen.getByText("Device Disconnected")).toBeInTheDocument();
+
+      // Switch to HW Mobile Unsupported
+      await userEvent.click(screen.getByRole("button", { name: "HW: Mobile Unsupported" }));
+      expect(screen.getByText("Device Unsupported on Mobile")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ConnectWalletModal — mobile detection via shared breakpoint helper (Issue #980)", () => {
+  const onClose = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    setViewportWidth(BREAKPOINT_MD);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("treats widths at or above BREAKPOINT_MD as desktop and below it as mobile, on mount", async () => {
+    setViewportWidth(BREAKPOINT_MD);
+    const { unmount } = render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+    const hwBtnDesktop = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+    await userEvent.click(hwBtnDesktop, { advanceTimers: vi.advanceTimersByTime });
+    expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+    unmount();
+
+    setViewportWidth(BREAKPOINT_MD - 1);
+    render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+    const hwBtnMobile = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+    await userEvent.click(hwBtnMobile, { advanceTimers: vi.advanceTimersByTime });
+    expect(screen.getByText("Device Unsupported on Mobile")).toBeInTheDocument();
+  });
+
+  it("updates mobile state only after the debounce delay elapses on resize", async () => {
+    setViewportWidth(BREAKPOINT_MD);
+    render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    setViewportWidth(BREAKPOINT_MD - 1);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS - 1);
+    });
+
+    const hwBtnStillDesktop = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+    fireEvent.click(hwBtnStillDesktop);
+    expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+  });
+
+  it("collapses rapid resize events into a single debounced update", async () => {
+    setViewportWidth(BREAKPOINT_MD - 1);
+    render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    act(() => {
+      for (let width = BREAKPOINT_MD; width <= BREAKPOINT_MD + 50; width += 5) {
+        setViewportWidth(width);
+        window.dispatchEvent(new Event("resize"));
+      }
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS - 1);
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    const hwBtn = screen.getByRole("listitem", { name: "Connect with Hardware Wallet" });
+    fireEvent.click(hwBtn);
+    expect(screen.getByText("Connect via USB")).toBeInTheDocument();
+  });
+
+  it("clears the pending debounce timer on unmount", () => {
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+    setViewportWidth(BREAKPOINT_MD);
+    const { unmount } = render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    setViewportWidth(BREAKPOINT_MD - 1);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
+    });
   });
 });

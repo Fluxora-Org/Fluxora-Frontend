@@ -30,6 +30,7 @@ describe("streamsService live mode", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -97,6 +98,7 @@ describe("streamsService live mode", () => {
   });
 
   it("propagates network errors as StreamsServiceError", async () => {
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "0");
     fetchMock.mockRejectedValue(new Error("connection refused"));
 
     await expect(getStreams()).rejects.toMatchObject({
@@ -130,6 +132,27 @@ describe("streamsService live mode", () => {
     );
 
     await expect(getStreamById("STR-404")).resolves.toBeNull();
+  });
+
+  it("forwards AbortSignal to fetch and rejects when aborted", async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        if (init?.signal?.aborted) {
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getStreamById("STR-1", controller.signal);
+    controller.abort();
+
+    await expect(promise).rejects.toThrow();
+    expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
   });
 
   it("validates recipient addresses before issuing a request", async () => {
@@ -226,6 +249,69 @@ describe("streamsService live mode", () => {
     expect(metrics).toHaveLength(1);
     expect(metrics[0]!.label).toBe("Active Streams");
   });
+
+  it("honors VITE_FETCH_MAX_RETRIES=0 with exactly zero retries", async () => {
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "0");
+    fetchMock.mockRejectedValue(new Error("connection refused"));
+
+    await expect(getStreams()).rejects.toMatchObject({ kind: "network" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors VITE_FETCH_INITIAL_DELAY_MS=0 with no backoff delay", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "1");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "0");
+
+    fetchMock
+      .mockRejectedValueOnce(new Error("connection refused"))
+      .mockResolvedValueOnce(jsonResponse({ data: [] }));
+
+    const promise = getStreams();
+    // Explicit 0 must schedule an immediate retry — advancing 0ms is enough.
+    // A mistaken 500ms default would leave the promise pending here.
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(promise).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to default retries when VITE_FETCH_MAX_RETRIES is unset", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockRejectedValue(new Error("connection refused"));
+
+    // Attach the rejection handler before advancing timers to avoid unhandled rejections.
+    const assertion = expect(getStreams()).rejects.toMatchObject({
+      kind: "network",
+    });
+    // Default maxRetries=3 → 1 initial attempt + 3 retries = 4 fetch calls.
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(8_000);
+    }
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("falls back to defaults when fetch retry env vars are non-numeric", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "not-a-number");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "also-bad");
+    fetchMock.mockRejectedValue(new Error("connection refused"));
+
+    const assertion = expect(getStreams()).rejects.toMatchObject({
+      kind: "network",
+    });
+
+    // First retry uses the default 500ms initial delay.
+    await vi.advanceTimersByTimeAsync(499);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
 });
 
 describe("streamsService mock mode", () => {
@@ -288,5 +374,38 @@ describe("streamsService mock mode", () => {
       "Withdrawable",
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("formats USDC metrics with the browser locale (non-US)", async () => {
+    vi.stubGlobal("navigator", { language: "de-DE" });
+
+    const metrics = await getTreasuryMetrics();
+
+    const totalStreaming = metrics.find((m) => m.label === "Total Streaming")!;
+    expect(totalStreaming.value).toMatch(/^[\d,.]+ USDC$/);
+    // German locale uses period as thousands separator (e.g. "81.600 USDC")
+    expect(totalStreaming.value).toContain(".");
+    expect(totalStreaming.value).not.toContain(",");
+
+    const withdrawable = metrics.find((m) => m.label === "Withdrawable")!;
+    expect(withdrawable.value).toMatch(/^[\d,.]+ USDC$/);
+  });
+
+  it("filters seeded streams by recipient and treasury filters", async () => {
+    const seed = streamRecords[0]!;
+    const filteredByRecipient = await getStreams({ recipient: seed.recipientAddress });
+    expect(filteredByRecipient.length).toBeGreaterThan(0);
+    expect(
+      filteredByRecipient.every(
+        (r) => r.recipientAddress === seed.recipientAddress,
+      ),
+    ).toBe(true);
+
+    const filteredByTreasury = await getStreams({ treasury: seed.treasuryAddress });
+    expect(
+      filteredByTreasury.every(
+        (r) => r.treasuryAddress === seed.treasuryAddress,
+      ),
+    ).toBe(true);
   });
 });

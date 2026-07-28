@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TruncatedAddress from "../common/TruncatedAddress";
 import { useOptionalToast } from "../toast/ToastProvider";
 
@@ -12,9 +12,21 @@ function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
   });
 }
 
+function setShare(share?: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, "share", {
+    configurable: true,
+    value: share,
+  });
+}
+
 describe("TruncatedAddress", () => {
+  beforeEach(() => {
+    setShare(undefined);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
+    setShare(undefined);
   });
 
   it("copies with the Clipboard API and announces success", async () => {
@@ -37,6 +49,24 @@ describe("TruncatedAddress", () => {
     expect(onCopy).toHaveBeenCalledWith(ADDRESS);
     expect(onCopyStateChange).toHaveBeenCalledWith("copied");
     expect(screen.getByText("Address copied")).toBeInTheDocument();
+  });
+
+  it("uses the Web Share API when available and announces the share action", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    setShare(share);
+    setClipboard(undefined);
+
+    render(<TruncatedAddress address={ADDRESS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share address/i }));
+
+    await waitFor(() =>
+      expect(share).toHaveBeenCalledWith({
+        title: "Stellar address",
+        text: `Stellar address: ${ADDRESS}`,
+      }),
+    );
+    expect(screen.getByText("Address shared")).toBeInTheDocument();
   });
 
   it("falls back to execCommand when Clipboard API is unavailable", async () => {
@@ -164,12 +194,53 @@ describe("TruncatedAddress", () => {
   });
 
   it("renders short addresses without truncation", () => {
-    render(<TruncatedAddress address="GSHORT" />);
+    const { container } = render(<TruncatedAddress address="GSHORT" />);
 
-    expect(screen.getByText("GSHORT")).toBeInTheDocument();
+    // The address appears in the code chip, sr-only span, and reveal chip.
+    // Use the code element specifically to assert the visible representation.
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toHaveTextContent("GSHORT");
     expect(screen.getByRole("button")).toHaveAttribute(
       "aria-label",
       expect.stringContaining("Copy address"),
     );
+  });
+
+  // ── sr-only reveal pattern (TruncatedReveal integration) ─────────────────
+
+  it("always renders an sr-only span with the full address in the DOM", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const srSpan = container.querySelector(".truncateReveal__srValue.srOnly");
+    expect(srSpan).not.toBeNull();
+    expect(srSpan).toHaveTextContent(ADDRESS);
+  });
+
+  it("sr-only span is present before any user interaction", () => {
+    // Render and immediately query — no click/hover/focus events fired.
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const srSpan = container.querySelector(".truncateReveal__srValue.srOnly");
+    expect(srSpan).toHaveTextContent(ADDRESS);
+  });
+
+  it("reveal chip is aria-hidden so ATs do not read the address twice", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const chip = container.querySelector(".truncateReveal__chip");
+    expect(chip).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("reveal chip contains the full address", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const chip = container.querySelector(".truncateReveal__chip");
+    expect(chip).toHaveTextContent(ADDRESS);
+  });
+
+  it("wrapper has the truncateReveal class required for CSS-driven reveal", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    expect(container.querySelector(".truncateReveal")).not.toBeNull();
   });
 });

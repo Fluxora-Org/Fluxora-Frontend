@@ -10,6 +10,8 @@
     />
     <meta name="theme-color" content="#06B6D4" />
     <link rel="canonical" href="https://fluxora.app/" />
+    <link rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" id="favicon" />
+    <link rel="alternate icon" type="image/png" href="/src/public/Icon.png" />
 
     <!--
       Content Security Policy
@@ -23,13 +25,49 @@
         object-src  'none'          — block plugins (Flash, etc.)
         frame-ancestors 'none'      — prevent clickjacking (equivalent to X-Frame-Options: DENY)
         base-uri    'self'          — prevent base-tag hijacking
+
+      EMBED ROUTE EXCEPTION (/embed/streams/:streamId):
+        The /embed/streams/* route is designed to be loaded inside a host-site
+        iframe. This meta tag's frame-ancestors 'none' applies to ALL routes
+        served by this HTML shell and cannot be scoped per-route via a <meta>
+        tag — browsers only honour frame-ancestors from HTTP response headers.
+
+        For production deployment, the reverse-proxy / CDN must emit a
+        SEPARATE, ROUTE-SCOPED Content-Security-Policy response header that
+        overrides this value only for /embed/streams/* requests, e.g.:
+
+          # Nginx example
+          location /embed/streams/ {
+            add_header Content-Security-Policy
+              "frame-ancestors https://trusted-host.example https://another.example";
+          }
+          location / {
+            add_header Content-Security-Policy "frame-ancestors 'none'";
+          }
+
+        The allow-list MUST:
+          • Name specific HTTPS origins — never use frame-ancestors *
+          • Cover only /embed/* paths, leaving all other routes at 'none'
+          • Be updated in the server config whenever a new embedding host is approved
+
+        See docs/EMBEDDABLE_STREAM_WIDGET_SPEC.md §Content Security Policy for
+        full rationale, Nginx/Caddy/Vercel config snippets, and the audit log
+        requirements for adding new trusted origins.
     -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
     />
 
-    <!-- Open Graph link previews -->
+    <!--
+      Site-Wide Default Open Graph & Twitter link previews
+      PER-ROUTE OVERRIDE PATTERN:
+      For single stream detail routes (/app/streams/:streamId), src/components/MetaTags.tsx
+      dynamically overrides og:title, og:description, og:url, og:image, and og:image:alt via
+      react-helmet-async to reference per-stream auto-generated 1200x630 cards
+      (e.g., https://fluxora.app/og-image/:streamId.png?v=:updatedAtTimestamp).
+      See docs/STREAM_OG_IMAGE_TEMPLATE_SPEC.md for full specifications.
+    -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Fluxora" />
     <meta property="og:title" content="Fluxora - Continuous Capital" />
@@ -55,6 +93,7 @@
       name="twitter:image"
       content="https://fluxora.app/freighter-wallet.jpeg"
     />
+    <meta name="twitter:image:alt" content="Fluxora Stellar wallet preview" />
   </head>
   <body>
     <div id="root"></div>

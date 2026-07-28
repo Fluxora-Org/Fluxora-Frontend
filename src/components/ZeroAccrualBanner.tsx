@@ -8,6 +8,37 @@
  *   • "loading"  — data hasn't arrived yet
  *   • "empty"    — no streams exist at all
  *
+ * ## Visibility contract (deterministic across refreshes and re-renders)
+ *
+ * The banner MUST be shown when ALL of the following hold:
+ *   1. Wallet is connected
+ *   2. At least one stream exists
+ *   3. Total withdrawable balance is exactly 0
+ *   4. At least one stream is in "Active" status
+ *
+ * The banner MUST NOT be shown:
+ *   • While data is loading (parent must gate on its own loading flag)
+ *   • When streams array is empty (no-streams empty state takes precedence)
+ *   • When balance > 0 (there is something to withdraw)
+ *   • When wallet is disconnected
+ *
+ * ## Reason priority (Streams page)
+ *   "rate-zero" > "cliff"  — if any active stream has monthlyRate === 0,
+ *   that is the most actionable explanation and takes priority.
+ *   "paused" and "schedule-future" are valid reasons but are currently
+ *   only reachable via direct prop (not derived by page logic).
+ *
+ * ## nextEventDate chip
+ *   Rendered only when `nextEventDate` is a valid, parseable ISO string.
+ *   An invalid or unparseable value suppresses the chip entirely (does
+ *   NOT fall through to a "Not set" display).
+ *   On the Recipient page, `nextEventDate` is intentionally omitted — the
+ *   cliff date is not surfaced there.
+ *
+ * ## actionLabel
+ *   Falls back to the per-reason `defaultActionLabel` when the prop is
+ *   absent, null, undefined, OR an empty string.
+ *
  * Design rationale:
  *   Amber/teal gradient signals "pending, not broken". Hourglass icon
  *   animates slowly to communicate "time is passing". The copy explains
@@ -20,8 +51,11 @@
  *   • The action button meets 44×44 px minimum touch target.
  *   • All interactive elements expose focus-visible ring.
  */
+// ZeroAccrualBanner has its own stylesheet after being separated from StateDisplay.
+import "./zero-accrual-banner.css";
+import { formatLocalDate } from "../lib/formatters";
 
-import "./state-display.css";
+// ── Helpers ───────────────────────────────────────────────────────────
 
 export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
@@ -73,14 +107,6 @@ const REASON_CONFIG: Record<
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function formatEventDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(iso));
-}
 
 function nextEventLabel(reason: ZeroAccrualReason): string {
   switch (reason) {
@@ -158,7 +184,21 @@ export default function ZeroAccrualBanner({
   actionLabel,
 }: ZeroAccrualBannerProps) {
   const cfg = REASON_CONFIG[reason];
-  const label = actionLabel ?? cfg.defaultActionLabel;
+  // Treat empty string the same as absent — always show a meaningful label.
+  const label = actionLabel || cfg.defaultActionLabel;
+  // Only show the date chip when nextEventDate parses to a real date.
+  // An invalid string must suppress the chip entirely rather than falling
+  // through to a "Not set" placeholder, which would be misleading here.
+  const formattedEventDate = (() => {
+    if (!nextEventDate) return null;
+    const d = new Date(nextEventDate);
+    if (Number.isNaN(d.getTime())) return null;
+    return formatLocalDate(nextEventDate, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  })();
 
   return (
     <div
@@ -178,10 +218,11 @@ export default function ZeroAccrualBanner({
         <p className="zero-accrual-banner__description">{cfg.description}</p>
 
         {/* Next event date chip */}
-        {nextEventDate && (
+        {formattedEventDate && (
           <span className="zero-accrual-banner__next-event">
             <CalendarIcon />
-            {nextEventLabel(reason)}: {formatEventDate(nextEventDate)}
+            {nextEventLabel(reason)}:{" "}
+            {formattedEventDate}
           </span>
         )}
       </div>

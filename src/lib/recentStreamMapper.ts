@@ -1,11 +1,8 @@
 import type { Stream } from "../components/RecentStreams";
 import type { StreamRecord } from "../data/streamRecords";
+import { formatUsdc } from "./formatters";
 
-export function formatUsdc(amount: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    amount,
-  )} USDC`;
-}
+export { formatUsdc };
 
 /**
  * Map a normalized {@link StreamRecord} onto the lightweight row shape the

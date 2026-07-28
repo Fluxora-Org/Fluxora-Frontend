@@ -1,4 +1,5 @@
 import React from 'react';
+import './Pagination.css';
 
 interface PaginationProps {
   totalItems: number;
@@ -31,6 +32,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   itemsPerPage,
   currentPage,
   onPageChange,
+  onItemsPerPageChange,
 }) => {
   const { totalPages, currentPage: normalizedPage } = normalizePagination(
     totalItems,
@@ -46,25 +48,64 @@ export const Pagination: React.FC<PaginationProps> = ({
     );
   }
 
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (onItemsPerPageChange) {
+      const newLimit = Number(e.target.value);
+      if (!isNaN(newLimit) && newLimit > 0) {
+        onItemsPerPageChange(newLimit);
+      }
+    }
+  };
+
+  const perPageOptions = [10, 20, 50];
+  const safeItemsPerPage = itemsPerPage > 0 ? itemsPerPage : 10;
+  if (!perPageOptions.includes(safeItemsPerPage)) {
+    perPageOptions.push(safeItemsPerPage);
+    perPageOptions.sort((a, b) => a - b);
+  }
+
   return (
-    <nav data-testid="pagination-container" className="pagination-container">
-      <button
-        onClick={() => onPageChange(normalizedPage - 1)}
-        disabled={normalizedPage <= 1}
-      >
-        Previous
-      </button>
+    <nav data-testid="pagination-container" className="pagination-container fluxora-pagination">
+      <div className="page-buttons">
+        <button
+          onClick={() => onPageChange(normalizedPage - 1)}
+          disabled={normalizedPage <= 1}
+          className="page-nav-btn"
+        >
+          Previous
+        </button>
 
-      <span data-testid="pagination-info">
-        Page {normalizedPage} of {totalPages}
-      </span>
+        <span data-testid="pagination-info" className="pagination-info">
+          Page {normalizedPage} of {totalPages}
+        </span>
 
-      <button
-        onClick={() => onPageChange(normalizedPage + 1)}
-        disabled={normalizedPage >= totalPages}
-      >
-        Next
-      </button>
+        <button
+          onClick={() => onPageChange(normalizedPage + 1)}
+          disabled={normalizedPage >= totalPages}
+          className="page-nav-btn"
+        >
+          Next
+        </button>
+      </div>
+
+      {onItemsPerPageChange && (
+        <div className="limit-selector" data-testid="items-per-page-container">
+          <label htmlFor="items-per-page-select">Items per page:</label>
+          <select
+            id="items-per-page-select"
+            aria-label="Items per page"
+            data-testid="items-per-page-select"
+            value={safeItemsPerPage}
+            onChange={handleItemsPerPageChange}
+          >
+            {perPageOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </nav>
   );
 };

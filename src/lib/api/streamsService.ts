@@ -10,6 +10,7 @@ import {
   type StreamRecord,
   type StreamStatus,
 } from "../../data/streamRecords";
+import { formatAssetAmount } from "../formatters";
 
 const DEFAULT_BASE_URL = "http://localhost:8787";
 
@@ -71,6 +72,20 @@ function joinUrl(baseUrl: string, path: string): string {
   const trimmedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   const trimmedPath = path.startsWith("/") ? path : `/${path}`;
   return `${trimmedBase}${trimmedPath}`;
+}
+
+/**
+ * Parses a numeric env var, preserving an explicit `0`. Falls back only when
+ * the value is missing or non-numeric (`NaN`), so `0 || default` coercion
+ * cannot silently override an intentional zero.
+ */
+function readFiniteEnvInt(
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 /** Options controlling retry behaviour of {@link fetchJson}. */
@@ -142,12 +157,14 @@ async function fetchJson<T>(
 ): Promise<T> {
   const { baseUrl, fetchMaxRetries, fetchInitialDelayMs } = {
     ...readEnv(),
-    fetchMaxRetries: (import.meta.env?.VITE_FETCH_MAX_RETRIES
-      ? parseInt(import.meta.env.VITE_FETCH_MAX_RETRIES as string, 10)
-      : NaN) || 3,
-    fetchInitialDelayMs: (import.meta.env?.VITE_FETCH_INITIAL_DELAY_MS
-      ? parseInt(import.meta.env.VITE_FETCH_INITIAL_DELAY_MS as string, 10)
-      : NaN) || 500,
+    fetchMaxRetries: readFiniteEnvInt(
+      import.meta.env.VITE_FETCH_MAX_RETRIES,
+      3,
+    ),
+    fetchInitialDelayMs: readFiniteEnvInt(
+      import.meta.env.VITE_FETCH_INITIAL_DELAY_MS,
+      500,
+    ),
   };
 
   const maxRetries = options.maxRetries ?? fetchMaxRetries;
@@ -159,7 +176,6 @@ async function fetchJson<T>(
 
   let attempt = 0;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
@@ -195,7 +211,6 @@ async function fetchJson<T>(
       attempt++;
 
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
           error,
@@ -246,9 +261,7 @@ function metricIcon(src: string, alt: string) {
 }
 
 function formatUsdc(amount: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    amount,
-  )} USDC`;
+  return formatAssetAmount(amount, "USDC");
 }
 
 function deriveMockMetrics(records: StreamRecord[]): Metric[] {
@@ -390,14 +403,24 @@ export async function getStreams(
  * Fetch a single stream by its identifier. Returns `null` when the upstream
  * service reports the stream does not exist (HTTP 404). The identifier is
  * URL-encoded before being interpolated into the path.
+ *
+ * @param id - Stream identifier.
+ * @param signal - Optional AbortSignal to cancel the request.
  */
-export async function getStreamById(id: string): Promise<StreamRecord | null> {
+export async function getStreamById(
+  id: string,
+  signal?: AbortSignal,
+): Promise<StreamRecord | null> {
   if (typeof id !== "string" || id.length === 0) return null;
   if (isMockMode()) {
     return seededStreamRecords.find((record) => record.id === id) ?? null;
   }
   try {
-    const raw = await fetchJson<unknown>(`/streams/${encodeURIComponent(id)}`);
+    const raw = await fetchJson<unknown>(
+      `/streams/${encodeURIComponent(id)}`,
+      undefined,
+      { signal },
+    );
     return normalizeStreamRecord(raw);
   } catch (error) {
     if (error instanceof StreamsServiceError && error.status === 404) {

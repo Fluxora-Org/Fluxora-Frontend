@@ -28,6 +28,16 @@ interface ImportMetaEnv {
    * Useful to increase on slow networks or in CI to reduce noise.
    */
   readonly VITE_WALLET_WATCH_INTERVAL_MS?: string;
+  /**
+   * Maximum number of retry attempts for streams API `fetchJson` on transient
+   * network errors. Defaults to `3`. An explicit `0` disables retries.
+   */
+  readonly VITE_FETCH_MAX_RETRIES?: string;
+  /**
+   * Initial delay in milliseconds before the first streams API retry.
+   * Defaults to `500`. An explicit `0` retries immediately with no backoff delay.
+   */
+  readonly VITE_FETCH_INITIAL_DELAY_MS?: string;
 }
 
 interface ImportMeta {
