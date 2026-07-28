@@ -423,3 +423,52 @@ describe("Exported constants", () => {
     }
   });
 });
+
+// ─── 8. Edge Cases (Loading, Empty, Responsive) ──────────────────────────────
+
+describe("ThemeEditorPanel — edge cases", () => {
+  it("handles empty input gracefully (sync validation, no retry states)", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const hexInputs = screen.getAllByRole("textbox");
+    const firstHex = hexInputs.find((el) => el.getAttribute("placeholder") === "#RRGGBB");
+    
+    // Clear input
+    await user.clear(firstHex!);
+    
+    // Attempt preview
+    await user.click(screen.getByRole("button", { name: /preview theme/i }));
+    
+    // Should show error for missing/invalid hex, but NO loading state
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.length).toBeGreaterThan(0);
+    
+    // Loading state is not present in sync validation
+    expect(screen.queryByText(/loading/i)).toBeNull();
+    expect(screen.queryByText(/retry/i)).toBeNull();
+  });
+
+  it("injects responsive layout CSS", () => {
+    renderPanel();
+    // The panel injects a <style> tag for responsive grid
+    const styles = document.querySelectorAll("style");
+    const styleText = Array.from(styles).map(s => s.textContent).join(" ");
+    expect(styleText).toContain("@media (min-width: 768px)");
+    expect(styleText).toContain("@media (min-width: 1280px)");
+  });
+  
+  it("colour picker keyboard fallback interacts with text input", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    
+    const hexInputs = screen.getAllByRole("textbox");
+    const firstHex = hexInputs.find((el) => el.getAttribute("placeholder") === "#RRGGBB");
+    
+    // Since native color pickers are aria-hidden and tabIndex={-1}, we interact with text
+    await user.clear(firstHex!);
+    await user.type(firstHex!, "#abcdef");
+    
+    expect(firstHex).toHaveValue("#abcdef");
+    // Contrast badge or UI should sync but native color picker state is uncontrolled by us except via value bind
+  });
+});

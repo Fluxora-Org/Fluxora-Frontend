@@ -46,6 +46,8 @@ export interface RecipientStreamsProps {
  * - borderColor uses var(--color-error-border) (not a hardcoded rgba) so both
  *   light (#dc2626) and dark (#ef4444) themes resolve correctly.
  */
+export type StreamFilter = "All" | "Active" | "Paused" | "Completed";
+
 export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   isLoading: externalIsLoading,
   streams: externalStreams,
@@ -58,6 +60,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [internalError, setInternalError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<StreamFilter>("All");
   /** Tracks how many consecutive retry attempts have been made without a
    *  successful response so the banner can escalate its message. */
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -230,8 +233,13 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     );
   }
 
+  const filteredStreams = effectiveStreams.filter((stream) => {
+    if (filter === "All") return true;
+    return stream.status?.toLowerCase() === filter.toLowerCase();
+  });
+
   // Stable rendering sort strategy: pinned streams bubble up first
-  const sortedStreams = [...effectiveStreams].sort(
+  const sortedStreams = [...filteredStreams].sort(
     (a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
   );
 
@@ -250,30 +258,56 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
       className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
       style={{ backgroundColor: "var(--color-bg-primary)" }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2
-            className="text-xl font-bold"
-            style={{ color: "var(--color-text-primary)" }}
-          >
-            Incoming Streams
-          </h2>
-          <p
-            className="text-sm"
-            style={{ color: "var(--color-text-tertiary)" }}
-          >
-            Real-time contract payment records
-          </p>
+      {/* Header and Filters */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2
+              className="text-xl font-bold"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Incoming Streams
+            </h2>
+            <p
+              className="text-sm"
+              style={{ color: "var(--color-text-tertiary)" }}
+            >
+              Real-time contract payment records
+            </p>
+          </div>
+          {fetchStreamsFn && (
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition w-full sm:w-auto"
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh Status"}
+            </button>
+          )}
         </div>
-        {fetchStreamsFn && (
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition"
+        
+        {/* Filter Controls */}
+        {effectiveStreams.length > 0 && (
+          <div 
+            role="group" 
+            aria-label="Filter streams by status"
+            className="flex flex-wrap gap-2"
           >
-            {isRefreshing ? "Refreshing..." : "Refresh Status"}
-          </button>
+            {(["All", "Active", "Paused", "Completed"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                aria-pressed={filter === status}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border ${
+                  filter === status
+                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                    : "bg-transparent text-gray-600 border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-800"
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -368,12 +402,25 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
       )}
 
       {/* State 3: Empty State (Shared EmptyState illustration pattern & Connect wallet CTA) */}
-      {!effectiveError && sortedStreams.length === 0 ? (
+      {!effectiveError && effectiveStreams.length === 0 ? (
         <EmptyState
           variant="recipient"
           walletConnected={false}
           onPrimaryAction={onEmptyPrimaryAction}
         />
+      ) : !effectiveError && sortedStreams.length === 0 ? (
+        /* State 3.5: Filter returned no results */
+        <div className="py-12 text-center rounded-xl border border-dashed" style={{ borderColor: "var(--color-border-default)" }}>
+          <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
+            No {filter.toLowerCase()} streams found.
+          </p>
+          <button
+            onClick={() => setFilter("All")}
+            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Clear Filters
+          </button>
+        </div>
       ) : (
         /* State 4: Populated State */
         <div className="space-y-3">

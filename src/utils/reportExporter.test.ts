@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   filterStreamsByDateRange,
   groupStreams,
   buildReportCSV,
+  downloadReportCSV,
+  printReportAsPDF,
 } from "./reportExporter";
 import type { Stream } from "../components/treasuryOverviewPage/Stream";
 
@@ -93,5 +95,78 @@ describe("buildReportCSV", () => {
       "None"
     );
     expect(csv.split("\n")[1]).toBe('"Stream, ""special"""');
+  });
+});
+
+describe("downloadReportCSV", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("triggers a real blob download for the generated CSV", () => {
+    const createObjectURL = vi.fn().mockReturnValue("blob:report");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+
+    const click = vi.fn();
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "a") {
+        return { href: "", download: "", click } as unknown as HTMLAnchorElement;
+      }
+      return realCreateElement(tag);
+    });
+    vi.spyOn(document.body, "appendChild").mockImplementation((node) => node);
+    vi.spyOn(document.body, "removeChild").mockImplementation((node) => node);
+
+    downloadReportCSV(
+      [makeStream({ name: "Alpha", status: "Active" })],
+      ["name", "status"],
+      "None",
+      "Test-Report",
+    );
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob = createObjectURL.mock.calls[0]![0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("text/csv;charset=utf-8;");
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("printReportAsPDF", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("throws when the print window cannot be opened so callers can avoid a fake success toast", () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+    expect(() =>
+      printReportAsPDF([makeStream({})], ["name"], "None"),
+    ).toThrow(/Unable to open print window/i);
+  });
+
+  it("writes report content and invokes print when a window opens", () => {
+    const printWindow = {
+      document: {
+        write: vi.fn(),
+        close: vi.fn(),
+      },
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    vi.spyOn(window, "open").mockReturnValue(printWindow as unknown as Window);
+
+    printReportAsPDF(
+      [makeStream({ name: "Alpha", status: "Active" })],
+      ["name", "status"],
+      "None",
+    );
+
+    expect(printWindow.document.write).toHaveBeenCalled();
+    expect(printWindow.document.close).toHaveBeenCalled();
+    expect(printWindow.focus).toHaveBeenCalled();
+    expect(printWindow.print).toHaveBeenCalled();
   });
 });

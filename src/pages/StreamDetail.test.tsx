@@ -32,6 +32,7 @@ const mockStream: StreamRecord = {
 describe("StreamDetail MetaTags Integration", () => {
   it("injects dynamic per-stream Open Graph and Twitter meta tags into document head", async () => {
     const helmetContext = {};
+    const expectedTimestamp = Date.parse(mockStream.endDate);
 
     render(
       <HelmetProvider context={helmetContext}>
@@ -42,12 +43,14 @@ describe("StreamDetail MetaTags Integration", () => {
     await waitFor(() => {
       const ogTitle = document.querySelector('meta[property="og:title"]');
       const ogImage = document.querySelector('meta[property="og:image"]');
+      const ogAlt = document.querySelector('meta[property="og:image:alt"]');
       const twitterCard = document.querySelector('meta[name="twitter:card"]');
 
       expect(ogTitle?.getAttribute("content")).toBe("Dev Grant - Alice – Fluxora");
       expect(ogImage?.getAttribute("content")).toBe(
-        `${window.location.origin}/og-image/STR-001.png?v=0`,
+        `${window.location.origin}/og-image/STR-001.png?v=${expectedTimestamp}`,
       );
+      expect(ogAlt?.getAttribute("content")).toContain("Fluxora stream Dev Grant - Alice");
       expect(twitterCard?.getAttribute("content")).toBe("summary_large_image");
     });
   });
@@ -94,10 +97,11 @@ describe("StreamDetail MetaTags Integration", () => {
     });
   });
 
-  it("omits the cache-busting query when updatedAt is missing", async () => {
+  it("omits the cache-busting query when updatedAt and endDate are missing", async () => {
     const helmetContext = {};
     const streamWithoutUpdate = {
       ...mockStream,
+      endDate: "",
       updatedAt: undefined,
     };
 
@@ -115,8 +119,8 @@ describe("StreamDetail MetaTags Integration", () => {
 
       expect(imageContent).not.toContain("v=NaN");
       expect(twitterContent).not.toContain("v=NaN");
-      expect(imageContent).toContain("https://fluxora.app/og-image/STR-001.png");
-      expect(twitterContent).toContain("https://fluxora.app/og-image/STR-001.png");
+      expect(imageContent).toContain(`${window.location.origin}/og-image/STR-001.png`);
+      expect(twitterContent).toContain(`${window.location.origin}/og-image/STR-001.png`);
     });
   });
 });

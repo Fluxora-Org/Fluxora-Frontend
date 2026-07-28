@@ -10,7 +10,11 @@ export interface PreviewValidateStepProps {
   onRowsChange: (rows: CsvRow[]) => void;
   onReview: () => void;
   onReplaceFile: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
+
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -289,6 +293,9 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
   onRowsChange,
   onReview,
   onReplaceFile,
+  isLoading,
+  error,
+  onRetry,
 }) => {
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [liveMessage, setLiveMessage] = useState('');
@@ -392,6 +399,36 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
     setIsConfirmModalOpen(false);
   }, []);
 
+  if (isLoading) {
+    return (
+      <div className="csv-preview-step csv-preview-step--loading" aria-busy="true" aria-live="polite">
+        <div className="csv-preview-loading-spinner" />
+        <p>Loading preview...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="csv-preview-step csv-preview-step--error" role="alert">
+        <div className="csv-preview-error-content">
+          <ErrorIcon />
+          <p>{error}</p>
+        </div>
+        <div className="csv-preview-error-actions">
+          {onRetry && (
+            <button type="button" className="btn btn-secondary" onClick={onRetry}>
+              Retry
+            </button>
+          )}
+          <button type="button" className="btn btn-back" onClick={onReplaceFile}>
+            Replace CSV
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="csv-preview-step">
       {/* ── Summary bar ── */}
@@ -453,7 +490,16 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="csv-preview-empty-state">
+                  <div className="csv-preview-empty-content">
+                    <p>No valid rows found in this file.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => {
               const isEditing = editingRowId === row.id;
               const firstFieldError = Object.entries(row.fieldErrors)[0];
 

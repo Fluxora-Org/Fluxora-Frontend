@@ -1219,3 +1219,30 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   14. CROSS-TAB THEME TRANSITION (.theme-transitioning)
+   ═══════════════════════════════════════════════════════════
+   See docs/THEME_CROSSFADE_TRANSITION_SPEC.md for the full design.
+
+   `ThemeProvider.applyTheme()` toggles `.theme-transitioning` on <html>
+   around every theme change (immediately before the `data-theme` update,
+   removed after the transition duration — deferred via `visibilitychange`
+   while the tab is hidden, so a background-tab flip cross-fades on refocus
+   instead of reading as an instant, jarring flash). The class was already
+   wired up on the JS side; this section supplies the CSS that was
+   previously missing, per the spec's documented property list:
+   background-color, border-color, color, fill, stroke transition; focus
+   rings (box-shadow/outline) are intentionally excluded so they never look
+   ambiguous mid-fade. `prefers-reduced-motion` is handled globally above,
+   which also zeroes this duration. */
+
+.theme-transitioning,
+.theme-transitioning * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: var(--transition-base);
+  transition-timing-function: var(--ease-in-out);
+}
+
+.theme-transitioning *:focus-visible {
+  transition: none;
+}

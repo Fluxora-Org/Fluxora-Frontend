@@ -283,7 +283,7 @@ describe("StreamComparePane rendering", () => {
     expect(screen.getByText(/difference(s)?/)).toBeInTheDocument();
   });
 
-  it("calls onExit when Remove (✕) button is clicked on left pane", async () => {
+  it("removes left pane when Remove (✕) is clicked on left pane, keeps right pane visible", async () => {
     const onExit = vi.fn();
     const user = userEvent.setup();
 
@@ -302,10 +302,22 @@ describe("StreamComparePane rendering", () => {
     const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
     await user.click(removeBtns[0]);
 
-    expect(onExit).toHaveBeenCalledTimes(1);
+    // Left pane should show "Pane removed" empty state
+    await waitFor(() => {
+      expect(screen.getByText(/Pane removed/i)).toBeInTheDocument();
+    });
+
+    // Right pane should still be shown
+    expect(screen.getByText("Pane B")).toBeInTheDocument();
+
+    // Toolbar should reflect 1 stream
+    expect(screen.getByText(/Comparing 1 stream/i)).toBeInTheDocument();
+
+    // onExit should NOT have been called (we're still in compare mode with 1 pane)
+    expect(onExit).not.toHaveBeenCalled();
   });
 
-  it("calls onExit when Remove (✕) button is clicked on right pane", async () => {
+  it("removes right pane when Remove (✕) is clicked on right pane, keeps left pane visible", async () => {
     const onExit = vi.fn();
     const user = userEvent.setup();
 
@@ -324,7 +336,56 @@ describe("StreamComparePane rendering", () => {
     const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
     await user.click(removeBtns[1]);
 
-    expect(onExit).toHaveBeenCalledTimes(1);
+    // Right pane should show "Pane removed" empty state
+    await waitFor(() => {
+      expect(screen.getByText(/Pane removed/i)).toBeInTheDocument();
+    });
+
+    // Left pane should still be shown
+    expect(screen.getByText("Pane A")).toBeInTheDocument();
+
+    // Toolbar should reflect 1 stream
+    expect(screen.getByText(/Comparing 1 stream/i)).toBeInTheDocument();
+
+    // onExit should NOT have been called
+    expect(onExit).not.toHaveBeenCalled();
+  });
+
+  it("calls onExit only when both panes have been removed", async () => {
+    const onExit = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <StreamComparePane
+        leftId="STR-LEFT"
+        rightId="STR-RIGHT"
+        onExit={onExit}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByLabelText(/Remove .* from comparison/i)).toHaveLength(2);
+    });
+
+    const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
+
+    // Remove left pane first
+    await user.click(removeBtns[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pane removed/i)).toBeInTheDocument();
+    });
+
+    expect(onExit).not.toHaveBeenCalled();
+
+    // Now remove the right pane via the remaining Remove button
+    const remainingRemoveBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
+    await user.click(remainingRemoveBtns[0]);
+
+    // onExit should be called since both panes are now empty
+    await waitFor(() => {
+      expect(onExit).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("swaps pane IDs when the Swap button is clicked", async () => {

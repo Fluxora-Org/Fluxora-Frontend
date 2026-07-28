@@ -44,6 +44,11 @@
   color: var(--muted);
 }
 
+.csv-preview-badge--valid {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-success, #10b981);
+}
+
 .csv-replace-link {
   margin-left: auto;
   background: none;
@@ -459,3 +464,54 @@
     min-width: unset;
   }
 }
+
+/* ─── Edge states ───────────────────────────────────────────────────────── */
+.csv-preview-step--loading,
+.csv-preview-step--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  background: var(--surface-raised);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  gap: 1rem;
+}
+
+.csv-preview-loading-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.csv-preview-error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-danger, #ef4444);
+}
+
+.csv-preview-error-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.csv-preview-empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+
