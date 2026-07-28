@@ -2,48 +2,53 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import ReportBuilderPanel from "../ReportBuilderPanel";
 import type { Stream } from "../Stream";
-import { downloadReportCSV } from "../../../utils/reportExporter";
+import {
+  downloadReportCSV,
+  printReportAsPDF,
+} from "../../../utils/reportExporter";
 
-// Mock the report exporter utilities to avoid browser API dependencies
-vi.mock("../../../utils/reportExporter", () => ({
-  filterStreamsByDateRange: vi.fn((streams: Stream[], startDate: string, endDate: string) => {
-    // Simple passthrough mock — filters by date if provided, otherwise returns all
-    if (!startDate && !endDate) return streams;
-    return streams;
-  }),
-  downloadReportCSV: vi.fn(),
-  printReportAsPDF: vi.fn(),
-}));
+const addToast = vi.fn();
 
-// Mock the toast provider
+// Keep real date filtering / grouping; stub only download side effects.
+vi.mock("../../../utils/reportExporter", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../utils/reportExporter")>();
+  return {
+    ...actual,
+    downloadReportCSV: vi.fn(),
+    printReportAsPDF: vi.fn(),
+  };
+});
+
 vi.mock("../../toast/ToastProvider", () => ({
-  useToast: () => ({ addToast: vi.fn() }),
+  useToast: () => ({ addToast }),
 }));
 
-// Helper: render panel with fixture streams
 const fixtureStreams: Stream[] = [
   {
     id: "1",
     name: "Stream Alpha",
-    recipient: "GA...AAAA",
+    recipient: "GAAAAA",
     rate: "100 USDC",
     accruedAmount: 500,
     status: "Active",
+    startDate: "2026-01-10",
   },
   {
     id: "2",
     name: "Stream Beta",
-    recipient: "GB...BBBB",
+    recipient: "GBBBBB",
     rate: "50 USDC",
     accruedAmount: 250,
     status: "Paused",
+    startDate: "2026-03-15",
   },
   {
     id: "3",
     name: "Stream Gamma",
-    recipient: "GC...CCCC",
+    recipient: "GAAAAA",
     rate: "200 USDC",
     status: "Completed",
+    startDate: "2026-06-01",
   },
 ];
 
@@ -72,14 +77,11 @@ describe("ReportBuilderPanel", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // ── handleFieldToggle: adding and removing fields ─────────────────────
+  // ── handleFieldToggle ─────────────────────────────────────────────────
 
-  it("renders all five field checkboxes unchecked by default when none selected", () => {
+  it("renders field checkboxes with the documented defaults", () => {
     renderPanel();
-    const checkboxes = screen.getAllByRole("checkbox");
-    // All 5 fields should be rendered
-    expect(checkboxes).toHaveLength(5);
-    // By default name, recipient, rate, status are selected; accruedAmount is not
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
     expect(screen.getByLabelText("Name")).toBeChecked();
     expect(screen.getByLabelText("Recipient")).toBeChecked();
     expect(screen.getByLabelText("Rate")).toBeChecked();
@@ -90,8 +92,6 @@ describe("ReportBuilderPanel", () => {
   it("toggles a field off when clicking an already-checked checkbox", () => {
     renderPanel();
     const nameCheckbox = screen.getByLabelText("Name");
-    expect(nameCheckbox).toBeChecked();
-
     fireEvent.click(nameCheckbox);
     expect(nameCheckbox).not.toBeChecked();
   });
@@ -99,26 +99,19 @@ describe("ReportBuilderPanel", () => {
   it("toggles a field on when clicking an unchecked checkbox", () => {
     renderPanel();
     const accruedCheckbox = screen.getByLabelText("Accrued Amount");
-    expect(accruedCheckbox).not.toBeChecked();
-
     fireEvent.click(accruedCheckbox);
     expect(accruedCheckbox).toBeChecked();
   });
 
   it("toggles multiple fields independently", () => {
     renderPanel();
-    const nameCb = screen.getByLabelText("Name");
-    const rateCb = screen.getByLabelText("Rate");
-    const accruedCb = screen.getByLabelText("Accrued Amount");
+    fireEvent.click(screen.getByLabelText("Name"));
+    fireEvent.click(screen.getByLabelText("Rate"));
+    fireEvent.click(screen.getByLabelText("Accrued Amount"));
 
-    // Deselect Name and Rate, select Accrued Amount
-    fireEvent.click(nameCb);
-    fireEvent.click(rateCb);
-    fireEvent.click(accruedCb);
-
-    expect(nameCb).not.toBeChecked();
-    expect(rateCb).not.toBeChecked();
-    expect(accruedCb).toBeChecked();
+    expect(screen.getByLabelText("Name")).not.toBeChecked();
+    expect(screen.getByLabelText("Rate")).not.toBeChecked();
+    expect(screen.getByLabelText("Accrued Amount")).toBeChecked();
     expect(screen.getByLabelText("Recipient")).toBeChecked();
     expect(screen.getByLabelText("Status")).toBeChecked();
   });
@@ -126,120 +119,94 @@ describe("ReportBuilderPanel", () => {
   it("re-adds a field after toggling it off", () => {
     renderPanel();
     const nameCb = screen.getByLabelText("Name");
-
     fireEvent.click(nameCb);
     expect(nameCb).not.toBeChecked();
-
     fireEvent.click(nameCb);
     expect(nameCb).toBeChecked();
   });
 
-  // ── canExport gating and Export-button-disabled behavior ──────────────
+  // ── canExport gating ──────────────────────────────────────────────────
 
   it("renders the Export button enabled when at least one field is selected", () => {
     renderPanel();
-    const exportBtn = screen.getByRole("button", { name: /Export CSV/i });
-    expect(exportBtn).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeEnabled();
   });
 
   it("disables the Export button when no fields are selected", () => {
     renderPanel();
-    // Deselect all four default-selected fields
     fireEvent.click(screen.getByLabelText("Name"));
     fireEvent.click(screen.getByLabelText("Recipient"));
     fireEvent.click(screen.getByLabelText("Rate"));
     fireEvent.click(screen.getByLabelText("Status"));
-
-    const exportBtn = screen.getByRole("button", { name: /Export CSV/i });
-    expect(exportBtn).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
   });
 
   it("re-enables the Export button after deselecting all fields and then selecting one", () => {
     renderPanel();
-    // Deselect all default-selected fields
     fireEvent.click(screen.getByLabelText("Name"));
     fireEvent.click(screen.getByLabelText("Recipient"));
     fireEvent.click(screen.getByLabelText("Rate"));
     fireEvent.click(screen.getByLabelText("Status"));
-
     expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
-
-    // Select one field
     fireEvent.click(screen.getByLabelText("Accrued Amount"));
     expect(screen.getByRole("button", { name: /Export CSV/i })).toBeEnabled();
   });
 
-
-
-  // ── grouping state changes ────────────────────────────────────────────
+  // ── grouping ──────────────────────────────────────────────────────────
 
   it("renders the grouping select with default value None", () => {
     renderPanel();
-    const groupingSelect = screen.getByLabelText("Grouping");
-    expect(groupingSelect).toBeInTheDocument();
-    expect(groupingSelect).toHaveValue("None");
+    expect(screen.getByLabelText("Grouping")).toHaveValue("None");
   });
 
   it("updates grouping state when selecting By Recipient", () => {
     renderPanel();
-    const groupingSelect = screen.getByLabelText("Grouping");
-    fireEvent.change(groupingSelect, { target: { value: "Recipient" } });
-    expect(groupingSelect).toHaveValue("Recipient");
+    fireEvent.change(screen.getByLabelText("Grouping"), { target: { value: "Recipient" } });
+    expect(screen.getByLabelText("Grouping")).toHaveValue("Recipient");
   });
 
   it("updates grouping state when selecting By Status", () => {
     renderPanel();
-    const groupingSelect = screen.getByLabelText("Grouping");
-    fireEvent.change(groupingSelect, { target: { value: "Status" } });
-    expect(groupingSelect).toHaveValue("Status");
+    fireEvent.change(screen.getByLabelText("Grouping"), { target: { value: "Status" } });
+    expect(screen.getByLabelText("Grouping")).toHaveValue("Status");
   });
 
   it("cycles through grouping options", () => {
     renderPanel();
     const groupingSelect = screen.getByLabelText("Grouping") as HTMLSelectElement;
-
     fireEvent.change(groupingSelect, { target: { value: "Recipient" } });
     expect(groupingSelect.value).toBe("Recipient");
-
     fireEvent.change(groupingSelect, { target: { value: "Status" } });
     expect(groupingSelect.value).toBe("Status");
-
     fireEvent.change(groupingSelect, { target: { value: "None" } });
     expect(groupingSelect.value).toBe("None");
   });
 
-  // ── exportFormat state changes ────────────────────────────────────────
+  // ── exportFormat ──────────────────────────────────────────────────────
 
   it("renders format radio buttons with CSV selected by default", () => {
     renderPanel();
-    const csvRadio = screen.getByLabelText("CSV");
-    const pdfRadio = screen.getByLabelText("PDF");
-
-    expect(csvRadio).toBeChecked();
-    expect(pdfRadio).not.toBeChecked();
+    expect(screen.getByLabelText("CSV")).toBeChecked();
+    expect(screen.getByLabelText("PDF")).not.toBeChecked();
   });
 
   it("updates exportFormat to PDF when selecting the PDF radio", () => {
     renderPanel();
-    const pdfRadio = screen.getByLabelText("PDF");
-    fireEvent.click(pdfRadio);
-
-    expect(pdfRadio).toBeChecked();
+    fireEvent.click(screen.getByLabelText("PDF"));
+    expect(screen.getByLabelText("PDF")).toBeChecked();
     expect(screen.getByLabelText("CSV")).not.toBeChecked();
   });
 
   it("updates export button label when switching between CSV and PDF", () => {
     renderPanel();
     expect(screen.getByRole("button", { name: /Export CSV/i })).toBeInTheDocument();
-
     fireEvent.click(screen.getByLabelText("PDF"));
     expect(screen.getByRole("button", { name: /Export PDF/i })).toBeInTheDocument();
-
     fireEvent.click(screen.getByLabelText("CSV"));
     expect(screen.getByRole("button", { name: /Export CSV/i })).toBeInTheDocument();
   });
 
-  // ── Preview table ─────────────────────────────────────────────────────
+  // ── Preview / filtering / grouping ────────────────────────────────────
 
   it("shows stream names in the preview table", () => {
     renderPanel();
@@ -253,15 +220,42 @@ describe("ReportBuilderPanel", () => {
     expect(screen.getByText("No data to preview.")).toBeInTheDocument();
   });
 
-  // ── Start/End date inputs ─────────────────────────────────────────────
+  it("filters the live preview when the date range changes", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-02-01" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-04-30" } });
+
+    expect(screen.queryByText("Stream Alpha")).not.toBeInTheDocument();
+    expect(screen.getByText("Stream Beta")).toBeInTheDocument();
+    expect(screen.queryByText("Stream Gamma")).not.toBeInTheDocument();
+  });
+
+  it("groups the live preview when grouping by recipient", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Grouping"), { target: { value: "Recipient" } });
+
+    expect(screen.getByText("GAAAAA")).toBeInTheDocument();
+    expect(screen.getByText("GBBBBB")).toBeInTheDocument();
+
+    const names = screen.getAllByText(/Stream (Alpha|Beta|Gamma)/).map((el) => el.textContent);
+    // Recipient groups preserve encounter order: GAAAAA (Alpha, Gamma), then GBBBBB (Beta)
+    expect(names).toEqual(["Stream Alpha", "Stream Gamma", "Stream Beta"]);
+  });
+
+  it("shows no preview rows when the date range excludes every stream", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2027-01-01" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2027-12-31" } });
+    expect(screen.getByText("No data to preview.")).toBeInTheDocument();
+  });
+
+  // ── Date inputs / validation ──────────────────────────────────────────
 
   it("renders date inputs for start and end date", () => {
     renderPanel();
     expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
     expect(screen.getByLabelText("End Date")).toBeInTheDocument();
   });
-
-  // ── Date validation ────────────────────────────────────────────────────
 
   it("shows date error when end date is before start date", () => {
     renderPanel();
@@ -290,7 +284,7 @@ describe("ReportBuilderPanel", () => {
     expect(screen.queryByText("End date must be on or after the start date.")).not.toBeInTheDocument();
   });
 
-  // ── Keyboard handling ──────────────────────────────────────────────────
+  // ── Keyboard handling ─────────────────────────────────────────────────
 
   it("calls onClose when Escape key is pressed", () => {
     const { onClose } = renderPanel();
@@ -304,7 +298,68 @@ describe("ReportBuilderPanel", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // ── Export retry ───────────────────────────────────────────────────────
+  // ── Real export trigger path ──────────────────────────────────────────
+
+  it("exports CSV with the date-filtered streams, selected fields, and grouping", () => {
+    const { onClose } = renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-02-01" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2026-04-30" } });
+    fireEvent.change(screen.getByLabelText("Grouping"), { target: { value: "Status" } });
+    fireEvent.click(screen.getByLabelText("Rate")); // deselect rate
+
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+
+    expect(downloadReportCSV).toHaveBeenCalledTimes(1);
+    const [streamsArg, fieldsArg, groupingArg] = vi.mocked(downloadReportCSV).mock.calls[0]!;
+    expect(streamsArg.map((s) => s.id)).toEqual(["2"]);
+    expect(fieldsArg).toEqual(["name", "recipient", "status"]);
+    expect(groupingArg).toBe("Status");
+    expect(addToast).toHaveBeenCalledWith("Successfully exported report as CSV", "success");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("exports PDF through printReportAsPDF and only then shows success", () => {
+    const { onClose } = renderPanel();
+    fireEvent.click(screen.getByLabelText("PDF"));
+    fireEvent.click(screen.getByRole("button", { name: /Export PDF/i }));
+
+    expect(printReportAsPDF).toHaveBeenCalledTimes(1);
+    expect(downloadReportCSV).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith("Successfully exported report as PDF", "success");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a success toast when CSV export throws", () => {
+    vi.mocked(downloadReportCSV).mockImplementationOnce(() => {
+      throw new Error("Export failed");
+    });
+    const { onClose } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));
+
+    expect(addToast).toHaveBeenCalledWith("Failed to export report. Please try again.", "error");
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.stringContaining("Successfully exported"),
+      "success",
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Retry Export/i })).toBeInTheDocument();
+  });
+
+  it("does not show a success toast when PDF export throws", () => {
+    vi.mocked(printReportAsPDF).mockImplementationOnce(() => {
+      throw new Error("Popup blocked");
+    });
+    const { onClose } = renderPanel();
+    fireEvent.click(screen.getByLabelText("PDF"));
+    fireEvent.click(screen.getByRole("button", { name: /Export PDF/i }));
+
+    expect(addToast).toHaveBeenCalledWith("Failed to export report. Please try again.", "error");
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.stringContaining("Successfully exported"),
+      "success",
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
   it("shows retry button when export fails", () => {
     vi.mocked(downloadReportCSV).mockImplementationOnce(() => {
@@ -317,7 +372,9 @@ describe("ReportBuilderPanel", () => {
 
   it("hides retry button after retry succeeds", () => {
     vi.mocked(downloadReportCSV)
-      .mockImplementationOnce(() => { throw new Error("Export failed"); })
+      .mockImplementationOnce(() => {
+        throw new Error("Export failed");
+      })
       .mockImplementationOnce(() => {});
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /Export CSV/i }));

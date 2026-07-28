@@ -3,6 +3,7 @@ import { Stream } from "./Stream";
 import { useToast } from "../toast/ToastProvider";
 import {
   filterStreamsByDateRange,
+  groupStreams,
   downloadReportCSV,
   printReportAsPDF,
 } from "../../utils/reportExporter";
@@ -18,6 +19,14 @@ export type ExportFormat = "CSV" | "PDF";
 
 const FIELD_ORDER: Field[] = ["name", "recipient", "rate", "accruedAmount", "status"];
 
+const allFields: { key: Field; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "recipient", label: "Recipient" },
+  { key: "rate", label: "Rate" },
+  { key: "accruedAmount", label: "Accrued Amount" },
+  { key: "status", label: "Status" },
+];
+
 export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPanelProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -31,6 +40,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
   const [dateError, setDateError] = useState("");
   const [exportError, setExportError] = useState(false);
   const { addToast } = useToast();
+  const panelRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
 
   // Track mounted state for safe async state updates
@@ -49,6 +59,15 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
       return next;
     });
   }, []);
+
+  // Validate date range
+  useEffect(() => {
+    if (startDate && endDate && endDate < startDate) {
+      setDateError("End date must be on or after the start date.");
+    } else {
+      setDateError("");
+    }
+  }, [startDate, endDate]);
 
   // Deterministic preview loading: triggered on filter change, resolved
   // at the next animation frame so the DOM can paint the loading overlay.
@@ -86,6 +105,12 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     [streams, startDate, endDate]
   );
 
+  // Preview mirrors export: date-filtered streams in grouping order (no placeholder slice).
+  const previewGroups = useMemo(
+    () => groupStreams(reportStreams, grouping),
+    [reportStreams, grouping]
+  );
+
   const orderedSelectedFields = useMemo(
     () => FIELD_ORDER.filter((f) => selectedFields.has(f)),
     [selectedFields]
@@ -113,17 +138,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     }
   }, [canExport, exportFormat, reportStreams, orderedSelectedFields, grouping, addToast, onClose]);
 
-  const filteredStreams = useMemo(() => {
-    return reportStreams.slice(0, 5);
-  }, [reportStreams]);
-
-  const allFields: { key: Field; label: string }[] = [
-    { key: "name", label: "Name" },
-    { key: "recipient", label: "Recipient" },
-    { key: "rate", label: "Rate" },
-    { key: "accruedAmount", label: "Accrued Amount" },
-    { key: "status", label: "Status" },
-  ];
+  const hasPreviewRows = previewGroups.some(([, groupList]) => groupList.length > 0);
 
   return (
     <div
@@ -225,7 +240,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               <option value="Status">By Status</option>
             </select>
           </div>
-          
+
           <div>
             <span className="block text-sm font-medium text-[var(--color-text-primary)] mb-1">Export Format</span>
             <div className="flex gap-4">
@@ -283,29 +298,55 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
                   letterSpacing: "0.05em",
                 }}
               >
-                {allFields.map((f) => (
-                  selectedFields.has(f.key) && (
-                    <th key={f.key} scope="col" className="py-4 px-3 uppercase">
-                      {f.label}
-                    </th>
-                  )
-                ))}
+                {allFields.map(
+                  (f) =>
+                    selectedFields.has(f.key) && (
+                      <th key={f.key} scope="col" className="py-4 px-3 uppercase">
+                        {f.label}
+                      </th>
+                    )
+                )}
               </tr>
             </thead>
             <tbody>
-              {filteredStreams.length > 0 ? (
-                filteredStreams.map((s, i) => (
-                  <tr key={s.id || i} className="border-t" style={{ borderColor: "var(--color-border-default)" }}>
-                    {selectedFields.has("name") && <td className="py-3 px-3 text-sm">{s.name}</td>}
-                    {selectedFields.has("recipient") && <td className="py-3 px-3 text-sm font-mono">{s.recipient.substring(0,6)}...</td>}
-                    {selectedFields.has("rate") && <td className="py-3 px-3 text-sm">{s.rate}</td>}
-                    {selectedFields.has("accruedAmount") && <td className="py-3 px-3 text-sm">{s.accruedAmount || "-"}</td>}
-                    {selectedFields.has("status") && <td className="py-3 px-3 text-sm">{s.status}</td>}
-                  </tr>
-                ))
+              {hasPreviewRows ? (
+                previewGroups.flatMap(([groupName, groupList]) => {
+                  const groupHeader =
+                    grouping !== "None" ? (
+                      <tr
+                        key={`group-${groupName}`}
+                        className="border-t"
+                        style={{ borderColor: "var(--color-border-default)", backgroundColor: "var(--color-surface-raised)" }}
+                      >
+                        <td
+                          colSpan={Math.max(selectedFields.size, 1)}
+                          className="py-2 px-3 text-xs font-semibold uppercase tracking-wide"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
+                          {groupName || "Ungrouped"}
+                        </td>
+                      </tr>
+                    ) : null;
+
+                  const streamRows = groupList.map((s, i) => (
+                    <tr key={s.id || `${groupName}-${i}`} className="border-t" style={{ borderColor: "var(--color-border-default)" }}>
+                      {selectedFields.has("name") && <td className="py-3 px-3 text-sm">{s.name}</td>}
+                      {selectedFields.has("recipient") && (
+                        <td className="py-3 px-3 text-sm font-mono">{s.recipient.substring(0, 6)}...</td>
+                      )}
+                      {selectedFields.has("rate") && <td className="py-3 px-3 text-sm">{s.rate}</td>}
+                      {selectedFields.has("accruedAmount") && (
+                        <td className="py-3 px-3 text-sm">{s.accruedAmount || "-"}</td>
+                      )}
+                      {selectedFields.has("status") && <td className="py-3 px-3 text-sm">{s.status}</td>}
+                    </tr>
+                  ));
+
+                  return groupHeader ? [groupHeader, ...streamRows] : streamRows;
+                })
               ) : (
                 <tr>
-                  <td colSpan={selectedFields.size} className="py-4 px-3 text-center" style={{ color: "var(--color-text-muted)" }}>
+                  <td colSpan={selectedFields.size || 1} className="py-4 px-3 text-center" style={{ color: "var(--color-text-muted)" }}>
                     No data to preview.
                   </td>
                 </tr>

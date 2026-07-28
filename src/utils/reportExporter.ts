@@ -149,7 +149,11 @@ export function printReportAsPDF(
   grouping: Grouping
 ): void {
   const printWindow = window.open("", "_blank", "width=900,height=700");
-  if (!printWindow) return;
+  if (!printWindow) {
+    throw new Error(
+      "Unable to open print window. Please allow pop-ups and try again.",
+    );
+  }
 
   const rows = groupStreams(streams, grouping)
     .map(([groupName, groupStreamsList]) => {
