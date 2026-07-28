@@ -358,3 +358,27 @@ export function formatLocalISOWithOffset(dateInput: Date | string): string {
   }
 }
 
+/**
+ * Formats a Date object and timezone into a human-readable UTC offset string.
+ * Example: "UTC+00:00", "UTC-07:00", "UTC+01:00"
+ */
+export function getFormattedUTCOffset(dateInput?: Date | string, tz?: string): string {
+  const date = dateInput ? (typeof dateInput === "string" ? new Date(dateInput) : dateInput) : new Date();
+  const timezone = tz || getBrowserTimezone();
+
+  if (timezone === "UTC") return "UTC+00:00";
+
+  try {
+    const offsetMin = date.getTimezoneOffset();
+    const absOffsetMin = Math.abs(offsetMin);
+    const offsetHours = Math.floor(absOffsetMin / 60);
+    const offsetMinutes = absOffsetMin % 60;
+    const sign = offsetMin <= 0 ? "+" : "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
+  } catch (e) {
+    return "UTC+00:00";
+  }
+}
+
+

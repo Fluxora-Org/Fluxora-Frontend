@@ -58,7 +58,9 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: mockPathname }),
+  useNavigate: () => vi.fn(),
 }));
+
 
 // localStorage stub
 beforeEach(() => {

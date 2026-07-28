@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Type, Search, Command } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
@@ -11,9 +11,13 @@ import {
   formatNavbarTime,
   formatLocalISOWithOffset,
   getBrowserTimezone,
+  getFormattedUTCOffset,
 } from "../../lib/timePresentation";
+
 import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
+
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -148,21 +152,6 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
     return items;
   }, [pathname]);
-}
-
-function getFormattedUTCOffset(date: Date, tz: string): string {
-  if (tz === "UTC") return "UTC+00:00";
-  try {
-    const offsetMin = date.getTimezoneOffset();
-    const absOffsetMin = Math.abs(offsetMin);
-    const offsetHours = Math.floor(absOffsetMin / 60);
-    const offsetMinutes = absOffsetMin % 60;
-    const sign = offsetMin <= 0 ? "+" : "-";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
-  } catch (e) {
-    return "UTC+00:00";
-  }
 }
 
 function NavbarTimeIndicator() {
