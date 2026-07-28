@@ -70,7 +70,10 @@ describe("AppNavbar wallet disconnect flow", () => {
     renderNavbar();
     act(() => vi.runAllTimers());
 
-    const walletTrigger = screen.getByRole("button", {
+    // The wallet area renders twice (desktop cluster + mobile duplicate,
+    // visibility is CSS-only) — interact with the first (desktop) trigger.
+    // See docs/NAVBAR_KEYBOARD_NAVIGATION_SPEC.md § 2.
+    const [walletTrigger] = screen.getAllByRole("button", {
       name: /wallet gabcde.*open wallet options/i,
     });
 
@@ -100,9 +103,9 @@ describe("AppNavbar wallet disconnect flow", () => {
     act(() => vi.runAllTimers());
 
     fireEvent.click(
-      screen.getByRole("button", {
+      screen.getAllByRole("button", {
         name: /wallet gabcde.*open wallet options/i,
-      }),
+      })[0],
     );
     fireEvent.click(screen.getByRole("menuitem", { name: /^disconnect$/i }));
     fireEvent.click(screen.getByRole("button", { name: /disconnect wallet/i }));
@@ -120,9 +123,12 @@ describe("AppNavbar wallet disconnect flow", () => {
     );
     act(() => vi.runAllTimers());
 
-    const connectWallet = screen.getByRole("link", {
+    const connectLinks = screen.getAllByRole("link", {
       name: /connect your stellar wallet/i,
     });
-    expect(connectWallet).toHaveAttribute("href", "/connect-wallet");
+    expect(connectLinks.length).toBeGreaterThanOrEqual(1);
+    connectLinks.forEach((link) => {
+      expect(link).toHaveAttribute("href", "/connect-wallet");
+    });
   });
 });
