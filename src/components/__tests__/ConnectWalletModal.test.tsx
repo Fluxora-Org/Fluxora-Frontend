@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -391,7 +391,6 @@ describe("ConnectWalletModal", () => {
       const title = screen.getByText('Choose your wallet');
       expect(title).toHaveAttribute('id', 'connect-wallet-modal-title');
     });
-  });
   });
 });
 

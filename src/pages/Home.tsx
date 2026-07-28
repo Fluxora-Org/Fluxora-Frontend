@@ -117,15 +117,15 @@ export default function Home() {
     // do not expose `window`).
     if (typeof window === "undefined") return;
 
-    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     // Debounced handler — collapses rapid resize / orientationchange events
     // into a single state update so re-renders are kept to a minimum.
     const handleResize = () => {
       if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
       }
-      timeoutId = window.setTimeout(() => {
+      timeoutId = setTimeout(() => {
         timeoutId = undefined;
         setIsMobileLayout(isMobileViewport());
       }, VIEWPORT_RESIZE_DEBOUNCE_MS);
@@ -142,7 +142,7 @@ export default function Home() {
       // Cancel any in-flight debounce so unmounting components can never
       // trigger a state update on an already-unmounted tree.
       if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
       }
     };
   }, []);

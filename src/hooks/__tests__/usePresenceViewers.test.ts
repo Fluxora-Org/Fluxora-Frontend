@@ -165,7 +165,7 @@ describe("usePresenceViewers — edge cases", () => {
     const { result, rerender } = renderHook(
       ({ id }: { id: string | undefined }) =>
         usePresenceViewers(id, mockViewers),
-      { initialProps: { id: "STR-123" } }
+      { initialProps: { id: "STR-123" as string | undefined } }
     );
 
     expect(result.current.viewers).toHaveLength(1);

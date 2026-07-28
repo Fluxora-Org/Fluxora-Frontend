@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from "@testing-library/react";
 import ValuePropositionSection from "../ValuePropositionSection";
 import { vi } from 'vitest';
@@ -37,7 +36,7 @@ describe("ValuePropositionSection", () => {
       "Native Stellar infrastructure. Soroban smart contracts",
     ];
     descriptions.forEach((desc) => {
-      const matches = screen.getAllByText((content, element) => element?.textContent?.includes(desc));
+      const matches = screen.getAllByText((_content, element) => Boolean(element?.textContent?.includes(desc)));
       expect(matches.length).toBeGreaterThan(0);
     });
   });

@@ -608,7 +608,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
                   )}
                 </React.Fragment>
               );
-            })}
+            }))}
           </tbody>
         </table>
       </div>

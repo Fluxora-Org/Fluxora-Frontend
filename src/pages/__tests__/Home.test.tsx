@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
@@ -7,7 +7,18 @@ import Home, {
   LAZY_SECTION_ROOT_MARGIN,
   LAZY_SECTION_SKELETON_HEIGHT,
 } from "../Home";
+import { VIEWPORT_RESIZE_DEBOUNCE_MS } from "../../lib/breakpoints";
 import { ThemeProvider } from "../../theme/ThemeProvider";
+
+let viewportWidth = 1024;
+
+function setViewportWidth(width: number) {
+  viewportWidth = width;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    get: () => viewportWidth,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
