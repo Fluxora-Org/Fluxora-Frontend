@@ -130,6 +130,32 @@ export const en = {
   "createStream.button.back": "Back",
   "createStream.button.cancel": "Cancel",
 
+  // In-flight at-risk marker — see docs/NETWORK_STATUS_BANNER_SPEC.md §6.
+  // Appended to the submit button label while a submission is in flight
+  // and the network status reports degraded connectivity.
+  "createStream.atRisk.networkSuffix": "network is unstable — submission may not complete",
+
+  // ─── Network-status banner (Issue #1044) ──────────────────────────────────
+  // Slow RPC — info-toned, polite live region.
+  "network.banner.slow.title": "Soroban RPC is responding slowly",
+  "network.banner.slow.body":
+    "Recent confirmation checks took longer than expected. New submissions are still going through; please be patient.",
+
+  // Offline — error-toned, assertive live region; user cannot reach network.
+  "network.banner.offline.title": "You're offline",
+  "network.banner.offline.body":
+    "Submissions will be queued locally and sent automatically once your connection returns. You can keep working with already-loaded data.",
+
+  // Reconnecting — warning-toned, polite live region.
+  "network.banner.reconnecting.title": "Reconnecting to Stellar network…",
+  "network.banner.reconnecting.body":
+    "Your connection is back. We're verifying the RPC endpoint before resuming submissions.",
+
+  // Reconnected confirmation pill — success-toned; auto-dismisses after 4 s.
+  "network.banner.reconnectedPill.title": "Connection restored",
+  "network.banner.reconnectedPill.body": "",
+  "network.banner.pillDismissAria": "Dismiss connection restored notification",
+
   "createStream.validation.ratePositive": "Stream rate must be a positive number.",
   "createStream.validation.rateMax": "Stream rate must be {max} USDC/day or less.",
   "createStream.validation.durationPositive": "Duration must be a positive number.",

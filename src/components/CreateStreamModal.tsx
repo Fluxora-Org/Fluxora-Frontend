@@ -8,6 +8,7 @@ import { useWallet } from './wallet-connect/Walletcontext';
 import { useToast } from './toast/ToastProvider';
 import { useTransactionStatus } from '../hooks/useTransactionStatus';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   enqueueAction,
   dequeueAction,
@@ -253,6 +254,11 @@ export default function CreateStreamModal({
   const pendingSubmissionRef = useRef<StreamSubmissionPayload | null>(null);
   const flushedFromQueueRef = useRef(false);
   const isOnline = useOnlineStatus();
+  // App-wide network status; used purely to surface a non-blocking "at-risk"
+  // marker on the submit button when an in-flight submission sits in front
+  // of a degraded RPC connection. See docs/NETWORK_STATUS_BANNER_SPEC.md §6.
+  const networkStatus = useNetworkStatus();
+  const isNetworkAtRisk = networkStatus.isAtRisk;
 
   // Dynamic Contrast Evaluation against selected background theme
   const bgHex = targetTheme === 'dark' ? THEME_BACKGROUNDS.dark : THEME_BACKGROUNDS.light;
@@ -337,6 +343,21 @@ export default function CreateStreamModal({
               : currentStep === 2
                 ? t("createStream.button.next")
                 : t("createStream.button.create");
+
+  // "At-risk" suffix — see docs/NETWORK_STATUS_BANNER_SPEC.md §6. We only
+  // apply this accent when the user is actively submitting; queued-only
+  // submissions are not at-risk because they are captured locally and never
+  // hit the network until the connection returns. Applies to BOTH the
+  // single-stream submit (currentStep === 3) and the bulk dry-run submit.
+  const atRiskSuffix =
+    isNetworkAtRisk &&
+    (isSubmitting ||
+      isConfirmationPending ||
+      isFlushingQueue ||
+      isBulkSubmitting)
+      ? ` — ${t("createStream.atRisk.networkSuffix")}`
+      : "";
+  const submitButtonLabelWithRisk = `${submitButtonLabel}${atRiskSuffix}`;
 
   const guardedClose = useCallback(() => {
     if (isActivelySubmitting) return;
@@ -1124,10 +1145,13 @@ export default function CreateStreamModal({
             disabled={!bulkDryRunConfirmed || isBulkSubmitting}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}
+            data-at-risk={
+              isNetworkAtRisk && isBulkSubmitting ? "true" : undefined
+            }
           >
             {isBulkSubmitting
               ? t("csvUpload.dryRun.submitting")
-              : t("csvUpload.dryRun.submitBtn", { count: validCount })}
+              : t("csvUpload.dryRun.submitBtn", { count: validCount })}${isNetworkAtRisk && isBulkSubmitting ? atRiskSuffix : ""}
           </button>
         </div>
       </>
@@ -3281,7 +3305,7 @@ export default function CreateStreamModal({
                 {(isBusyCreating && currentStep === 3) && (
                   <span className="btn-spinner" aria-hidden="true" data-testid="btn-spinner" />
                 )}
-                {submitButtonLabel}
+                {submitButtonLabelWithRisk}
               </button>
             </>
           )}

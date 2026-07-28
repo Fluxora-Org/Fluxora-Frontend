@@ -172,6 +172,24 @@
   gap: var(--section-gap);
 }
 
+/* Network-status banner host slot.
+   Banner is rendered as the first child of .app-content-area; spans the
+   full width of the content column and never overlaps the skip-link (which
+   remains `position: absolute` at the top of the layout container). */
+.app-content-area > .network-status-banner {
+  align-self: stretch;
+  margin-bottom: calc(var(--space-2, 0.5rem) * -1);
+}
+
+@media (max-width: 860px) {
+  .app-content-area > .network-status-banner {
+    border-radius: 0;
+    margin-left: calc(-1 * var(--space-4, 1rem));
+    margin-right: calc(-1 * var(--space-4, 1rem));
+    width: calc(100% + 2 * var(--space-4, 1rem));
+  }
+}
+
 .app-install-banner {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

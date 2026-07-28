@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
+import NetworkStatusBanner from "./NetworkStatusBanner";
 import "./Layout.css";
 
 /**
@@ -131,6 +132,11 @@ export default function Layout() {
 
         {/* CONTENT */}
         <div className="app-content-area">
+          {/* App-wide network-status banner — never tab-stops; sits above
+              <main> but below the skip-link so the keyboard skip-link still
+              bypasses it. See docs/NETWORK_STATUS_BANNER_SPEC.md §5. */}
+          <NetworkStatusBanner />
+
           <header className="app-mobile-topbar">
             <button
               className="app-mobile-menu-btn"

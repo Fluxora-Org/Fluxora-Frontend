@@ -1,5 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { transactionPollingConfig } from "../lib/transactionConfig";
+import {
+  reportRpcFailure,
+  reportRpcSuccess,
+  type RpcErrorCategory,
+} from "../lib/networkStatus";
+
+/**
+ * Translate polling-harness exceptions into the small set of categories
+ * the network-status store understands. Anything we can not confidently
+ * classify as offline/timeout falls back to `"rpc"` so the banner
+ * surfaces "we don't know what's wrong" instead of staying silent.
+ */
+function classifyRpcError(error: unknown): RpcErrorCategory {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "rpc";
+  }
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (
+      msg.includes("timeout") ||
+      msg.includes("timed out")
+    ) {
+      return "timeout";
+    }
+    if (
+      msg.includes("failed to fetch") ||
+      msg.includes("networkerror") ||
+      msg.includes("network request failed")
+    ) {
+      return "network";
+    }
+  }
+  return "rpc";
+}
 
 /**
  * Transaction lifecycle used by create-stream and withdraw flows.
@@ -124,6 +158,7 @@ export function useTransactionStatus(
 
     const poll = async (attempt: number) => {
       setAttempts(attempt);
+      const attemptStartedAt = Date.now();
 
       try {
         const nextStatus = await getStatus(txHash, {
@@ -132,19 +167,23 @@ export function useTransactionStatus(
         });
 
         if (cancelled) return;
+        const latency = Date.now() - attemptStartedAt;
 
         if (nextStatus === "confirmed") {
+          reportRpcSuccess(latency);
           setStatus("confirmed");
           return;
         }
 
         if (nextStatus === "failed") {
+          reportRpcFailure(latency, "rpc");
           setStatus("failed");
           setError("Transaction failed before confirmation.");
           return;
         }
 
         if (attempt >= maxAttempts) {
+          reportRpcFailure(latency, "timeout");
           setStatus("failed");
           setError("Transaction confirmation timed out.");
           return;
@@ -158,6 +197,9 @@ export function useTransactionStatus(
         }, delay);
       } catch (caughtError) {
         if (cancelled || isAbortError(caughtError)) return;
+        const latency = Date.now() - attemptStartedAt;
+        const category = classifyRpcError(caughtError);
+        reportRpcFailure(latency, category);
         setStatus("failed");
         setError(getErrorMessage(caughtError));
       }
