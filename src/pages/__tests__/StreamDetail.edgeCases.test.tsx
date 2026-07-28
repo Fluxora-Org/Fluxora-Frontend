@@ -557,4 +557,34 @@ describe("StreamDetail - Edge Cases and Error States", () => {
       expect(screen.getByText("STR-999")).toBeInTheDocument();
     });
   });
+
+  describe("Partial data rendering (defaults)", () => {
+    it("renders gracefully when service returns data with defaults for missing properties", async () => {
+      // If the API returns partial data, normalizeStreamRecord (in the service layer)
+      // provides safe defaults. This test ensures the UI renders those defaults properly without crashing.
+      const partialStream = {
+        ...mockStream,
+        name: "Untitled stream", // Default applied by normalizer
+        summary: "",
+        depositAmount: 0,
+        timeline: [],
+      };
+      vi.spyOn(streamsService, "getStreamById").mockResolvedValue(partialStream);
+
+      renderWithHelmet(
+        <MemoryRouter initialEntries={["/app/streams/STR-PARTIAL"]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      // Breadcrumb and Heading use default name
+      const headings = await screen.findAllByRole("heading", { name: "Untitled stream" });
+      expect(headings.length).toBeGreaterThan(0);
+      
+      // Amount formatted as 0 USDC
+      expect(screen.getByText("0.00 USDC")).toBeInTheDocument();
+    });
+  });
 });
