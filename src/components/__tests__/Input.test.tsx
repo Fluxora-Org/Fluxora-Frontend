@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import * as fc from 'fast-check';
 import Input from '../Input';
 
@@ -36,9 +36,6 @@ describe('Input Component Properties', () => {
         expect(describedBy).toBeTruthy();
         
         // CSS Modules make the class name dynamic, so we select by ID
-        // Note: querySelector needs CSS escape for ids containing certain characters, 
-        // but since our component generates them via useId, they might have colons e.g. ":r0:".
-        // It's safer to use document.getElementById or match the id attribute manually.
         const errorEl = container.querySelector(`[id="${describedBy}"]`);
         expect(errorEl).not.toBeNull();
         expect(errorEl!.textContent).toContain(error);
@@ -106,5 +103,83 @@ describe('Input Component Properties', () => {
     
     expect(labelElAfter!.getAttribute('for')).toBe(initialFor);
     expect(inputAfter!.getAttribute('id')).toBe(initialId);
+  });
+});
+
+describe('Input Validation ARIA attributes', () => {
+  it('updates aria-invalid and aria-describedby when error is shown and cleared', () => {
+    const { rerender } = render(
+      <Input id="test-input" label="Test Input" />
+    );
+
+    const input = screen.getByLabelText("Test Input");
+
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(input.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Show error
+    rerender(
+      <Input id="test-input" label="Test Input" error="This field is required" />
+    );
+
+    // Error state
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).not.toBeNull();
+    expect(alert.getAttribute("id")).toBe(describedBy);
+    expect(alert.textContent).toBe("This field is required");
+
+    // Clear error
+    rerender(<Input id="test-input" label="Test Input" />);
+
+    // Cleared state
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(input.getAttribute("aria-describedby")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it('maintains helperText association when error is toggled', () => {
+    const { rerender } = render(
+      <Input id="test-input" label="Test Input" helperText="Helper text here" />
+    );
+
+    const input = screen.getByLabelText("Test Input");
+
+    // Initial state: hint only.
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    const hintDescribedBy = input.getAttribute("aria-describedby");
+    expect(hintDescribedBy).toBeTruthy();
+
+    // Show error
+    rerender(
+      <Input
+        id="test-input"
+        label="Test Input"
+        helperText="Helper text here"
+        error="Now has error"
+      />
+    );
+
+    // Error state: the alert id must be referenced by aria-describedby.
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    const errorDescribedBy = input.getAttribute("aria-describedby");
+    expect(errorDescribedBy).toBeTruthy();
+    expect(errorDescribedBy).not.toBe(hintDescribedBy);
+
+    const alert = screen.getByRole("alert");
+    expect(errorDescribedBy!.split(/\s+/)).toContain(alert.getAttribute("id"));
+
+    // Clear error
+    rerender(
+      <Input id="test-input" label="Test Input" helperText="Helper text here" />
+    );
+
+    // Back to hint only
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(input.getAttribute("aria-describedby")).toBe(hintDescribedBy);
   });
 });
