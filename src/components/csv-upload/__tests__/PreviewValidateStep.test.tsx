@@ -27,7 +27,7 @@ function makeRow(overrides: Partial<CsvRow> = {}): CsvRow {
   };
 }
 
-function renderStep(rows: CsvRow[]) {
+function renderStep(rows: CsvRow[], extraProps: Partial<import('../PreviewValidateStep').PreviewValidateStepProps> = {}) {
   const onRowsChange = vi.fn();
   const onReview = vi.fn();
   const onReplaceFile = vi.fn();
@@ -37,6 +37,7 @@ function renderStep(rows: CsvRow[]) {
       onRowsChange={onRowsChange}
       onReview={onReview}
       onReplaceFile={onReplaceFile}
+      {...extraProps}
     />,
   );
   return { onRowsChange, onReview, onReplaceFile, result };
@@ -180,6 +181,35 @@ describe('PreviewValidateStep', () => {
     it('appends "d" suffix to duration value', () => {
       renderStep([makeRow({ durationDays: '60' })]);
       expect(screen.getByText('60d')).toBeInTheDocument();
+    });
+  });
+
+  describe('edge states', () => {
+    it('renders loading state when isLoading is true', () => {
+      renderStep([], { isLoading: true });
+      expect(screen.getByText('Loading preview...')).toBeInTheDocument();
+      expect(screen.getByRole('status', { busy: true })).toBeInTheDocument();
+    });
+
+    it('renders error state with retry and replace actions', async () => {
+      const user = userEvent.setup();
+      const onRetry = vi.fn();
+      const { onReplaceFile } = renderStep([], { error: 'Failed to parse CSV', onRetry });
+      
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText('Failed to parse CSV')).toBeInTheDocument();
+      
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByRole('button', { name: 'Replace CSV' }));
+      expect(onReplaceFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders empty table body when rows array is empty', () => {
+      renderStep([]);
+      expect(screen.getByText('No valid rows found in this file.')).toBeInTheDocument();
+      expect(screen.queryByRole('row', { name: /Row 1/ })).not.toBeInTheDocument();
     });
   });
 
