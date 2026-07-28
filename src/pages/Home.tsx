@@ -100,6 +100,15 @@ function LazySection({ children, label, "data-testid": testId }: LazySectionProp
 
 export default function Home() {
   const { theme } = useTheme();
+  /**
+   * Tracks whether the current viewport falls under the mobile breakpoint (`< 768px`).
+   * 
+   * This Javascript-driven state works alongside CSS media queries. The outcome is
+   * bound to the `<main>` element as `data-mobile-layout="mobile" | "desktop"`.
+   * Child sections rely on this data attribute to cascade large-scale structural
+   * layout shifts (like column stacking or margin removal) safely without repeating
+   * media queries deeply inside inline styles or deeply nested CSS.
+   */
   const [isMobileLayout, setIsMobileLayout] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -108,6 +117,11 @@ export default function Home() {
     return isMobileViewport();
   });
 
+  /**
+   * Evaluates the mobile viewport condition on window resize.
+   * Uses a debounce timer (`VIEWPORT_RESIZE_DEBOUNCE_MS`) to prevent layout thrashing
+   * and excessive React renders during active window resizing.
+   */
   useEffect(() => {
     if (typeof window === "undefined") {
       return;

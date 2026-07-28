@@ -565,3 +565,66 @@ describe("Home page accessibility - landmarks and heading hierarchy", () => {
     expect(results.violations).toEqual([]);
   });
 });
+
+// ===========================================================================
+// SUITE 9 – Responsive Layout Breakpoints
+// ===========================================================================
+
+describe("Home – Responsive Layout Breakpoints", () => {
+  let originalInnerWidth: number;
+
+  beforeEach(() => {
+    originalInnerWidth = window.innerWidth;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: originalInnerWidth,
+    });
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("applies data-mobile-layout='desktop' by default on wide viewports", () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1024 });
+    renderHome();
+    
+    const main = document.getElementById("main-content");
+    expect(main).toHaveAttribute("data-mobile-layout", "desktop");
+  });
+
+  it("applies data-mobile-layout='mobile' on narrow viewports", () => {
+    Object.defineProperty(window, 'innerWidth', { value: 375 });
+    renderHome();
+    
+    const main = document.getElementById("main-content");
+    expect(main).toHaveAttribute("data-mobile-layout", "mobile");
+  });
+
+  it("dynamically updates data-mobile-layout on window resize after debounce", async () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1024 });
+    renderHome();
+    
+    const main = document.getElementById("main-content");
+    expect(main).toHaveAttribute("data-mobile-layout", "desktop");
+
+    // Simulate resizing to mobile width
+    Object.defineProperty(window, 'innerWidth', { value: 375 });
+    window.dispatchEvent(new Event("resize"));
+
+    // Immediately after event (before debounce), it should still be desktop
+    expect(main).toHaveAttribute("data-mobile-layout", "desktop");
+
+    // Advance time by VIEWPORT_RESIZE_DEBOUNCE_MS (150ms) + buffer
+    const { act } = await import("@testing-library/react");
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
+    // After debounce, it should update to mobile
+    expect(main).toHaveAttribute("data-mobile-layout", "mobile");
+  });
+});
