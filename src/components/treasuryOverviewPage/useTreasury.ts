@@ -50,18 +50,20 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const filtersKey = serializeFilters(filters);
+  const inFlightRef = useRef<number>(0);
 
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
   useEffect(() => {
+    const runId = ++inFlightRef.current;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
       .then(([nextMetrics, nextStreams]) => {
-        if (cancelled) return;
+        if (cancelled || runId !== inFlightRef.current) return;
 
         const activeStreams = nextStreams.filter(s => s.status === "Active");
         
@@ -96,10 +98,11 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
 
         setMetrics(updatedMetrics);
         setStreams(nextStreams);
+        setError(null);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled) return;
+        if (cancelled || runId !== inFlightRef.current) return;
         setMetrics([]);
         setStreams([]);
         setError(readError(cause));
@@ -135,6 +138,7 @@ export function useRecipientStreams(address: string | null | undefined): {
   const [loading, setLoading] = useState<boolean>(Boolean(address));
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const inFlightRef = useRef<number>(0);
 
   useEffect(() => {
     if (!address) {
@@ -144,18 +148,20 @@ export function useRecipientStreams(address: string | null | undefined): {
       return;
     }
 
+    const runId = ++inFlightRef.current;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     getRecipientStreams(address)
       .then((next) => {
-        if (cancelled) return;
+        if (cancelled || runId !== inFlightRef.current) return;
         setStreams(next);
+        setError(null);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled) return;
+        if (cancelled || runId !== inFlightRef.current) return;
         setStreams([]);
         setError(readError(cause));
         setLoading(false);

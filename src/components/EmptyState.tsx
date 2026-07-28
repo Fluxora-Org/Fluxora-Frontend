@@ -1,4 +1,4 @@
-import React from "react";
+import React, { RefObject } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,11 @@ export interface EmptyStateProps {
    * Drives distinct icon and copy vs true empty state.
    */
   zeroAccrual?: boolean;
+  /** Optional ref forwarded to the inline Retry button in the error banner.
+   *  Used by callers that need to move focus programmatically when an error
+   *  first mounts (WCAG 2.4.3 Focus Order).
+   */
+  retryButtonRef?: RefObject<HTMLButtonElement>;
 }
 
 // ── Per-variant copy & icon config ───────────────────────────────────────────
@@ -209,6 +214,7 @@ export default function EmptyState({
   errorMessage,
   ctaDisabled = false,
   zeroAccrual = false,
+  retryButtonRef,
 }: EmptyStateProps) {
   // When zero-accrual is flagged and variant is not already zero-accrual,
   // override the icon+copy to zero-accrual semantics.
@@ -257,7 +263,18 @@ export default function EmptyState({
             </svg>
             <span>{error}</span>
             {onRetry && (
-              <button onClick={onRetry} style={retryBtn} aria-label="Retry loading data">
+              <button
+                onClick={onRetry}
+                style={{
+                  ...retryBtn,
+                  opacity: ctaDisabled ? 0.5 : retryBtn.opacity,
+                  cursor: ctaDisabled ? "not-allowed" : retryBtn.cursor,
+                }}
+                disabled={ctaDisabled}
+                aria-disabled={ctaDisabled}
+                ref={retryButtonRef}
+                aria-label="Retry loading data"
+              >
                 Retry
               </button>
             )}

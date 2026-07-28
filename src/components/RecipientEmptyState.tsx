@@ -1,3 +1,4 @@
+import { RefObject } from "react";
 import EmptyState from "./EmptyState";
 
 interface RecipientEmptyStateProps {
@@ -6,6 +7,8 @@ interface RecipientEmptyStateProps {
   error?: string | null;
   onRetry?: () => void;
   onPrimaryAction?: () => void;
+  ctaDisabled?: boolean;
+  retryButtonRef?: RefObject<HTMLButtonElement>;
 }
 
 export default function RecipientEmptyState({
@@ -14,6 +17,8 @@ export default function RecipientEmptyState({
   error = null,
   onRetry,
   onPrimaryAction,
+  ctaDisabled = false,
+  retryButtonRef,
 }: RecipientEmptyStateProps) {
   return (
     <EmptyState
@@ -23,6 +28,8 @@ export default function RecipientEmptyState({
       error={error}
       onRetry={onRetry}
       onPrimaryAction={onPrimaryAction}
+      ctaDisabled={ctaDisabled}
+      retryButtonRef={retryButtonRef}
     />
   );
 }
