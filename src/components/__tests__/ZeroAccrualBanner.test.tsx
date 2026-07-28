@@ -378,3 +378,37 @@ describe("ZeroAccrualBanner — locale-aware date formatting", () => {
     expect(chip.textContent).toContain(expected);
   });
 });
+
+// ─── Edge-case visibility locks ───────────────────────────────────────────────
+
+describe("ZeroAccrualBanner — edge-case visibility locks", () => {
+  it("renders normally when no lock props are passed (happy path)", () => {
+    const { container } = renderBanner({ reason: "cliff" });
+    expect(container).not.toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when isLoading is true", () => {
+    const { container } = renderBanner({ reason: "cliff", isLoading: true });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when isEmpty is true", () => {
+    const { container } = renderBanner({ reason: "cliff", isEmpty: true });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when isRetry is true", () => {
+    const { container } = renderBanner({ reason: "cliff", isRetry: true });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when isKeyboardOpen is true", () => {
+    const { container } = renderBanner({ reason: "cliff", isKeyboardOpen: true });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when isResponsiveHide is true", () => {
+    const { container } = renderBanner({ reason: "cliff", isResponsiveHide: true });
+    expect(container).toBeEmptyDOMElement();
+  });
+});
