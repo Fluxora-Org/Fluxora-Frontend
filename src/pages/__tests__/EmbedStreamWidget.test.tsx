@@ -148,6 +148,25 @@ describe('EmbedStreamWidget', () => {
         expect(screen.queryByText(/Powered by Fluxora/)).not.toBeInTheDocument();
       });
     });
+
+    it('handles malformed percent-encoded streamId gracefully — no uncaught error', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      (getStreamById as any).mockRejectedValue(new Error('Stream not found'));
+
+      renderEmbedWidget('%E0%A4%A');
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(screen.getByText(/Stream unavailable/)).toBeInTheDocument();
+      });
+
+      expect(console.error).not.toHaveBeenCalledWith(
+        expect.stringMatching(/URIError|URI malformed/)
+      );
+
+      vi.restoreAllMocks();
+    });
   });
 
   describe('Success State', () => {

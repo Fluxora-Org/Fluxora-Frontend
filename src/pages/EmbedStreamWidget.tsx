@@ -93,7 +93,7 @@ export default function EmbedStreamWidget() {
     setLoading(true);
     setError(null);
     
-    getStreamById(decodeURIComponent(streamId), controller.signal)
+    getStreamById(streamId, controller.signal)
       .then((result) => {
         if (!cancelled) {
           setStream(result);
