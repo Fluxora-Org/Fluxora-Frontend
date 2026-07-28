@@ -11,6 +11,8 @@ import { useTickingNow } from "../hooks/useTickingNow";
 import { MetaTags } from "../components/MetaTags";
 import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
+import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
+import { Share2 } from "lucide-react";
 
 /**
  * StreamDetail page
@@ -46,6 +48,7 @@ export default function StreamDetail() {
   const compareWithId = searchParams.get("compare");
   const isCompareMode = Boolean(compareWithId && streamId);
 
+  const [isOgModalOpen, setIsOgModalOpen] = useState(false);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
   );
@@ -290,20 +293,56 @@ export default function StreamDetail() {
       <MetaTags stream={stream} />
 
       {/* Header */}
-      <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
-        <h1
+      <div
+        style={{
+          marginTop: "1.5rem",
+          marginBottom: "1.5rem",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              margin: 0,
+              marginBottom: "0.25rem",
+            }}
+          >
+            {stream.name}
+          </h1>
+          <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
+            {stream.summary}
+          </p>
+        </div>
+
+        {/* Share & Social Preview Card Trigger */}
+        <button
+          onClick={() => setIsOgModalOpen(true)}
+          data-testid="share-og-preview-btn"
+          aria-label={`Share ${stream.name} and preview social card`}
           style={{
-            fontSize: "1.75rem",
-            fontWeight: 700,
-            margin: 0,
-            marginBottom: "0.25rem",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid var(--color-border, #e5e7eb)",
+            background: "var(--color-surface-1, #fff)",
+            color: "var(--color-text-primary, #111827)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
           }}
         >
-          {stream.name}
-        </h1>
-        <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
-          {stream.summary}
-        </p>
+          <Share2 size={16} />
+          <span>Share / Preview Card</span>
+        </button>
       </div>
 
       {/* Presence Badge Container */}
@@ -451,6 +490,13 @@ export default function StreamDetail() {
       {isPresenceEnabled && (
         <PresenceCursorOverlay viewers={viewers} />
       )}
+
+      {/* Open Graph Social Preview Modal */}
+      <StreamOGPreviewModal
+        stream={stream}
+        isOpen={isOgModalOpen}
+        onClose={() => setIsOgModalOpen(false)}
+      />
     </div>
   );
 }

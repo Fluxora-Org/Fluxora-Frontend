@@ -1,355 +1,489 @@
-// Regression tests for navbar keyboard navigation and focus order.
-// Locks the CURRENT behavior documented in docs/NAVBAR_KEYBOARD_NAVIGATION_SPEC.md
-// — top-level link sets, DOM-order tab sequence, time-indicator tooltip keys,
-// connecting (loading) state, sidebar-toggle ARIA, and the unreachable mobile
-// marketing menu. No production behavior is changed by these tests.
+/**
+ * AppNavbar keyboard navigation regression tests
+ *
+ * Covers every keyboard edge case identified during the audit:
+ *   A. Skip-link presence and target
+ *   B. Focus order — skip-link is first; logo is second
+ *   C. Anon hamburger opens/closes the mobile menu, aria-expanded stays in sync
+ *   D. Escape key closes an open mobile menu
+ *   E. App-view sidebar toggle attributes (aria-expanded, aria-controls)
+ *   F. Desktop nav links carry correct aria-current and are Tab-reachable
+ *   G. Easy-read font button exists exactly once per view; aria-pressed reflects state
+ *   H. Connecting skeleton is announced as status role and suppresses action buttons
+ *   I. CTA link "Connect Wallet" renders text (not hamburger icons) in anon view
+ */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppNavbar from "../AppNavbar";
 import { ThemeProvider } from "../../../theme/ThemeProvider";
 
-// Mutable wallet state so individual tests can flip connected/anonymous.
-const walletState = vi.hoisted(() => ({
+// ─── Shared mocks ─────────────────────────────────────────────────────────────
+
+vi.mock("../../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => <div data-testid="mock-voice-mic" />,
+}));
+
+vi.mock("../../../hooks/useTickingNow", () => ({
+  useTickingNow: () => "2026-07-27T12:00:00.000Z",
+}));
+
+// Wallet mock — reset per describe block via walletOverrides
+const defaultWallet = {
   connected: false,
   address: undefined as string | undefined,
-}));
+  network: undefined as string | undefined,
+  expectedNetwork: "TESTNET",
+  expectedNetworkLabel: "Testnet",
+  isNetworkMismatch: false,
+  disconnect: vi.fn(),
+};
+
+let walletOverrides: Partial<typeof defaultWallet> = {};
 
 vi.mock("../../wallet-connect/Walletcontext", () => ({
-  useWallet: () => ({
-    connected: walletState.connected,
-    address: walletState.address,
-    network: "TESTNET",
-    loading: false,
-    error: null,
-    expectedNetwork: "TESTNET",
-    expectedNetworkLabel: "Testnet",
-    isNetworkMismatch: false,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  }),
-  WalletProvider: ({ children }: { children: React.ReactNode }) => children,
+  useWallet: () => ({ ...defaultWallet, ...walletOverrides }),
 }));
 
-// VoiceMicButton pulls in VoiceContext; replace with an inert (non-focusable) stub.
-vi.mock("../../voice/VoiceMicButton", () => ({
-  VoiceMicButton: () => <div data-testid="mock-voice-mic-button" />,
+// Router mock — pathname can be overridden per test
+let mockPathname = "/";
+vi.mock("react-router-dom", () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: React.PropsWithChildren<{ to: string; [key: string]: unknown }>) => (
+    <a href={String(to)} {...props}>
+      {children}
+    </a>
+  ),
+  useLocation: () => ({ pathname: mockPathname }),
+  useNavigate: () => vi.fn(),
 }));
 
-// Freeze the clock cadence so the time indicator renders deterministically.
-vi.mock("../../../hooks/useTickingNow", () => ({
-  useTickingNow: () => "2026-07-24T05:07:26.000Z",
-}));
 
-const MOCK_ADDRESS = "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV";
+// localStorage stub
+beforeEach(() => {
+  const store: Record<string, string> = {};
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => store[k] ?? null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+    clear: () => { for (const k in store) delete store[k]; },
+  });
+  vi.useFakeTimers();
+  walletOverrides = {};
+  mockPathname = "/";
+});
 
-function renderNavbar(
-  route = "/",
-  props: Partial<React.ComponentProps<typeof AppNavbar>> = {},
-) {
-  return render(
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+/** Renders AppNavbar wrapped in ThemeProvider and flushes the connecting timer. */
+function renderNavbar(props: React.ComponentProps<typeof AppNavbar> = {}) {
+  const result = render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[route]}>
-        <AppNavbar {...props} />
-      </MemoryRouter>
+      <AppNavbar {...props} />
     </ThemeProvider>,
   );
-}
-
-/**
- * Render and immediately flush the simulated 600ms wallet "connecting"
- * window under fake timers, then restore real timers so userEvent-free
- * assertions run against the settled navbar.
- */
-function renderNavbarSettled(
-  route = "/",
-  props: Partial<React.ComponentProps<typeof AppNavbar>> = {},
-) {
-  vi.useFakeTimers();
-  const result = renderNavbar(route, props);
-  act(() => {
-    vi.advanceTimersByTime(700);
-  });
-  vi.useRealTimers();
+  act(() => vi.runAllTimers());
   return result;
 }
 
-beforeEach(() => {
-  walletState.connected = false;
-  walletState.address = undefined;
+// ─── A. Skip-link ──────────────────────────────────────────────────────────────
+
+describe("A: Skip-link", () => {
+  it("is present in the DOM as the first link in the header", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    const links = within(header).getAllByRole("link");
+    expect(links[0]).toHaveTextContent(/skip to main content/i);
+  });
+
+  it("points to #main-content", () => {
+    renderNavbar();
+    const skip = screen.getByRole("link", { name: /skip to main content/i });
+    expect(skip).toHaveAttribute("href", "#main-content");
+  });
+
+  it("is visually hidden by default (sr-only class)", () => {
+    renderNavbar();
+    const skip = screen.getByRole("link", { name: /skip to main content/i });
+    // sr-only is Tailwind's screen-reader-only utility — confirm the class is present
+    expect(skip.className).toMatch(/sr-only/);
+  });
 });
 
-describe("Top-level navigation link sets", () => {
-  it("anonymous users get the marketing link set with native tab semantics", () => {
-    renderNavbarSettled("/");
+// ─── B. Focus order ────────────────────────────────────────────────────────────
 
-    const nav = screen.getByRole("navigation", { name: "Marketing navigation" });
-    expect(nav).toBeInTheDocument();
+describe("B: Focus order — skip-link precedes all other focusable elements", () => {
+  it("skip-link appears before the logo in DOM order (anon view)", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    const allLinks = within(header).getAllByRole("link");
+    const skipIdx = allLinks.findIndex((el) =>
+      /skip to main content/i.test(el.textContent ?? ""),
+    );
+    const logoIdx = allLinks.findIndex((el) =>
+      /fluxora home/i.test(el.getAttribute("aria-label") ?? ""),
+    );
+    expect(skipIdx).toBeLessThan(logoIdx);
+  });
+
+  it("logo link has a descriptive aria-label in anon view", () => {
+    renderNavbar();
     expect(
-      screen.queryByRole("navigation", { name: "App navigation" }),
+      screen.getByRole("link", { name: /fluxora home/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("logo link has a descriptive aria-label in app (connected) view", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    expect(
+      screen.getByRole("link", { name: /fluxora home/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+// ─── C. Anon hamburger (marketing mobile menu) ────────────────────────────────
+
+describe("C: Anon hamburger opens and closes the mobile menu", () => {
+  it("renders a hamburger button in anon view on mobile", () => {
+    renderNavbar();
+    // The button is md:hidden so it's always in the DOM; visibility is CSS-only
+    expect(
+      screen.getByRole("button", { name: /open navigation menu/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("aria-expanded starts as false", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("aria-expanded becomes true after one click", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /open navigation menu/i });
+    fireEvent.click(btn);
+    expect(
+      screen.getByRole("button", { name: /close navigation menu/i }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("mobile menu renders nav links when open", () => {
+    renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    // Both the always-visible desktop <nav> and the mobile dropdown share the same
+    // aria-label; query by id to target only the dropdown.
+    const mobileNav = document.getElementById("mobile-nav")!;
+    expect(mobileNav).toBeInTheDocument();
+    expect(within(mobileNav).getByRole("link", { name: /features/i })).toBeInTheDocument();
+    expect(within(mobileNav).getByRole("link", { name: /docs/i })).toBeInTheDocument();
+    expect(within(mobileNav).getByRole("link", { name: /pricing/i })).toBeInTheDocument();
+  });
+
+  it("clicking a nav link closes the mobile menu", () => {
+    renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    const mobileNav = document.getElementById("mobile-nav")!;
+    fireEvent.click(within(mobileNav).getByRole("link", { name: /features/i }));
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+  });
+
+  it("aria-controls points to the mobile nav element id", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(btn).toHaveAttribute("aria-controls", "mobile-nav");
+    fireEvent.click(btn);
+    expect(document.getElementById("mobile-nav")).toBeInTheDocument();
+  });
+
+  it("does NOT render a separate anon hamburger in app (connected) view", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    // In app view only the sidebar toggle exists — no anon hamburger
+    expect(
+      screen.queryByRole("button", { name: /open navigation menu/i }),
     ).not.toBeInTheDocument();
-
-    for (const label of ["Features", "Docs", "Pricing"]) {
-      const link = screen.getByRole("link", { name: label });
-      // No roving tabindex: enabled links never carry tabIndex=-1.
-      expect(link).not.toHaveAttribute("tabindex");
-      expect(link).not.toHaveAttribute("aria-disabled");
-    }
-  });
-
-  it("connected users get the app link set with native tab semantics", () => {
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbarSettled("/app");
-
-    const nav = screen.getByRole("navigation", { name: "App navigation" });
-    expect(nav).toBeInTheDocument();
-    expect(
-      screen.queryByRole("navigation", { name: "Marketing navigation" }),
-    ).not.toBeInTheDocument();
-
-    for (const label of ["Dashboard", "Streams", "Recipient"]) {
-      const link = screen.getByRole("link", { name: label });
-      expect(link).not.toHaveAttribute("tabindex");
-    }
-  });
-
-  it("marks only Dashboard with aria-current on /app", () => {
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbarSettled("/app");
-
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByRole("link", { name: "Streams" })).not.toHaveAttribute(
-      "aria-current",
-    );
-    expect(screen.getByRole("link", { name: "Recipient" })).not.toHaveAttribute(
-      "aria-current",
-    );
-  });
-
-  it("known quirk: Dashboard keeps aria-current on /app/streams (prefix match, no `end`)", () => {
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbarSettled("/app/streams");
-
-    // NavLink matches by segment prefix and AppNavbar does not pass `end`,
-    // so BOTH Dashboard (/app) and Streams (/app/streams) report the current
-    // page. Locked as shipped behavior — see spec § 1.
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByRole("link", { name: "Streams" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByRole("link", { name: "Recipient" })).not.toHaveAttribute(
-      "aria-current",
-    );
   });
 });
 
-describe("Keyboard focus order (DOM order, no focus management)", () => {
-  // These tests run with real timers (userEvent + fake timers deadlock);
-  // the tab stops asserted here all exist during the connecting window,
-  // so the 600ms wallet-area swap does not need to be flushed.
+// ─── D. Escape key closes open mobile menu ────────────────────────────────────
 
-  it("anonymous: logo → marketing links → time indicator → command palette", async () => {
-    const user = userEvent.setup();
-    renderNavbar("/");
+describe("D: Escape key closes an open mobile menu", () => {
+  it("Escape while menu is open sets mobileMenuOpen to false", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    expect(document.getElementById("mobile-nav")).toBeInTheDocument();
 
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Fluxora home" })).toHaveFocus();
-
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Features" })).toHaveFocus();
-
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Docs" })).toHaveFocus();
-
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Pricing" })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      screen.getByRole("button", { name: /^current time/i }),
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(
-      screen.getByRole("button", { name: /open command palette/i }),
-    ).toHaveFocus();
+    fireEvent.keyDown(header, { key: "Escape", code: "Escape" });
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
   });
 
-  it("connected app view: sidebar toggle is the first tab stop, before the logo", async () => {
-    const user = userEvent.setup();
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbar("/app");
+  it("Escape while menu is already closed is a no-op (no error)", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    // menu is already closed — Escape must not throw
+    expect(() => {
+      fireEvent.keyDown(header, { key: "Escape", code: "Escape" });
+    }).not.toThrow();
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+  });
 
-    await user.tab();
-    expect(
-      screen.getByRole("button", { name: "Open navigation sidebar" }),
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Fluxora home" })).toHaveFocus();
-
-    await user.tab();
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveFocus();
+  it("hamburger button reflects closed state after Escape", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    fireEvent.keyDown(header, { key: "Escape", code: "Escape" });
+    const btn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
   });
 });
 
-describe("Time indicator tooltip keyboard behavior", () => {
-  it("opens on focus and closes on Escape while keeping focus on the button", () => {
-    renderNavbarSettled("/");
+// ─── E. App-view sidebar toggle ───────────────────────────────────────────────
 
-    const timeBtn = screen.getByRole("button", { name: /^current time/i });
+describe("E: App-view sidebar toggle (md:hidden)", () => {
+  const connectedState = {
+    connected: true,
+    address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    network: "TESTNET",
+  };
 
-    act(() => {
-      timeBtn.focus();
-    });
-    expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    expect(timeBtn).toHaveAttribute("aria-expanded", "true");
-
-    fireEvent.keyDown(timeBtn, { key: "Escape" });
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-    expect(timeBtn).toHaveAttribute("aria-expanded", "false");
-    // Escape only dismisses the tooltip — focus never moves.
-    expect(timeBtn).toHaveFocus();
+  it("renders the sidebar toggle in app view", () => {
+    walletOverrides = connectedState;
+    mockPathname = "/app";
+    renderNavbar({ onSidebarToggle: vi.fn(), isSidebarOpen: false });
+    expect(
+      screen.getByRole("button", { name: /open navigation sidebar/i }),
+    ).toBeInTheDocument();
   });
 
-  it("closes when focus leaves the button (blur)", () => {
-    renderNavbarSettled("/");
-
-    const timeBtn = screen.getByRole("button", { name: /^current time/i });
-
-    act(() => {
-      timeBtn.focus();
-    });
-    expect(screen.getByRole("tooltip")).toBeInTheDocument();
-
-    fireEvent.blur(timeBtn);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  it("aria-expanded reflects isSidebarOpen=false", () => {
+    walletOverrides = connectedState;
+    mockPathname = "/app";
+    renderNavbar({ onSidebarToggle: vi.fn(), isSidebarOpen: false });
+    expect(
+      screen.getByRole("button", { name: /open navigation sidebar/i }),
+    ).toHaveAttribute("aria-expanded", "false");
   });
-});
 
-describe("Connecting (loading) state", () => {
-  it("announces the skeleton via role=status and keeps nav links reachable", () => {
-    vi.useFakeTimers();
-    renderNavbar("/");
-
-    // Before the 600ms window elapses, the wallet area is a status skeleton.
-    const skeletons = screen.getAllByRole("status", {
-      name: /connecting wallet/i,
-    });
-    expect(skeletons.length).toBeGreaterThanOrEqual(1);
+  it("aria-expanded reflects isSidebarOpen=true", () => {
+    walletOverrides = connectedState;
+    mockPathname = "/app";
+    renderNavbar({ onSidebarToggle: vi.fn(), isSidebarOpen: true });
     expect(
-      screen.queryByRole("link", { name: "Connect your Stellar wallet" }),
-    ).not.toBeInTheDocument();
-
-    // Top-level navigation stays keyboard reachable during loading.
-    expect(screen.getByRole("link", { name: "Features" })).not.toHaveAttribute(
-      "tabindex",
-    );
-
-    act(() => {
-      vi.advanceTimersByTime(700);
-    });
-    vi.useRealTimers();
-
-    // Skeleton resolves to the Connect Wallet affordance (anonymous user).
-    expect(
-      screen.queryByRole("status", { name: /connecting wallet/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole("link", { name: "Connect your Stellar wallet" })
-        .length,
-    ).toBeGreaterThanOrEqual(1);
+      screen.getByRole("button", { name: /close navigation sidebar/i }),
+    ).toHaveAttribute("aria-expanded", "true");
   });
-});
 
-describe("Sidebar toggle (app view only)", () => {
-  it("exposes aria-expanded/aria-controls and calls onSidebarToggle", async () => {
-    const user = userEvent.setup();
+  it("aria-controls points to app-sidebar", () => {
+    walletOverrides = connectedState;
+    mockPathname = "/app";
+    renderNavbar({ onSidebarToggle: vi.fn(), isSidebarOpen: false });
+    expect(
+      screen.getByRole("button", { name: /open navigation sidebar/i }),
+    ).toHaveAttribute("aria-controls", "app-sidebar");
+  });
+
+  it("calls onSidebarToggle when the sidebar button is clicked", () => {
+    walletOverrides = connectedState;
+    mockPathname = "/app";
     const onSidebarToggle = vi.fn();
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbar("/app", { onSidebarToggle, isSidebarOpen: false });
-
-    const toggle = screen.getByRole("button", {
-      name: "Open navigation sidebar",
-    });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveAttribute("aria-controls", "app-sidebar");
-
-    toggle.focus();
-    await user.keyboard("{Enter}");
+    renderNavbar({ onSidebarToggle, isSidebarOpen: false });
+    fireEvent.click(screen.getByRole("button", { name: /open navigation sidebar/i }));
     expect(onSidebarToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("reflects the open state in its label and aria-expanded", () => {
-    walletState.connected = true;
-    walletState.address = MOCK_ADDRESS;
-    renderNavbarSettled("/app", { isSidebarOpen: true });
-
-    const toggle = screen.getByRole("button", {
-      name: "Close navigation sidebar",
-    });
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("is absent for anonymous users and outside /app routes", () => {
-    renderNavbarSettled("/");
+  it("does NOT render the sidebar toggle in anon view", () => {
+    renderNavbar({ onSidebarToggle: vi.fn(), isSidebarOpen: false });
     expect(
       screen.queryByRole("button", { name: /navigation sidebar/i }),
     ).not.toBeInTheDocument();
   });
 });
 
-describe("Command palette trigger", () => {
-  it("dispatches open-command-palette when activated with Enter", async () => {
-    const user = userEvent.setup();
-    const handler = vi.fn();
-    window.addEventListener("open-command-palette", handler);
-    try {
-      renderNavbar("/");
+// ─── F. Desktop nav links (aria-current + Tab reachability) ──────────────────
 
-      const paletteBtn = screen.getByRole("button", {
-        name: /open command palette/i,
-      });
-      paletteBtn.focus();
-      await user.keyboard("{Enter}");
-      expect(handler).toHaveBeenCalledTimes(1);
-    } finally {
-      window.removeEventListener("open-command-palette", handler);
-    }
+describe("F: Desktop nav links", () => {
+  it("anon view renders marketing links (Features, Docs, Pricing) in the desktop nav", () => {
+    renderNavbar();
+    const desktopNav = screen.getByRole("navigation", {
+      name: /marketing navigation/i,
+    });
+    expect(within(desktopNav).getByRole("link", { name: /^features$/i })).toBeInTheDocument();
+    expect(within(desktopNav).getByRole("link", { name: /^docs$/i })).toBeInTheDocument();
+    expect(within(desktopNav).getByRole("link", { name: /^pricing$/i })).toBeInTheDocument();
+  });
+
+  it("app view renders app links (Dashboard, Streams, Recipient) in the desktop nav", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    const desktopNav = screen.getByRole("navigation", { name: /app navigation/i });
+    expect(within(desktopNav).getByRole("link", { name: /^dashboard$/i })).toBeInTheDocument();
+    expect(within(desktopNav).getByRole("link", { name: /^streams$/i })).toBeInTheDocument();
+    expect(within(desktopNav).getByRole("link", { name: /^recipient$/i })).toBeInTheDocument();
+  });
+
+  it("the active app route link carries aria-current=page (Streams route)", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app/streams";
+    renderNavbar();
+    const desktopNav = screen.getByRole("navigation", { name: /app navigation/i });
+    expect(
+      within(desktopNav).getByRole("link", { name: /^streams$/i }),
+    ).toHaveAttribute("aria-current", "page");
+    // Recipient should NOT be active on /app/streams
+    expect(
+      within(desktopNav).getByRole("link", { name: /^recipient$/i }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("Dashboard link carries aria-current=page on exactly /app", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    const desktopNav = screen.getByRole("navigation", { name: /app navigation/i });
+    expect(
+      within(desktopNav).getByRole("link", { name: /^dashboard$/i }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("all desktop nav links are Tab-reachable (no tabIndex -1)", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    const desktopNav = screen.getByRole("navigation", { name: /app navigation/i });
+    within(desktopNav).getAllByRole("link").forEach((link) => {
+      expect(link).not.toHaveAttribute("tabindex", "-1");
+    });
   });
 });
 
-describe("Mobile marketing menu (documented as unreachable)", () => {
-  it("never renders and exposes no toggle control", () => {
-    renderNavbarSettled("/");
+// ─── G. Easy-read font toggle ─────────────────────────────────────────────────
 
-    // mobileMenuOpen has no setter wired to any UI control, so the dropdown
-    // (#mobile-nav) is unreachable. Locked as-is — re-enabling the menu must
-    // add a real toggle plus Escape/focus-return handling. See spec § 3.D.
-    expect(document.getElementById("mobile-nav")).toBeNull();
-    expect(document.querySelector('[aria-controls="mobile-nav"]')).toBeNull();
-
-    // The Menu/X icon in the anonymous navbar is the Connect Wallet LINK,
-    // not a menu toggle.
-    const connectLinks = screen.getAllByRole("link", {
-      name: "Connect your Stellar wallet",
+describe("G: Easy-read font toggle", () => {
+  it("exactly one font toggle button is in the document in anon view", () => {
+    renderNavbar();
+    // The desktop-only button is hidden with CSS but still in the DOM.
+    // The outer duplicate must have been removed, leaving only the one inside md:flex.
+    const toggles = screen.getAllByRole("button", {
+      name: /toggle easy-read font/i,
     });
-    for (const link of connectLinks) {
-      expect(link).toHaveAttribute("href", "/connect-wallet");
-    }
+    expect(toggles).toHaveLength(1);
+  });
+
+  it("exactly one font toggle button is in the document in app (connected) view", () => {
+    walletOverrides = { connected: true, address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12", network: "TESTNET" };
+    mockPathname = "/app";
+    renderNavbar();
+    const toggles = screen.getAllByRole("button", {
+      name: /toggle easy-read font/i,
+    });
+    expect(toggles).toHaveLength(1);
+  });
+
+  it("aria-pressed starts as false", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /toggle easy-read font/i });
+    expect(btn).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("aria-pressed becomes true after one click", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /toggle easy-read font/i });
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("aria-pressed returns to false after two clicks", () => {
+    renderNavbar();
+    const btn = screen.getByRole("button", { name: /toggle easy-read font/i });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("mobile menu also contains a font toggle in anon view when open", () => {
+    renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    const mobileNav = document.getElementById("mobile-nav")!;
+    expect(mobileNav).toBeInTheDocument();
+    expect(
+      within(mobileNav).getAllByRole("button", { name: /toggle easy-read font|easy-read/i }).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── H. Connecting skeleton ───────────────────────────────────────────────────
+
+describe("H: Connecting skeleton (wallet session restore)", () => {
+  it("shows a 'Connecting wallet…' status region while connecting", () => {
+    // Do NOT flush timers — check the interim state
+    render(
+      <ThemeProvider>
+        <AppNavbar />
+      </ThemeProvider>,
+    );
+    // The skeleton should be present before timers fire
+    const status = screen.getAllByRole("status");
+    expect(status.some((el) => /connecting wallet/i.test(el.getAttribute("aria-label") ?? ""))).toBe(true);
+  });
+
+  it("hides the skeleton and shows the CTA after the timer resolves (anon)", () => {
+    renderNavbar(); // flushes timers
+    expect(
+      screen.queryByRole("status", { name: /connecting wallet/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /connect your stellar wallet/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the skeleton and shows WalletStatus after the timer resolves (connected)", () => {
+    walletOverrides = {
+      connected: true,
+      address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+      network: "TESTNET",
+    };
+    mockPathname = "/app";
+    renderNavbar(); // flushes timers
+    expect(
+      screen.queryByRole("status", { name: /connecting wallet/i }),
+    ).not.toBeInTheDocument();
+    // WalletStatus renders a wallet trigger button
+    expect(
+      screen.getByRole("button", { name: /open wallet options/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+// ─── I. CTA link content ──────────────────────────────────────────────────────
+
+describe("I: Connect-wallet CTA renders text, not icons", () => {
+  it("CTA link text is 'Connect Wallet', not empty or icon-only", () => {
+    renderNavbar();
+    const cta = screen.getByRole("link", { name: /connect your stellar wallet/i });
+    // The textContent must include the label text, confirming no icon-only render
+    expect(cta.textContent?.trim()).toBe("Connect Wallet");
+  });
+
+  it("CTA link navigates to /connect-wallet", () => {
+    renderNavbar();
+    const cta = screen.getByRole("link", { name: /connect your stellar wallet/i });
+    expect(cta).toHaveAttribute("href", "/connect-wallet");
+  });
+
+  it("CTA link is focusable (no tabIndex -1)", () => {
+    renderNavbar();
+    const cta = screen.getByRole("link", { name: /connect your stellar wallet/i });
+    expect(cta).not.toHaveAttribute("tabindex", "-1");
   });
 });

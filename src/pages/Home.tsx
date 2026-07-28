@@ -18,18 +18,39 @@ const ValuePropositionSection = lazy(
 const GetStartedCTA = lazy(() => import("../components/GetStartedCTA"));
 const NewsletterSection = lazy(() => import("../components/NewsletterSection"));
 
+/**
+ * Height of the skeleton placeholder rendered while a lazy section is waiting
+ * to intersect the viewport, or while its dynamic import resolves.
+ *
+ * Kept as a named constant so tests can assert the value without duplicating
+ * the magic number, and so a single edit propagates everywhere.
+ */
+export const LAZY_SECTION_SKELETON_HEIGHT = 240;
+
+/**
+ * The rootMargin passed to IntersectionObserver when observing each lazy
+ * section placeholder. A positive value starts loading the section before it
+ * actually scrolls into the visible area, reducing perceived blank flashes.
+ *
+ * Exported so tests can assert the exact value without duplicating it.
+ */
+export const LAZY_SECTION_ROOT_MARGIN = "300px";
+
 interface LazySectionProps {
   children: React.ReactNode;
   /** Accessible label for the placeholder region while the section loads. */
   label: string;
+  /** Optional data-testid forwarded to the wrapper element. */
+  "data-testid"?: string;
 }
 
 /**
  * Defers rendering (and therefore the dynamic import) of its children until the
- * placeholder scrolls within 300px of the viewport. When IntersectionObserver is
- * unavailable (older browsers, jsdom/SSR), it falls back to loading immediately.
+ * placeholder scrolls within LAZY_SECTION_ROOT_MARGIN of the viewport. When
+ * IntersectionObserver is unavailable (older browsers, jsdom/SSR), it falls
+ * back to loading immediately.
  */
-function LazySection({ children, label }: LazySectionProps) {
+function LazySection({ children, label, "data-testid": testId }: LazySectionProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [shouldLoad, setShouldLoad] = useState(
     () => typeof IntersectionObserver === "undefined",
@@ -47,7 +68,7 @@ function LazySection({ children, label }: LazySectionProps) {
           observer.disconnect();
         }
       },
-      { rootMargin: "300px" },
+      { rootMargin: LAZY_SECTION_ROOT_MARGIN },
     );
 
     observer.observe(node);
@@ -55,13 +76,23 @@ function LazySection({ children, label }: LazySectionProps) {
   }, [shouldLoad]);
 
   return (
-    <div ref={ref}>
+    <div ref={ref} data-testid={testId}>
       {shouldLoad ? (
-        <Suspense fallback={<Skeleton height={240} aria-label={`Loading ${label}`} />}>
+        <Suspense
+          fallback={
+            <Skeleton
+              height={LAZY_SECTION_SKELETON_HEIGHT}
+              aria-label={`Loading ${label}`}
+            />
+          }
+        >
           {children}
         </Suspense>
       ) : (
-        <Skeleton height={240} aria-label={`Loading ${label}`} />
+        <Skeleton
+          height={LAZY_SECTION_SKELETON_HEIGHT}
+          aria-label={`Loading ${label}`}
+        />
       )}
     </div>
   );
@@ -69,6 +100,15 @@ function LazySection({ children, label }: LazySectionProps) {
 
 export default function Home() {
   const { theme } = useTheme();
+  /**
+   * Tracks whether the current viewport falls under the mobile breakpoint (`< 768px`).
+   * 
+   * This Javascript-driven state works alongside CSS media queries. The outcome is
+   * bound to the `<main>` element as `data-mobile-layout="mobile" | "desktop"`.
+   * Child sections rely on this data attribute to cascade large-scale structural
+   * layout shifts (like column stacking or margin removal) safely without repeating
+   * media queries deeply inside inline styles or deeply nested CSS.
+   */
   const [isMobileLayout, setIsMobileLayout] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -77,6 +117,11 @@ export default function Home() {
     return isMobileViewport();
   });
 
+  /**
+   * Evaluates the mobile viewport condition on window resize.
+   * Uses a debounce timer (`VIEWPORT_RESIZE_DEBOUNCE_MS`) to prevent layout thrashing
+   * and excessive React renders during active window resizing.
+   */
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -120,18 +165,34 @@ export default function Home() {
         style={{ flex: 1 }}
       >
         <HeroSection theme={theme as "light" | "dark"} />
-        <LazySection label="value proposition section">
+        <LazySection
+          label="value proposition section"
+          data-testid="lazy-section-value-proposition"
+        >
           <ValuePropositionSection />
         </LazySection>
-        <LazySection label="trust section">
+        <LazySection
+          label="trust section"
+          data-testid="lazy-section-trust"
+        >
           <TrustSection theme={theme as "light" | "dark"} />
         </LazySection>
-        <LazySection label="get started section">
-          <section style={{ padding: "80px 20px" }} aria-label="Get started">
+        <LazySection
+          label="get started section"
+          data-testid="lazy-section-get-started"
+        >
+          <section
+            style={{ padding: "80px 20px" }}
+            aria-label="Get started"
+            data-testid="get-started-section-wrapper"
+          >
             <GetStartedCTA />
           </section>
         </LazySection>
-        <LazySection label="newsletter section">
+        <LazySection
+          label="newsletter section"
+          data-testid="lazy-section-newsletter"
+        >
           <NewsletterSection />
         </LazySection>
       </main>

@@ -58,32 +58,30 @@ Focus order is **pure DOM order** — there is no focus management at the
 navbar level. Full sequence (connected, app view):
 
 ```
-1. Sidebar toggle        (app view only; CSS-hidden ≥ md)
-2. Fluxora logo link     (→ /app when connected, / otherwise)
-3. Nav links             (Dashboard → Streams → Recipient)
-4. Time indicator button
-5. Command palette button (dispatches "open-command-palette", advertises ⌘K)
-6. Voice mic button
-7. Easy-read font toggle  (Type icon)
-8. Theme segmented control (radiogroup "theme preference")
-9. Wallet area            (WalletStatus trigger, or Connect Wallet link)
-10. Second easy-read toggle ("Aa" — mobile duplicate, CSS-hidden ≥ md… see quirk)
-11. Second wallet area      (mobile duplicate)
+1. Skip link              ("Skip to main content", sr-only until focused)
+2. Sidebar toggle         (app view only; CSS-hidden ≥ md)
+3. Fluxora logo link      (→ /app when connected, / otherwise)
+4. Nav links              (Dashboard → Streams → Recipient)
+5. Time indicator button
+6. Command palette button (dispatches "open-command-palette", advertises ⌘K)
+7. Voice mic button
+8. Easy-read font toggle  (Type icon)
+9. Theme segmented control (radiogroup "theme preference")
+10. Wallet area           (WalletStatus trigger, or Connect Wallet link)
 ```
 
 Anonymous users get the same order minus the sidebar toggle, with the
-marketing link set at step 3 and the Connect Wallet link in the wallet areas.
+marketing link set at step 4, the Connect Wallet link in the wallet area,
+and a **mobile hamburger** ("Open/Close navigation menu") as the last stop
+in the top bar. Cmd/Ctrl+K also toggles the command palette
+(`KeyboardShortcutsModal`) from anywhere via a document-level listener.
 
-### Known quirk: duplicate tab stops
+### Known quirk: duplicate controls inside the mobile menu
 
-The easy-read font toggle and the wallet area are rendered **twice** — once
-inside the `hidden md:flex` desktop cluster and once outside it. Visibility
-is controlled purely by CSS classes, so:
-
-- In the browser, only one copy is visible per breakpoint, but the hidden
-  copy is hidden with `display: none` (not focusable — no keyboard trap).
-- In jsdom (unit tests) no stylesheet applies, so **both** copies are
-  rendered and focusable. Tests must use `getAllByRole` for these controls.
+The open mobile marketing menu contains **two** easy-read font toggles
+(Type icon + "Aa") back to back. In the browser the menu is `md:hidden`;
+in jsdom no stylesheet applies, so tests must use `getAllByRole` for the
+font toggle whenever the menu is open.
 
 ---
 
@@ -129,20 +127,21 @@ Rendered **only** when the wallet is connected **and** the route starts with
 
 Anonymous users and non-`/app` routes never render this button.
 
-### D. Mobile marketing menu — unreachable (documented as-is)
+### D. Mobile marketing menu (anonymous view only)
 
-The mobile marketing dropdown (`#mobile-nav`,
-`aria-label="Marketing navigation"`) is gated on `mobileMenuOpen`, but **no
-UI control ever sets it to `true`** — the Menu/X icon in the anonymous
-navbar is the Connect Wallet **link**, not a menu toggle, and `closeMobile`
-only sets `false`. Consequences, locked by tests:
+The anonymous top bar renders a mobile hamburger (`md:hidden`) that toggles
+the marketing dropdown:
 
-- `#mobile-nav` never renders; no element has `aria-controls="mobile-nav"`.
-- The menu therefore has no Escape handling, focus trap, or focus return —
-  acceptable only because it is unreachable.
-- Any future work that re-enables the menu **must** add a real toggle
-  button plus Escape/focus-return handling, and will intentionally break
-  the "unreachable" regression test.
+- `aria-label`: `Open navigation menu` / `Close navigation menu`
+- `aria-expanded` mirrors the open state; `aria-controls="mobile-nav"`
+- The dropdown (`#mobile-nav`, `role="navigation"`,
+  `aria-label="Marketing navigation"`) repeats the marketing links plus
+  font toggles and the wallet area; activating a link closes the menu.
+- **Escape** (handled at the `header` level) closes an open menu; it does
+  not move focus. There is no focus trap — the dropdown is a disclosure,
+  not a modal.
+- The hamburger never renders in the connected app view; there the sidebar
+  toggle (§ 3.C) owns mobile navigation.
 
 ### E. Wallet dropdown (WalletStatus)
 
@@ -168,33 +167,33 @@ What the tests lock, and what a change would mean:
 
 | Behavior | Locked by | Breaking it means |
 |---|---|---|
-| Link sets + nav aria-label per wallet state | `AppNavbar.keyboard.test.tsx` | Top-level IA changed |
-| DOM-order tab sequence (logo → links → time indicator) | `AppNavbar.keyboard.test.tsx` | Focus order changed |
-| No roving tabindex (every enabled link tabbable, none `tabIndex=-1`) | `AppNavbar.keyboard.test.tsx` | Interaction model changed |
-| Prefix-match `aria-current` (Dashboard active on `/app/streams`) | `AppNavbar.keyboard.test.tsx` | Active-state semantics changed |
-| Time tooltip: focus-open / Escape-close / blur-close | `AppNavbar.keyboard.test.tsx` | Tooltip keyboard contract changed |
-| Connecting skeleton `role="status"` + nav reachable while loading | `AppNavbar.keyboard.test.tsx` | Loading a11y contract changed |
-| Sidebar toggle ARIA (`aria-expanded`/`aria-controls`) + app-view gating | `AppNavbar.keyboard.test.tsx`, `AppNavbar.accessibility.test.tsx` | Responsive nav contract changed |
-| Mobile marketing menu unreachable | `AppNavbar.keyboard.test.tsx` | Menu re-enabled — requires new a11y work |
-| Command palette button keyboard activation (`open-command-palette`) | `AppNavbar.keyboard.test.tsx` | Palette entry point changed |
-| Wallet dropdown arrows / trap / Escape | `WalletStatus.keyboard.test.tsx` | Menu keyboard contract changed |
+| Link sets + nav aria-label per wallet state | `AppNavbar.keyboard.test.tsx` (§ F) | Top-level IA changed |
+| Skip link first in DOM, targets `#main-content` | `AppNavbar.keyboard.test.tsx` (§ A/B) | Focus order changed |
+| No roving tabindex (every enabled link tabbable, none `tabIndex=-1`) | `AppNavbar.keyboard.test.tsx` (§ F) | Interaction model changed |
+| `aria-current="page"` on the active app link | `AppNavbar.keyboard.test.tsx` (§ F) | Active-state semantics changed |
+| Time tooltip: focus-open / Escape-close / blur-close | `AppNavbar.timezone.test.tsx` | Tooltip keyboard contract changed |
+| Connecting skeleton `role="status"` resolves to wallet controls | `AppNavbar.keyboard.test.tsx` (§ H) | Loading a11y contract changed |
+| Sidebar toggle ARIA (`aria-expanded`/`aria-controls`) + app-view gating | `AppNavbar.keyboard.test.tsx` (§ E) | Responsive nav contract changed |
+| Anon hamburger toggles `#mobile-nav`; Escape closes it | `AppNavbar.keyboard.test.tsx` (§ C/D), `AppNavbar.accessibility.test.tsx` | Mobile menu contract changed |
+| Connect Wallet CTA is a focusable text link to `/connect-wallet` | `AppNavbar.keyboard.test.tsx` (§ I) | Entry-point affordance changed |
+| Wallet dropdown arrows / trap / Escape / focus return | `WalletStatus.keyboard.test.tsx`, `AppNavbar.disconnect.test.tsx` | Menu keyboard contract changed |
 
-Out of scope (unchanged, pre-existing): timezone-formatting assertions in
-`AppNavbar.timezone.test.tsx` (environment-timezone sensitive) and clipboard
-behavior in `WalletStatus.copy.test.tsx`.
+Out of scope (unchanged, pre-existing): clipboard behavior in
+`WalletStatus.copy.test.tsx`.
 
 ---
 
 ## Accessibility Checklist (current state)
 
 - [x] All interactive navbar controls reachable by Tab in DOM order
-- [x] No keyboard trap anywhere in the navbar (browser; hidden duplicates use `display: none`)
+- [x] Skip link ("Skip to main content") is the first focusable element
+- [x] No keyboard trap anywhere in the navbar
 - [x] `aria-current="page"` on active top-level link(s)
 - [x] Disabled links removed from tab order (`tabIndex=-1`)
 - [x] Loading state announced via `role="status"`
 - [x] Tooltip dismissible with Escape (WCAG 1.4.13)
-- [x] Sidebar toggle exposes `aria-expanded` + `aria-controls`
+- [x] Sidebar toggle and anon hamburger expose `aria-expanded` + `aria-controls`
+- [x] Mobile marketing menu closes on Escape and on link activation
 - [ ] Arrow-key navigation on top-level links (not implemented — links are
       plain anchors; this is acceptable per APG "disclosure navigation"
       guidance, since Tab order is short and linear)
-- [ ] Mobile marketing menu focus management (moot — menu is unreachable)

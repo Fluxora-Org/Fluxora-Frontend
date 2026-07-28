@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Type, Search, Command } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
@@ -11,9 +11,13 @@ import {
   formatNavbarTime,
   formatLocalISOWithOffset,
   getBrowserTimezone,
+  getFormattedUTCOffset,
 } from "../../lib/timePresentation";
+
 import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
+
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -148,21 +152,6 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
     return items;
   }, [pathname]);
-}
-
-function getFormattedUTCOffset(date: Date, tz: string): string {
-  if (tz === "UTC") return "UTC+00:00";
-  try {
-    const offsetMin = date.getTimezoneOffset();
-    const absOffsetMin = Math.abs(offsetMin);
-    const offsetHours = Math.floor(absOffsetMin / 60);
-    const offsetMinutes = absOffsetMin % 60;
-    const sign = offsetMin <= 0 ? "+" : "-";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
-  } catch (e) {
-    return "UTC+00:00";
-  }
 }
 
 function NavbarTimeIndicator() {
@@ -300,12 +289,28 @@ export default function AppNavbar({
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   // Simulate a brief "connecting" state on first mount when wallet restores session
   useEffect(() => {
     setConnecting(true);
     const t = setTimeout(() => setConnecting(false), 600);
     return () => clearTimeout(t);
+  }, []);
+
+  const openPalette = useCallback(() => setIsPaletteOpen(true), []);
+  const closePalette = useCallback(() => setIsPaletteOpen(false), []);
+
+  // Global Cmd/Ctrl+K shortcut
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsPaletteOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
 const location = useLocation();
@@ -316,12 +321,26 @@ const location = useLocation();
 
   const closeMobile = () => setMobileMenuOpen(false);
 
+  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && mobileMenuOpen) {
+      closeMobile();
+    }
+  };
+
   return (
     <header
       role="banner"
       aria-label="Global navigation"
+      onKeyDown={handleHeaderKeyDown}
       className="sticky top-0 z-50 w-full border-b border-[var(--navbar-border)] bg-[var(--navbar-bg)]/80 backdrop-blur-md"
     >
+      {/* Skip link — visually hidden until focused, lets keyboard users jump past the navbar */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-[var(--navbar-bg)] focus:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] focus:text-sm focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-4">
@@ -440,46 +459,23 @@ const location = useLocation();
             )}
           </div>
 
-          {/* Easy-read font toggle */}
-          <button
-            onClick={toggleEasyReadFont}
-            aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
-            aria-pressed={easyReadFont}
-            title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-            className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-              easyReadFont
-                ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
-                : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
-            }`}
-          >
-            <span className="font-bold text-xs tracking-wider uppercase" aria-hidden="true">
-              Aa
-            </span>
-          </button>
-
-          {/* Wallet area */}
-          {connecting ? (
-            <ConnectingSkeleton />
-          ) : connected && address ? (
-            <WalletStatus
-              address={address}
-              network={network ?? "TESTNET"}
-              expectedNetwork={expectedNetwork}
-              isNetworkMismatch={isNetworkMismatch}
-              onDisconnect={disconnect}
-            />
-          ) : (
-            <Link
-              to="/connect-wallet"
-              aria-label="Connect your Stellar wallet"
-              className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+          {/* Mobile hamburger — anon (marketing) view only.
+               In app view the sidebar toggle above the logo handles mobile nav. */}
+          {!isAppView && (
+            <button
+              type="button"
+              className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
             >
               {mobileMenuOpen ? (
                 <X size={22} aria-hidden="true" />
               ) : (
                 <Menu size={22} aria-hidden="true" />
               )}
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -570,6 +566,9 @@ const location = useLocation();
           </div>
         </div>
       )}
+
+      {/* Command Palette — rendered inside header but uses fixed positioning */}
+      <KeyboardShortcutsModal isOpen={isPaletteOpen} onClose={closePalette} />
     </header>
   );
 }

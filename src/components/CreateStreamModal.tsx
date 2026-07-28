@@ -941,7 +941,7 @@ export default function CreateStreamModal({
               {t("csvUpload.dryRun.outcome")}
             </h4>
             {totals ? (
-              <div className="dry-run-summary__cards">
+              <div className="dry-run-summary__cards" aria-live="polite">
                 <div className="dry-run-summary__card">
                   <span className="dry-run-summary__label">
                     {t("csvUpload.dryRun.totalStreams")}
@@ -1120,7 +1120,7 @@ export default function CreateStreamModal({
           </label>
           <button
             type="button"
-            className="btn btn-next"
+            className="btn btn-next dry-run-submit-btn"
             disabled={!bulkDryRunConfirmed || isBulkSubmitting}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}

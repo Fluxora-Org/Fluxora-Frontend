@@ -41,6 +41,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: "/app" }),
+  useNavigate: () => vi.fn(),
 }));
 
 function renderNavbar() {
@@ -70,10 +71,7 @@ describe("AppNavbar wallet disconnect flow", () => {
     renderNavbar();
     act(() => vi.runAllTimers());
 
-    // The wallet area renders twice (desktop cluster + mobile duplicate,
-    // visibility is CSS-only) — interact with the first (desktop) trigger.
-    // See docs/NAVBAR_KEYBOARD_NAVIGATION_SPEC.md § 2.
-    const [walletTrigger] = screen.getAllByRole("button", {
+    const walletTrigger = screen.getByRole("button", {
       name: /wallet gabcde.*open wallet options/i,
     });
 
@@ -103,9 +101,9 @@ describe("AppNavbar wallet disconnect flow", () => {
     act(() => vi.runAllTimers());
 
     fireEvent.click(
-      screen.getAllByRole("button", {
+      screen.getByRole("button", {
         name: /wallet gabcde.*open wallet options/i,
-      })[0],
+      }),
     );
     fireEvent.click(screen.getByRole("menuitem", { name: /^disconnect$/i }));
     fireEvent.click(screen.getByRole("button", { name: /disconnect wallet/i }));

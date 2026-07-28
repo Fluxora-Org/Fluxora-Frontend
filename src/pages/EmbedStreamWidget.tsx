@@ -93,7 +93,7 @@ export default function EmbedStreamWidget() {
     setLoading(true);
     setError(null);
     
-    getStreamById(decodeURIComponent(streamId), controller.signal)
+    getStreamById(streamId, controller.signal)
       .then((result) => {
         if (!cancelled) {
           setStream(result);
@@ -235,6 +235,7 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
         aria-label="Loading stream widget"
         aria-busy="true"
         data-testid="embed-skeleton-compact"
+        className="embed-widget-compact"
       >
         <Skeleton width="100%" height={80} borderRadius={8} />
       </div>
@@ -250,7 +251,8 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
         data-testid="embed-skeleton-banner"
         // Stack vertically by default; CSS widens to a flex-row at ≥640 px,
         // matching the real banner's responsive behaviour.
-        className="embed-widget-banner-skeleton"
+        className="embed-widget-banner-skeleton embed-widget-banner"
+        style={{ padding: "1rem", backgroundColor: "var(--color-surface-default, #fafbfc)" }}
       >
         {/* Info column */}
         <div className="embed-widget-banner-skeleton__info">
@@ -277,6 +279,7 @@ function EmbedWidgetSkeleton({ widgetPreset }: EmbedWidgetSkeletonProps) {
       aria-label="Loading stream widget"
       aria-busy="true"
       data-testid="embed-skeleton-card"
+      className="embed-widget-card"
     >
       <Skeleton width="80%" height={24} style={{ marginBottom: "0.75rem" }} />
       <Skeleton width="60%" height={16} style={{ marginBottom: "1.5rem" }} />
@@ -309,12 +312,15 @@ function EmbedWidgetErrorState({ error, widgetPreset, onRetry }: EmbedWidgetErro
       role="alert" 
       aria-live="assertive"
       data-testid="embed-error-state"
+      className={`embed-widget-${widgetPreset}`}
       style={{
-        padding: isCompact ? "0.5rem" : "1rem",
         backgroundColor: "var(--color-error-bg, #fef2f2)",
-        border: "1px solid var(--color-error-border, #dc2626)",
-        borderRadius: "8px",
-        color: "var(--color-error-text, #b91c1c)"
+        borderColor: "var(--color-error-border, #dc2626)",
+        color: "var(--color-error-text, #b91c1c)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "flex-start",
       }}
     >
       <div style={{ 
@@ -342,6 +348,7 @@ function EmbedWidgetErrorState({ error, widgetPreset, onRetry }: EmbedWidgetErro
         <div style={{ marginTop: "0.75rem" }}>
           <button
             onClick={onRetry}
+            className="embed-widget-metric"
             style={{
               padding: "0.375rem 0.75rem",
               fontSize: "0.875rem",

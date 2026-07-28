@@ -3,18 +3,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { useState } from "react";
 import * as fc from "fast-check";
 import AppNavbar from "../AppNavbar";
 import { ThemeProvider } from "../../../theme/ThemeProvider";
 
-// Mock useWallet — connected + on an /app route so the sidebar toggle
-// (the only hamburger AppNavbar renders) is present.
+// Mock useWallet
 vi.mock("../../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
-    connected: true,
-    address: "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUV",
-    network: "TESTNET",
+    connected: false,
+    address: undefined,
+    network: undefined,
     loading: false,
     error: null,
     expectedNetwork: "TESTNET",
@@ -33,7 +31,7 @@ vi.mock("../../../hooks/useTickingNow", () => ({
   useTickingNow: () => "2026-07-24T05:07:26.000Z",
 }));
 
-// Mock react-router-dom — /app route so isAppView is true
+// Mock react-router-dom
 vi.mock("react-router-dom", () => ({
   Link: ({
     children,
@@ -44,25 +42,9 @@ vi.mock("react-router-dom", () => ({
       {children}
     </a>
   ),
-  useLocation: () => ({ pathname: "/app" }),
+  useLocation: () => ({ pathname: "/" }),
+  useNavigate: () => vi.fn(),
 }));
-
-/**
- * The sidebar toggle is a controlled component (aria-expanded mirrors the
- * isSidebarOpen prop). Wire it up the same way App.tsx does so clicking the
- * hamburger actually flips the state under test.
- */
-function NavbarSidebarHarness() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  return (
-    <ThemeProvider>
-      <AppNavbar
-        isSidebarOpen={isSidebarOpen}
-        onSidebarToggle={() => setIsSidebarOpen((prev) => !prev)}
-      />
-    </ThemeProvider>
-  );
-}
 
 beforeEach(() => {
   const store: Record<string, string> = {};
@@ -107,9 +89,9 @@ describe("Property 3: Icon-only buttons have non-empty aria-labels", () => {
               vi.runAllTimers();
             });
 
-            // Sidebar toggle (hamburger) — only hamburger in AppNavbar
+            // Hamburger button
             const hamburger = screen.getByRole("button", {
-              name: /open navigation sidebar|close navigation sidebar/i,
+              name: /open navigation menu|close navigation menu/i,
             });
             const hamburgerLabel = hamburger.getAttribute("aria-label");
             expect(hamburgerLabel).toBeTruthy();
@@ -137,19 +119,23 @@ describe("Property 3: Icon-only buttons have non-empty aria-labels", () => {
 });
 
 /**
- * Property 4: Sidebar toggle aria-expanded reflects sidebar state
+ * Property 4: Hamburger aria-expanded reflects menu state
  * Validates: Requirements 4.4
  */
-describe("Property 4: aria-expanded reflects sidebar open state", () => {
+describe("Property 4: aria-expanded reflects mobileOpen state", () => {
   it(
-    "aria-expanded on the sidebar toggle equals current open/closed state after each click",
+    "aria-expanded on hamburger equals current open/closed state after each click",
     () => {
       fc.assert(
         fc.property(
           fc.array(fc.constant("click"), { minLength: 0, maxLength: 10 }),
           (clicks) => {
             localStorage.setItem("theme", "dark");
-            const { unmount } = render(<NavbarSidebarHarness />);
+            const { unmount } = render(
+              <ThemeProvider>
+                <AppNavbar />
+              </ThemeProvider>
+            );
 
             // Flush connecting skeleton timer
             act(() => {
@@ -160,7 +146,7 @@ describe("Property 4: aria-expanded reflects sidebar open state", () => {
 
             // Verify initial state
             const initialBtn = screen.getByRole("button", {
-              name: /open navigation sidebar|close navigation sidebar/i,
+              name: /open navigation menu|close navigation menu/i,
             });
             expect(initialBtn.getAttribute("aria-expanded")).toBe(
               String(expectedOpen)
@@ -168,7 +154,7 @@ describe("Property 4: aria-expanded reflects sidebar open state", () => {
 
             for (const _ of clicks) {
               const btn = screen.getByRole("button", {
-                name: /open navigation sidebar|close navigation sidebar/i,
+                name: /open navigation menu|close navigation menu/i,
               });
               act(() => {
                 fireEvent.click(btn);
@@ -176,7 +162,7 @@ describe("Property 4: aria-expanded reflects sidebar open state", () => {
               expectedOpen = !expectedOpen;
 
               const updatedBtn = screen.getByRole("button", {
-                name: /open navigation sidebar|close navigation sidebar/i,
+                name: /open navigation menu|close navigation menu/i,
               });
               expect(updatedBtn.getAttribute("aria-expanded")).toBe(
                 String(expectedOpen)
