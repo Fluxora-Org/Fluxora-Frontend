@@ -357,6 +357,12 @@
   user-select: none;
 }
 
+.emptyPaneHint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #6b7a94);
+  margin: 0;
+}
+
 /* ─── Dark mode overrides ─── */
 [data-theme="dark"] .compareToolbar,
 [data-theme="dark"] .paneHeader {

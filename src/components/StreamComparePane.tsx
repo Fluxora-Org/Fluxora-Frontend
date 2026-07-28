@@ -118,6 +118,12 @@ export function usePaneStream(streamId: string): PaneState {
   });
 
   useEffect(() => {
+    // If streamId is empty (pane was removed), skip fetching and mark as null
+    if (!streamId) {
+      setState({ streamId: '', stream: null, error: null });
+      return;
+    }
+
     let cancelled = false;
     setState({ streamId, stream: undefined, error: null });
 
@@ -224,8 +230,17 @@ function CompareStreamPane({
           </div>
         )}
 
+        {/* Removed / empty pane — shown when user removed this pane */}
+        {stream === null && !streamId && (
+          <div className={styles.emptyPane}>
+            <span className={styles.emptyPaneIcon} aria-hidden="true">🗑️</span>
+            <p>Pane removed.</p>
+            <p className={styles.emptyPaneHint}>Select two streams from the table to compare again.</p>
+          </div>
+        )}
+
         {/* Not found */}
-        {stream === null && (
+        {stream === null && streamId && (
           <div className={styles.emptyPane}>
             <span className={styles.emptyPaneIcon} aria-hidden="true">🔍</span>
             <p>Stream <code>{streamId}</code> not found.</p>
@@ -341,12 +356,22 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
   }
 
   function handleRemoveLeft() {
-    onExit();
+    setIds((prev) => ['', prev[1]]);
   }
 
   function handleRemoveRight() {
-    onExit();
+    setIds((prev) => [prev[0], '']);
   }
+
+  // If both panes have been removed, exit compare mode entirely
+  const bothEmpty = !ids[0] && !ids[1];
+  useEffect(() => {
+    if (bothEmpty) {
+      onExit();
+    }
+  }, [bothEmpty, onExit]);
+
+  const activePaneCount = [ids[0], ids[1]].filter(Boolean).length;
 
   return (
     <div
@@ -358,8 +383,10 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
       {/* ── Toolbar ── */}
       <div className={styles.compareToolbar}>
         <p className={styles.compareToolbarTitle}>
-          Comparing 2 streams
-          {diffCount > 0 && (
+          {activePaneCount === 2
+            ? 'Comparing 2 streams'
+            : `Comparing ${activePaneCount} stream`}
+          {diffCount > 0 && activePaneCount === 2 && (
             <span className={styles.diffBadge} style={{ marginLeft: "0.5rem" }}>
               {diffCount} difference{diffCount !== 1 ? "s" : ""}
             </span>

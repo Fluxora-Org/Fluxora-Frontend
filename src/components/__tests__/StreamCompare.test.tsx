@@ -360,7 +360,7 @@ describe("StreamComparePane", () => {
     expect(onExit).toHaveBeenCalledOnce();
   });
 
-  it("remove button on Pane A calls onExit", async () => {
+  it("remove button on Pane A removes only that pane without exiting", async () => {
     const user = userEvent.setup();
     const onExit = vi.fn();
     renderComparePane("STR-001", "STR-002", onExit);
@@ -373,7 +373,14 @@ describe("StreamComparePane", () => {
     await user.click(
       within(paneASection).getByRole("button", { name: /Remove/i }),
     );
-    expect(onExit).toHaveBeenCalledOnce();
+
+    // Pane A should show "Pane removed", Pane B should remain
+    await waitFor(() => {
+      expect(screen.getByText(/Pane removed/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText("Pane B")).toBeInTheDocument();
+    // onExit should NOT be called — only the pane was removed
+    expect(onExit).not.toHaveBeenCalled();
   });
 
   it("shows loading skeletons while fetch is pending", () => {
@@ -439,7 +446,7 @@ describe("StreamComparePane", () => {
   });
 
   it("formats large safe integer amounts via formatAssetAmount instead of toLocaleString", async () => {
-    const largeRecord: StreamRecord = {
+    const largeRecordA: StreamRecord = {
       ...recordA,
       monthlyRate: Number.MAX_SAFE_INTEGER,
       depositAmount: Number.MAX_SAFE_INTEGER,
@@ -447,7 +454,21 @@ describe("StreamComparePane", () => {
       withdrawableAmount: Number.MAX_SAFE_INTEGER,
       remainingAmount: Number.MAX_SAFE_INTEGER,
     };
-    vi.mocked(streamsService.getStreamById).mockResolvedValue(largeRecord);
+    const largeRecordB: StreamRecord = {
+      ...recordB,
+      id: "STR-002",
+      name: "Beta Grant",
+      monthlyRate: Number.MAX_SAFE_INTEGER,
+      depositAmount: Number.MAX_SAFE_INTEGER,
+      streamedAmount: Number.MAX_SAFE_INTEGER,
+      withdrawableAmount: Number.MAX_SAFE_INTEGER,
+      remainingAmount: Number.MAX_SAFE_INTEGER,
+    };
+    vi.mocked(streamsService.getStreamById).mockImplementation((id: string) => {
+      if (id === "STR-001") return Promise.resolve(largeRecordA);
+      if (id === "STR-002") return Promise.resolve(largeRecordB);
+      return Promise.resolve(null);
+    });
 
     renderComparePane("STR-001", "STR-002");
     await waitFor(() => {
@@ -455,9 +476,10 @@ describe("StreamComparePane", () => {
     });
 
     // All five numeric fields should use the shared formatter
+    // Both panes show the same large amounts, so we expect at least 8 matches
     const formatted = screen.getAllByText(/9,007,199,254,740,991 USDC/);
-    // depositAmount, streamedAmount, withdrawableAmount, remainingAmount = 4 digits-only
-    // monthlyRate appends "/mo" so it won't match this pattern → 4 matches
-    expect(formatted.length).toBeGreaterThanOrEqual(4);
+    // depositAmount, streamedAmount, withdrawableAmount, remainingAmount = 4 digits-only per pane × 2 panes = 8
+    // monthlyRate appends "/mo" so it won't match this pattern → 8 matches
+    expect(formatted.length).toBeGreaterThanOrEqual(8);
   });
 });
