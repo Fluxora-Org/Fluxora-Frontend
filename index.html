@@ -12,6 +12,7 @@
     <link rel="canonical" href="https://fluxora.app/" />
     <link rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" id="favicon" />
     <link rel="alternate icon" type="image/png" href="/src/public/Icon.png" />
+    <link rel="manifest" href="/manifest.json" />
 
     <!--
       Content Security Policy
@@ -53,6 +54,9 @@
         See docs/EMBEDDABLE_STREAM_WIDGET_SPEC.md §Content Security Policy for
         full rationale, Nginx/Caddy/Vercel config snippets, and the audit log
         requirements for adding new trusted origins.
+
+        Note: Server-side CSP overrides are mandatory because client-side meta tags
+        do not support frame-ancestors restrictions.
     -->
     <meta
       http-equiv="Content-Security-Policy"

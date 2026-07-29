@@ -165,7 +165,7 @@ describe("usePresenceViewers — edge cases", () => {
     const { result, rerender } = renderHook(
       ({ id }: { id: string | undefined }) =>
         usePresenceViewers(id, mockViewers),
-      { initialProps: { id: "STR-123" } }
+      { initialProps: { id: "STR-123" as string | undefined } }
     );
 
     expect(result.current.viewers).toHaveLength(1);
@@ -407,5 +407,20 @@ describe("usePresenceViewers — edge cases", () => {
     expect(result.current.viewerCount).toBe(0);
     // But they're still in the viewers array (not yet removed).
     expect(result.current.viewers).toHaveLength(2);
+  });
+
+  // ── isLoading state transitions ───────────────────────────────────────────
+
+  it("isLoading is true initially and transitions to false", () => {
+    const { result } = renderHook(() => usePresenceViewers("STR-123"));
+    
+    expect(result.current.isLoading).toBe(true);
+    
+    // After the effect runs, loading should be false
+    act(() => {
+      vi.runAllTimers();
+    });
+    
+    expect(result.current.isLoading).toBe(false);
   });
 });

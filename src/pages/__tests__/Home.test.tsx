@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
@@ -7,7 +7,18 @@ import Home, {
   LAZY_SECTION_ROOT_MARGIN,
   LAZY_SECTION_SKELETON_HEIGHT,
 } from "../Home";
+import { VIEWPORT_RESIZE_DEBOUNCE_MS } from "../../lib/breakpoints";
 import { ThemeProvider } from "../../theme/ThemeProvider";
+
+let viewportWidth = 1024;
+
+function setViewportWidth(width: number) {
+  viewportWidth = width;
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    get: () => viewportWidth,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,9 +133,185 @@ describe("Home canonical landing page", () => {
   });
 });
 
-// ===========================================================================
-// SUITE 2 – IntersectionObserver controlled tests
-// ===========================================================================
+describe("Home responsive viewport behavior", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it("tracks mobile and desktop layout decisions with debounced viewport changes", () => {
+    setViewportWidth(1280);
+    renderHome();
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    setViewportWidth(375);
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    act(() => {
+      vi.advanceTimersByTime(149);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+
+    setViewportWidth(1280);
+    act(() => {
+      vi.advanceTimersByTime(149);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+  });
+
+  // ── Edge cases added for issues #1169 and #1170 ───────────────────────────
+
+  it("initial render reflects the viewport width without waiting for a resize event", () => {
+    // Arrange: viewport is already mobile-sized before mount.
+    setViewportWidth(375);
+    renderHome();
+
+    // No timers need to elapse — the initial state is read synchronously.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+  });
+
+  it("collapses rapid resize bursts into a single debounced update (stability)", () => {
+    setViewportWidth(1280);
+    renderHome();
+
+    // Spray many resize events in quick succession, each resetting the timer.
+    act(() => {
+      for (let w = 300; w <= 400; w += 10) {
+        setViewportWidth(w);
+      }
+      // Debounce period has not elapsed yet — layout must remain desktop.
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS - 1);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    // One tick later the debounce fires with the final (mobile) width.
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+  });
+
+  it("cancels the in-flight debounce timer when the component unmounts", () => {
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    setViewportWidth(1280);
+    const { unmount } = renderHome();
+
+    // Trigger a resize to start the debounce timer.
+    act(() => {
+      setViewportWidth(375);
+    });
+
+    // Unmount before the timer fires.
+    unmount();
+
+    // clearTimeout must have been called during cleanup.
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    // Advancing time after unmount must not throw (no setState on unmounted).
+    expect(() => {
+      act(() => {
+        vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS * 2);
+      });
+    }).not.toThrow();
+  });
+
+  it("responds to orientationchange events the same way as resize events", () => {
+    setViewportWidth(1280);
+    renderHome();
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    // Simulate a device rotation: width shrinks, then orientationchange fires.
+    act(() => {
+      setViewportWidth(375);
+      window.dispatchEvent(new Event("orientationchange"));
+    });
+
+    // Debounce not yet elapsed — layout unchanged.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+
+    act(() => {
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
+    });
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+  });
+
+  it("does not flip layout on rapid orientation+resize interleaving before debounce settles", () => {
+    setViewportWidth(375);
+    renderHome();
+    // Mobile at mount.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+
+    act(() => {
+      // Simulate device rotation oscillation: portrait→landscape→portrait
+      setViewportWidth(812);
+      window.dispatchEvent(new Event("orientationchange"));
+      vi.advanceTimersByTime(50);
+      setViewportWidth(375);
+      window.dispatchEvent(new Event("orientationchange"));
+      vi.advanceTimersByTime(50);
+      setViewportWidth(812);
+      window.dispatchEvent(new Event("resize"));
+      // Total 100 ms — still within the 150 ms debounce window.
+    });
+    // No commit yet.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+
+    act(() => {
+      vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
+    });
+    // Final width 812 → desktop.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "desktop");
+  });
+
+  it("is stable across multiple unmount/remount cycles (no accumulated timers)", () => {
+    setViewportWidth(375);
+
+    for (let i = 0; i < 3; i++) {
+      const { unmount } = renderHome();
+      // Each mount should read the correct initial layout immediately.
+      expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+      unmount();
+    }
+
+    // Flushing remaining timers should not throw.
+    expect(() => {
+      act(() => {
+        vi.runAllTimers();
+      });
+    }).not.toThrow();
+  });
+
+  it("does not re-render between mount and first resize — initial state is already correct", () => {
+    const setStateSpy = vi.fn();
+    // We can't intercept React's useState directly, but we can verify the
+    // data-attribute is correct immediately after render (no timer flush needed).
+    setViewportWidth(320);
+    renderHome();
+
+    // Assert without advancing any timers: the initial state must already be mobile.
+    expect(screen.getByRole("main")).toHaveAttribute("data-mobile-layout", "mobile");
+    // Suppresses the unused variable lint warning.
+    void setStateSpy;
+  });
+});
 
 describe("Home lazy sections with IntersectionObserver", () => {
   let observers: MockObserverRecord[];

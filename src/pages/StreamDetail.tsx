@@ -42,7 +42,7 @@ import { Share2 } from "lucide-react";
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { viewers, isPresenceEnabled, updateCursor } = usePresenceViewers(streamId);
+  const { viewers, isPresenceEnabled, updateCursor, isLoading } = usePresenceViewers(streamId);
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");
@@ -349,7 +349,7 @@ export default function StreamDetail() {
       {isPresenceEnabled && (
         <div style={{ position: "relative", zIndex: 30 }}>
           <div style={{ position: "absolute", right: 0, top: "-54px" }}>
-            <PresenceBadge viewers={viewers} />
+            <PresenceBadge viewers={viewers} isLoading={isLoading} />
           </div>
         </div>
       )}

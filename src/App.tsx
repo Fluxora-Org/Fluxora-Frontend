@@ -29,6 +29,10 @@ const EmptyStateDemo = IS_DEV
   ? lazy(() => import("./pages/EmptyStateDemo"))
   : () => null;
 
+const ComponentGallery = IS_DEV
+  ? lazy(() => import("./pages/dev/ComponentGallery"))
+  : () => null;
+
 
 function LegacyStreamRedirect() {
   const { streamId } = useParams();
@@ -139,6 +143,12 @@ export default function App() {
                         <Route
                           path="empty-state-demo"
                           element={lazyAppRoute(<EmptyStateDemo />)}
+                        />
+                      )}
+                      {IS_DEV && (
+                        <Route
+                          path="component-gallery"
+                          element={lazyAppRoute(<ComponentGallery />)}
                         />
                       )}
                     </Route>

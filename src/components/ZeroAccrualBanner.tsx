@@ -72,6 +72,16 @@ interface ZeroAccrualBannerProps {
   onAction?: () => void;
   /** Label for the action button */
   actionLabel?: string;
+  /** Suppress banner during data fetching */
+  isLoading?: boolean;
+  /** Suppress banner if no streams exist */
+  isEmpty?: boolean;
+  /** Suppress banner while retry is in flight */
+  isRetry?: boolean;
+  /** Suppress banner when soft keyboard is open (mobile) */
+  isKeyboardOpen?: boolean;
+  /** Suppress banner based on responsive breakpoint rules */
+  isResponsiveHide?: boolean;
 }
 
 // ── Per-reason copy ───────────────────────────────────────────────────
@@ -182,7 +192,16 @@ export default function ZeroAccrualBanner({
   nextEventDate,
   onAction,
   actionLabel,
+  isLoading,
+  isEmpty,
+  isRetry,
+  isKeyboardOpen,
+  isResponsiveHide,
 }: ZeroAccrualBannerProps) {
+  if (isLoading || isEmpty || isRetry || isKeyboardOpen || isResponsiveHide) {
+    return null;
+  }
+
   const cfg = REASON_CONFIG[reason];
   // Treat empty string the same as absent — always show a meaningful label.
   const label = actionLabel || cfg.defaultActionLabel;

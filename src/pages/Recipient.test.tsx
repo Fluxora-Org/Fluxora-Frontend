@@ -44,6 +44,9 @@ function makeMockStream(overrides: Partial<StreamRecord>): StreamRecord {
 
 const recipientStreamsState = vi.hoisted(() => ({
   streams: [] as StreamRecord[],
+  loading: false,
+  error: null as string | null,
+  refetch: vi.fn(),
 }));
 
 const withdrawMock = vi.hoisted(() => vi.fn());
@@ -71,9 +74,9 @@ vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
   }),
   useRecipientStreams: () => ({
     streams: recipientStreamsState.streams,
-    loading: false,
-    error: null,
-    refetch: vi.fn(),
+    loading: recipientStreamsState.loading,
+    error: recipientStreamsState.error,
+    refetch: recipientStreamsState.refetch,
   }),
 }));
 
@@ -81,10 +84,20 @@ vi.mock("../lib/stellar/tx", () => ({
   withdraw: withdrawMock,
 }));
 
-function renderRecipient() {
-  render(<Recipient />);
+const MIN_LOADING_MS = 300;
+const MIN_LOADING_OVERSHOOT = 50;
+
+function renderRecipientAndWaitForMinLoading() {
+  const result = render(<Recipient />);
   act(() => {
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(MIN_LOADING_MS + MIN_LOADING_OVERSHOOT);
+  });
+  return result;
+}
+
+function advancePastMinLoading() {
+  act(() => {
+    vi.advanceTimersByTime(MIN_LOADING_MS + MIN_LOADING_OVERSHOOT);
   });
 }
 
@@ -95,6 +108,9 @@ describe("Recipient wallet source", () => {
     walletState.address = null;
     walletState.network = null;
     recipientStreamsState.streams = [];
+    recipientStreamsState.loading = false;
+    recipientStreamsState.error = null;
+    recipientStreamsState.refetch = vi.fn();
     withdrawMock.mockReset();
     withdrawMock.mockResolvedValue({});
   });
@@ -104,7 +120,7 @@ describe("Recipient wallet source", () => {
   });
 
   it("uses disconnected state from useWallet for the empty state", () => {
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     expect(
       screen.getByRole("region", { name: "Recipient empty state" }),
@@ -122,7 +138,7 @@ describe("Recipient wallet source", () => {
     // disable the withdraw action.
     walletState.network = "TESTNET";
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     expect(
       screen.getByRole("button", { name: /Withdraw 22,600 USDC/i }),
@@ -143,7 +159,7 @@ describe("Recipient wallet source", () => {
       }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     fireEvent.click(
       screen.getByRole("button", { name: /Withdraw 4,200 USDC/i }),
@@ -176,7 +192,7 @@ describe("Recipient wallet source", () => {
       }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     // jsdom's document.hasFocus() is environment-dependent. Dispatch a focus
     // event first to guarantee isTabFocused=true before asserting the clean title.
@@ -244,7 +260,7 @@ describe("Recipient wallet source", () => {
       walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
       walletState.network = "TESTNET";
 
-      renderRecipient();
+      renderRecipientAndWaitForMinLoading();
       await act(async () => {
         await Promise.resolve();
       });
@@ -259,7 +275,7 @@ describe("Recipient wallet source", () => {
       walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
       walletState.network = "TESTNET";
 
-      renderRecipient();
+      renderRecipientAndWaitForMinLoading();
       await act(async () => {
         await Promise.resolve();
       });
@@ -305,7 +321,13 @@ describe("Recipient wallet source", () => {
       expect(screen.getByText("Setup Complete!")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Done" }));
 
-      expect(screen.getByText("Active")).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+
+      const securityStatusBadge = screen.getByRole("status", { name: /local security gate status/i });
+      expect(securityStatusBadge).toBeInTheDocument();
+      expect(securityStatusBadge).toHaveTextContent(/active/i);
       expect(screen.getByRole("button", { name: "Disable" })).toBeInTheDocument();
     });
 
@@ -317,7 +339,7 @@ describe("Recipient wallet source", () => {
       walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
       walletState.network = "TESTNET";
 
-      renderRecipient();
+      renderRecipientAndWaitForMinLoading();
       await act(async () => {
         await Promise.resolve();
       });
@@ -338,7 +360,7 @@ describe("Recipient wallet source", () => {
       walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
       walletState.network = "TESTNET";
 
-      renderRecipient();
+      renderRecipientAndWaitForMinLoading();
       await act(async () => {
         await Promise.resolve();
       });
@@ -371,7 +393,7 @@ describe("Recipient wallet source", () => {
       walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
       walletState.network = "TESTNET";
 
-      renderRecipient();
+      renderRecipientAndWaitForMinLoading();
       await act(async () => {
         await Promise.resolve();
       });
@@ -406,7 +428,7 @@ describe("Recipient monthly summary", () => {
       makeMockStream({ id: "STR-001" }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     expect(
       screen.getByRole("toolbar", { name: /select summary month/i }),
@@ -419,7 +441,7 @@ describe("Recipient monthly summary", () => {
   it("does not render the monthly summary when there are no live streams", () => {
     recipientStreamsState.streams = [];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     expect(
       screen.queryByRole("toolbar", { name: /select summary month/i }),
@@ -436,7 +458,7 @@ describe("Recipient monthly summary", () => {
       }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     const printBtn = screen.getByRole("button", { name: /print monthly summary/i });
     expect(printBtn).toBeDisabled();
@@ -449,7 +471,7 @@ describe("Recipient monthly summary", () => {
       makeMockStream({ id: "STR-001" }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     const toolbar = screen.getByRole("toolbar", { name: /select summary month/i });
     expect(within(toolbar).getByText(new RegExp(monthName, "i"))).toBeInTheDocument();
@@ -460,7 +482,7 @@ describe("Recipient monthly summary", () => {
       makeMockStream({ id: "STR-001" }),
     ];
 
-    renderRecipient();
+    renderRecipientAndWaitForMinLoading();
 
     expect(
       screen.getByRole("button", { name: /previous month/i }),
@@ -518,5 +540,309 @@ describe("computeMonthlySummary utility", () => {
     );
 
     expect(result.totalWithdrawn).toBe(4200);
+  });
+});
+
+describe("Recipient page loading state hardening", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    walletState.connected = false;
+    walletState.address = null;
+    walletState.network = null;
+    recipientStreamsState.streams = [];
+    recipientStreamsState.loading = false;
+    recipientStreamsState.error = null;
+    recipientStreamsState.refetch = vi.fn();
+    withdrawMock.mockReset();
+    withdrawMock.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows full-page RecipientLoading skeleton when wallet is connected and data is loading", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.loading = true;
+    recipientStreamsState.streams = [];
+
+    const { rerender } = render(<Recipient />);
+
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+    expect(screen.queryByText("Withdrawable now")).not.toBeInTheDocument();
+
+    advancePastMinLoading();
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+
+    recipientStreamsState.loading = false;
+    rerender(<Recipient />);
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+
+    expect(screen.queryByRole("status", { name: "Loading recipient portal" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Withdraw 22,600 USDC/i })).toBeInTheDocument();
+  });
+
+  it("respects minimum loading duration to prevent skeleton flash on fast fetches", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [makeMockStream({ id: "1" })];
+
+    render(<Recipient />);
+
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+
+    advancePastMinLoading();
+    expect(screen.queryByRole("status", { name: "Loading recipient portal" })).not.toBeInTheDocument();
+  });
+
+  it("displays full RecipientLoading indefinitely while useRecipientStreams.loading remains true", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    recipientStreamsState.loading = true;
+
+    render(<Recipient />);
+
+    for (let i = 0; i < 5; i++) {
+      advancePastMinLoading();
+    }
+
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+    expect(screen.queryByText("Withdrawable now")).not.toBeInTheDocument();
+  });
+
+  it("bypasses full-page RecipientLoading when wallet is disconnected (no pending recipient fetch)", () => {
+    walletState.connected = false;
+    walletState.address = null;
+
+    render(<Recipient />);
+
+    expect(screen.queryByRole("status", { name: "Loading recipient portal" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+  });
+
+  it("transitions cleanly: loading skeleton → populated dashboard when live streams arrive", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.loading = true;
+    recipientStreamsState.streams = [];
+
+    const { rerender } = render(<Recipient />);
+    advancePastMinLoading();
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [
+      makeMockStream({ id: "5", withdrawableAmount: 7500, streamedAmount: 10000 }),
+    ];
+    rerender(<Recipient />);
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
+
+    expect(screen.getByRole("button", { name: /Withdraw 7,500 USDC/i })).toBeInTheDocument();
+    expect(screen.getByText("Withdrawable now")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading recipient portal" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Recipient page error and retry state hardening", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    walletState.connected = false;
+    walletState.address = null;
+    walletState.network = null;
+    recipientStreamsState.streams = [];
+    recipientStreamsState.loading = false;
+    recipientStreamsState.error = null;
+    recipientStreamsState.refetch = vi.fn();
+    withdrawMock.mockReset();
+    withdrawMock.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the inline error banner via RecipientEmptyState with retry button when service error occurs", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "Unable to load recipient streams.";
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Unable to load recipient streams.")).toBeInTheDocument();
+    const retryBtn = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtn).toBeInTheDocument();
+    expect(retryBtn).toBeEnabled();
+  });
+
+  it("invokes useRecipientStreams.refetch via the page-level retry button when error state is active", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "RPC unavailable.";
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(recipientStreamsState.refetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading data" }));
+
+    expect(recipientStreamsState.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables error Retry button while a refetch is in-flight to prevent double submission", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "temporary glitch";
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    const retryBtnBefore = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtnBefore).toBeEnabled();
+    expect(retryBtnBefore).toHaveAttribute("aria-disabled", "false");
+    expect(recipientStreamsState.refetch).toHaveBeenCalledTimes(0);
+
+    fireEvent.click(retryBtnBefore);
+
+    expect(recipientStreamsState.refetch).toHaveBeenCalledTimes(1);
+
+    const retryBtnAfter = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtnAfter).toBeDisabled();
+    expect(retryBtnAfter).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(retryBtnAfter);
+    expect(recipientStreamsState.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps demo balance values hidden from the populated surface when a service error blocks confirmation", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "502 Bad Gateway";
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+    expect(screen.queryByText("Withdrawable now")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Withdraw 22,600 USDC/i })).not.toBeInTheDocument();
+  });
+
+  it("uses the error state path instead of populated page even when streams array has stale data", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "Network partition";
+    recipientStreamsState.streams = [makeMockStream({ id: "1" })];
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("Withdrawable now")).not.toBeInTheDocument();
+  });
+
+  it("does not show any error alert when wallet is disconnected (no fetch attempted yet)", () => {
+    walletState.connected = false;
+    walletState.address = null;
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /connect your wallet/i })).toBeInTheDocument();
+  });
+});
+
+describe("Recipient page backward-compat regression guards", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    walletState.connected = false;
+    walletState.address = null;
+    walletState.network = null;
+    recipientStreamsState.streams = [];
+    recipientStreamsState.loading = false;
+    recipientStreamsState.error = null;
+    recipientStreamsState.refetch = vi.fn();
+    withdrawMock.mockReset();
+    withdrawMock.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("preserves the original disconnected empty-state copy and connected demo dashboard surface", () => {
+    const { rerender } = render(<Recipient />);
+    advancePastMinLoading();
+    expect(screen.getByRole("heading", { name: /connect your wallet/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Withdraw/i })).not.toBeInTheDocument();
+
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    rerender(<Recipient />);
+    advancePastMinLoading();
+
+    expect(screen.getByRole("button", { name: /Withdraw 22,600 USDC/i })).toBeInTheDocument();
+    expect(screen.getByText("Withdrawable now")).toBeInTheDocument();
+  });
+
+  it("renders the Local Security Gate settings card alongside RecipientEmptyState when wallet is connected AND a service error forces the empty-state path", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.streams = [];
+    recipientStreamsState.error = "Service error: empty path gate";
+
+    renderRecipientAndWaitForMinLoading();
+
+    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
+    expect(screen.getByText("Local Security Gate")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enable" })).toBeInTheDocument();
+  });
+
+  it("falls back to demo balance values only when no service error AND no live streams AND wallet is connected", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.streams = [];
+    recipientStreamsState.error = null;
+
+    const { rerender } = render(<Recipient />);
+    advancePastMinLoading();
+
+    recipientStreamsState.streams = [
+      makeMockStream({
+        id: "1",
+        withdrawableAmount: 15000,
+        streamedAmount: 30000,
+      }),
+    ];
+    rerender(<Recipient />);
+
+    expect(screen.getByRole("button", { name: /Withdraw 15,000 USDC/i })).toBeInTheDocument();
   });
 });

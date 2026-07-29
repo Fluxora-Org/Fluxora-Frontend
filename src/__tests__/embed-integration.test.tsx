@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 
+
 // Mock the lazy components to avoid loading them in tests
 vi.mock('../pages/Dashboard', () => ({
   default: () => <div>Dashboard Mock</div>
 }));
+
 
 vi.mock('../pages/Streams', () => ({
   default: () => <div>Streams Mock</div>
@@ -49,7 +51,9 @@ vi.mock('../components/wallet-connect/Walletcontext', () => ({
     isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
+
   }),
+
 }));
 
 vi.mock('../components/voice/VoiceCommandPanel', () => ({
@@ -63,6 +67,7 @@ vi.mock('../components/voice/VoiceConfirmModal', () => ({
 describe('Embed Route Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
   });
 
   const renderAppWithRoute = (path: string) => {

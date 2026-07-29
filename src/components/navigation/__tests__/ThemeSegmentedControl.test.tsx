@@ -105,4 +105,16 @@ describe("ThemeSegmentedControl", () => {
     expect(radios[2]).toHaveAttribute("aria-checked", "true");
     expect(localStorage.getItem("theme")).toBeNull();
   });
+
+  it("sizes icons per --icon-size-sm as specified (not --icon-size-xs)", () => {
+    const { container } = render(
+      <ThemeProvider>
+        <ThemeSegmentedControl />
+      </ThemeProvider>
+    );
+
+    const icons = container.querySelectorAll("svg.icon-sm");
+    expect(icons).toHaveLength(3);
+    expect(container.querySelectorAll("svg.icon-xs")).toHaveLength(0);
+  });
 });

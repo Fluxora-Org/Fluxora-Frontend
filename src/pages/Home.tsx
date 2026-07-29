@@ -100,22 +100,12 @@ function LazySection({ children, label, "data-testid": testId }: LazySectionProp
 
 export default function Home() {
   const { theme } = useTheme();
-  /**
-   * Tracks whether the current viewport falls under the mobile breakpoint (`< 768px`).
-   * 
-   * This Javascript-driven state works alongside CSS media queries. The outcome is
-   * bound to the `<main>` element as `data-mobile-layout="mobile" | "desktop"`.
-   * Child sections rely on this data attribute to cascade large-scale structural
-   * layout shifts (like column stacking or margin removal) safely without repeating
-   * media queries deeply inside inline styles or deeply nested CSS.
-   */
-  const [isMobileLayout, setIsMobileLayout] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return isMobileViewport();
-  });
+  // Initialise synchronously from the live viewport so the very first render
+  // already uses the correct layout tier. Falls back to `false` (desktop) in
+  // non-browser / SSR environments so the component is still renderable.
+  const [isMobileLayout, setIsMobileLayout] = useState<boolean>(() =>
+    typeof window !== "undefined" ? isMobileViewport() : false,
+  );
 
   /**
    * Evaluates the mobile viewport condition on window resize.
@@ -123,29 +113,36 @@ export default function Home() {
    * and excessive React renders during active window resizing.
    */
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    // Skip the listener entirely in non-browser environments (SSR / tests that
+    // do not expose `window`).
+    if (typeof window === "undefined") return;
 
-    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
+    // Debounced handler — collapses rapid resize / orientationchange events
+    // into a single state update so re-renders are kept to a minimum.
     const handleResize = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
       }
-
-      timeoutId = window.setTimeout(() => {
+      timeoutId = setTimeout(() => {
+        timeoutId = undefined;
         setIsMobileLayout(isMobileViewport());
       }, VIEWPORT_RESIZE_DEBOUNCE_MS);
     };
 
-    handleResize();
+    // orientationchange fires on mobile before innerWidth has updated, so we
+    // listen to both events and let the debounce coalesce them into one read.
     window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
+      window.removeEventListener("orientationchange", handleResize);
+      // Cancel any in-flight debounce so unmounting components can never
+      // trigger a state update on an already-unmounted tree.
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
       }
     };
   }, []);

@@ -30,6 +30,7 @@ export interface Viewer {
  * - `viewerCount`: Number of active viewers (excluding those fading out).
  * - `isPresenceEnabled`: Whether the badge should render as live presence.
  * - `presenceStatus`: Current availability state for the presence feature.
+ * - `isLoading`: Whether the initial presence data is still loading.
  */
 export function usePresenceViewers(
   streamId?: string,
@@ -126,6 +127,15 @@ export function usePresenceViewers(
 
   const viewerCount = viewers.filter(v => !v.fadingOut).length;
 
+  // Loading state: true initially, transitions to false after first sync.
+  // In a production presence transport this would reflect the initial fetch.
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Transition out of loading state once we've determined the initial viewer set.
+    setIsLoading(false);
+  }, []);
+
   return {
     viewers,
     markActive,
@@ -133,5 +143,6 @@ export function usePresenceViewers(
     viewerCount,
     isPresenceEnabled,
     presenceStatus,
+    isLoading,
   };
 }

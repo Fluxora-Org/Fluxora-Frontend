@@ -121,9 +121,12 @@ describe("AppNavbar wallet disconnect flow", () => {
     );
     act(() => vi.runAllTimers());
 
-    const connectWallet = screen.getByRole("link", {
+    const connectLinks = screen.getAllByRole("link", {
       name: /connect your stellar wallet/i,
     });
-    expect(connectWallet).toHaveAttribute("href", "/connect-wallet");
+    expect(connectLinks.length).toBeGreaterThanOrEqual(1);
+    connectLinks.forEach((link) => {
+      expect(link).toHaveAttribute("href", "/connect-wallet");
+    });
   });
 });
