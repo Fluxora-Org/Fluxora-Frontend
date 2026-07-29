@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  LogOut,
+  Check,
+  Link2,
+  Unlink,
+} from "lucide-react";
 import {
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
@@ -7,6 +15,14 @@ import {
 import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
+import {
+  type ShareProvider,
+  SHARE_WORKSPACES_CHANGED_EVENT,
+  connectWorkspace,
+  disconnectWorkspace,
+  getShareProviderLabel,
+  readConnectedWorkspaces,
+} from "../../lib/shareWorkspaces";
 
 interface WalletStatusProps {
   address: string;
@@ -27,6 +43,7 @@ export default function WalletStatus({
   const [open, setOpen] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [workspaces, setWorkspaces] = useState(() => readConnectedWorkspaces());
   const { copy, status: copyStatus } = useClipboard();
   const toast = useOptionalToast();
   const copied = copyStatus === "copied";
@@ -39,6 +56,8 @@ export default function WalletStatus({
   const networkUpper = normalizeStellarNetwork(network);
   const isWrongNetwork = isNetworkMismatch;
   const isTestnet = networkUpper === "TESTNET";
+  const slackWorkspace = workspaces.find((w) => w.provider === "slack");
+  const teamsWorkspace = workspaces.find((w) => w.provider === "teams");
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -125,6 +144,42 @@ export default function WalletStatus({
     return () => clearTimeout(timer);
   }, [address]);
 
+  useEffect(() => {
+    const syncWorkspaces = () => setWorkspaces(readConnectedWorkspaces());
+    window.addEventListener("storage", syncWorkspaces);
+    window.addEventListener("focus", syncWorkspaces);
+    window.addEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    return () => {
+      window.removeEventListener("storage", syncWorkspaces);
+      window.removeEventListener("focus", syncWorkspaces);
+      window.removeEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    };
+  }, []);
+
+  const handleWorkspaceConnect = (provider: ShareProvider) => {
+    const connected = connectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace connected.`,
+      "success",
+    );
+    setAnnouncement(
+      `${getShareProviderLabel(provider)} connected to ${connected.workspaceName}`,
+    );
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
+
+  const handleWorkspaceDisconnect = (provider: ShareProvider) => {
+    disconnectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace disconnected.`,
+      "info",
+    );
+    setAnnouncement(`${getShareProviderLabel(provider)} workspace disconnected`);
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
+
  const handleCopy = async () => {
   // Copy via the shared hook (Clipboard API + execCommand fallback).
   const success = await copy(address);
@@ -177,6 +232,23 @@ export default function WalletStatus({
             }`}
           />
           {isTestnet ? "Testnet" : "Mainnet"}
+        </span>
+      )}
+
+      {slackWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-sky-400/15 text-sky-200 border border-sky-400/30"
+          title={`Slack connected: ${slackWorkspace.workspaceName}`}
+        >
+          Slack · {slackWorkspace.workspaceName}
+        </span>
+      )}
+      {teamsWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-indigo-400/15 text-indigo-200 border border-indigo-400/30"
+          title={`Teams connected: ${teamsWorkspace.workspaceName}`}
+        >
+          Teams · {teamsWorkspace.workspaceName}
         </span>
       )}
 
@@ -264,6 +336,48 @@ export default function WalletStatus({
                   <ExternalLink size={16} />
                   View in explorer
                 </button>
+
+                <div className="my-1 h-px bg-[var(--navbar-border)]" />
+
+                {slackWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Slack
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Slack workspace
+                  </button>
+                )}
+
+                {teamsWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Teams
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Microsoft Teams
+                  </button>
+                )}
 
                 <div className="my-1 h-px bg-[var(--navbar-border)]" />
 
