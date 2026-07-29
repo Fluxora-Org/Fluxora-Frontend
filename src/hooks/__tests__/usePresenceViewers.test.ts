@@ -408,4 +408,19 @@ describe("usePresenceViewers — edge cases", () => {
     // But they're still in the viewers array (not yet removed).
     expect(result.current.viewers).toHaveLength(2);
   });
+
+  // ── isLoading state transitions ───────────────────────────────────────────
+
+  it("isLoading is true initially and transitions to false", () => {
+    const { result } = renderHook(() => usePresenceViewers("STR-123"));
+    
+    expect(result.current.isLoading).toBe(true);
+    
+    // After the effect runs, loading should be false
+    act(() => {
+      vi.runAllTimers();
+    });
+    
+    expect(result.current.isLoading).toBe(false);
+  });
 });

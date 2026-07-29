@@ -5,6 +5,7 @@ import "./Presence.css";
 
 interface PresenceBadgeProps {
   viewers: Viewer[];
+  isLoading?: boolean;
 }
 
 const AVATAR_PALETTE = [
@@ -27,7 +28,7 @@ export function getInitials(displayName: string | null | undefined): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
+export default function PresenceBadge({ viewers, isLoading = false }: PresenceBadgeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,6 +110,27 @@ export default function PresenceBadge({ viewers }: PresenceBadgeProps) {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
+
+  // Show loading state while presence data is initially fetching
+  if (isLoading) {
+    return (
+      <div className="presence-badge-container">
+        <button
+          disabled
+          aria-busy="true"
+          aria-label="Loading presence information"
+          className="presence-badge-trigger presence-badge-trigger--loading"
+        >
+          <span className="presence-loading-indicator" aria-hidden="true">
+            <span className="presence-loading-dot"></span>
+            <span className="presence-loading-dot"></span>
+            <span className="presence-loading-dot"></span>
+          </span>
+          <span className="presence-badge-text">Loading...</span>
+        </button>
+      </div>
+    );
+  }
 
   if (viewers.length === 0) {
     return null; // solo-viewer (0 other viewers): render nothing
