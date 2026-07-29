@@ -4,9 +4,10 @@ import {
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
-import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
+import { stellarExplorerUrl } from "../../lib/stellar";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
+import { formatAddress } from "../common/TruncatedAddress";
 
 interface WalletStatusProps {
   address: string;
@@ -120,7 +121,7 @@ export default function WalletStatus({
 
   useEffect(() => {
     // Announce connection on mount
-    setAnnouncement(`Wallet connected: ${maskAddress(address, 6, 4)}`);
+    setAnnouncement(`Wallet connected: ${formatAddress(address)}`);
     const timer = setTimeout(() => setAnnouncement(""), 1000);
     return () => clearTimeout(timer);
   }, [address]);
@@ -187,12 +188,12 @@ export default function WalletStatus({
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Wallet ${maskAddress(address, 6, 4)}. Open wallet options.`}
+          aria-label={`Wallet ${formatAddress(address)}. Open wallet options.`}
           className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span className="font-mono text-xs">
-            {maskAddress(address, 6, 4)}
+            {formatAddress(address)}
           </span>
           <ChevronDown
             size={16}
