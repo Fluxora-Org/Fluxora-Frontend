@@ -34,6 +34,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: "/" }),
+  useNavigate: () => vi.fn(),
 }));
 
 describe("AppNavbar timezone-aware relative-time indicator", () => {
