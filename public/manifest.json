@@ -1,0 +1,21 @@
+{
+  "name": "Fluxora",
+  "short_name": "Fluxora",
+  "description": "Stream treasury capital continuously on Stellar with dashboard, recipient, and wallet workflows.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1E293B",
+  "theme_color": "#06B6D4",
+  "icons": [
+    {
+      "src": "/src/public/Icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/src/public/Icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
