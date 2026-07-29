@@ -53,6 +53,9 @@
         See docs/EMBEDDABLE_STREAM_WIDGET_SPEC.md §Content Security Policy for
         full rationale, Nginx/Caddy/Vercel config snippets, and the audit log
         requirements for adding new trusted origins.
+
+        Note: Server-side CSP overrides are mandatory because client-side meta tags
+        do not support frame-ancestors restrictions.
     -->
     <meta
       http-equiv="Content-Security-Policy"
