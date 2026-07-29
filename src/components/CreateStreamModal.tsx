@@ -154,6 +154,16 @@ function validateDuration(value: string, t: any): string | undefined {
 
 /** Snapshot of everything `createStream` needs, captured at submit time so a
  * queued (offline) submission replays with the exact values the user reviewed. */
+/** Data passed to the parent when a stream is successfully created. Used by the
+ * success modal to display a branded downloadable transaction receipt. */
+export interface StreamCreatedData {
+  txHash?: string | null;
+  amount: string;
+  rate: string;
+  sender: string;
+  recipient: string;
+}
+
 interface StreamSubmissionPayload {
   sender: string;
   recipient: string;
@@ -166,8 +176,9 @@ interface StreamSubmissionPayload {
 interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void | Promise<void>;
+  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal.
+   * Receives transaction data (txHash, amount, rate, sender, recipient) for the downloadable receipt. */
+  onStreamCreated?: (data?: StreamCreatedData) => void | Promise<void>;
   /** Called when stream creation fails after the user confirms the review step. */
   onStreamError?: (err: unknown) => void;
   /**
@@ -461,16 +472,26 @@ export default function CreateStreamModal({
     }
 
     setHasCompletedConfirmation(true);
+
+    const amountNum = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+    const createdData: StreamCreatedData = {
+      txHash: submittedTxHash,
+      amount: `${amountNum.toLocaleString()} USDC`,
+      rate: `${accrualRate} USDC/day`,
+      sender: wallet.address ?? "",
+      recipient,
+    };
+
     if (flushedFromQueueRef.current) {
       flushedFromQueueRef.current = false;
       addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
         label: t("createStream.queue.viewStreamAction"),
-        onClick: () => onStreamCreated?.(),
+        onClick: () => onStreamCreated?.(createdData),
       });
     } else {
       addToast(t("createStream.success.message"), "success");
     }
-    onStreamCreated?.();
+    onStreamCreated?.(createdData);
     onClose();
   }, [
     addToast,
@@ -479,6 +500,11 @@ export default function CreateStreamModal({
     onStreamCreated,
     transactionStatus.status,
     t,
+    submittedTxHash,
+    depositAmount,
+    accrualRate,
+    wallet.address,
+    recipient,
   ]);
 
   // Auto-flush a queued submission as soon as connectivity returns. Runs even

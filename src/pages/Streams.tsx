@@ -12,6 +12,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
 import CreateStreamModal from "../components/CreateStreamModal";
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
@@ -815,6 +816,11 @@ export default function Streams() {
   const [createdStream, setCreatedStream] = useState({
     id: "STR-NEW",
     url: "https://fluxora.io/stream/STR-NEW",
+    txHash: undefined as string | null | undefined,
+    amount: undefined as string | undefined,
+    rate: undefined as string | undefined,
+    sender: undefined as string | undefined,
+    recipient: undefined as string | undefined,
   });
 
   // Pagination state
@@ -1061,11 +1067,16 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   }, [resolveSessionOnInteraction]);
 
-  const handleStreamCreated = useCallback(() => {
+  const handleStreamCreated = useCallback((data?: StreamCreatedData) => {
     const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
       id: generatedId,
       url: `https://fluxora.io/stream/${generatedId}`,
+      txHash: data?.txHash,
+      amount: data?.amount,
+      rate: data?.rate,
+      sender: data?.sender,
+      recipient: data?.recipient,
     });
     setIsCreateModalOpen(false);
     setIsSuccessModalOpen(true);
@@ -1180,6 +1191,11 @@ export default function Streams() {
           onClose={() => setIsSuccessModalOpen(false)}
           streamId={createdStream.id}
           streamUrl={createdStream.url}
+          txHash={createdStream.txHash ?? undefined}
+          amount={createdStream.amount}
+          rate={createdStream.rate}
+          sender={createdStream.sender}
+          recipient={createdStream.recipient}
           onCreateAnother={() => {
             setIsSuccessModalOpen(false);
             setIsCreateModalOpen(true);
