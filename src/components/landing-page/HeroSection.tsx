@@ -177,10 +177,21 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             )}
           </div>
 
-          {/* ─── RIGHT: Glassmorphic Stream Card ─── */}
+          {/* ─── RIGHT: Glassmorphic Stream Card & Illustration ─── */}
           <div
             className={`relative flex justify-center lg:justify-end transition-all duration-1000 delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}
           >
+            {/* Hero Illustration */}
+            <img
+              src="/src/assets/dashboard.png"
+              srcSet="/src/assets/dashboard-640w.png 640w, /src/assets/dashboard-768w.png 768w, /src/assets/dashboard-1024w.png 1024w, /src/assets/dashboard-1280w.png 1280w, /src/assets/dashboard-1536w.png 1536w"
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              alt="Fluxora dashboard showing active treasury streams and analytics"
+              loading="eager"
+              fetchPriority="high"
+              className="absolute -right-10 top-0 max-w-[600px] w-full rounded-2xl shadow-2xl hidden lg:block opacity-40 mix-blend-overlay"
+            />
+
             {/* Animated Glow Rings */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-[120%] h-[120%] rounded-full opacity-[0.03] border border-cyan-500 animate-spin-slow" />
