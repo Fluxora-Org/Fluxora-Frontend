@@ -425,16 +425,19 @@ const location = useLocation();
             {/* Easy-read font toggle */}
             <button
               onClick={toggleEasyReadFont}
-              aria-label="Toggle easy-read font"
+              aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
               aria-pressed={easyReadFont}
               title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2.5 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] gap-1 ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
                   : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
               }`}
             >
               <Type size={16} aria-hidden="true" />
+              <span className="font-bold text-xs tracking-wider uppercase" aria-hidden="true">
+                Aa
+              </span>
             </button>
 
             {/* Theme toggle */}
@@ -516,29 +519,16 @@ const location = useLocation();
             {/* Easy-read font toggle */}
             <button
               onClick={toggleEasyReadFont}
-              aria-label="Toggle easy-read font"
+              aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
               aria-pressed={easyReadFont}
               title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-3 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] gap-1.5 ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
                   : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
               }`}
             >
               <Type size={16} aria-hidden="true" />
-            </button>
-
-            <button
-              onClick={toggleEasyReadFont}
-              aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
-              aria-pressed={easyReadFont}
-              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                easyReadFont
-                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
-                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
-              }`}
-            >
               <span className="font-bold text-xs tracking-wider uppercase" aria-hidden="true">
                 Aa
               </span>

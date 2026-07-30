@@ -85,7 +85,7 @@ The toggle is exposed as an accessible control placed directly adjacent to the t
 
 ## 7. Engineering Implementation References
 
-- `src/design-tokens.css`: Token definition and `:root[data-font="dyslexic"]` overrides.
-- `src/theme/ThemeProvider.tsx`: Unified context provider (`fontMode`, `setFontMode`, `toggleFontMode`, `isFontMode`).
+- `src/design-tokens.css`: Token definition and `:root[data-font="easy-read"]` overrides.
+- `src/theme/ThemeProvider.tsx`: Unified context provider (`easyReadFont`, `setEasyReadFont`, `toggleEasyReadFont`, `isEasyReadFont`, `FONT_STORAGE_KEY`).
 - `src/components/navigation/AppNavbar.tsx`: Navbar integration for desktop and mobile layouts.
 - `src/theme/__tests__/ThemeProvider.test.tsx`: Complete unit test coverage for font mode resolution, persistence, and cross-tab sync.
