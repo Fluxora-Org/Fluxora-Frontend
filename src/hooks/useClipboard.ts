@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Copy feedback state exposed by {@link useClipboard}. */
-export type ClipboardStatus = "idle" | "copied" | "shared" | "cancelled" | "failed";
+export type ClipboardStatus = "idle" | "copied" | "shared" | "cancelled" | "failed" | "sharing";
 
 export interface SharePayload {
   title?: string;
@@ -72,12 +72,22 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   return fallbackCopy(text);
 }
 
-export function isShareSupported(): boolean {
-  return typeof window !== "undefined" && typeof navigator !== "undefined" && typeof navigator.share === "function";
+export function isShareSupported(payload?: SharePayload): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+  if (payload && typeof navigator.canShare === "function") {
+    try {
+      return navigator.canShare(payload);
+    } catch {
+      return true;
+    }
+  }
+  return true;
 }
 
 export async function shareText(payload: SharePayload): Promise<"shared" | "cancelled" | "failed"> {
-  if (!isShareSupported()) {
+  if (!isShareSupported(payload)) {
     return "failed";
   }
 
@@ -85,7 +95,7 @@ export async function shareText(payload: SharePayload): Promise<"shared" | "canc
     await navigator.share(payload);
     return "shared";
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (error instanceof Error && (error.name === "AbortError" || (error.name === "NotAllowedError" && error.message.includes("cancel")))) {
       return "cancelled";
     }
     return "failed";
@@ -93,7 +103,7 @@ export async function shareText(payload: SharePayload): Promise<"shared" | "canc
 }
 
 /**
- * useClipboard — write-only clipboard helper with consistent success/failure
+ * useClipboard — write-only clipboard and Web Share API helper with consistent success/failure
  * feedback. It never reads from the clipboard (reading requires a separate
  * permission and can expose other apps' data).
  *
@@ -101,9 +111,9 @@ export async function shareText(payload: SharePayload): Promise<"shared" | "canc
  *
  * @example
  * ```tsx
- * const { copy, status } = useClipboard();
- * <button onClick={() => copy(address)}>
- *   {status === "copied" ? "Copied" : "Copy"}
+ * const { copy, share, status, support } = useClipboard();
+ * <button onClick={() => support.share ? share({ title, text, url }) : copy(text)}>
+ *   {status === "copied" || status === "shared" ? "Done" : support.share ? "Share" : "Copy"}
  * </button>
  * ```
  */
@@ -142,6 +152,7 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
   const share = useCallback(
     async (payload: SharePayload): Promise<"shared" | "cancelled" | "failed"> => {
       clearTimer();
+      setStatus("sharing");
       const outcome = await shareText(payload);
 
       if (outcome === "shared") {
@@ -163,4 +174,5 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
 
   return { copy, share, status, support, reset };
 }
+
 

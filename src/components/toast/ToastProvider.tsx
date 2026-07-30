@@ -227,4 +227,4 @@ export function useToast(): ToastContextValue {
  */
 export function useOptionalToast(): ToastContextValue | null {
   return useContext(ToastContext);
-}
+}

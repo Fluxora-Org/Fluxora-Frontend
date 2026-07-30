@@ -9,6 +9,13 @@
  * - Handles hash-pending ("Pending confirmation") and hash-confirmed states.
  */
 
+import {
+  getExpectedStellarNetwork,
+  getNetworkExplorerPath,
+  normalizeStellarNetwork,
+} from "../lib/stellarNetwork";
+import { getNetworkLabel } from "../lib/config";
+
 export interface ReceiptData {
   streamId: string;
   type: "Creation" | "Withdrawal";
@@ -20,6 +27,49 @@ export interface ReceiptData {
   txHash?: string | null;
   status: "confirmed" | "pending";
   network?: string;
+}
+
+/**
+ * Resolves the human-readable network label shown on the receipt.
+ * Prefer an explicit `data.network` from callers; otherwise use the app config.
+ */
+export function resolveReceiptNetworkLabel(
+  network?: string | null,
+): string {
+  const trimmed = network?.trim();
+  if (trimmed) return trimmed;
+  return getNetworkLabel(getExpectedStellarNetwork());
+}
+
+/**
+ * Maps a receipt network value (code or label) to a stellar.expert path segment.
+ */
+export function resolveReceiptExplorerSegment(
+  network?: string | null,
+): string {
+  const normalized = normalizeStellarNetwork(network);
+  if (normalized) return getNetworkExplorerPath(normalized);
+
+  const label = network?.trim().toLowerCase() ?? "";
+  if (label.includes("public") || label.includes("mainnet")) {
+    return getNetworkExplorerPath("PUBLIC");
+  }
+  if (label.includes("test")) {
+    return getNetworkExplorerPath("TESTNET");
+  }
+
+  return getNetworkExplorerPath(getExpectedStellarNetwork());
+}
+
+/**
+ * Builds a complete stellar.expert transaction explorer URL for receipt text.
+ */
+export function buildReceiptExplorerUrl(
+  txHash: string,
+  network?: string | null,
+): string {
+  const segment = resolveReceiptExplorerSegment(network);
+  return `https://stellar.expert/explorer/${segment}/tx/${txHash}`;
 }
 
 export function formatTimestamp(isoOrTimestamp?: string): string {
@@ -171,7 +221,7 @@ export function drawReceiptToCanvas(
 
   drawRow(415, "Sender Account", data.sender);
   drawRow(475, "Recipient Beneficiary", data.recipient);
-  drawRow(535, "Network / Ledger", data.network || "Stellar Testnet");
+  drawRow(535, "Network / Ledger", resolveReceiptNetworkLabel(data.network));
 
   // 5. TRANSACTION HASH VERIFICATION BLOCK
   ctx.fillStyle = "#94A3B8";
@@ -205,8 +255,12 @@ export function drawReceiptToCanvas(
     ctx.fillText(data.txHash || "—", 90, 695);
 
     ctx.fillStyle = "#94A3B8";
-    ctx.font = "12px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("Explorer: https://stellar.expert/explorer/testnet/tx/", 90, 725);
+    ctx.font = "11px monospace";
+    ctx.fillText(
+      `Explorer: ${buildReceiptExplorerUrl(data.txHash || "", data.network)}`,
+      90,
+      725,
+    );
   }
 
   // 6. FOOTER & DISCLAIMER

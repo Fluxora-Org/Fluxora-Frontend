@@ -1,10 +1,27 @@
-import { Skeleton, SkeletonCard } from "./Skeleton";
+import {
+  LoadingRetryState,
+  MAX_LOADING_RETRIES,
+  Skeleton,
+  SkeletonCard,
+} from "./Skeleton";
 import "./skeleton.css";
 
+interface TreasuryOverviewLoadingProps {
+  retryCount?: number;
+  onRetry?: () => void;
+}
+
 /** Skeleton for the full Dashboard / Treasury overview surface. */
-export default function TreasuryOverviewLoading() {
+export default function TreasuryOverviewLoading({
+  retryCount = 0,
+  onRetry,
+}: TreasuryOverviewLoadingProps) {
+  if (retryCount >= MAX_LOADING_RETRIES) {
+    return <LoadingRetryState label="the treasury overview" onRetry={onRetry} />;
+  }
+
   return (
-    <div role="status" aria-label="Loading treasury overview" aria-busy="true">
+    <div data-testid={LOADING_TEST_IDS.treasury} role="status" aria-label="Loading treasury overview" aria-busy="true">
       <span className="sr-only">Loading treasury overview…</span>
 
       {/* Page header */}

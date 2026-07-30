@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import React from "react";
+import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import ConnectWalletModal from "../ConnectWalletModal";
-import { getNetwork } from "@stellar/freighter-api";
+import ConnectWalletModal, { type ConnectWalletModalProps } from "../ConnectWalletModal";
+import { getNetwork, isConnected } from "@stellar/freighter-api";
 import { BREAKPOINT_MD, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../../lib/breakpoints";
 vi.mock("@stellar/freighter-api", () => {
   return {
@@ -93,6 +93,18 @@ describe("ConnectWalletModal", () => {
     const backdrop = screen.getByTestId("connect-wallet-backdrop");
     await userEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape while a Freighter connection is pending", () => {
+    (isConnected as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+
+    render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Connecting...")).toBeInTheDocument();
   });
 
   it("renders 'not_installed' error state with correct copy, links, and actions", async () => {
@@ -293,6 +305,62 @@ describe("ConnectWalletModal", () => {
 
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
     });
+  });
+
+  describe("Edge Case Behaviors & States", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders loading state copy and disables options while connection is in flight", async () => {
+      let resolveNetwork: (value: any) => void;
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise((resolve) => {
+          resolveNetwork = resolve;
+        })
+      );
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
+      
+      fireEvent.click(freighterBtn);
+
+      expect(screen.getByText("Connecting...")).toBeInTheDocument();
+      expect(freighterBtn).toBeDisabled();
+
+      await act(async () => {
+        resolveNetwork({ network: "TESTNET" });
+      });
+    });
+
+    it("applies interactive styling when options are hovered or focused via keyboard", async () => {
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />);
+      
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+      
+      // Focus via keyboard
+      await userEvent.tab();
+      if (document.activeElement !== freighterBtn) {
+        freighterBtn.focus();
+      }
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Blur
+      freighterBtn.blur();
+      expect(freighterBtn.style.boxShadow).toBe("none");
+
+      // Hover via mouse
+      fireEvent.mouseEnter(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toContain("var(--interactive-focus-ring)");
+
+      // Mouse leave
+      fireEvent.mouseLeave(freighterBtn);
+      expect(freighterBtn.style.boxShadow).toBe("none");
+    });
+  });
     // Accessibility tests
   describe('accessibility', () => {
     it('traps focus within the modal and wraps correctly', async () => {
@@ -336,18 +404,14 @@ describe("ConnectWalletModal", () => {
       expect(title).toHaveAttribute('id', 'connect-wallet-modal-title');
     });
   });
-  });
 });
 
 describe("unavailable wallet options (Albedo, WalletConnect)", () => {
-  // Skipped: pre-existing failure unrelated to CI setup — modal body content
-  // (Albedo/WalletConnect options) doesn't render in this test environment.
-  // Tracked as pre-existing test debt.
-  it.skip("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
+  it("renders Albedo and WalletConnect as disabled when no handlers provided", () => {
     render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
 
-    const albedo = screen.getByRole("button", { name: "Albedo — coming soon" });
-    const wc = screen.getByRole("button", { name: "WalletConnect — coming soon" });
+    const albedo = screen.getByRole("listitem", { name: "Albedo — coming soon" });
+    const wc = screen.getByRole("listitem", { name: "WalletConnect — coming soon" });
 
     expect(albedo).toBeDisabled();
     expect(wc).toBeDisabled();
@@ -358,9 +422,7 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
     expect(screen.getAllByText("coming soon")).toHaveLength(2);
   });
 
-  // Skipped: pre-existing failure unrelated to CI setup (same root cause as
-  // above). Tracked as pre-existing test debt.
-  it.skip("enables Albedo when a handler is provided", () => {
+  it("enables Albedo when a handler is provided", () => {
     const onAlbedo = vi.fn();
     render(
       <ConnectWalletModal
@@ -371,7 +433,7 @@ describe("unavailable wallet options (Albedo, WalletConnect)", () => {
       />
     );
 
-    const albedo = screen.getByRole("button", { name: "Connect with Albedo" });
+    const albedo = screen.getByRole("listitem", { name: "Connect with Albedo" });
     expect(albedo).not.toBeDisabled();
     expect(screen.getAllByText("coming soon")).toHaveLength(1); // only WalletConnect
   });
@@ -625,5 +687,113 @@ describe("ConnectWalletModal — mobile detection via shared breakpoint helper (
     act(() => {
       vi.advanceTimersByTime(VIEWPORT_RESIZE_DEBOUNCE_MS);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Copy stability tests (issue #1156) — ensure copy is deterministic across
+// refreshes, rerenders, and state transitions.
+// ---------------------------------------------------------------------------
+
+describe("ConnectWalletModal — copy stability", () => {
+  it("renders the same default view title and description text after a rerender", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal isOpen={true} onClose={onClose} />
+    );
+
+    const titleBefore = screen.getByText("Choose your wallet");
+    const subtitleBefore = screen.getByText(
+      /Select a provider below to connect/
+    );
+
+    rerender(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+    const titleAfter = screen.getByText("Choose your wallet");
+    const subtitleAfter = screen.getByText(
+      /Select a provider below to connect/
+    );
+
+    expect(titleBefore.textContent).toBe(titleAfter.textContent);
+    expect(subtitleBefore.textContent).toBe(subtitleAfter.textContent);
+  });
+
+  it("preserves exact error state copy on rerender", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={onClose}
+        errorState="network_mismatch"
+      />
+    );
+
+    const titleBefore = screen.getByText("Wrong Stellar Network");
+    rerender(
+      <ConnectWalletModal
+        isOpen={true}
+        onClose={onClose}
+        errorState="network_mismatch"
+      />
+    );
+    const titleAfter = screen.getByText("Wrong Stellar Network");
+
+    expect(titleBefore.textContent).toBe(titleAfter.textContent);
+  });
+
+it("preserves exact heading copy on rerender for all error states", () => {
+    const errorStates: Array<NonNullable<ConnectWalletModalProps["errorState"]>> = [
+      "not_installed",
+      "rejected",
+      "network_mismatch",
+      "network_timeout",
+      "device-searching",
+      "device-found-selecting",
+      "awaiting-device-confirmation",
+      "device-locked-error",
+      "wrong-app-error",
+      "unplugged-error",
+      "mobile-unsupported",
+    ];
+
+    const onClose = vi.fn();
+
+    for (const state of errorStates) {
+      const { rerender } = render(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState={state} />
+      );
+
+      const heading = screen.getByRole("heading", { level: 2 });
+
+      rerender(
+        <ConnectWalletModal isOpen={true} onClose={onClose} errorState={state} />
+      );
+
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+        heading.textContent
+      );
+
+      cleanup();
+    }
+  });
+
+  it("does not change the wallet list copy when the modal re-renders due to hover state change", async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />
+    );
+
+    const freighterTextBefore = screen.getAllByText("Freighter")[0].textContent;
+    const albedoTextBefore = screen.getAllByText("Albedo")[0].textContent;
+
+    // Trigger a hover on the Freighter option to change internal state
+    const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter" });
+    fireEvent.mouseEnter(freighterBtn);
+
+    const freighterTextAfter = screen.getAllByText("Freighter")[0].textContent;
+    const albedoTextAfter = screen.getAllByText("Albedo")[0].textContent;
+
+    expect(freighterTextBefore).toBe(freighterTextAfter);
+    expect(albedoTextBefore).toBe(albedoTextAfter);
   });
 });

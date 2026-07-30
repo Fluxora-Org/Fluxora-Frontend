@@ -10,7 +10,9 @@ import StreamComparePane from "../components/StreamComparePane";
 import { useTickingNow } from "../hooks/useTickingNow";
 import { MetaTags } from "../components/MetaTags";
 import { usePresenceViewers } from "../hooks/usePresenceViewers";
-import { PresenceBadge } from "../components/presence";
+import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
+import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
+import { Share2 } from "lucide-react";
 
 /**
  * StreamDetail page
@@ -30,19 +32,23 @@ import { PresenceBadge } from "../components/presence";
  * States:
  * - **loading**   – skeleton shimmer while the request is in-flight
  * - **not found** – friendly empty state with a link back to the list
- * - **error**     – error message with a retry button
+ * - **error**     – error message with a "Try again" button and a back link.
+ *                   The retry button re-issues the fetch without a full page
+ *                   navigation, keeping loading → error → loading transitions
+ *                   deterministic across refreshes and re-renders.
  * - **compare**   – two-pane split view
  * - **success**   – full single stream detail layout
  */
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { viewers, isPresenceEnabled } = usePresenceViewers(streamId);
+  const { viewers, isPresenceEnabled, updateCursor, isLoading } = usePresenceViewers(streamId);
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");
   const isCompareMode = Boolean(compareWithId && streamId);
 
+  const [isOgModalOpen, setIsOgModalOpen] = useState(false);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
   );
@@ -90,6 +96,26 @@ export default function StreamDetail() {
       controller.abort();
     };
   }, [streamId, isCompareMode]);
+
+  // Track local scroll position to broadcast cursorY
+  useEffect(() => {
+    if (!isPresenceEnabled) return;
+    const handleScroll = () => {
+      const scrollY = window.scrollY + window.innerHeight / 2;
+      const docHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+      );
+      updateCursor(docHeight > 0 ? scrollY / docHeight : 0);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [isPresenceEnabled, updateCursor]);
 
   // ── Compare mode ──────────────────────────────────────────────────────────
   if (isCompareMode && streamId && compareWithId) {
@@ -142,6 +168,25 @@ export default function StreamDetail() {
   }
 
   if (error) {
+    const handleRetry = () => {
+      if (!streamId) return;
+      setLoading(true);
+      setError(null);
+
+      const controller = new AbortController();
+      getStreamById(decodeURIComponent(streamId), controller.signal)
+        .then((result) => {
+          setStream(result);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          setError(
+            err instanceof Error ? err.message : "Failed to load stream.",
+          );
+          setLoading(false);
+        });
+    };
+
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
         <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
@@ -157,12 +202,33 @@ export default function StreamDetail() {
         >
           <strong>Error loading stream:</strong> {error}
         </div>
-        <Link
-          to="/app/streams"
-          style={{ display: "inline-block", marginTop: "1rem" }}
-        >
-          ← Back to streams
-        </Link>
+        <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
+          <button
+            onClick={handleRetry}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Try again
+          </button>
+          <Link
+            to="/app/streams"
+            style={{
+              display: "inline-block",
+              padding: "0.5rem 1rem",
+              textDecoration: "none",
+              color: "var(--color-text-secondary, #6b7280)",
+            }}
+          >
+            ← Back to streams
+          </Link>
+        </div>
       </div>
     );
   }
@@ -227,27 +293,63 @@ export default function StreamDetail() {
       <MetaTags stream={stream} />
 
       {/* Header */}
-      <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
-        <h1
+      <div
+        style={{
+          marginTop: "1.5rem",
+          marginBottom: "1.5rem",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              margin: 0,
+              marginBottom: "0.25rem",
+            }}
+          >
+            {stream.name}
+          </h1>
+          <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
+            {stream.summary}
+          </p>
+        </div>
+
+        {/* Share & Social Preview Card Trigger */}
+        <button
+          onClick={() => setIsOgModalOpen(true)}
+          data-testid="share-og-preview-btn"
+          aria-label={`Share ${stream.name} and preview social card`}
           style={{
-            fontSize: "1.75rem",
-            fontWeight: 700,
-            margin: 0,
-            marginBottom: "0.25rem",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid var(--color-border, #e5e7eb)",
+            background: "var(--color-surface-1, #fff)",
+            color: "var(--color-text-primary, #111827)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
           }}
         >
-          {stream.name}
-        </h1>
-        <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
-          {stream.summary}
-        </p>
+          <Share2 size={16} />
+          <span>Share / Preview Card</span>
+        </button>
       </div>
 
       {/* Presence Badge Container */}
       {isPresenceEnabled && (
         <div style={{ position: "relative", zIndex: 30 }}>
           <div style={{ position: "absolute", right: 0, top: "-54px" }}>
-            <PresenceBadge viewers={viewers} />
+            <PresenceBadge viewers={viewers} isLoading={isLoading} />
           </div>
         </div>
       )}
@@ -383,6 +485,18 @@ export default function StreamDetail() {
           </p>
         </section>
       )}
+
+      {/* Cursor indicator overlays */}
+      {isPresenceEnabled && (
+        <PresenceCursorOverlay viewers={viewers} />
+      )}
+
+      {/* Open Graph Social Preview Modal */}
+      <StreamOGPreviewModal
+        stream={stream}
+        isOpen={isOgModalOpen}
+        onClose={() => setIsOgModalOpen(false)}
+      />
     </div>
   );
 }

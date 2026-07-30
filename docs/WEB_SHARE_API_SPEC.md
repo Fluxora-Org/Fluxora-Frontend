@@ -1,54 +1,106 @@
-# Web Share API integration spec
+# Web Share API Integration & Clipboard Fallback Specification
 
 ## Overview
 
-This spec defines the share/copy interaction for address and stream-link surfaces in the Fluxora frontend. The goal is to prefer the native Web Share API on supporting mobile browsers while preserving a reliable copy fallback on desktop and unsupported environments.
+This specification details the Web Share API (`navigator.share`) integration with an automatic copy-to-clipboard fallback across the Fluxora application, specifically targeting `TruncatedAddress.tsx` and `StreamCreatedModal.tsx`.
 
-## Interaction states
+The goal is to provide a seamless native sharing experience on supported mobile/modern browsers while preserving a robust, accessible copy affordance on desktop and unsupported environments.
 
-### Shared action button states
-- `default`: shows a share icon when `navigator.share` is available; otherwise shows a copy icon.
-- `share-supported`: the button label is `Share <target>` and uses the native share sheet.
-- `share-unsupported`: the button label is `Copy <target>` and copies the value to the clipboard.
-- `share-in-progress`: the button remains disabled while the share promise resolves; no duplicate action is triggered.
-- `share-cancelled-by-user`: the button returns to the default state and announces a gentle `Share cancelled` message.
-- `copy-failed`: the button surfaces an accessible error message and falls back to the URL/address being visible in the UI.
+---
 
-### Feedback patterns
-- Native share success: announce `Address shared` or `Stream URL shared` in an ARIA live region.
-- Clipboard success: announce `Address copied` or `Stream URL copied`.
-- Clipboard failure: announce a descriptive error message and preserve the visible address/URL as a manual fallback.
+## 1. Feature Detection & Affordance Swap
 
-## Payload definitions
+- **Feature Detection**: The `useClipboard` hook tests for `typeof navigator.share === "function"` and optionally validates payload capability via `navigator.canShare(payload)`.
+- **Button Affordance**:
+  - **Share Available (`support.share === true`)**: Renders the native share icon (`Share2` / upload icon) with dynamic aria-labels (`Share address` / `Share stream URL`).
+  - **Share Unsupported (`support.share === false`)**: Renders the copy icon (`Copy` / dual square icon) with dynamic aria-labels (`Copy address` / `Copy stream URL`).
 
-### Address payload
-- Title: `Stellar address`
-- Text: `Stellar address: <address>`
-- URL: omitted
+---
 
-### Stream link payload
-- Title: `Stream created`
-- Text: `View my Stellar stream and withdraw funds.`
-- URL: `<streamUrl>`
+## 2. Interaction States & Transitions
 
-## Accessibility requirements
+The component and hook support five explicit operational states:
 
-- The action button must expose an accessible name that reflects the active mode:
-  - `Share address: <address>` when sharing is supported
-  - `Copy address: <address>` when sharing is unsupported
-  - `Share stream URL` / `Copy stream URL` for the modal
-- The active state must be announced via `aria-live` and the control must remain keyboard operable with Enter/Space.
-- Focus must remain on the triggering control after the share sheet closes or after a copy confirmation.
+1. **`share-supported`**:
+   - Icon: `Share2` / Upload sheet icon.
+   - Label: `Share <target>` (e.g. `Share address: GAB...`, `Share stream URL`).
+   - Action: Invokes `navigator.share(payload)`.
 
-## Visual design notes
+2. **`share-unsupported` (Copy Fallback)**:
+   - Icon: `Copy` icon.
+   - Label: `Copy <target>` (e.g. `Copy address: GAB...`, `Copy stream URL`).
+   - Action: Invokes `navigator.clipboard.writeText()` with legacy `execCommand("copy")` fallback.
 
-- Icon button uses the same 42px control size as the existing modal copy button and the same compact 14px icon treatment used in the address chip.
-- Share state uses the existing action color token with a subtle success tint after a successful action.
-- Contrast targets meet WCAG 2.1 AA for icon/text and focus ring visibility.
+3. **`share-in-progress`**:
+   - Icon: `Loader2` / `spinning` progress indicator.
+   - Button State: `disabled={true}`, `aria-busy="true"`, `cursor-wait`.
+   - Announcement: `"Opening share sheet"` / `"Sharing stream URL"`.
+   - Action: Prevents duplicate triggers while OS modal is open.
 
-## Testing checklist
+4. **`share-cancelled-by-user`**:
+   - Icon: Reverts smoothly to `Share2` or `Copy`.
+   - Announcement: `"Share cancelled"`.
+   - Focus Management: Focus remains pinned on the trigger element.
 
-- Verify the share path on supported mobile browsers.
-- Verify clipboard copy on desktop and unsupported browsers.
-- Verify keyboard activation, focus retention, and screen-reader announcements.
-- Verify the control remains usable when the native share sheet is dismissed or canceled.
+5. **`copy-failed`**:
+   - Icon: `AlertCircle` with warning style (`--color-danger`).
+   - Announcement: `"Address could not be copied"` / error toast notification.
+   - Fallback: Full address / URL remains visually selectable and accessible in DOM.
+
+---
+
+## 3. Shared Payload Schemas
+
+### 3.1 Bare Address (`TruncatedAddress.tsx`)
+```json
+{
+  "title": "Stellar address",
+  "text": "Stellar address: GAB...TREASURY"
+}
+```
+*Note*: `url` is omitted for bare address sharing to avoid invalid URI schema errors.
+
+### 3.2 Stream Link (`StreamCreatedModal.tsx`)
+```json
+{
+  "title": "Stream created",
+  "text": "View my Stellar stream and withdraw funds.",
+  "url": "https://app.fluxora.io/stream/1020"
+}
+```
+
+---
+
+## 4. Confirmation Micro-Interactions
+
+- **Native OS Share Sheet**:
+  - Success: Briefly transitions icon to `Check` mark (`--color-success`), announces `"Address shared"` / `"Stream URL shared"` via `aria-live="polite"` or `aria-live="assertive"`.
+  - Cancellation: Gracefully resets to idle state after user dismisses sheet, announces `"Share cancelled"`.
+- **In-App Copy Fallback**:
+  - Success: Swaps icon to green `Check` mark, sets state to `copied`, displays toast notification or inline announcement for 2000ms before auto-resetting to `idle`.
+
+---
+
+## 5. Accessibility (WCAG 2.1 AA Compliance) & Redlines
+
+- **Accessible Names**: `aria-label` dynamically updates according to action and target state:
+  - `"Share address: GAB...TREASURY"`
+  - `"Copy address: GAB...TREASURY"`
+  - `"Sharing stream URL"`
+  - `"Copied stream URL"`
+- **ARIA Live Regions**: Screen reader live announcements communicate state changes without stealing focus (`aria-live="polite"` for address, `aria-live="assertive"` for modal).
+- **Keyboard Navigation**:
+  - Full keyboard access via `Tab` / `Shift+Tab`.
+  - Activatable via `Enter` or `Space` keys (`onKeyDown` handler).
+  - Focus ring styled with high contrast token outline (`outline-color: var(--cyber-yellow)` / `0 0 0 4px #00b8d4`).
+- **Contrast Ratios**:
+  - Default text / icon contrast: ≥ 4.5:1 (text) and ≥ 3:1 (graphical icons).
+  - Hover / Focus states meet WCAG 2.1 AA across light, dark, and cyberpunk themes.
+
+---
+
+## 6. Verification & Test Walkthrough
+
+1. **Mobile / Native Share Test**: Open on supporting browser (iOS Safari, Android Chrome). Verify clicking button launches native share sheet with specified title, text, and URL.
+2. **Desktop / Fallback Test**: Open on browser without `navigator.share`. Verify button displays Copy icon and copies payload directly to clipboard with success checkmark / toast.
+3. **Cancellation Test**: Launch share sheet and dismiss without selecting an app. Verify status reverts to `idle` without throwing error or breaking focus.

@@ -267,6 +267,7 @@
 
 .shareButton {
   flex: 1;
+  min-height: 44px;
   padding: 0.75rem 0.875rem;
   border-radius: 10px;
   border: 1px solid #2a3d58;
@@ -282,9 +283,140 @@
   outline: none;
 }
 
+.shareButton:focus-visible {
+  box-shadow: 0 0 0 2px #0d1421, 0 0 0 4px #00b8d4;
+}
+
+.shareButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .shareButtonActive {
   background: rgba(0, 184, 212, 0.18);
   border-color: #00b8d4;
+}
+
+.shareConnectPanel {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shareConnectButton,
+.shareSendButton {
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: #00b8d4;
+  color: #04131a;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+}
+
+.shareConnectButton:hover,
+.shareSendButton:hover {
+  background: #0099b3;
+}
+
+.shareConnectButton:focus-visible,
+.shareSendButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #0d1421, 0 0 0 4px #00b8d4;
+}
+
+.shareSendButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sharePickerPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.shareWorkspaceHint {
+  margin: 0;
+  color: #8ec5ff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.channelPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+}
+
+.channelLabel {
+  color: #e8ecf4;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.channelCombobox {
+  position: relative;
+}
+
+.channelInput {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #2a3d58;
+  background: #0d1421;
+  color: #e8ecf4;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9375rem;
+}
+
+.channelInput:focus-visible {
+  outline: none;
+  border-color: #00b8d4;
+  box-shadow: 0 0 0 2px #0d1421, 0 0 0 4px #00b8d4;
+}
+
+.channelList {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #2a3d58;
+  border-radius: 10px;
+  background: #141e30;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.channelOption {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  color: #e8ecf4;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.channelOption:hover,
+.channelOptionActive {
+  background: #1e2d42;
+}
+
+.channelEmpty {
+  padding: 0.65rem;
+  color: #99a1af;
+  font-size: 0.8125rem;
 }
 
 .sharePreviewCard {
@@ -292,6 +424,7 @@
   border-radius: 12px;
   background: #0d1421;
   padding: 0.9rem;
+  text-align: left;
 }
 
 .sharePreviewHeader {
@@ -299,12 +432,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.65rem;
 }
 
 .sharePreviewLabel {
-  color: #6b7a94;
+  margin: 0;
+  color: #b0b8c9;
   font-size: 0.825rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -316,16 +451,86 @@
 }
 
 .sharePreviewBody {
+  margin: 0;
   color: #e8ecf4;
   font-size: 0.875rem;
   line-height: 1.5;
   word-break: break-word;
 }
 
-.shareConnectState {
-  margin-top: 0.75rem;
+.sharePreviewRow {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.sharePreviewRow dt {
+  margin: 0;
   color: #99a1af;
+  font-weight: 600;
+}
+
+.sharePreviewRow dd {
+  margin: 0;
+}
+
+.sharePreviewLink {
+  color: #8ec5ff;
+  text-decoration: underline;
+}
+
+.sharePreviewLink:hover,
+.sharePreviewLink:focus-visible {
+  color: #b6dbff;
+}
+
+.shareConnectState {
+  margin: 0;
+  color: #b0b8c9;
   font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.shareError {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+
+.cyberpunkSkin .shareButton {
+  background: var(--cyber-panel);
+  border-color: var(--cyber-border);
+  color: var(--cyber-text);
+}
+
+.cyberpunkSkin .shareButtonActive {
+  border-color: var(--cyber-cyan);
+  background: rgba(101, 246, 255, 0.12);
+}
+
+.cyberpunkSkin .shareConnectButton,
+.cyberpunkSkin .shareSendButton {
+  background: var(--cyber-cyan);
+  color: var(--cyber-bg);
+}
+
+.cyberpunkSkin .channelInput,
+.cyberpunkSkin .sharePreviewCard,
+.cyberpunkSkin .channelList {
+  background: var(--cyber-bg);
+  border-color: var(--cyber-border);
+  color: var(--cyber-text);
+}
+
+.cyberpunkSkin .channelOption:hover,
+.cyberpunkSkin .channelOptionActive {
+  background: var(--cyber-panel-raised);
 }
 
 .actions {
@@ -374,6 +579,10 @@
   .shareGroup {
     flex-direction: column;
   }
+  .sharePreviewRow {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
   .actions {
     flex-direction: column;
   }
@@ -402,4 +611,17 @@
 
 .fallbackLink:hover {
   color: #93c5fd;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

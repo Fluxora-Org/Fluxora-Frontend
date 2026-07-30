@@ -11,16 +11,18 @@ export const VoiceConfirmModal: React.FC = () => {
   } = useVoiceContext();
 
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const isOpen =
     state === "confirming-destructive" && pendingDestructiveCommand !== null;
 
-  // Auto focus confirm button when opened
+  // Auto focus Cancel button when opened (safe default — prevents accidental
+  // destructive action via reflexive Enter/Space press)
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
-        confirmBtnRef.current?.focus();
+        cancelBtnRef.current?.focus();
       }, 50);
     }
   }, [isOpen]);
@@ -159,6 +161,7 @@ export const VoiceConfirmModal: React.FC = () => {
             Confirm Action
           </button>
           <button
+            ref={cancelBtnRef}
             type="button"
             onClick={cancelDestructiveAction}
             className="py-3 px-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--border-neutral)] text-[var(--text-vivid)] hover:bg-[var(--surface-elevated)] font-semibold text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"

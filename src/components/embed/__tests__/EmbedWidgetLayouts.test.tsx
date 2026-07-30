@@ -231,7 +231,10 @@ describe('EmbedWidgetLayouts', () => {
     it('card layout has responsive metrics grid', () => {
       render(<EmbedWidgetLayoutCard {...commonProps} />);
 
-      const metricsContainer = screen.getByText('$5,000/month').closest('.embed-widget-card__metrics');
+      // formatNumber does not prefix a dollar sign; asset label follows the number.
+      const metricsContainer = screen
+        .getByText('5,000 USDC/month')
+        .closest('.embed-widget-card__metrics');
       expect(metricsContainer).toBeInTheDocument();
     });
 
@@ -271,9 +274,163 @@ describe('EmbedWidgetLayouts', () => {
         <EmbedWidgetLayoutCard {...commonProps} stream={largeStream} />
       );
 
-      expect(screen.getByText(/9,007,199,254,740,991/)).toBeInTheDocument();
+      // Card has 3 metric values that all contain the MAX_SAFE_INTEGER digits
+      const cardMatches = screen.getAllByText(/9,007,199,254,740,991/);
+      expect(cardMatches.length).toBeGreaterThanOrEqual(1);
+
       rerender(<EmbedWidgetLayoutBanner {...commonProps} stream={largeStream} />);
-      expect(screen.getByText(/9,007,199,254,740,991/)).toBeInTheDocument();
+      const bannerMatches = screen.getAllByText(/9,007,199,254,740,991/);
+      expect(bannerMatches.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('StatusBadge unknown status fallback', () => {
+    it('renders a neutral badge for an unrecognised status without crashing', () => {
+      // Cast through unknown to simulate a future API value the frontend
+      // has not mapped yet.
+      const unknownStream = {
+        ...mockStream,
+        status: 'Cancelled' as unknown as typeof mockStream.status,
+      };
+      render(<EmbedWidgetLayoutCard {...commonProps} stream={unknownStream} />);
+
+      const badge = screen.getByRole('status');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent('Cancelled');
+      expect(badge).toHaveAttribute('aria-label', 'Stream status: Cancelled');
+      expect(badge).toHaveClass('embed-widget-status-badge--unknown');
+    });
+
+    it('compact mode renders first character of unknown status', () => {
+      const unknownStream = {
+        ...mockStream,
+        status: 'Cancelled' as unknown as typeof mockStream.status,
+      };
+      render(<EmbedWidgetLayoutCompact {...commonProps} stream={unknownStream} />);
+
+      const badge = screen.getByRole('status');
+      expect(badge).toHaveTextContent('C');
+      expect(badge).toHaveClass('embed-widget-status-badge--unknown');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Progress boundary values: 0% and 100%
+  // -------------------------------------------------------------------------
+  describe('Progress boundary values', () => {
+    it('card layout renders 0% progress without crashing', () => {
+      render(<EmbedWidgetLayoutCard {...commonProps} stream={{ ...mockStream, progress: 0 }} />);
+      expect(screen.getByText('0%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+      const fill = progressBar.querySelector('[class*="progress-fill"]');
+      expect(fill).toHaveStyle({ width: '0%' });
+    });
+
+    it('card layout renders 100% progress without crashing', () => {
+      render(<EmbedWidgetLayoutCard {...commonProps} stream={{ ...mockStream, progress: 100 }} />);
+      expect(screen.getByText('100%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+      const fill = progressBar.querySelector('[class*="progress-fill"]');
+      expect(fill).toHaveStyle({ width: '100%' });
+    });
+
+    it('banner layout renders 0% progress without crashing', () => {
+      render(<EmbedWidgetLayoutBanner {...commonProps} stream={{ ...mockStream, progress: 0 }} />);
+      expect(screen.getByText('0%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+    });
+
+    it('banner layout renders 100% progress without crashing', () => {
+      render(<EmbedWidgetLayoutBanner {...commonProps} stream={{ ...mockStream, progress: 100 }} />);
+      expect(screen.getByText('100%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+    });
+
+    it('compact layout renders 0% progress without crashing', () => {
+      render(<EmbedWidgetLayoutCompact {...commonProps} stream={{ ...mockStream, progress: 0 }} />);
+      expect(screen.getByText('0%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '0');
+    });
+
+    it('compact layout renders 100% progress without crashing', () => {
+      render(<EmbedWidgetLayoutCompact {...commonProps} stream={{ ...mockStream, progress: 100 }} />);
+      expect(screen.getByText('100%')).toBeInTheDocument();
+      const progressBar = screen.getByRole('progressbar');
+      expect(progressBar).toHaveAttribute('aria-valuenow', '100');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // cliffDate absent (undefined) — optional field must not crash any layout
+  // -------------------------------------------------------------------------
+  describe('Optional cliffDate field', () => {
+    const streamWithoutCliff = { ...mockStream, cliffDate: undefined as unknown as string };
+
+    it('card layout does not crash when cliffDate is undefined', () => {
+      expect(() =>
+        render(<EmbedWidgetLayoutCard {...commonProps} stream={streamWithoutCliff} />)
+      ).not.toThrow();
+      expect(screen.getByRole('article')).toBeInTheDocument();
+    });
+
+    it('banner layout does not crash when cliffDate is undefined', () => {
+      expect(() =>
+        render(<EmbedWidgetLayoutBanner {...commonProps} stream={streamWithoutCliff} />)
+      ).not.toThrow();
+      expect(screen.getByRole('article')).toBeInTheDocument();
+    });
+
+    it('compact layout does not crash when cliffDate is undefined', () => {
+      expect(() =>
+        render(<EmbedWidgetLayoutCompact {...commonProps} stream={streamWithoutCliff} />)
+      ).not.toThrow();
+      expect(screen.getByRole('article')).toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Deterministic CSS class names — regression guard for layout identity
+  // -------------------------------------------------------------------------
+  describe('Layout CSS class stability', () => {
+    it('card root element has class embed-widget-card', () => {
+      render(<EmbedWidgetLayoutCard {...commonProps} />);
+      expect(screen.getByRole('article')).toHaveClass('embed-widget-card');
+    });
+
+    it('banner root element has class embed-widget-banner', () => {
+      render(<EmbedWidgetLayoutBanner {...commonProps} />);
+      expect(screen.getByRole('article')).toHaveClass('embed-widget-banner');
+    });
+
+    it('compact root element has class embed-widget-compact', () => {
+      render(<EmbedWidgetLayoutCompact {...commonProps} />);
+      expect(screen.getByRole('article')).toHaveClass('embed-widget-compact');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Completed status renders correctly across presets
+  // -------------------------------------------------------------------------
+  describe('Completed stream status across all presets', () => {
+    const completedStream = { ...mockStream, status: 'Completed' as const, progress: 100 };
+
+    it('card layout shows Completed status badge and 100%', () => {
+      render(<EmbedWidgetLayoutCard {...commonProps} stream={completedStream} />);
+      const badge = screen.getByText('Completed');
+      expect(badge).toHaveClass('embed-widget-status-badge--completed');
+      expect(screen.getByText('100%')).toBeInTheDocument();
+    });
+
+    it('banner layout shows compact Completed status badge (C) and 100%', () => {
+      render(<EmbedWidgetLayoutBanner {...commonProps} stream={completedStream} />);
+      const badge = screen.getByText('C');
+      expect(badge).toHaveClass('embed-widget-status-badge--completed');
+      expect(screen.getByText('100%')).toBeInTheDocument();
     });
   });
 });

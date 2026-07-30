@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
@@ -90,7 +91,7 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleStreamCreated = () => {
+  const handleStreamCreated = (_data?: StreamCreatedData) => {
     setIsModalOpen(false);
     setToast({
       message:

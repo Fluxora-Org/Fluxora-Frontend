@@ -3,6 +3,12 @@ import { en } from "./en";
 
 /**
  * Supported locales in the application.
+ *
+ * Note on CJK and composed-input locales:
+ * Locale catalogs provide translated field labels and error messages, while IME composition
+ * handling in components (Input.tsx, InputField.tsx) defers validation feedback and screen reader
+ * announcements until `compositionend` is received. For detailed design specs and guidelines, see
+ * `docs/IME_COMPOSITION_SUPPORT_SPEC.md`.
  */
 export type Locale = "en" | "es";
 

@@ -162,7 +162,7 @@ describe("Metrics", () => {
       render(<Metrics metrics={treasuryDemoMetrics} />);
 
       // Open the move-menu on the first widget ("Active Streams")
-      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move" });
+      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move Active Streams widget" });
       await user.click(firstMoveBtn);
 
       // The "Move Down" menu item should now be enabled (idx 0 + 1 < 3)
@@ -184,7 +184,7 @@ describe("Metrics", () => {
       const user = userEvent.setup();
       render(<Metrics metrics={treasuryDemoMetrics} />);
 
-      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move" });
+      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move Active Streams widget" });
       await user.click(firstMoveBtn);
 
       const moveDownItem = screen.getByRole("menuitem", { name: "Move Down" });
@@ -210,7 +210,7 @@ describe("Metrics", () => {
       ];
       render(<Metrics metrics={fourMetrics} />);
 
-      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move" });
+      const [firstMoveBtn] = screen.getAllByRole("button", { name: "Move Active Streams widget" });
       await user.click(firstMoveBtn);
 
       const moveDownItem = screen.getByRole("menuitem", { name: "Move Down" });

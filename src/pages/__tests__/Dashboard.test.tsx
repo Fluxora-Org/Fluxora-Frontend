@@ -1,23 +1,25 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ONBOARDING_DISMISSED_STORAGE_KEY } from "../../lib/onboarding";
 import Dashboard from "../Dashboard";
-import * as treasuryModule from "../../components/treasuryOverviewPage/useTreasury";
 
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: vi.fn(async () => ({ isConnected: false })),
   getAddress: vi.fn(),
 }));
 
+const mockUseTreasury = vi.fn(() => ({
+  metrics: [],
+  streams: [],
+  loading: false,
+  error: null,
+  refetch: vi.fn(),
+}));
+
 vi.mock("../../components/treasuryOverviewPage/useTreasury", () => ({
-  useTreasury: () => ({
-    metrics: [],
-    streams: [],
-    loading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  useTreasury: () => mockUseTreasury(),
   useRecipientStreams: () => ({
     streams: [],
     loading: false,
@@ -38,7 +40,11 @@ describe("Dashboard page accessibility and announcements", () => {
   });
 
   async function renderLoadedDashboard() {
-    const view = render(<Dashboard />);
+    const view = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -81,7 +87,7 @@ describe("Dashboard page accessibility and announcements", () => {
   });
 
   it("renders the Total Streaming figure as the sum of active streams depositAmount", async () => {
-    vi.mocked(treasuryModule.useTreasury).mockReturnValue({
+    mockUseTreasury.mockReturnValue({
       metrics: [],
       streams: [
         { status: "Active", depositAmount: 10000 },
@@ -123,7 +129,11 @@ describe("Dashboard page accessibility - landmarks and heading hierarchy", () =>
   });
 
   async function renderLoadedDashboard() {
-    const view = render(<Dashboard />);
+    const view = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -178,7 +188,7 @@ describe("Dashboard page accessibility - landmarks and heading hierarchy", () =>
   it("renders large safe integer amounts via formatters instead of bare toLocaleString", async () => {
     // Override wallet to be connected so withdrawable is non-null and
     // the announcement uses formatAssetAmount.
-    vi.mocked(treasuryModule.useTreasury).mockReturnValue({
+    mockUseTreasury.mockReturnValue({
       metrics: [],
       streams: [
         { status: "Active", depositAmount: Number.MAX_SAFE_INTEGER },

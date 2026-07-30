@@ -49,6 +49,20 @@ describe("RecipientStreams Testing Engine", () => {
     expect(callCount).toBe(1);
   });
 
+  it("labels pinned state with text alongside the star icon", async () => {
+    const fetchMock = vi.fn().mockResolvedValue([
+      { id: "1", sender: "Alice", amount: "10", status: "active", isPinned: true },
+    ]);
+
+    render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
+
+    expect(await screen.findByText("Pinned")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unpin stream" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   describe("theme-aware styling via design tokens", () => {
     beforeEach(() => {
       document.documentElement.removeAttribute("data-theme");

@@ -23,7 +23,12 @@ import {
   getCliffStatus,
   formatStreamTimeRange,
   isWithinDays,
+  getBrowserTimezone,
+  formatNavbarTime,
+  formatLocalISOWithOffset,
+  getFormattedUTCOffset,
 } from "../timePresentation";
+
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -425,3 +430,37 @@ describe("property: getUrgencyLevel always returns valid levels", () => {
     );
   });
 });
+
+// ─── navbar timezone utilities ──────────────────────────────────────────────
+
+describe("navbar timezone utilities", () => {
+  beforeEach(() => pinTime(BASE));
+  afterEach(() => vi.useRealTimers());
+
+  it("getBrowserTimezone returns resolved timezone or UTC on fallback", () => {
+    const tz = getBrowserTimezone();
+    expect(typeof tz).toBe("string");
+    expect(tz.length).toBeGreaterThan(0);
+  });
+
+  it("formatNavbarTime formats time with timezone indicator", () => {
+    const testDate = new Date("2026-07-28T14:45:00.000Z");
+    const fullText = formatNavbarTime(testDate, { compact: false, timezone: "UTC" });
+    expect(fullText).toContain("UTC");
+
+    const compactText = formatNavbarTime(testDate, { compact: true, timezone: "UTC" });
+    expect(compactText).not.toContain("UTC");
+  });
+
+  it("formatLocalISOWithOffset produces valid ISO string with offset", () => {
+    const testDate = new Date("2026-07-28T14:45:00.000Z");
+    const isoResult = formatLocalISOWithOffset(testDate);
+    expect(isoResult).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+
+  it("getFormattedUTCOffset returns correct offset format", () => {
+    const testDate = new Date("2026-07-28T14:45:00.000Z");
+    expect(getFormattedUTCOffset(testDate, "UTC")).toBe("UTC+00:00");
+  });
+});
+

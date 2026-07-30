@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import "./ToastNotification.css";
 
 export type ToastVariant = "success" | "error" | "info" | "warning";
@@ -154,6 +155,8 @@ interface ToastNotificationProps {
   /** Optional inline action (e.g. "View stream"). Rendered only when both are set. */
   actionLabel?: string;
   onAction?: () => void;
+  /** Optional reversible action with a five-second, pauseable countdown. */
+  onUndo?: () => void;
 }
 
 const TOAST_COPY: Record<ToastVariant, { label: string; icon: string }> = {
@@ -198,8 +201,23 @@ export default function ToastNotification({
   onClose,
   actionLabel,
   onAction,
+  onUndo,
 }: ToastNotificationProps) {
   const semantics = VARIANT_SEMANTICS[variant] ?? FALLBACK_SEMANTICS;
+  const [remainingMs, setRemainingMs] = useState(5000);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (!onUndo || isPaused) return;
+    const timer = window.setInterval(() => {
+      setRemainingMs((remaining) => {
+        const next = Math.max(0, remaining - 100);
+        if (next === 0) onClose();
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [isPaused, onClose, onUndo]);
 
   const { label, icon } = TOAST_COPY[variant] ?? FALLBACK_COPY;
 
@@ -214,7 +232,15 @@ export default function ToastNotification({
       <div className="toast-notification__icon" aria-hidden="true">
         {icon}
       </div>
-      <div className="toast-notification__content">
+      <div
+        className="toast-notification__content"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onFocus={() => setIsPaused(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setIsPaused(false);
+        }}
+      >
         <p className="toast-notification__eyebrow">{label}</p>
         <p className="toast-notification__message">{message}</p>
         {actionLabel && onAction && (
@@ -229,6 +255,32 @@ export default function ToastNotification({
             {actionLabel}
           </button>
         )}
+        {onUndo && remainingMs > 0 && (
+          <div className="toast-notification__undo">
+            <button
+              type="button"
+              className="toast-notification__action"
+              onClick={() => {
+                onUndo();
+                onClose();
+              }}
+            >
+              Undo
+            </button>
+            <span aria-live="polite" className="toast-notification__undo-countdown">
+              {Math.ceil(remainingMs / 1000)}s
+            </span>
+            <div
+              className="toast-notification__undo-progress"
+              role="progressbar"
+              aria-label="Undo time remaining"
+              aria-valuemin={0}
+              aria-valuemax={5000}
+              aria-valuenow={remainingMs}
+              style={{ transform: `scaleX(${remainingMs / 5000})` }}
+            />
+          </div>
+        )}
       </div>
       <button
         type="button"
@@ -241,4 +293,3 @@ export default function ToastNotification({
     </div>
   );
 }
-

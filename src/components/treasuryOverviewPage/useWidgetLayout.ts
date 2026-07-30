@@ -95,7 +95,11 @@ export function useWidgetLayout(metrics: Metric[]) {
 
   const saveLayout = useCallback((newLayout: WidgetLayout) => {
     setLayout(newLayout);
-    localStorage.setItem(storageKey, JSON.stringify(newLayout));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newLayout));
+    } catch (e) {
+      console.warn("Failed to persist layout to localStorage.", e);
+    }
   }, [storageKey]);
 
   const reorderWidgets = useCallback((newWidgets: WidgetConfig[]) => {

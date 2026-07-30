@@ -18,6 +18,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
+        // Public landing page and its lazy-section infrastructure
+        "src/pages/Home.tsx",
         "src/components/GlowingDot.tsx",
         "src/components/GetStartedCTA.tsx",
         "src/components/InputField.tsx",
@@ -64,6 +66,7 @@ export default defineConfig({
         "src/components/presence/PresenceBadge.tsx",
         "src/components/presence/PresenceViewerList.tsx",
         "src/hooks/usePresenceViewers.ts",
+        "src/hooks/useEmbedAccessibility.ts",
         // CSV bulk-upload feature
         "src/components/csv-upload/csvParser.ts",
         "src/components/csv-upload/CsvDropZone.tsx",

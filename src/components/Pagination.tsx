@@ -79,7 +79,22 @@ export const Pagination: React.FC<PaginationProps> = ({
           Page {normalizedPage} of {totalPages}
         </span>
 
+        <div className="page-number-list" aria-label="Pages">
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={`page-num-btn${page === normalizedPage ? ' is-active' : ''}`}
+              aria-current={page === normalizedPage ? 'page' : undefined}
+              onClick={() => onPageChange(page)}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+
         <button
+          type="button"
           onClick={() => onPageChange(normalizedPage + 1)}
           disabled={normalizedPage >= totalPages}
           className="page-nav-btn"

@@ -11,6 +11,7 @@ import {
   splitCsvLine,
   stripBom,
   normaliseLineEndings,
+  parseCsvNumber,
   validateRow,
   markDuplicates,
   parseAndValidateCsv,
@@ -71,6 +72,44 @@ describe('stripBom', () => {
   });
   it('handles an empty string', () => {
     expect(stripBom('')).toBe('');
+  });
+});
+
+describe('parseCsvNumber', () => {
+  it('parses a simple integer', () => {
+    expect(parseCsvNumber('1234')).toBe(1234);
+  });
+
+  it('parses a number with thousands separator', () => {
+    expect(parseCsvNumber('1,825')).toBe(1825);
+  });
+
+  it('parses a number with multiple thousands separators', () => {
+    expect(parseCsvNumber('1,234,567')).toBe(1234567);
+  });
+
+  it('parses a decimal number with thousands separator', () => {
+    expect(parseCsvNumber('1,234.56')).toBe(1234.56);
+  });
+
+  it('parses a decimal number without commas', () => {
+    expect(parseCsvNumber('1234.56')).toBe(1234.56);
+  });
+
+  it('parses a large number with thousands separators', () => {
+    expect(parseCsvNumber('100,000')).toBe(100000);
+  });
+
+  it('parses a number with leading/trailing whitespace', () => {
+    expect(parseCsvNumber('  1,234  ')).toBe(1234);
+  });
+
+  it('returns NaN for an empty string', () => {
+    expect(parseCsvNumber('')).toBeNaN();
+  });
+
+  it('returns NaN for a non-numeric string', () => {
+    expect(parseCsvNumber('abc')).toBeNaN();
   });
 });
 

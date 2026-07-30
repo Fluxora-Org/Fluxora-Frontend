@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface Viewer {
   id: string;
@@ -7,6 +7,7 @@ export interface Viewer {
   color: string;
   lastSeen: number;
   fadingOut?: boolean;
+  cursorY?: number;
 }
 
 /**
@@ -19,6 +20,9 @@ export interface Viewer {
  *
  * @param streamId - The ID of the current stream.
  * @param __devMockViewers - Optional mock viewers array for local development/testing.
+ *   Callers may pass an inline array literal; the hook stabilises the reference
+ *   internally via JSON serialisation so rerenders with an equal-valued but
+ *   referentially-distinct array do NOT reset the eviction-interval state.
  *
  * Returns:
  * - `viewers`: Array of current active viewers (excluding the local user).
@@ -26,6 +30,7 @@ export interface Viewer {
  * - `viewerCount`: Number of active viewers (excluding those fading out).
  * - `isPresenceEnabled`: Whether the badge should render as live presence.
  * - `presenceStatus`: Current availability state for the presence feature.
+ * - `isLoading`: Whether the initial presence data is still loading.
  */
 export function usePresenceViewers(
   streamId?: string,
@@ -34,24 +39,43 @@ export function usePresenceViewers(
   const hasRealPresenceTransport = false;
   const isPresenceEnabled = hasRealPresenceTransport && Boolean(streamId);
   const presenceStatus = __devMockViewers.length > 0 ? "mocked" : "unavailable";
-  const [viewers, setViewers] = useState<Viewer[]>(() => __devMockViewers);
 
+  // Stabilise the __devMockViewers reference so callers that pass inline array
+  // literals do not trigger a re-run of the sync effect on every render.
+  // We compare by serialised value; if the content is equal the ref stays the
+  // same object identity, keeping the effect dependency stable.
+  const mockViewersRef = useRef<Viewer[]>(__devMockViewers);
+  const serialised = JSON.stringify(__devMockViewers);
+  const prevSerialisedRef = useRef<string>(serialised);
+  if (prevSerialisedRef.current !== serialised) {
+    prevSerialisedRef.current = serialised;
+    mockViewersRef.current = __devMockViewers;
+  }
+  const stableMockViewers = mockViewersRef.current;
+
+  const [viewers, setViewers] = useState<Viewer[]>(() => stableMockViewers);
+
+  // Sync viewers from mock input. Uses the stabilised reference so this effect
+  // only re-runs when the mock viewer *content* changes, not on every render.
   useEffect(() => {
     if (!streamId) {
       setViewers([]);
       return;
     }
 
-    if (__devMockViewers.length > 0) {
-      setViewers(__devMockViewers);
+    if (stableMockViewers.length > 0) {
+      setViewers(stableMockViewers);
       return;
     }
 
     if (!isPresenceEnabled) {
       setViewers([]);
     }
-  }, [streamId, __devMockViewers, isPresenceEnabled]);
+  }, [streamId, stableMockViewers, isPresenceEnabled]);
 
+  // Eviction interval: marks viewers as fading at 29 s and removes them at 30 s.
+  // Runs unconditionally so the timer is always active while the hook is mounted,
+  // regardless of whether mock or real viewers are in use.
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
@@ -73,7 +97,7 @@ export function usePresenceViewers(
           });
         return changed ? next : prev;
       });
-    }, 1000); // 1-second interval to catch the 29s and 30s thresholds precisely
+    }, 1000); // 1-second interval to catch the 29 s and 30 s thresholds precisely
 
     return () => clearInterval(interval);
   }, []);
@@ -89,13 +113,36 @@ export function usePresenceViewers(
     );
   }, []);
 
+  const updateCursor = useCallback((y: number) => {
+    const now = Date.now();
+    setViewers(prev =>
+      prev.map(v => ({
+        ...v,
+        cursorY: y,
+        lastSeen: now,
+        fadingOut: false,
+      }))
+    );
+  }, []);
+
   const viewerCount = viewers.filter(v => !v.fadingOut).length;
+
+  // Loading state: true initially, transitions to false after first sync.
+  // In a production presence transport this would reflect the initial fetch.
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Transition out of loading state once we've determined the initial viewer set.
+    setIsLoading(false);
+  }, []);
 
   return {
     viewers,
     markActive,
+    updateCursor,
     viewerCount,
     isPresenceEnabled,
     presenceStatus,
+    isLoading,
   };
 }

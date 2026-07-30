@@ -121,6 +121,24 @@ describe("EmptyState — error state", () => {
 // ── CTA button ────────────────────────────────────────────────────────────────
 
 describe("EmptyState — CTA button", () => {
+  it("keeps retry and primary actions distinct when both are supplied", () => {
+    const onRetry = vi.fn();
+    const onPrimaryAction = vi.fn();
+    render(
+      <EmptyState
+        variant="error"
+        error="Network error"
+        onRetry={onRetry}
+        onPrimaryAction={onPrimaryAction}
+      />,
+    );
+
+    screen.getByRole("button", { name: "Retry loading data" }).click();
+    screen.getByRole("button", { name: "Try again" }).click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onPrimaryAction).toHaveBeenCalledTimes(1);
+  });
+
   it("renders CTA with correct aria-label when disconnected", () => {
     render(<EmptyState variant="treasury" walletConnected={false} />);
     expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument();

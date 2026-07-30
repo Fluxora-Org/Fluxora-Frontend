@@ -17,10 +17,14 @@
  * <Input label="Password" type="password" required disabled />
  */
 
-import type {
-  InputHTMLAttributes,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
+
+import {
+  useId,
+  useEffect,
+  useRef,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
   CompositionEventHandler,
 } from "react";
 import { useState } from "react";
@@ -90,14 +94,22 @@ export default function Input({
   onCompositionEnd,
   ...props
 }: InputProps) {
+  const generatedId = useId();
   const [isComposing, setIsComposing] = useState(false);
+  const wasInvalid = useRef(false);
+  const [shakeError, setShakeError] = useState(false);
 
   // Generate ID if not provided
-  const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+  const inputId = id ?? generatedId;
 
   // Determine if input has error
   const hasError = Boolean(error) && !(compositionAware && isComposing);
   const composingClass = compositionAware && isComposing ? styles.composing : "";
+
+  useEffect(() => {
+    setShakeError(hasError && !wasInvalid.current);
+    wasInvalid.current = hasError;
+  }, [hasError]);
 
   const handleCompositionStart: CompositionEventHandler<HTMLInputElement> = (event) => {
     onCompositionStart?.(event);
@@ -144,7 +156,7 @@ export default function Input({
           id={inputId}
           className={`${styles.input} ${styles.textarea} ${
             hasError ? styles.error : ""
-          } ${composingClass} ${className}`.trim()}
+          } ${shakeError ? styles.errorShake : ""} ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
@@ -162,7 +174,7 @@ export default function Input({
           id={inputId}
           className={`${styles.input} ${styles.select} ${
             hasError ? styles.error : ""
-          } ${composingClass} ${className}`.trim()}
+          } ${shakeError ? styles.errorShake : ""} ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}
@@ -185,7 +197,7 @@ export default function Input({
           type={type}
           className={`${styles.input} ${
             hasError ? styles.error : ""
-          } ${composingClass} ${className}`.trim()}
+          } ${shakeError ? styles.errorShake : ""} ${composingClass} ${className}`.trim()}
           aria-invalid={hasError ? "true" : "false"}
           aria-errormessage={hasError ? `${inputId}-error` : undefined}
           aria-describedby={describedBy}

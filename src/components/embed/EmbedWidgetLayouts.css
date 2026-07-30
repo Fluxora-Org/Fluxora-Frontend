@@ -49,6 +49,13 @@
   border-color: var(--color-info, #3b82f6);
 }
 
+/* Fallback badge for status values not yet recognised by the frontend */
+.embed-widget-status-badge--unknown {
+  background-color: var(--color-surface-elevated, #f0f3f7);
+  color: var(--color-text-secondary, #4a5565);
+  border-color: var(--color-border-default, #e0e6ed);
+}
+
 .embed-widget-metric {
   display: flex;
   flex-direction: column;
@@ -118,7 +125,10 @@
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   max-width: 420px;
-  min-width: 300px;
+  /* min-width uses min() so it never exceeds the available container width.
+     At 300px+ the preferred floor applies; in very narrow embed iframes the
+     card flexes down to 100% instead of overflowing its parent. */
+  min-width: min(300px, 100%);
   width: 100%;
 }
 
@@ -199,7 +209,12 @@
   background: var(--color-surface-default, #fafbfc);
   border: 1px solid var(--color-border-default, #e0e6ed);
   border-radius: 8px;
-  min-width: 500px;
+  /* Preferred floor of 500px, but never wider than the container.
+     This lets the banner fit inside any embed iframe without triggering
+     horizontal scroll, while preserving the horizontal layout intention
+     at real 500px+ widths. The ≤640px media query below switches to
+     flex-direction: column and drops min-width entirely for very narrow frames. */
+  min-width: min(500px, 100%);
   max-width: 800px;
   width: 100%;
 }
@@ -270,7 +285,9 @@
   background: var(--color-surface-default, #fafbfc);
   border: 1px solid var(--color-border-default, #e0e6ed);
   border-radius: 8px;
-  min-width: 200px;
+  /* Preferred floor of 200px, capped at 100% so the compact widget never
+     overflows its iframe container in very tight embed slots. */
+  min-width: min(200px, 100%);
   max-width: 300px;
   width: 100%;
 }
@@ -380,5 +397,54 @@
   .embed-widget-card__attribution,
   .embed-widget-compact__attribution {
     color: #000;
+  }
+}
+
+/* ============================================================================
+   Banner Skeleton Layout
+   Mirrors the real banner's responsive structure so there is no layout shift
+   on load: stacked (column) by default, row at ≥640 px.
+   ============================================================================ */
+
+.embed-widget-banner-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--color-surface-default, #fafbfc);
+  border: 1px solid var(--color-border-default, #e0e6ed);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.embed-widget-banner-skeleton__info,
+.embed-widget-banner-skeleton__timeline,
+.embed-widget-banner-skeleton__metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 641px) {
+  .embed-widget-banner-skeleton {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .embed-widget-banner-skeleton__info {
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+
+  .embed-widget-banner-skeleton__timeline {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .embed-widget-banner-skeleton__metrics {
+    min-width: 120px;
+    flex-shrink: 0;
   }
 }

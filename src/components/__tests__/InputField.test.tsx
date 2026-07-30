@@ -9,8 +9,8 @@
 // Feature: create-stream-modal-validation, Property 13: label htmlFor matches input id
 // Feature: create-stream-modal-validation, Property 14: required=true sets aria-required="true"
 
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as fc from 'fast-check';
 import { InputField } from '../InputField';
 
@@ -191,14 +191,17 @@ describe('Property 10: Success state sets aria-invalid="false"', () => {
  * Validates: Requirements 5.3
  */
 describe('Property 11: Error replaces hint — mutual exclusion', () => {
-  it('only error ValidationMessage is rendered when both error and helperText are set', () => {
+  it('renders both messages and references both ids when error and helperText are set', () => {
     fc.assert(
       fc.property(idArb, labelArb, messageArb, messageArb, (id, label, error, helperText) => {
         const { container, unmount } = renderField({ id, label, error, helperText });
         const errorMsg = container.querySelector('.validation-message--error');
         const hintMsg = container.querySelector('.validation-message--hint');
         expect(errorMsg).not.toBeNull();
-        expect(hintMsg).toBeNull();
+        expect(hintMsg).not.toBeNull();
+        expect(input!.getAttribute('aria-describedby')!.split(/\s+/)).toEqual(
+          expect.arrayContaining([`${id}-hint`, `${id}-error`]),
+        );
         unmount();
       }),
       { numRuns: 100 }
@@ -244,5 +247,27 @@ describe('Property 14: required=true sets aria-required="true"', () => {
       }),
       { numRuns: 100 }
     );
+  });
+});
+
+describe('InputField debounced validation', () => {
+  it('delays invalid feedback while typing and clears it immediately', () => {
+    vi.useFakeTimers();
+    const validate = (value: string) => value.length < 3 ? 'Enter at least 3 characters' : undefined;
+    render(
+      <InputField id="username" label="Username" validate={validate}>
+        <input type="text" />
+      </InputField>,
+    );
+    const input = screen.getByLabelText('Username');
+
+    fireEvent.change(input, { target: { value: 'a' } });
+    expect(screen.queryByText('Enter at least 3 characters')).not.toBeInTheDocument();
+    vi.advanceTimersByTime(300);
+    expect(screen.getByText('Enter at least 3 characters')).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'abc' } });
+    expect(screen.queryByText('Enter at least 3 characters')).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

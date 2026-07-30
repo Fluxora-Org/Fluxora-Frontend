@@ -95,3 +95,14 @@ const walletOptions = [
 ## Integration Example
 
 Use the `ConnectWalletModal` component as demonstrated in the Usage section above.
+
+## Edge Case Behaviors & States
+
+The modal explicitly manages various edge cases and interaction states to ensure a robust user flow:
+
+- **Loading State**: When a wallet connection is initiated and the request is in flight, the selected wallet button displays a spinning loader, the description updates to `"Connecting..."`, and all wallet options become disabled to prevent concurrent requests.
+- **Empty / Disabled State**: If a wallet option (e.g., Albedo or WalletConnect) does not have a provided action handler, it is rendered in a disabled state. It appears with reduced opacity, a `"coming soon"` badge, and a `not-allowed` cursor, and it cannot be clicked or focused.
+- **Retry State**: If a connection is rejected by the user or encounters a network mismatch/timeout, a specific error view is shown. This view includes a "Retry Connection" or "Check Network Again" button which allows the user to re-initiate the identical connection flow without closing the modal.
+- **Keyboard & Hover States**: The modal explicitly tracks focused and hovered items to provide unified styling. Active options receive an elevated background, a highlighted border, and a focus ring (when navigating via keyboard) to ensure visual feedback is locked down.
+- **Pending Connection Escape Handling**: While a wallet connection request is in progress, pressing Escape will not dismiss the modal, so the loading state can complete without interrupting the flow.
+- **Responsive / Mobile State**: The component adjusts based on the viewport width (using `BREAKPOINT_MD`). On mobile viewports, the Hardware Wallet flow intercepts the user with a `"Device Unsupported on Mobile"` error state, prompting them to use WalletConnect instead of the standard USB scanning flow.

@@ -8,6 +8,37 @@
  *   • "loading"  — data hasn't arrived yet
  *   • "empty"    — no streams exist at all
  *
+ * ## Visibility contract (deterministic across refreshes and re-renders)
+ *
+ * The banner MUST be shown when ALL of the following hold:
+ *   1. Wallet is connected
+ *   2. At least one stream exists
+ *   3. Total withdrawable balance is exactly 0
+ *   4. At least one stream is in "Active" status
+ *
+ * The banner MUST NOT be shown:
+ *   • While data is loading (parent must gate on its own loading flag)
+ *   • When streams array is empty (no-streams empty state takes precedence)
+ *   • When balance > 0 (there is something to withdraw)
+ *   • When wallet is disconnected
+ *
+ * ## Reason priority (Streams page)
+ *   "rate-zero" > "cliff"  — if any active stream has monthlyRate === 0,
+ *   that is the most actionable explanation and takes priority.
+ *   "paused" and "schedule-future" are valid reasons but are currently
+ *   only reachable via direct prop (not derived by page logic).
+ *
+ * ## nextEventDate chip
+ *   Rendered only when `nextEventDate` is a valid, parseable ISO string.
+ *   An invalid or unparseable value suppresses the chip entirely (does
+ *   NOT fall through to a "Not set" display).
+ *   On the Recipient page, `nextEventDate` is intentionally omitted — the
+ *   cliff date is not surfaced there.
+ *
+ * ## actionLabel
+ *   Falls back to the per-reason `defaultActionLabel` when the prop is
+ *   absent, null, undefined, OR an empty string.
+ *
  * Design rationale:
  *   Amber/teal gradient signals "pending, not broken". Hourglass icon
  *   animates slowly to communicate "time is passing". The copy explains
@@ -41,6 +72,16 @@ interface ZeroAccrualBannerProps {
   onAction?: () => void;
   /** Label for the action button */
   actionLabel?: string;
+  /** Suppress banner during data fetching */
+  isLoading?: boolean;
+  /** Suppress banner if no streams exist */
+  isEmpty?: boolean;
+  /** Suppress banner while retry is in flight */
+  isRetry?: boolean;
+  /** Suppress banner when soft keyboard is open (mobile) */
+  isKeyboardOpen?: boolean;
+  /** Suppress banner based on responsive breakpoint rules */
+  isResponsiveHide?: boolean;
 }
 
 // ── Per-reason copy ───────────────────────────────────────────────────
@@ -151,16 +192,33 @@ export default function ZeroAccrualBanner({
   nextEventDate,
   onAction,
   actionLabel,
+  isLoading,
+  isEmpty,
+  isRetry,
+  isKeyboardOpen,
+  isResponsiveHide,
 }: ZeroAccrualBannerProps) {
-  const cfg = REASON_CONFIG[reason];
-  const label = actionLabel ?? cfg.defaultActionLabel;
-  const formattedEventDate = nextEventDate
-    ? formatLocalDate(nextEventDate, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
+  if (isLoading || isEmpty || isRetry || isKeyboardOpen || isResponsiveHide) {
+    return null;
+  }
+
+  // Fallback to a safe config if reason is unknown at runtime.
+  const cfg = REASON_CONFIG[reason] ?? REASON_CONFIG["rate-zero"];
+  // Trim whitespace so a space-only string falls back to the default label.
+  const label = actionLabel?.trim() || cfg.defaultActionLabel;
+  // Only show the date chip when nextEventDate parses to a real date.
+  // An invalid string must suppress the chip entirely rather than falling
+  // through to a "Not set" placeholder, which would be misleading here.
+  const formattedEventDate = (() => {
+    if (!nextEventDate) return null;
+    const d = new Date(nextEventDate);
+    if (Number.isNaN(d.getTime())) return null;
+    return formatLocalDate(nextEventDate, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  })();
 
   return (
     <div
