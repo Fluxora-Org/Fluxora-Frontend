@@ -61,7 +61,9 @@ export type ZeroAccrualReason =
   | "cliff"         // Cliff date hasn't passed yet
   | "paused"        // All streams are paused
   | "rate-zero"     // Streams exist but rate = 0
-  | "schedule-future"; // Stream hasn't started yet
+  | "schedule-future" // Stream hasn't started yet
+  | "not-started"   // All streams are upcoming / not started yet
+  | "pre-cliff";    // Cliff period hasn't been reached
 
 interface ZeroAccrualBannerProps {
   /** Why accrual is zero — drives copy */
@@ -114,6 +116,18 @@ const REASON_CONFIG: Record<
       "Your streams are configured and funded, but the start date is in the future. Accrual will begin automatically on the scheduled start date.",
     defaultActionLabel: "View schedule",
   },
+  "not-started": {
+    title: "Streams haven't started yet",
+    description:
+      "Your streams are configured but the start date hasn't been reached. Accrual will begin automatically once the scheduled start date arrives.",
+    defaultActionLabel: "View schedule",
+  },
+  "pre-cliff": {
+    title: "Streams are live — pre-cliff period",
+    description:
+      "Your streams are active and accruing time-tracked value, but the cliff date hasn't been reached yet. No funds are withdrawable until the cliff period ends.",
+    defaultActionLabel: "View stream details",
+  },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -121,10 +135,12 @@ const REASON_CONFIG: Record<
 function nextEventLabel(reason: ZeroAccrualReason): string {
   switch (reason) {
     case "cliff":
+    case "pre-cliff":
       return "Cliff date";
     case "paused":
       return "Scheduled resume";
     case "schedule-future":
+    case "not-started":
       return "Stream start";
     default:
       return "Next event";

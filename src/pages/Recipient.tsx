@@ -779,7 +779,7 @@ export default function Recipient() {
       {isZeroAccrual && (
         <div style={{ marginBottom: "2rem" }}>
           <ZeroAccrualBanner
-            reason="cliff"
+            reason="pre-cliff"
             onAction={() => {
               /* Navigate to streams page for cliff details */
               window.location.href = "/app/streams";

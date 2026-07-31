@@ -69,6 +69,28 @@ describe("ZeroAccrualBanner — reason variants", () => {
       screen.getByText(/start date is in the future/i),
     ).toBeInTheDocument();
   });
+
+  it("not-started: renders correct title and description", () => {
+    renderBanner({ reason: "not-started" });
+
+    expect(
+      screen.getByText("Streams haven't started yet"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/start date hasn't been reached/i),
+    ).toBeInTheDocument();
+  });
+
+  it("pre-cliff: renders correct title and description", () => {
+    renderBanner({ reason: "pre-cliff" });
+
+    expect(
+      screen.getByText("Streams are live — pre-cliff period"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/cliff date hasn't been reached yet/i),
+    ).toBeInTheDocument();
+  });
 });
 
 // ─── Default action labels ────────────────────────────────────────────────────
@@ -79,6 +101,8 @@ describe("ZeroAccrualBanner — default action labels", () => {
     { reason: "paused", label: "View streams" },
     { reason: "rate-zero", label: "Review streams" },
     { reason: "schedule-future", label: "View schedule" },
+    { reason: "not-started", label: "View schedule" },
+    { reason: "pre-cliff", label: "View stream details" },
   ];
 
   cases.forEach(({ reason, label }) => {
@@ -214,6 +238,22 @@ describe("ZeroAccrualBanner — nextEventDate chip", () => {
       nextEventDate: "2027-05-20T00:00:00Z",
     });
     expect(screen.getByText(/Stream start:/i)).toBeInTheDocument();
+  });
+
+  it("renders chip with label 'Stream start' for reason=not-started", () => {
+    renderBanner({
+      reason: "not-started",
+      nextEventDate: "2027-06-01T00:00:00Z",
+    });
+    expect(screen.getByText(/Stream start:/i)).toBeInTheDocument();
+  });
+
+  it("renders chip with label 'Cliff date' for reason=pre-cliff", () => {
+    renderBanner({
+      reason: "pre-cliff",
+      nextEventDate: "2027-07-01T00:00:00Z",
+    });
+    expect(screen.getByText(/Cliff date:/i)).toBeInTheDocument();
   });
 
   it("renders chip with label 'Next event' for reason=rate-zero", () => {

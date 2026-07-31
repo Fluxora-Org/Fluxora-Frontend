@@ -1058,7 +1058,7 @@ export default function Streams() {
     activeStreams.length > 0;
   // Determine the most specific reason: rate-zero takes priority over cliff
   const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
-  const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "cliff";
+  const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "pre-cliff";
   const effectiveExpandedId = paginatedStreams.some(
     (stream) => stream.id === expandedStreamId,
   )
