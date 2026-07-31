@@ -1,5 +1,5 @@
-import { MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check } from "lucide-react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
+import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check, Clock } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
@@ -10,6 +10,9 @@ import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoint
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
+
+/** Duration (seconds) for the auto-retry countdown after a connection timeout. */
+const AUTO_RETRY_DELAY_S = 5;
 
 /**
  * Wraps a promise with a timeout that rejects after `ms` milliseconds.
@@ -125,6 +128,13 @@ export default function ConnectWalletModal({
  const [isMobile, setIsMobile] = useState(() => isMobileViewport());
   const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
 
+  // Auto-retry countdown after a connection timeout
+  const [autoRetryCountdown, setAutoRetryCountdown] = useState<number | null>(null);
+  const [countdownInitialized, setCountdownInitialized] = useState(false);
+  const hasAutoRetriedRef = useRef(false);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryHandlerRef = useRef<(() => Promise<void>) | null>(null);
+
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
 
@@ -236,6 +246,7 @@ export default function ConnectWalletModal({
       }
 
       // Successful connection!
+      hasAutoRetriedRef.current = false;
       connect(access.address, net.network);
       if (onConnectFreighter) {
         onConnectFreighter();
@@ -245,6 +256,7 @@ export default function ConnectWalletModal({
       if (err instanceof Error && err.message === "NETWORK_CHECK_TIMEOUT") {
         setInternalErrorState("network_timeout");
       } else {
+        hasAutoRetriedRef.current = false;
         setInternalErrorState("rejected");
       }
     } finally {
@@ -255,6 +267,7 @@ export default function ConnectWalletModal({
 
   // Reset internal error state back to default wallet list
   const handleBackToWalletSelection = () => {
+    hasAutoRetriedRef.current = false;
     setInternalErrorState(null);
     if (onRetryConnection) {
       onRetryConnection();
@@ -338,6 +351,65 @@ export default function ConnectWalletModal({
 
     return () => clearTimeout(timer);
   }, [isOpen, currentErrorState]);
+
+  // Auto-retry countdown: when network_timeout is first entered, start a 5-second
+  // countdown that auto-retries. A second consecutive timeout falls back to manual retry.
+  useEffect(() => {
+    if (currentErrorState !== "network_timeout") {
+      // Clean up when leaving the timeout state
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setAutoRetryCountdown(null);
+      setCountdownInitialized(false);
+      return;
+    }
+
+    // If we've already auto-retried once, show manual retry (no countdown)
+    if (hasAutoRetriedRef.current) {
+      setAutoRetryCountdown(null);
+      setCountdownInitialized(true);
+      return;
+    }
+
+    // First timeout: start the countdown
+    hasAutoRetriedRef.current = true;
+    setCountdownInitialized(true);
+    setAutoRetryCountdown(AUTO_RETRY_DELAY_S);
+
+    countdownIntervalRef.current = setInterval(() => {
+      setAutoRetryCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          // Countdown finished — clear the interval
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [currentErrorState]);
+
+  // Trigger auto-retry when countdown reaches 0
+  useEffect(() => {
+    if (autoRetryCountdown !== 0) return;
+    // The onConnectFreighter / handleFreighterClick is stored in the ref
+    retryHandlerRef.current?.();
+    setAutoRetryCountdown(null);
+  }, [autoRetryCountdown]);
+
+  // Keep the retry handler ref up to date
+  retryHandlerRef.current = handleFreighterClick;
 
   if (!isOpen) {
     return null;
@@ -695,9 +767,85 @@ export default function ConnectWalletModal({
           </div>
         )}
 
-        {/* ERROR STATE: Network Check Timed Out */}
-        {currentErrorState === "network_timeout" && (
-          <div className={styles.errorContainer} data-testid="error-state-network-timeout">
+        {/* ERROR STATE: Network Check Timed Out — auto-retry countdown */}
+        {currentErrorState === "network_timeout" && autoRetryCountdown !== null && autoRetryCountdown > 0 && (
+          <div className={styles.errorContainer} data-testid="error-state-network-timeout-countdown">
+            <div className={`${styles.errorIcon} ${styles.iconCountdown}`} aria-hidden="true">
+              <Clock size={28} />
+            </div>
+
+            <div
+              className={styles.ariaLiveContainer}
+              role="status"
+              aria-live="polite"
+              data-testid="countdown-announcement"
+            >
+              {autoRetryCountdown === AUTO_RETRY_DELAY_S
+                ? "Connection timed out. Auto-retrying in 5 seconds."
+                : `Auto-retrying in ${autoRetryCountdown} seconds.`}
+            </div>
+
+            <span className={styles.badge} id="badge-timeout">Timed Out</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              Network Check Timed Out
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              The network check did not respond in time. Auto-retrying in{" "}
+              <strong>{autoRetryCountdown}</strong> second{autoRetryCountdown !== 1 ? "s" : ""}…
+            </p>
+
+            {/* Visual countdown indicator */}
+            <div className={styles.countdownIndicator} aria-hidden="true">
+              <div className={styles.countdownCircle}>
+                <span className={styles.countdownNumber}>{autoRetryCountdown}</span>
+                <span className={styles.countdownLabel}>seconds</span>
+              </div>
+            </div>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={() => {
+                  // Clear countdown and retry immediately
+                  if (countdownIntervalRef.current) {
+                    clearInterval(countdownIntervalRef.current);
+                    countdownIntervalRef.current = null;
+                  }
+                  setAutoRetryCountdown(null);
+                  handleFreighterClick();
+                }}
+                aria-label="Retry now, skip countdown"
+              >
+                <RefreshCw size={18} />
+                Retry Now
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => {
+                  // Cancel auto-retry and return to wallet selection
+                  if (countdownIntervalRef.current) {
+                    clearInterval(countdownIntervalRef.current);
+                    countdownIntervalRef.current = null;
+                  }
+                  hasAutoRetriedRef.current = false;
+                  setAutoRetryCountdown(null);
+                  setCountdownInitialized(false);
+                  setInternalErrorState(null);
+                }}
+                aria-label="Cancel auto-retry and return to wallet selection"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ERROR STATE: Network Check Timed Out — manual retry (second consecutive timeout) */}
+        {currentErrorState === "network_timeout" && countdownInitialized && autoRetryCountdown === null && (
+          <div className={styles.errorContainer} data-testid="error-state-network-timeout-manual">
             <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
               <Timer size={28} />
             </div>
@@ -716,7 +864,10 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleFreighterClick}
+                onClick={() => {
+                  hasAutoRetriedRef.current = false;
+                  handleFreighterClick();
+                }}
                 aria-label="Retry network check"
               >
                 <RefreshCw size={18} />

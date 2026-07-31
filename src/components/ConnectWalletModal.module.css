@@ -476,6 +476,68 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   COUNTDOWN INDICATOR
+   ═══════════════════════════════════════════════════════════ */
+
+.countdownIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-xl);
+  animation: fadeIn var(--transition-base);
+}
+
+.countdownCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning-bg);
+  border: 3px solid var(--status-warning);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+  animation: pulseCountdown 1s ease-in-out infinite;
+}
+
+.countdownNumber {
+  font: var(--font-heading-2);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--status-warning);
+  line-height: 1;
+}
+
+.countdownLabel {
+  font: var(--font-label-sm);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-top: 2px;
+}
+
+.iconCountdown {
+  background: var(--color-warning-bg);
+  color: var(--status-warning);
+}
+
+@keyframes pulseCountdown {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdownCircle {
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    DESIGN QA PREVIEW TOOLBAR
    ═══════════════════════════════════════════════════════════ */
 

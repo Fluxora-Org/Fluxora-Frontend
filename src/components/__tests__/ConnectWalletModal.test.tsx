@@ -12,6 +12,15 @@ vi.mock("@stellar/freighter-api", () => {
     getNetwork: vi.fn().mockResolvedValue({ network: "TESTNET" }),
   };
 });
+vi.mock("../../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => ({
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    address: null,
+    network: null,
+  }),
+  WalletProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 let viewportWidth = 1024;
 
@@ -203,7 +212,7 @@ describe("ConnectWalletModal", () => {
       vi.useRealTimers();
     });
 
-    it("shows timeout error when getNetwork never resolves", async () => {
+    it("shows countdown UI when getNetwork never resolves", async () => {
       vi.useFakeTimers();
       (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
 
@@ -217,11 +226,16 @@ describe("ConnectWalletModal", () => {
       // Advance past the timeout duration
       await vi.advanceTimersByTimeAsync(5000);
 
+      // Extra tick to let the countdown useEffect fire
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Should show countdown UI
       expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
-      expect(screen.getByText(/The network check did not respond in time/)).toBeInTheDocument();
+      expect(screen.getByText(/Auto-retrying in 5 second/)).toBeInTheDocument();
+      expect(screen.getByTestId("error-state-network-timeout-countdown")).toBeInTheDocument();
     });
 
-    it("shows timeout error state with retry button", async () => {
+    it("shows 'Retry Now' and 'Cancel' buttons during countdown", async () => {
       vi.useFakeTimers();
       (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
 
@@ -231,35 +245,64 @@ describe("ConnectWalletModal", () => {
 
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
 
-      // Should have a retry button
-      const retryBtn = screen.getByRole("button", { name: "Retry network check" });
-      expect(retryBtn).toBeInTheDocument();
+      // Should have Retry Now and Cancel buttons
+      const retryNowBtn = screen.getByRole("button", { name: "Retry now, skip countdown" });
+      expect(retryNowBtn).toBeInTheDocument();
 
-      // Back button should also be present
-      expect(
-        screen.getByRole("button", { name: "Back to wallet selection list" })
-      ).toBeInTheDocument();
+      const cancelBtn = screen.getByRole("button", { name: "Cancel auto-retry and return to wallet selection" });
+      expect(cancelBtn).toBeInTheDocument();
     });
 
-    it("recovers with retry after timeout when getNetwork succeeds on next attempt", async () => {
+    it("falls back to manual retry after second consecutive timeout", async () => {
       vi.useFakeTimers();
       const neverPromise = new Promise(() => {});
       (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(neverPromise);
 
       render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
 
-      // First attempt — times out
+      // First attempt — times out, countdown starts
       fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(5000);
-      expect(screen.getByText("Network Check Timed Out")).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(0);
 
-      // Now make getNetwork resolve
+      // Countdown should be visible
+      expect(screen.getByTestId("error-state-network-timeout-countdown")).toBeInTheDocument();
+
+      // Advance past the 5-second countdown to trigger auto-retry
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Second attempt also times out (getNetwork still never resolves)
+      // Should now show manual retry
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(screen.getByTestId("error-state-network-timeout-manual")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Retry network check" })).toBeInTheDocument();
+    });
+
+    it("recovers with auto-retry after timeout when getNetwork succeeds on second attempt", async () => {
+      vi.useFakeTimers();
+      const neverPromise = new Promise(() => {});
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(neverPromise);
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      // First attempt — times out, countdown starts
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Now make getNetwork resolve for the auto-retry
       (getNetwork as ReturnType<typeof vi.fn>).mockResolvedValue({ network: "TESTNET" });
 
-      // Click retry
-      fireEvent.click(screen.getByRole("button", { name: "Retry network check" }));
+      // Advance past the 5-second countdown to trigger auto-retry
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
 
       // Let all microtasks resolve
       await vi.advanceTimersByTimeAsync(0);
@@ -267,6 +310,48 @@ describe("ConnectWalletModal", () => {
       // Should succeed — modal should close
       expect(onClose).toHaveBeenCalled();
       expect(screen.queryByText("Network Check Timed Out")).not.toBeInTheDocument();
+    });
+
+    it("cancels countdown and returns to wallet selection when Cancel is clicked", async () => {
+      vi.useFakeTimers();
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Click Cancel
+      fireEvent.click(screen.getByRole("button", { name: "Cancel auto-retry and return to wallet selection" }));
+
+      // Should return to wallet selection
+      expect(screen.getByText("Choose your wallet")).toBeInTheDocument();
+    });
+
+    it("skips countdown and retries immediately when Retry Now is clicked", async () => {
+      vi.useFakeTimers();
+      (getNetwork as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+
+      render(<ConnectWalletModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Now make getNetwork resolve
+      (getNetwork as ReturnType<typeof vi.fn>).mockResolvedValue({ network: "TESTNET" });
+
+      // Click Retry Now
+      fireEvent.click(screen.getByRole("button", { name: "Retry now, skip countdown" }));
+
+      // Let all microtasks resolve
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Should succeed — modal should close
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
