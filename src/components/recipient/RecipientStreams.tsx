@@ -256,7 +256,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
   return (
     <div
-      className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
+      className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm content-fade-in"
       style={{ backgroundColor: "var(--color-bg-primary)" }}
     >
       {/* Header and Filters */}
