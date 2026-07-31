@@ -4,6 +4,7 @@ import EmptyState from "./EmptyState";
 interface TreasuryEmptyStateProps {
   onCreateStream: () => void;
   walletConnected?: boolean;
+  walletAddress?: string;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
@@ -12,6 +13,7 @@ interface TreasuryEmptyStateProps {
 const TreasuryEmptyState: React.FC<TreasuryEmptyStateProps> = ({
   onCreateStream,
   walletConnected = true,
+  walletAddress,
   loading = false,
   error = null,
   onRetry,
@@ -19,6 +21,7 @@ const TreasuryEmptyState: React.FC<TreasuryEmptyStateProps> = ({
   <EmptyState
     variant="treasury"
     walletConnected={walletConnected}
+    walletAddress={walletAddress}
     loading={loading}
     error={error}
     onRetry={onRetry}

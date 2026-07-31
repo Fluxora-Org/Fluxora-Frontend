@@ -10,6 +10,34 @@ vi.mock("@stellar/freighter-api", () => ({
   getAddress: vi.fn(),
 }));
 
+const mockWalletState = {
+  address: null,
+  network: null,
+  connected: false,
+  loading: false,
+  error: null,
+  expectedNetwork: "TESTNET",
+  expectedNetworkLabel: "Testnet",
+  isNetworkMismatch: false,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+};
+vi.mock("../../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => mockWalletState,
+  WalletProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock("../../components/toast/ToastProvider", () => ({
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+  useToast: () => ({ addToast: vi.fn() }),
+  useOptionalToast: () => ({ addToast: vi.fn() }),
+}));
+
+vi.mock("../../i18n", () => ({
+  I18nProvider: ({ children }: { children: React.ReactNode }) => children,
+  useI18n: () => ({ t: (s: string) => s, locale: "en" }),
+}));
+
 const mockUseTreasury = vi.fn(() => ({
   metrics: [],
   streams: [],
@@ -32,6 +60,14 @@ describe("Dashboard page accessibility and announcements", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    mockUseTreasury.mockReset();
+    mockUseTreasury.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -122,6 +158,14 @@ describe("Dashboard page accessibility - landmarks and heading hierarchy", () =>
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    mockUseTreasury.mockReset();
+    mockUseTreasury.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   afterEach(() => {

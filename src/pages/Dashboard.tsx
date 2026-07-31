@@ -242,7 +242,7 @@ export default function Dashboard() {
           onDismiss={handleDismissOnboarding}
         />
       ) : (
-        <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} />
+        <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} walletAddress={walletAddress ?? undefined} />
       )}
 
       <CreateStreamModal

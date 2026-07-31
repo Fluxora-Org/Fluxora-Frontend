@@ -1,4 +1,5 @@
 import React, { RefObject } from "react";
+import { formatAddress } from "./common/TruncatedAddress";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ export interface EmptyStateProps {
   variant: EmptyStateVariant;
   /** Whether a Stellar wallet is connected */
   walletConnected?: boolean;
+  /** Connected wallet address for personalized headline */
+  walletAddress?: string;
   /** Show skeleton/loading treatment instead of empty content */
   loading?: boolean;
   /** Show error treatment with optional retry */
@@ -206,6 +209,7 @@ function LoadingSkeleton() {
 export default function EmptyState({
   variant,
   walletConnected = false,
+  walletAddress,
   loading = false,
   error = null,
   onRetry,
@@ -225,7 +229,13 @@ export default function EmptyState({
 
   if (loading) return <LoadingSkeleton />;
 
-  const title = isConnected ? cfg.connectedTitle : cfg.anonymousTitle;
+  // Personalize the connected title when a wallet address is available.
+  // Use the same formatAddress utility from TruncatedAddress for consistency.
+  let title = isConnected ? cfg.connectedTitle : cfg.anonymousTitle;
+  if (isConnected && walletAddress) {
+    const truncated = formatAddress(walletAddress);
+    title = `Welcome, ${truncated} — no streams yet`;
+  }
   // For the error variant, allow an override message via errorMessage prop
   const description =
     effectiveVariant === "error" && errorMessage
