@@ -34,6 +34,71 @@ interface WalletStatusProps {
 }
 
 
+/** Tooltip explaining the network badge, with sr-only text for screen readers. */
+function NetworkBadge({ isTestnet }: { isTestnet: boolean }) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const badgeRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = "network-badge-tooltip";
+
+  const label = isTestnet ? "Testnet" : "Mainnet";
+  const explanation = isTestnet
+    ? "Connected to the Stellar test network. Streamed assets are not real USDC."
+    : "Connected to the Stellar mainnet. Real assets are in use.";
+
+  const showTooltip = () => setTooltipOpen(true);
+  const hideTooltip = () => setTooltipOpen(false);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      hideTooltip();
+      badgeRef.current?.focus();
+    }
+  };
+
+  return (
+    <div className="relative inline-flex">
+      <span
+        ref={badgeRef}
+        tabIndex={0}
+        role="status"
+        aria-describedby={tooltipOpen ? tooltipId : undefined}
+        aria-label={`Network: ${label}. ${explanation}`}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
+        onKeyDown={handleKeyDown}
+        className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border cursor-default outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${
+          isTestnet
+            ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
+            : "bg-emerald-400/15 text-emerald-300 border-emerald-400/30"
+        }`}
+      >
+        <span
+          className={`w-2 h-2 rounded-full ${
+            isTestnet ? "bg-amber-300" : "bg-emerald-400"
+          }`}
+        />
+        {label}
+      </span>
+      {/* sr-only explanation — always present for screen readers */}
+      <span className="sr-only" aria-live="polite">
+        {explanation}
+      </span>
+      {/* Visual tooltip on hover/focus */}
+      {tooltipOpen && (
+        <div
+          id={tooltipId}
+          role="tooltip"
+          className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-2 rounded-lg bg-[var(--tooltip-bg,var(--surface-elevated))] border border-[var(--tooltip-border,var(--border-neutral))] shadow-[var(--tooltip-shadow)] text-[var(--tooltip-text-color,var(--text-secondary))] text-xs z-[1100] pointer-events-none"
+        >
+          {explanation}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WalletStatus({
   address,
   network,
@@ -220,20 +285,7 @@ export default function WalletStatus({
           Expected {expectedNetwork}
         </span>
       ) : (
-        <span
-          className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border ${
-            isTestnet
-              ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
-              : "bg-emerald-400/15 text-emerald-300 border-emerald-400/30"
-          }`}
-        >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isTestnet ? "bg-amber-300" : "bg-emerald-400"
-            }`}
-          />
-          {isTestnet ? "Testnet" : "Mainnet"}
-        </span>
+        <NetworkBadge isTestnet={isTestnet} />
       )}
 
       {slackWorkspace && (
