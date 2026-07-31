@@ -12,7 +12,9 @@ import { MetaTags } from "../components/MetaTags";
 import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
-import { Share2 } from "lucide-react";
+import { Check, Copy, Share2 } from "lucide-react";
+import { useClipboard } from "../hooks/useClipboard";
+import { useOptionalToast } from "../components/toast/ToastProvider";
 
 /**
  * StreamDetail page
@@ -55,6 +57,8 @@ export default function StreamDetail() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const currentDate = useTickingNow();
+  const { copy, status: copyStatus } = useClipboard();
+  const toast = useOptionalToast();
 
   useEffect(() => {
     // In compare mode the individual panes manage their own fetches
@@ -321,28 +325,74 @@ export default function StreamDetail() {
         </div>
 
         {/* Share & Social Preview Card Trigger */}
-        <button
-          onClick={() => setIsOgModalOpen(true)}
-          data-testid="share-og-preview-btn"
-          aria-label={`Share ${stream.name} and preview social card`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
-            borderRadius: "8px",
-            border: "1px solid var(--color-border, #e5e7eb)",
-            background: "var(--color-surface-1, #fff)",
-            color: "var(--color-text-primary, #111827)",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-          }}
-        >
-          <Share2 size={16} />
-          <span>Share / Preview Card</span>
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setIsOgModalOpen(true)}
+            data-testid="share-og-preview-btn"
+            aria-label={`Share ${stream.name} and preview social card`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Share2 size={16} />
+            <span>Share / Preview Card</span>
+          </button>
+          <button
+            onClick={async () => {
+              const success = await copy(window.location.href);
+              if (!success) {
+                toast?.addToast?.("Failed to copy link. Please copy the URL manually.", "error");
+              }
+            }}
+            data-testid="copy-stream-link-btn"
+            aria-label={
+              copyStatus === "copied"
+                ? "Stream link copied"
+                : "Copy stream link to clipboard"
+            }
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color:
+                copyStatus === "copied"
+                  ? "var(--color-success, #16a34a)"
+                  : "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+              transition: "color 0.2s ease",
+            }}
+          >
+            {copyStatus === "copied" ? (
+              <>
+                <Check size={16} aria-hidden="true" />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={16} aria-hidden="true" />
+                <span>Copy Link</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Presence Badge Container */}

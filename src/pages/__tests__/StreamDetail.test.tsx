@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import StreamDetail from "../StreamDetail";
@@ -236,5 +237,68 @@ describe("StreamDetail Page", () => {
     });
 
     expect(container.firstChild).toBeNull();
+  });
+
+  it("renders a Copy Link button that copies the current URL to the clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue(mockStream);
+
+    renderWithHelmet(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const copyBtn = await screen.findByTestId("copy-stream-link-btn");
+    expect(copyBtn).toBeInTheDocument();
+    expect(copyBtn).toHaveTextContent("Copy Link");
+
+    await userEvent.click(copyBtn);
+
+    // In jsdom, window.location.href defaults to http://localhost:3000/
+    // MemoryRouter does not update the actual window.location, so we just
+    // verify that the clipboard API was called with a URL string.
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledOnce();
+      expect(typeof writeText.mock.calls[0][0]).toBe("string");
+      expect(writeText.mock.calls[0][0]).toContain("http");
+    });
+
+    // After copy, the button should show "Copied" state
+    expect(copyBtn).toHaveTextContent("Copied");
+  });
+
+  it("shows 'Copied' text on the Copy Link button after successful copy", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue(mockStream);
+
+    renderWithHelmet(
+      <MemoryRouter initialEntries={["/app/streams/STR-123"]}>
+        <Routes>
+          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const copyBtn = await screen.findByTestId("copy-stream-link-btn");
+    await userEvent.click(copyBtn);
+
+    await waitFor(() => {
+      expect(copyBtn).toHaveTextContent("Copied");
+    });
   });
 });
