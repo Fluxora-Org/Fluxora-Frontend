@@ -9,7 +9,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, afterEach } from "vitest";
-import MetricCard from "./MetricCard";
+import MetricCard, { MetricCardVariant } from "./MetricCard";
 
 describe("MetricCard", () => {
   const mockMetric = {
@@ -101,5 +101,39 @@ describe("MetricCard", () => {
         expect(screen.getByText("Available in treasury")).toBeInTheDocument();
       });
     }
+  });
+
+  describe("compact variant", () => {
+    it("renders label and value in a single row when variant is compact", () => {
+      render(<MetricCard {...mockMetric} variant="compact" />);
+      expect(screen.getByText("Total Balance")).toBeInTheDocument();
+      expect(screen.getByText("$100,000")).toBeInTheDocument();
+      // Description should not appear in compact mode
+      expect(screen.queryByText("Available in treasury")).not.toBeInTheDocument();
+    });
+
+    it("uses reduced padding and row layout for compact variant", () => {
+      const { container } = render(<MetricCard {...mockMetric} variant="compact" />);
+      const card = container.firstChild as HTMLElement;
+      const inlineStyle = card.getAttribute("style") || "";
+      // Compact variant uses row flex direction (hyphenated in DOM)
+      expect(inlineStyle).toContain("flex-direction: row");
+      // Compact variant uses smaller padding tokens
+      expect(inlineStyle).toContain("var(--space-sm) var(--space-md)");
+    });
+
+    it("defaults to default variant when no variant prop is passed", () => {
+      const { container } = render(<MetricCard {...mockMetric} />);
+      const card = container.firstChild as HTMLElement;
+      const inlineStyle = card.getAttribute("style") || "";
+      expect(inlineStyle).toContain("flex-direction: column");
+      expect(inlineStyle).toContain("var(--space-xl)");
+    });
+
+    it("renders icon and value in compact mode", () => {
+      render(<MetricCard {...mockMetric} variant="compact" />);
+      expect(screen.getByText("💰")).toBeInTheDocument();
+      expect(screen.getByText("$100,000")).toBeInTheDocument();
+    });
   });
 });

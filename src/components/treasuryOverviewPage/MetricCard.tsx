@@ -25,6 +25,8 @@ import { useOptionalTheme } from "../../theme/ThemeProvider";
 import { GripVertical, MoreVertical } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
+export type MetricCardVariant = "default" | "compact";
+
 export interface MetricCardProps extends Metric {
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -39,6 +41,7 @@ export interface MetricCardProps extends Metric {
   onResize?: (size: "1x1" | "2x1") => void;
   onHide?: () => void;
   currentSize?: "1x1" | "2x1";
+  variant?: MetricCardVariant;
   reorderButtons?: React.ReactNode;
   moveMenuOptions?: {
     onMoveLeft?: () => void;
@@ -71,6 +74,7 @@ export default function MetricCard({
   onResize,
   onHide,
   currentSize = "1x1",
+  variant = "default",
   reorderButtons,
   moveMenuOptions,
 }: MetricCardProps) {
@@ -159,12 +163,13 @@ export default function MetricCard({
       onDrop={onDrop}
       style={{
         display: "flex",
-        flexDirection: "column",
+        flexDirection: variant === "compact" ? "row" : "column",
+        alignItems: variant === "compact" ? "center" : undefined,
         backgroundColor: "var(--color-surface-default)",
         border: "1px solid var(--color-border-default)",
         borderRadius: "var(--radius-xl)",
-        padding: "var(--space-xl)",
-        height: "100%",
+        padding: variant === "compact" ? "var(--space-sm) var(--space-md)" : "var(--space-xl)",
+        height: variant === "compact" ? "auto" : "100%",
         position: "relative",
         minWidth: 0,
         overflow: "hidden",
@@ -417,67 +422,123 @@ export default function MetricCard({
         )}
       </div>
 
-      <div
-        className="cyberpunk-scanlines flex items-center justify-center w-10 h-10 text-3xl leading-none mb-4 shrink-0"
-        style={{ color: "var(--color-text-secondary)", pointerEvents: "none" }}
-      >
-        {icon}
-      </div>
-
-      <div
-        className="font-medium text-sm leading-5 mb-2"
-        style={{
-          color: "var(--color-text-primary)",
-          pointerEvents: "none",
-          overflow: "hidden",
-          minWidth: 0,
-        }}
-      >
-        {label}
-      </div>
-
-      <div
-        className="text-2xl font-semibold leading-8 mb-2 flex flex-col gap-1"
-        style={{
-          color: "var(--color-text-vivid)",
-          pointerEvents: "none",
-          overflow: "hidden",
-          wordBreak: "break-word",
-          minWidth: 0,
-        }}
-      >
-        {tokens && tokens.length > 0 ? (
-          tokens.map((t, i) => (
-            <div
-              key={t.asset}
-              className={i === 0 ? "" : "text-base font-medium"}
-              style={
-                i === 0 ? {} : { color: "var(--color-text-secondary)" }
-              }
-            >
-              {formatAssetAmount(t.amount, t.asset)}
-            </div>
-          ))
-        ) : (
-          <div>{value}</div>
-        )}
-      </div>
-
-      {trend && trend.length >= 2 && (
+      {variant === "compact" ? (
+        /* ── Compact variant: single-row layout ── */
         <div
-          style={{ marginBottom: "var(--space-sm)" }}
-          aria-label="Rate of change sparkline"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-sm)",
+            minWidth: 0,
+            flex: 1,
+          }}
         >
-          <Sparkline data={trend} />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--color-text-secondary)",
+              fontSize: "var(--font-size-base)",
+              flexShrink: 0,
+            }}
+            aria-hidden="true"
+          >
+            {icon}
+          </div>
+          <span
+            style={{
+              color: "var(--color-text-primary)",
+              font: "var(--font-body-sm)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            {label}
+          </span>
+          <span
+            style={{
+              color: "var(--color-text-vivid)",
+              font: "var(--font-label-sm)",
+              fontWeight: 600,
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            {tokens && tokens.length > 0
+              ? formatAssetAmount(tokens[0].amount, tokens[0].asset)
+              : value}
+          </span>
         </div>
-      )}
+      ) : (
+        /* ── Default variant: full multi-line layout ── */
+        <>
+          <div
+            className="cyberpunk-scanlines flex items-center justify-center w-10 h-10 text-3xl leading-none mb-4 shrink-0"
+            style={{ color: "var(--color-text-secondary)", pointerEvents: "none" }}
+          >
+            {icon}
+          </div>
 
-      <p
-        className="text-sm leading-5 mt-auto"
-        style={{ color: "var(--color-text-secondary)", pointerEvents: "none" }}
-      >
-        {desc}
-      </p>
+          <div
+            className="font-medium text-sm leading-5 mb-2"
+            style={{
+              color: "var(--color-text-primary)",
+              pointerEvents: "none",
+              overflow: "hidden",
+              minWidth: 0,
+            }}
+          >
+            {label}
+          </div>
+
+          <div
+            className="text-2xl font-semibold leading-8 mb-2 flex flex-col gap-1"
+            style={{
+              color: "var(--color-text-vivid)",
+              pointerEvents: "none",
+              overflow: "hidden",
+              wordBreak: "break-word",
+              minWidth: 0,
+            }}
+          >
+            {tokens && tokens.length > 0 ? (
+              tokens.map((t, i) => (
+                <div
+                  key={t.asset}
+                  className={i === 0 ? "" : "text-base font-medium"}
+                  style={
+                    i === 0 ? {} : { color: "var(--color-text-secondary)" }
+                  }
+                >
+                  {formatAssetAmount(t.amount, t.asset)}
+                </div>
+              ))
+            ) : (
+              <div>{value}</div>
+            )}
+          </div>
+
+          {trend && trend.length >= 2 && (
+            <div
+              style={{ marginBottom: "var(--space-sm)" }}
+              aria-label="Rate of change sparkline"
+            >
+              <Sparkline data={trend} />
+            </div>
+          )}
+
+          <p
+            className="text-sm leading-5 mt-auto"
+            style={{ color: "var(--color-text-secondary)", pointerEvents: "none" }}
+          >
+            {desc}
+          </p>
+        </>
+      )}
 
       {/* Shared Kebab / Context Menu Popup */}
       {menuState.isOpen && (
