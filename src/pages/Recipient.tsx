@@ -125,6 +125,7 @@ export default function Recipient() {
   const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [withdrawalAnnouncement, setWithdrawalAnnouncement] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
@@ -248,6 +249,14 @@ export default function Recipient() {
     minLoadingRef.current = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
     prevStreamsErrorRef.current = null;
   }, [wallet.address]);
+
+  // Clear the withdrawal announcement after a timeout so stale text
+  // is not re-announced when a new live region is inserted.
+  useEffect(() => {
+    if (!withdrawalAnnouncement) return;
+    const id = setTimeout(() => setWithdrawalAnnouncement(""), 5000);
+    return () => clearTimeout(id);
+  }, [withdrawalAnnouncement]);
 
   useEffect(() => {
     const handleBlur = () => setIsTabFocused(false);
@@ -613,6 +622,8 @@ export default function Recipient() {
       setTxState("submitting");
       const txRes = await withdraw(recipientAddr, streamId, amountStr);
       setTxState("confirmed");
+      const formattedAmount = formatAssetAmount(balance, "USDC");
+      setWithdrawalAnnouncement(`Withdrew ${formattedAmount}. Remaining balance: 0 USDC.`);
       const newReceipt: ReceiptData = {
         streamId: streamId || "1",
         type: "Withdrawal",
@@ -667,6 +678,7 @@ export default function Recipient() {
   const serviceError = walletConnected ? recipientStreams.error : null;
   if (!walletConnected || !hasStreams || serviceError) {
     return (
+      <>
       <main aria-labelledby="recipient-page-title">
         <h1
           id="recipient-page-title"
@@ -737,6 +749,17 @@ export default function Recipient() {
           </section>
         )}
       </main>
+
+      {/* ── Screen-reader withdrawal announcement (always present) ── */}
+      <div
+        aria-live="polite"
+        role="status"
+        className="sr-only"
+        aria-atomic="true"
+      >
+        {withdrawalAnnouncement}
+      </div>
+      </>
     );
   }
 
@@ -1341,6 +1364,16 @@ export default function Recipient() {
           </div>
         </div>
       )}
+
+      {/* ── Screen-reader withdrawal announcement (always present) ── */}
+      <div
+        aria-live="polite"
+        role="status"
+        className="sr-only"
+        aria-atomic="true"
+      >
+        {withdrawalAnnouncement}
+      </div>
     </main>
   );
 }
