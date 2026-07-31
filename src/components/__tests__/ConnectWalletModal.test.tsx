@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -795,5 +795,66 @@ it("preserves exact heading copy on rerender for all error states", () => {
 
     expect(freighterTextBefore).toBe(freighterTextAfter);
     expect(albedoTextBefore).toBe(albedoTextAfter);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Last-used wallet preference tests (issue #1287)
+// ---------------------------------------------------------------------------
+
+describe("ConnectWalletModal — last-used wallet preference", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("shows a 'Last used' badge on the Freighter option when preference is set", () => {
+    localStorage.setItem("fluxora_last_used_wallet", "freighter");
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+    const badge = screen.getByText("Last used");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute("aria-label", "Last used wallet");
+  });
+
+  it("shows no 'Last used' badge when localStorage is empty", () => {
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+    expect(screen.queryByText("Last used")).not.toBeInTheDocument();
+  });
+
+  it("does not show 'Last used' badge on disabled wallet options", () => {
+    localStorage.setItem("fluxora_last_used_wallet", "albedo");
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+    // Albedo is disabled when no handler is provided — badge should not show
+    expect(screen.queryByText("Last used")).not.toBeInTheDocument();
+  });
+
+  it("persists wallet ID to localStorage on successful Freighter connection", async () => {
+    (isConnected as ReturnType<typeof vi.fn>).mockResolvedValue({ isConnected: true });
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+    await userEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+    expect(localStorage.getItem("fluxora_last_used_wallet")).toBe("freighter");
+  });
+
+  it("shows 'Last used' badge after successful connection and re-opening the modal", async () => {
+    (isConnected as ReturnType<typeof vi.fn>).mockResolvedValue({ isConnected: true });
+    const onClose = vi.fn();
+
+    // First open — connect
+    render(
+      <ConnectWalletModal isOpen={true} onClose={onClose} showStateSwitcher={false} />
+    );
+
+    await userEvent.click(screen.getByRole("listitem", { name: "Connect with Freighter" }));
+
+    // Close then re-open
+    cleanup();
+    render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+    // Freighter should now show "Last used"
+    expect(screen.getByText("Last used")).toBeInTheDocument();
   });
 });

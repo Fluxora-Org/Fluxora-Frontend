@@ -7,6 +7,7 @@ import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
 import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
+import { useLastUsedWalletId, saveLastUsedWalletId } from "../lib/useLastUsedWallet";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -125,6 +126,9 @@ export default function ConnectWalletModal({
  const [isMobile, setIsMobile] = useState(() => isMobileViewport());
   const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
 
+  // Read last-used wallet preference from localStorage
+  const lastUsedWalletId = useLastUsedWalletId();
+
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
 
@@ -237,6 +241,7 @@ export default function ConnectWalletModal({
 
       // Successful connection!
       connect(access.address, net.network);
+      saveLastUsedWalletId("freighter");
       if (onConnectFreighter) {
         onConnectFreighter();
       }
@@ -511,6 +516,11 @@ export default function ConnectWalletModal({
                             aria-hidden="true"
                           >
                             coming soon
+                          </span>
+                        )}
+                        {!wallet.disabled && wallet.id === lastUsedWalletId && (
+                          <span className={styles.lastUsedBadge} aria-label="Last used wallet">
+                            Last used
                           </span>
                         )}
                       </div>

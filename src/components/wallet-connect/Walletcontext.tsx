@@ -19,6 +19,7 @@ import {
 } from "../../lib/stellarNetwork";
 import { isValidStellarAddress } from "../../lib/stellar";
 import { getNetworkLabel } from "../../lib/config";
+import { clearLastUsedWalletId } from "../../lib/useLastUsedWallet";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -165,6 +166,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = () => {
     disconnectVersionRef.current += 1;
     clearWatcher();
+    clearLastUsedWalletId();
     setState(DISCONNECTED);
   };
 
