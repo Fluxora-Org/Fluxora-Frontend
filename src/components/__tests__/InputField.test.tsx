@@ -271,3 +271,91 @@ describe('InputField debounced validation', () => {
     vi.useRealTimers();
   });
 });
+
+// ── Character counter tests ─────────────────────────────────────────────────
+
+describe('InputField character counter', () => {
+  it('renders no counter when child input has no maxLength', () => {
+    const { container, unmount } = render(
+      <InputField id="name" label="Name">
+        <input type="text" />
+      </InputField>,
+    );
+    expect(container.querySelector('.input-counter')).toBeNull();
+    unmount();
+  });
+
+  it('renders counter with correct initial value when maxLength is set', () => {
+    const { container, unmount } = render(
+      <InputField id="bio" label="Bio">
+        <input type="text" maxLength={100} />
+      </InputField>,
+    );
+    const counter = container.querySelector('.input-counter');
+    expect(counter).not.toBeNull();
+    expect(counter!.textContent).toBe('0/100');
+    unmount();
+  });
+
+  it('updates counter as user types', () => {
+    render(
+      <InputField id="bio" label="Bio">
+        <input type="text" maxLength={100} />
+      </InputField>,
+    );
+    const input = screen.getByLabelText('Bio');
+    fireEvent.change(input, { target: { value: 'Hello' } });
+    const counter = document.querySelector('.input-counter');
+    expect(counter!.textContent).toBe('5/100');
+  });
+
+  it('applies warning color when within 10% of maxLength', () => {
+    render(
+      <InputField id="code" label="Code">
+        <input type="text" maxLength={10} />
+      </InputField>,
+    );
+    const input = screen.getByLabelText('Code');
+    fireEvent.change(input, { target: { value: '123456789' } });
+    const counter = document.querySelector('.input-counter');
+    expect(counter!.textContent).toBe('9/10');
+    // 1 character remaining out of 10 = 10%, within 10% threshold -> should be bold
+    expect(counter!.getAttribute('style')).toContain('font-weight: 600');
+  });
+
+  it('does not show warning color when well under maxLength', () => {
+    render(
+      <InputField id="code" label="Code">
+        <input type="text" maxLength={100} />
+      </InputField>,
+    );
+    const input = screen.getByLabelText('Code');
+    fireEvent.change(input, { target: { value: 'Hello' } });
+    const counter = document.querySelector('.input-counter');
+    // 95 chars remaining out of 100 = 95%, well above 10% -> normal weight
+    expect(counter!.getAttribute('style')).toContain('font-weight: 400');
+  });
+
+  it('renders hidden aria-live region for debounced announcements', () => {
+    const { container, unmount } = render(
+      <InputField id="bio" label="Bio">
+        <input type="text" maxLength={100} />
+      </InputField>,
+    );
+    const liveRegion = container.querySelector('[aria-live="polite"][aria-atomic="true"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion!.className).toBe('sr-only');
+    unmount();
+  });
+
+  it('includes counter id in aria-describedby when maxLength is set', () => {
+    const { container, unmount } = render(
+      <InputField id="bio" label="Bio">
+        <input type="text" maxLength={100} />
+      </InputField>,
+    );
+    const input = container.querySelector('input');
+    expect(input!.getAttribute('aria-describedby')).toContain('bio-counter');
+    unmount();
+  });
+});

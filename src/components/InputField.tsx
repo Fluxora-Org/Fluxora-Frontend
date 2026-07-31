@@ -37,8 +37,34 @@ export const InputField: React.FC<InputFieldProps> = ({
   const hasHint = Boolean(helperText) && !hasError;
   const hasSuccess = success === true && !hasError;
 
-  // Build the id for the active ValidationMessage
-  const messageId = [hasHint ? `${id}-hint` : null, hasError ? `${id}-error` : null]
+  // ── Character counter state ──────────────────────────────────────────
+  const [valueLength, setValueLength] = React.useState(0);
+  const [counterAnnouncement, setCounterAnnouncement] = React.useState('');
+  const announceTimer = React.useRef<ReturnType<typeof setTimeout>>();
+
+  // Clone the child element to inject ARIA props onto the underlying <input>
+  const child = React.Children.only(children) as React.ReactElement;
+  const childProps = child.props as {
+    onChange?: (event: React.ChangeEvent<HTMLElement>) => void;
+    onBlur?: (event: React.FocusEvent<HTMLElement>) => void;
+    onCompositionStart?: (event: React.CompositionEvent<HTMLElement>) => void;
+    onCompositionEnd?: (event: React.CompositionEvent<HTMLElement>) => void;
+    maxLength?: number;
+  };
+
+  // Read maxLength from the child <input> element
+  const maxLength = childProps.maxLength;
+  const showCounter = typeof maxLength === 'number' && maxLength > 0;
+  const counterId = showCounter ? `${id}-counter` : undefined;
+
+  // Deferred announcement for screen readers (not on every keystroke)
+  const scheduleAnnouncement = React.useCallback((text: string) => {
+    if (announceTimer.current) clearTimeout(announceTimer.current);
+    announceTimer.current = setTimeout(() => setCounterAnnouncement(text), 600);
+  }, []);
+
+  // Build the id for the active ValidationMessage (include counter)
+  const messageId = [hasHint ? `${id}-hint` : null, hasError ? `${id}-error` : null, counterId]
     .filter(Boolean)
     .join(' ') || undefined;
 
@@ -49,14 +75,10 @@ export const InputField: React.FC<InputFieldProps> = ({
     ? 'input-container--success'
     : '';
 
-  // Clone the child element to inject ARIA props onto the underlying <input>
-  const child = React.Children.only(children) as React.ReactElement;
-  const childProps = child.props as {
-    onChange?: (event: React.ChangeEvent<HTMLElement>) => void;
-    onBlur?: (event: React.FocusEvent<HTMLElement>) => void;
-    onCompositionStart?: (event: React.CompositionEvent<HTMLElement>) => void;
-    onCompositionEnd?: (event: React.CompositionEvent<HTMLElement>) => void;
-  };
+  // Counter display
+  const counterText = showCounter ? `${valueLength}/${maxLength}` : '';
+  const charsRemaining = showCounter ? maxLength! - valueLength : 0;
+  const isNearLimit = showCounter && charsRemaining <= Math.max(1, Math.floor(maxLength! * 0.1));
   React.useEffect(() => {
     if (!validate) setValidatedError(error);
     return () => {
@@ -82,7 +104,12 @@ export const InputField: React.FC<InputFieldProps> = ({
     'data-composing': compositionAware && isComposing ? 'true' : undefined,
     onChange: (event: React.ChangeEvent<HTMLElement>) => {
       childProps.onChange?.(event);
-      handleValidation((event.currentTarget as HTMLInputElement).value);
+      const value = (event.currentTarget as HTMLInputElement).value;
+      setValueLength(value.length);
+      handleValidation(value);
+      if (showCounter) {
+        scheduleAnnouncement(`${value.length} of ${maxLength} characters`);
+      }
     },
     onBlur: (event: React.FocusEvent<HTMLElement>) => {
       childProps.onBlur?.(event);
@@ -116,6 +143,46 @@ export const InputField: React.FC<InputFieldProps> = ({
       )}
       {hasHint && (
         <ValidationMessage id={`${id}-hint`} message={helperText!} type="hint" />
+      )}
+
+      {showCounter && (
+        <div
+          id={counterId}
+          className="input-counter"
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            fontSize: '0.8rem',
+            marginTop: 'var(--space-xs, 4px)',
+            color: isNearLimit ? 'var(--color-warning, #f59e0b)' : 'var(--color-text-muted, #6b7a94)',
+            fontWeight: isNearLimit ? 600 : 400,
+          }}
+          aria-live={isNearLimit ? 'polite' : 'off'}
+        >
+          {counterText}
+        </div>
+      )}
+
+      {/* Visually hidden aria-live region for debounced screen-reader announcements */}
+      {showCounter && (
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: 'hidden',
+            clip: 'rect(0,0,0,0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          {counterAnnouncement}
+        </div>
       )}
     </div>
   );
