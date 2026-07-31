@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
 import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
@@ -40,6 +40,16 @@ export default function TreasuryPage() {
     useTreasuryOverviewData();
   const { connected: walletConnected } = useWallet();
   const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const prevLoadingRef = useRef(loading);
+
+  // Track the last successful poll timestamp
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading && !error) {
+      setLastUpdatedAt(Date.now());
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, error]);
 
   const demoState: DemoState = loading
     ? "loading"
@@ -93,6 +103,7 @@ export default function TreasuryPage() {
         <Header
           onExportClick={() => setShowReportBuilder(true)}
           onRefresh={refetch}
+          lastUpdatedAt={lastUpdatedAt}
         />
         {showReportBuilder && (
           <ReportBuilderPanel
