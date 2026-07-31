@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
@@ -24,6 +24,7 @@ import {
   isBeforeLocalDateTime,
   isDateTimeInPast,
 } from '../lib/createStreamDates';
+import { createDateTimeFormat } from '../lib/formatters';
 import { useI18n } from '../i18n';
 // ── Bulk CSV imports ──────────────────────────────────────────────────────────
 import CsvDropZone from './csv-upload/CsvDropZone';
@@ -323,6 +324,37 @@ export default function CreateStreamModal({
   const durationValue = parseFloat(duration || "0");
   const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
+  const cliffDateRangeHelper = useMemo(() => {
+    if (!cliffEnabled) return null;
+
+    // Compute start date
+    const startDate = startTimeOption === 'now'
+      ? new Date()
+      : customStartDate
+        ? new Date(customStartDate)
+        : null;
+
+    if (!startDate || isNaN(startDate.getTime())) return null;
+
+    const durationNum = parseFloat(duration);
+    if (!isFinite(durationNum) || durationNum <= 0) return null;
+
+    const endDate = computeStreamEndDate(startDate, durationNum);
+    if (!endDate) return null;
+
+    const df = createDateTimeFormat({
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    });
+
+    return t("createStream.step2.cliffDateRangeHelper", {
+      startDate: df.format(startDate),
+      endDate: df.format(endDate),
+    });
+  }, [cliffEnabled, startTimeOption, customStartDate, duration, t]);
   const transactionStatus = useTransactionStatus(submittedTxHash, {
     enabled: currentStep === 3 && Boolean(submittedTxHash),
     getStatus: getTransactionStatus,
@@ -2156,7 +2188,7 @@ export default function CreateStreamModal({
                     label={t("createStream.step2.cliffDateLabel")}
                     required
                     error={cliffDateError}
-                    helperText={t("createStream.step2.cliffDateHelper")}
+                    helperText={cliffDateRangeHelper ?? t("createStream.step2.cliffDateHelper")}
                     success={cliffDateSuccess}
                   >
                     <input
@@ -3133,7 +3165,7 @@ export default function CreateStreamModal({
                                 label={t("createStream.step2.cliffDateLabel")}
                                 required
                                 error={cliffDateError}
-                                helperText={t("createStream.step2.cliffDateHelper")}
+                                helperText={cliffDateRangeHelper ?? t("createStream.step2.cliffDateHelper")}
                                 success={cliffDateSuccess}
                               >
                                 <input

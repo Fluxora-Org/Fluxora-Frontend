@@ -79,6 +79,7 @@ export const en = {
   "createStream.step2.enableCliffLabel": "Enable cliff (vesting lockup until specific date)",
   "createStream.step2.cliffDateLabel": "Cliff date",
   "createStream.step2.cliffDateHelper": "The recipient cannot withdraw until this date, even though USDC accrues",
+  "createStream.step2.cliffDateRangeHelper": "Must fall between {startDate} and {endDate}",
   "createStream.step2.requiredDepositLabel": "Required deposit",
   "createStream.step2.yourDepositLabel": "Your deposit",
 
