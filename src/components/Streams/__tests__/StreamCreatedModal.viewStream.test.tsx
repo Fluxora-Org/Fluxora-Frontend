@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import StreamCreatedModal from '../StreamCreatedModal';
 
@@ -14,6 +14,34 @@ describe('StreamCreatedModal View Stream', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('wraps Tab and Shift+Tab within the modal focus trap', async () => {
+    render(
+      <StreamCreatedModal
+        isOpen={true}
+        onClose={() => {}}
+        streamId="123"
+        streamUrl="https://stellar.expert/explorer/public/account/G123"
+        onCreateAnother={() => {}}
+      />,
+    );
+
+    const closeButton = screen.getByRole('button', { name: /close stream created modal/i });
+    await waitFor(() => expect(closeButton).toHaveFocus());
+
+    const modal = closeButton.closest('[role="dialog"]') as HTMLElement;
+    const focusable = Array.from(
+      modal.querySelectorAll<HTMLElement>('button:not([disabled]), [href]'),
+    );
+    const lastFocusable = focusable[focusable.length - 1];
+    lastFocusable.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(closeButton).toHaveFocus();
+
+    closeButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(lastFocusable).toHaveFocus();
   });
 
   it('opens new window when url is valid and popup is not blocked', async () => {

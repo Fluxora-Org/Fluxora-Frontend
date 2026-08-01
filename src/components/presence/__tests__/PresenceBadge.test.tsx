@@ -310,6 +310,63 @@ describe("PresenceBadge", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------------------------
+
+  describe("loading state", () => {
+    it("renders loading indicator when isLoading is true", () => {
+      render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const button = screen.getByRole("button");
+      expect(button).toBeInTheDocument();
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-busy", "true");
+      expect(button).toHaveAttribute("aria-label", "Loading presence information");
+    });
+
+    it("displays loading text and animated dots when loading", () => {
+      const { container } = render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      
+      const dots = container.querySelectorAll(".presence-loading-dot");
+      expect(dots).toHaveLength(3);
+    });
+
+    it("does not render viewer list or avatar stack when loading", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} isLoading={true} />);
+      
+      // Should not show avatars even though viewers array has data
+      expect(screen.queryByText("AS")).not.toBeInTheDocument();
+      expect(screen.queryByText("2 viewing")).not.toBeInTheDocument();
+    });
+
+    it("renders normally when isLoading is false", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} isLoading={false} />);
+      
+      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+      expect(screen.getByText("2 viewing")).toBeInTheDocument();
+    });
+
+    it("loading indicator is aria-hidden", () => {
+      const { container } = render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const indicator = container.querySelector(".presence-loading-indicator");
+      expect(indicator).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("loading button cannot be clicked", () => {
+      render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const button = screen.getByRole("button");
+      fireEvent.click(button);
+      
+      // List should not appear because button is disabled
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Tooltip: role and content
   // -------------------------------------------------------------------------
 

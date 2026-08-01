@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import RecipientEmptyState from "../components/RecipientEmptyState";
 import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
+import { MAX_LOADING_RETRIES } from "../components/Skeleton";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
@@ -104,7 +105,6 @@ export default function Recipient() {
   const wallet = useWallet();
   const { addToast } = useToast();
 
-  const [loading, setLoading] = useState(true);
   const [txState, setTxState] = useState<
     "idle" | "signing" | "submitting" | "confirmed" | "error"
   >("idle");
@@ -128,6 +128,12 @@ export default function Recipient() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
+
+  const [minLoadingElapsed, setMinLoadingElapsed] = useState(false);
+  const minLoadingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pageRefetchState, setPageRefetchState] = useState<"idle" | "retrying">("idle");
+  const prevStreamsErrorRef = useRef<string | null>(null);
+  const pageRetryButtonRef = useRef<HTMLButtonElement>(null);
 
   // ── Local Security Gate States ──
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
@@ -192,10 +198,37 @@ export default function Recipient() {
     checkSupport();
   }, []);
 
+  const MIN_LOADING_MS = 300;
+
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(t);
+    minLoadingRef.current = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
+    return () => {
+      if (minLoadingRef.current) {
+        clearTimeout(minLoadingRef.current);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    const hadError = Boolean(prevStreamsErrorRef.current);
+    const hasError = Boolean(recipientStreams.error);
+
+    if (!hadError && hasError && pageRetryButtonRef.current) {
+      pageRetryButtonRef.current.focus();
+    }
+
+    prevStreamsErrorRef.current = recipientStreams.error ?? null;
+  }, [recipientStreams.error]);
+
+  const handlePageRefetch = useCallback(async () => {
+    setPageRefetchState("retrying");
+    try {
+      recipientStreams.refetch();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    } finally {
+      setPageRefetchState("idle");
+    }
+  }, [recipientStreams]);
 
   /**
    * Resets transaction state when the active wallet address changes.
@@ -208,6 +241,12 @@ export default function Recipient() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    setMinLoadingElapsed(false);
+    if (minLoadingRef.current) {
+      clearTimeout(minLoadingRef.current);
+    }
+    minLoadingRef.current = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
+    prevStreamsErrorRef.current = null;
   }, [wallet.address]);
 
   useEffect(() => {
@@ -224,15 +263,18 @@ export default function Recipient() {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (minLoadingRef.current) {
+        clearTimeout(minLoadingRef.current);
+      }
 
       document.title = RECIPIENT_PAGE_TITLE;
     };
   }, []);
 
-  const fetchIncomingStreams = async (): Promise<Stream[]> => [
+  const fetchIncomingStreams = useCallback(async (): Promise<Stream[]> => [
     { id: "1", sender: "Treasury", amount: "12000", status: "active" },
     { id: "2", sender: "Payroll", amount: "8600", status: "active" },
-  ];
+  ], []);
 
   const liveStreams = recipientStreams.streams;
   // A service error means we cannot confirm the recipient has no streams —
@@ -240,13 +282,29 @@ export default function Recipient() {
   // instead of silently falling through to demo balance values.
   const hasLiveStreams = liveStreams.length > 0 && !recipientStreams.error;
 
+  const walletConnected = wallet.connected;
+
+  const pageLoading = useMemo(() => {
+    if (!walletConnected) return false;
+    const dataLoading = recipientStreams.loading;
+    if (dataLoading) return true;
+    if (!minLoadingElapsed) return true;
+    return false;
+  }, [walletConnected, recipientStreams.loading, minLoadingElapsed]);
+
+  const effectiveEmptyStateLoading = useMemo(() => {
+    if (!walletConnected) return false;
+    if (recipientStreams.error) return false;
+    return recipientStreams.loading || pageRefetchState === "retrying";
+  }, [walletConnected, recipientStreams.loading, recipientStreams.error, pageRefetchState]);
+
+  const isRetryingDisabled = pageRefetchState === "retrying" || recipientStreams.loading;
+
   const demoWithdrawStream: WithdrawStreamCandidate = {
     id: "1",
     status: "Active",
     withdrawableAmount: DEMO_BALANCE,
   };
-
-  const walletConnected = wallet.connected;
 
   const withdrawStreamCandidates = walletConnected
     ? hasLiveStreams
@@ -593,7 +651,14 @@ export default function Recipient() {
     }
   };
 
-  if (loading) return <RecipientLoading />;
+  if (pageLoading || (recipientStreams.error && recipientStreams.retryCount >= MAX_LOADING_RETRIES)) {
+    return (
+      <RecipientLoading
+        retryCount={recipientStreams.retryCount}
+        onRetry={handlePageRefetch}
+      />
+    );
+  }
 
   // Show empty-state path when:
   //   - wallet is disconnected, OR
@@ -614,9 +679,11 @@ export default function Recipient() {
         </p>
         <RecipientEmptyState
           walletConnected={walletConnected}
-          loading={walletConnected ? recipientStreams.loading : false}
+          loading={effectiveEmptyStateLoading}
           error={walletConnected ? recipientStreams.error : null}
-          onRetry={walletConnected ? recipientStreams.refetch : undefined}
+          onRetry={walletConnected ? handlePageRefetch : undefined}
+          ctaDisabled={isRetryingDisabled}
+          retryButtonRef={pageRetryButtonRef}
         />
 
         {/* ── Local Security Gate (shown even without streams) ── */}
@@ -638,14 +705,16 @@ export default function Recipient() {
               </div>
               <div className="security-gate-card__actions">
                 <div className="security-gate-status">
-                  <span className="security-status-label">Status:</span>
-                  <span
-                    className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
-                    aria-live="polite"
-                  >
-                    {isSecurityGateEnabled ? "Active" : "Disabled"}
-                  </span>
-                </div>
+                <span className="security-status-label">Status:</span>
+                <span
+                  className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
+                  aria-live="polite"
+                  role="status"
+                  aria-label={`Local Security Gate status: ${isSecurityGateEnabled ? "Active" : "Disabled"}`}
+                >
+                  {isSecurityGateEnabled ? "Active" : "Disabled"}
+                </span>
+              </div>
                 <button
                   type="button"
                   className={`streams-primary-button security-gate-toggle-btn ${isSecurityGateEnabled ? "danger" : ""}`}
@@ -819,6 +888,8 @@ export default function Recipient() {
               <span
                 className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
                 aria-live="polite"
+                role="status"
+                aria-label={`Local Security Gate status: ${isSecurityGateEnabled ? "Active" : "Disabled"}`}
               >
                 {isSecurityGateEnabled ? "Active" : "Disabled"}
               </span>

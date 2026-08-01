@@ -91,6 +91,10 @@ The standard accent cyan `--color-accent-primary` (`#00b8d4`) fails contrast che
 - **Move Trigger Button:**
   - Standard focusable `<button class="keyboard-move-btn">`. Visually hidden by default, becomes visible when keyboard focused.
   - Activating (Space / Enter) reveals the Move menu.
+  - `aria-label="Move {label} widget"` gives each button a unique accessible
+    name — with many widgets on the page, a bare "Move" name is
+    indistinguishable to screen reader users navigating by element list.
+  - `aria-haspopup="menu"` / `aria-expanded` expose the menu-trigger state.
 - **Move Directional Menu:**
   - Renders menu options (Move Left / Right / Up / Down) with appropriate disabled states (e.g. Move Left is disabled for the first widget).
   - Pressing Escape closes the menu and returns focus to the trigger button.

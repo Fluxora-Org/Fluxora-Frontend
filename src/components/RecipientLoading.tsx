@@ -1,10 +1,24 @@
-import { Skeleton, SkeletonCard } from "./Skeleton";
+import {
+  LoadingRetryState,
+  MAX_LOADING_RETRIES,
+  Skeleton,
+  SkeletonCard,
+} from "./Skeleton";
 import "./skeleton.css";
 
+interface RecipientLoadingProps {
+  retryCount?: number;
+  onRetry?: () => void;
+}
+
 /** Skeleton for the Recipient portal balance card + stats row. */
-export default function RecipientLoading() {
+export default function RecipientLoading({ retryCount = 0, onRetry }: RecipientLoadingProps) {
+  if (retryCount >= MAX_LOADING_RETRIES) {
+    return <LoadingRetryState label="your streams" onRetry={onRetry} />;
+  }
+
   return (
-    <div role="status" aria-label="Loading recipient portal" aria-busy="true">
+    <div data-testid={LOADING_TEST_IDS.recipient} role="status" aria-label="Loading recipient portal" aria-busy="true">
       <span className="sr-only">Loading your streams…</span>
 
       {/* Page header */}

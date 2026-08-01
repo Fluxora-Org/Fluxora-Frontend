@@ -1,12 +1,29 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  LogOut,
+  Check,
+  Link2,
+  Unlink,
+} from "lucide-react";
 import {
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
-import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
+import { stellarExplorerUrl } from "../../lib/stellar";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
+import { formatAddress } from "../common/TruncatedAddress";
+import {
+  type ShareProvider,
+  SHARE_WORKSPACES_CHANGED_EVENT,
+  connectWorkspace,
+  disconnectWorkspace,
+  getShareProviderLabel,
+  readConnectedWorkspaces,
+} from "../../lib/shareWorkspaces";
 
 interface WalletStatusProps {
   address: string;
@@ -27,6 +44,7 @@ export default function WalletStatus({
   const [open, setOpen] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [workspaces, setWorkspaces] = useState(() => readConnectedWorkspaces());
   const { copy, status: copyStatus } = useClipboard();
   const toast = useOptionalToast();
   const copied = copyStatus === "copied";
@@ -39,6 +57,8 @@ export default function WalletStatus({
   const networkUpper = normalizeStellarNetwork(network);
   const isWrongNetwork = isNetworkMismatch;
   const isTestnet = networkUpper === "TESTNET";
+  const slackWorkspace = workspaces.find((w) => w.provider === "slack");
+  const teamsWorkspace = workspaces.find((w) => w.provider === "teams");
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -120,10 +140,46 @@ export default function WalletStatus({
 
   useEffect(() => {
     // Announce connection on mount
-    setAnnouncement(`Wallet connected: ${maskAddress(address, 6, 4)}`);
+    setAnnouncement(`Wallet connected: ${formatAddress(address)}`);
     const timer = setTimeout(() => setAnnouncement(""), 1000);
     return () => clearTimeout(timer);
   }, [address]);
+
+  useEffect(() => {
+    const syncWorkspaces = () => setWorkspaces(readConnectedWorkspaces());
+    window.addEventListener("storage", syncWorkspaces);
+    window.addEventListener("focus", syncWorkspaces);
+    window.addEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    return () => {
+      window.removeEventListener("storage", syncWorkspaces);
+      window.removeEventListener("focus", syncWorkspaces);
+      window.removeEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    };
+  }, []);
+
+  const handleWorkspaceConnect = (provider: ShareProvider) => {
+    const connected = connectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace connected.`,
+      "success",
+    );
+    setAnnouncement(
+      `${getShareProviderLabel(provider)} connected to ${connected.workspaceName}`,
+    );
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
+
+  const handleWorkspaceDisconnect = (provider: ShareProvider) => {
+    disconnectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace disconnected.`,
+      "info",
+    );
+    setAnnouncement(`${getShareProviderLabel(provider)} workspace disconnected`);
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
 
  const handleCopy = async () => {
   // Copy via the shared hook (Clipboard API + execCommand fallback).
@@ -180,6 +236,23 @@ export default function WalletStatus({
         </span>
       )}
 
+      {slackWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-sky-400/15 text-sky-200 border border-sky-400/30"
+          title={`Slack connected: ${slackWorkspace.workspaceName}`}
+        >
+          Slack · {slackWorkspace.workspaceName}
+        </span>
+      )}
+      {teamsWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-indigo-400/15 text-indigo-200 border border-indigo-400/30"
+          title={`Teams connected: ${teamsWorkspace.workspaceName}`}
+        >
+          Teams · {teamsWorkspace.workspaceName}
+        </span>
+      )}
+
       {/* Wallet Button */}
       <div className="relative">
         <button
@@ -187,12 +260,12 @@ export default function WalletStatus({
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Wallet ${maskAddress(address, 6, 4)}. Open wallet options.`}
+          aria-label={`Wallet ${formatAddress(address)}. Open wallet options.`}
           className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span className="font-mono text-xs">
-            {maskAddress(address, 6, 4)}
+            {formatAddress(address)}
           </span>
           <ChevronDown
             size={16}
@@ -264,6 +337,48 @@ export default function WalletStatus({
                   <ExternalLink size={16} />
                   View in explorer
                 </button>
+
+                <div className="my-1 h-px bg-[var(--navbar-border)]" />
+
+                {slackWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Slack
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Slack workspace
+                  </button>
+                )}
+
+                {teamsWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Teams
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Microsoft Teams
+                  </button>
+                )}
 
                 <div className="my-1 h-px bg-[var(--navbar-border)]" />
 

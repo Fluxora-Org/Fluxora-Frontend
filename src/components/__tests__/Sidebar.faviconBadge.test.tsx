@@ -2,21 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Sidebar from "../Sidebar";
-import { VoiceProvider } from "../voice/VoiceContext";
 
 describe("Sidebar in-page unread badge fallback & reset", () => {
   it("renders in-page badge with single digit count and accessible label", () => {
     render(
       <MemoryRouter>
-        <VoiceProvider>
-          <Sidebar
-            collapsed={false}
-            onToggleCollapse={() => {}}
-            mobileOpen={false}
-            onMobileClose={() => {}}
-            unreadCount={3}
-          />
-        </VoiceProvider>
+        <Sidebar
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          mobileOpen={false}
+          onMobileClose={() => {}}
+          unreadCount={3}
+        />
       </MemoryRouter>
     );
 
@@ -29,15 +26,13 @@ describe("Sidebar in-page unread badge fallback & reset", () => {
   it("renders '9+' overflow state for unread counts over 9", () => {
     render(
       <MemoryRouter>
-        <VoiceProvider>
-          <Sidebar
-            collapsed={false}
-            onToggleCollapse={() => {}}
-            mobileOpen={false}
-            onMobileClose={() => {}}
-            unreadCount={14}
-          />
-        </VoiceProvider>
+        <Sidebar
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          mobileOpen={false}
+          onMobileClose={() => {}}
+          unreadCount={14}
+        />
       </MemoryRouter>
     );
 
@@ -50,15 +45,13 @@ describe("Sidebar in-page unread badge fallback & reset", () => {
   it("does not render in-page badge when unreadCount is 0", () => {
     render(
       <MemoryRouter>
-        <VoiceProvider>
-          <Sidebar
-            collapsed={false}
-            onToggleCollapse={() => {}}
-            mobileOpen={false}
-            onMobileClose={() => {}}
-            unreadCount={0}
-          />
-        </VoiceProvider>
+        <Sidebar
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          mobileOpen={false}
+          onMobileClose={() => {}}
+          unreadCount={0}
+        />
       </MemoryRouter>
     );
 
@@ -69,16 +62,14 @@ describe("Sidebar in-page unread badge fallback & reset", () => {
     const handleReset = vi.fn();
     render(
       <MemoryRouter>
-        <VoiceProvider>
-          <Sidebar
-            collapsed={false}
-            onToggleCollapse={() => {}}
-            mobileOpen={false}
-            onMobileClose={() => {}}
-            unreadCount={5}
-            onResetUnread={handleReset}
-          />
-        </VoiceProvider>
+        <Sidebar
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          mobileOpen={false}
+          onMobileClose={() => {}}
+          unreadCount={5}
+          onResetUnread={handleReset}
+        />
       </MemoryRouter>
     );
 

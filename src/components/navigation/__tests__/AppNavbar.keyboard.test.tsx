@@ -487,3 +487,83 @@ describe("I: Connect-wallet CTA renders text, not icons", () => {
     expect(cta).not.toHaveAttribute("tabindex", "-1");
   });
 });
+
+// ─── J: Focus restoration on mobile-menu close ────────────────────────────────
+// A disclosure widget (the hamburger menu) must return focus to the control
+// that opened it whenever it closes via keyboard or link activation —
+// otherwise a keyboard user's focus silently falls back to <body> and their
+// place in the page is lost.
+
+describe("J: Focus restoration on mobile-menu close", () => {
+  it("Escape returns focus to the hamburger button", () => {
+    renderNavbar();
+    const header = screen.getByRole("banner");
+    const openBtn = screen.getByRole("button", { name: /open navigation menu/i });
+    fireEvent.click(openBtn);
+    expect(document.getElementById("mobile-nav")).toBeInTheDocument();
+
+    fireEvent.keyDown(header, { key: "Escape", code: "Escape" });
+
+    const closedBtn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(document.activeElement).toBe(closedBtn);
+  });
+
+  it("activating a link inside the mobile menu returns focus to the hamburger button", () => {
+    renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    const mobileNav = document.getElementById("mobile-nav")!;
+    fireEvent.click(within(mobileNav).getByRole("link", { name: /features/i }));
+
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+    const reopenedBtn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(document.activeElement).toBe(reopenedBtn);
+  });
+
+  it("activating the Connect Wallet CTA inside the mobile menu returns focus to the hamburger button", () => {
+    renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    const mobileNav = document.getElementById("mobile-nav")!;
+    fireEvent.click(within(mobileNav).getByRole("link", { name: /connect your stellar wallet/i }));
+
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+    const reopenedBtn = screen.getByRole("button", { name: /open navigation menu/i });
+    expect(document.activeElement).toBe(reopenedBtn);
+  });
+});
+
+// ─── K: Route-change auto-closes the mobile menu ──────────────────────────────
+// The menu must close deterministically on any navigation, not only when the
+// close handler happens to run first (e.g. browser back/forward or a
+// programmatic redirect that bypasses the in-menu link's onClick).
+
+describe("K: Route change closes an open mobile menu", () => {
+  it("mobile menu unmounts when the pathname changes while it is open", () => {
+    mockPathname = "/";
+    const { rerender } = renderNavbar();
+    fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
+    expect(document.getElementById("mobile-nav")).toBeInTheDocument();
+
+    mockPathname = "/#pricing";
+    act(() => {
+      rerender(
+        <ThemeProvider>
+          <AppNavbar />
+        </ThemeProvider>,
+      );
+    });
+
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /open navigation menu/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("mounting on a fresh pathname does not throw and starts with the menu closed", () => {
+    mockPathname = "/#docs";
+    renderNavbar();
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /open navigation menu/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+});

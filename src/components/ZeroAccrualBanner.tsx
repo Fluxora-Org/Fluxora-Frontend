@@ -72,6 +72,16 @@ interface ZeroAccrualBannerProps {
   onAction?: () => void;
   /** Label for the action button */
   actionLabel?: string;
+  /** Suppress banner during data fetching */
+  isLoading?: boolean;
+  /** Suppress banner if no streams exist */
+  isEmpty?: boolean;
+  /** Suppress banner while retry is in flight */
+  isRetry?: boolean;
+  /** Suppress banner when soft keyboard is open (mobile) */
+  isKeyboardOpen?: boolean;
+  /** Suppress banner based on responsive breakpoint rules */
+  isResponsiveHide?: boolean;
 }
 
 // ── Per-reason copy ───────────────────────────────────────────────────
@@ -182,10 +192,20 @@ export default function ZeroAccrualBanner({
   nextEventDate,
   onAction,
   actionLabel,
+  isLoading,
+  isEmpty,
+  isRetry,
+  isKeyboardOpen,
+  isResponsiveHide,
 }: ZeroAccrualBannerProps) {
-  const cfg = REASON_CONFIG[reason];
-  // Treat empty string the same as absent — always show a meaningful label.
-  const label = actionLabel || cfg.defaultActionLabel;
+  if (isLoading || isEmpty || isRetry || isKeyboardOpen || isResponsiveHide) {
+    return null;
+  }
+
+  // Fallback to a safe config if reason is unknown at runtime.
+  const cfg = REASON_CONFIG[reason] ?? REASON_CONFIG["rate-zero"];
+  // Trim whitespace so a space-only string falls back to the default label.
+  const label = actionLabel?.trim() || cfg.defaultActionLabel;
   // Only show the date chip when nextEventDate parses to a real date.
   // An invalid string must suppress the chip entirely rather than falling
   // through to a "Not set" placeholder, which would be misleading here.

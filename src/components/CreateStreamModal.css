@@ -39,6 +39,22 @@
   justify-content: center;
 }
 
+/* Mobile Safari resizes the visual viewport when its keyboard opens. Using
+   dynamic viewport units keeps the modal and its footer inside that resized
+   area instead of measuring against the hidden layout viewport. */
+@supports (height: 100dvh) {
+  .create-stream-overlay {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .create-stream-modal {
+    max-height: min(calc(100dvh - 2rem), 600px);
+  }
+}
+
 .create-stream-modal {
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
   max-height: min(90vh, 600px);
@@ -72,6 +88,12 @@
   margin: -2px -4px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+@media (max-width: 640px) {
+  .create-stream-modal .modal-footer {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
 }
 
 .create-stream-modal .modal-body-scroll::-webkit-scrollbar {
@@ -2295,4 +2317,3 @@
     transition: none;
   }
 }
-

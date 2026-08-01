@@ -164,6 +164,9 @@ function ThemeToggle() {
 
 New contributors should start with [CONTRIBUTING.md](CONTRIBUTING.md) for a full walkthrough of local setup, branch naming, commit conventions, and the test/coverage workflow.
 
+Component-specific styling and accessibility conventions are documented in
+[docs/COMPONENT_GUIDELINES.md](docs/COMPONENT_GUIDELINES.md).
+
 
 Pull requests and pushes to `main` run the GitHub Actions CI workflow
 (`.github/workflows/ci.yml`) on Node 18 and Node 20. The workflow installs with

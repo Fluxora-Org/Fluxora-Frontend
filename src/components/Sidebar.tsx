@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type TouchEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   VIEWPORT_RESIZE_DEBOUNCE_MS,
@@ -30,6 +30,9 @@ interface SidebarProps {
   onResetUnread?: () => void;
 }
 
+const SIDEBAR_SWIPE_DISTANCE_PX = 64;
+const SIDEBAR_SWIPE_VELOCITY_PX_PER_MS = 0.35;
+
 export default function Sidebar({
   collapsed,
   onToggleCollapse,
@@ -41,6 +44,30 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
+    if (!mobileOpen || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLElement>) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || !mobileOpen) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const elapsed = Math.max(1, Date.now() - start.time);
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isFastEnough = Math.abs(deltaX) / elapsed >= SIDEBAR_SWIPE_VELOCITY_PX_PER_MS;
+
+    if (isHorizontal && deltaX < 0 && (Math.abs(deltaX) >= SIDEBAR_SWIPE_DISTANCE_PX || isFastEnough)) {
+      onMobileClose();
+    }
+  }
 
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
@@ -142,6 +169,8 @@ export default function Sidebar({
       {/* Sidebar Drawer */}
       <aside
         ref={sidebarRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         id="app-sidebar"
         className={cn(
           "fixed left-0 top-0 z-50 h-screen bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col",

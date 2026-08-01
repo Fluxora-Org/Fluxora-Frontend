@@ -1,15 +1,29 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi } from "vitest";
 import StreamsLoading from "../StreamsLoading";
 import TreasuryOverviewLoading from "../TreasuryOverviewLoading";
 import RecipientLoading from "../RecipientLoading";
+import { LOADING_TEST_IDS } from "../Skeleton";
 
 describe("StreamsLoading", () => {
+  it("escalates after the shared retry cutoff and offers manual retry", async () => {
+    const onRetry = vi.fn();
+    render(<StreamsLoading retryCount={3} onRetry={onRetry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Automatic retries have stopped");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
   it("has role=status with correct aria-label and aria-busy", () => {
     render(<StreamsLoading />);
     const region = screen.getByRole("status");
     expect(region).toHaveAttribute("aria-label", "Loading streams");
     expect(region).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("uses the shared streams loading selector", () => {
+    render(<StreamsLoading />);
+    expect(screen.getByTestId(LOADING_TEST_IDS.streams)).toHaveAttribute("role", "status");
   });
 
   it("renders sr-only announcement text", () => {
@@ -53,6 +67,11 @@ describe("TreasuryOverviewLoading", () => {
     const region = screen.getByRole("status");
     expect(region).toHaveAttribute("aria-label", "Loading treasury overview");
     expect(region).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("uses the shared treasury loading selector", () => {
+    render(<TreasuryOverviewLoading />);
+    expect(screen.getByTestId(LOADING_TEST_IDS.treasury)).toHaveAttribute("role", "status");
   });
 
   it("renders sr-only announcement text", () => {
@@ -113,6 +132,11 @@ describe("RecipientLoading", () => {
     const region = screen.getByRole("status");
     expect(region).toHaveAttribute("aria-label", "Loading recipient portal");
     expect(region).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("uses the shared recipient loading selector", () => {
+    render(<RecipientLoading />);
+    expect(screen.getByTestId(LOADING_TEST_IDS.recipient)).toHaveAttribute("role", "status");
   });
 
   it("renders sr-only announcement text", () => {

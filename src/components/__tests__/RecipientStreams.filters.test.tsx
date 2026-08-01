@@ -284,6 +284,24 @@ describe("RecipientStreams — populated state", () => {
   });
 });
 
+describe("RecipientStreams — large lists", () => {
+  it("virtualizes incoming streams once the list exceeds 50 items", async () => {
+    const streams = Array.from({ length: 60 }, (_, index) => ({
+      ...activeStream,
+      id: `stream-${index}`,
+      senderName: `Sender ${index}`,
+    }));
+
+    render(<RecipientStreams streams={streams} pollIntervalMs={0} />);
+
+    const list = await screen.findByRole("list", { name: "Incoming streams" });
+    expect(list).toHaveAttribute("data-virtualized", "true");
+    expect(list.querySelectorAll('[role="listitem"]').length).toBeLessThan(
+      streams.length,
+    );
+  });
+});
+
 // ─── 6. Keyboard accessibility on pin button ──────────────────────────────────
 
 describe("RecipientStreams — keyboard accessibility", () => {
@@ -317,6 +335,36 @@ describe("RecipientStreams — keyboard accessibility", () => {
     );
     const pinBtn = await screen.findByRole("button", { name: /pin stream/i });
     expect(pinBtn).toHaveAttribute("aria-label", "Pin stream");
+  });
+
+  it("filter buttons are disabled during refresh operations", async () => {
+    // Need a deferred fetch to keep it "in flight"
+    const deferreds: { resolve: (v: Stream[]) => void }[] = [];
+    const fetchFn = vi.fn().mockImplementation(() => {
+      return new Promise<Stream[]>((resolve) => deferreds.push({ resolve }));
+    });
+    
+    render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
+    
+    // Initial fetch is in flight, so buttons shouldn't even render if streams are empty.
+    // So let's provide streams externally while internal is refreshing, or resolve initial
+    // then trigger a refresh.
+    deferreds[0].resolve([activeStream]);
+    
+    const activeBtn = await screen.findByRole("button", { name: "Active" });
+    expect(activeBtn).not.toBeDisabled();
+    
+    // Trigger refresh
+    const refreshBtn = screen.getByRole("button", { name: /refresh status/i });
+    await userEvent.click(refreshBtn);
+    
+    // While refresh is in flight, filter buttons should be disabled
+    expect(activeBtn).toBeDisabled();
+    
+    // Resolve refresh
+    deferreds[1].resolve([activeStream]);
+    
+    await waitFor(() => expect(activeBtn).not.toBeDisabled());
   });
 });
 

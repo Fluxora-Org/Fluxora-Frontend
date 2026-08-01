@@ -1,5 +1,7 @@
 import {
+  lazy,
   memo,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -11,11 +13,13 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
-import CreateStreamModal from "../components/CreateStreamModal";
+const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
 import StreamsLoading from "../components/StreamsLoading";
+import { MAX_LOADING_RETRIES } from "../components/Skeleton";
 import Input from "../components/Input";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import SessionRecoveryBanner, {
@@ -798,7 +802,7 @@ export default function Streams() {
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
 
-  const { streams, loading, error, refetch } = useTreasury();
+  const { streams, loading, error, refetch, retryCount } = useTreasury();
   const filterLabels: Record<StatusFilter, string> = {
     All: t("streams.filter.all"),
     Active: t("streams.filter.active"),
@@ -815,6 +819,11 @@ export default function Streams() {
   const [createdStream, setCreatedStream] = useState({
     id: "STR-NEW",
     url: "https://fluxora.io/stream/STR-NEW",
+    txHash: undefined as string | null | undefined,
+    amount: undefined as string | undefined,
+    rate: undefined as string | undefined,
+    sender: undefined as string | undefined,
+    recipient: undefined as string | undefined,
   });
 
   // Pagination state
@@ -1061,11 +1070,16 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   }, [resolveSessionOnInteraction]);
 
-  const handleStreamCreated = useCallback(() => {
+  const handleStreamCreated = useCallback((data?: StreamCreatedData) => {
     const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
       id: generatedId,
       url: `https://fluxora.io/stream/${generatedId}`,
+      txHash: data?.txHash,
+      amount: data?.amount,
+      rate: data?.rate,
+      sender: data?.sender,
+      recipient: data?.recipient,
     });
     setIsCreateModalOpen(false);
     setIsSuccessModalOpen(true);
@@ -1135,7 +1149,9 @@ export default function Streams() {
     [announce],
   );
 
-  if (loading) return <StreamsLoading />;
+  if (loading || (error && retryCount >= MAX_LOADING_RETRIES)) {
+    return <StreamsLoading retryCount={retryCount} onRetry={refetch} />;
+  }
 
   if (error) {
     return (
@@ -1164,13 +1180,15 @@ export default function Streams() {
           onCreateStream={handleCreateStream}
         />
 
-        <CreateStreamModal
-          isOpen={isCreateModalOpen}
-          onClose={handleCloseCreateModal}
-          onStreamCreated={handleStreamCreated}
-          initialDraft={restoredDraft}
-          onDraftChange={setLiveDraft}
-        />
+        <Suspense fallback={null}>
+          <CreateStreamModal
+            isOpen={isCreateModalOpen}
+            onClose={handleCloseCreateModal}
+            onStreamCreated={handleStreamCreated}
+            initialDraft={restoredDraft}
+            onDraftChange={setLiveDraft}
+          />
+        </Suspense>
         <CreateStreamFab
           onCreateStream={handleCreateStream}
           hidden={isCreateModalOpen}
@@ -1180,6 +1198,11 @@ export default function Streams() {
           onClose={() => setIsSuccessModalOpen(false)}
           streamId={createdStream.id}
           streamUrl={createdStream.url}
+          txHash={createdStream.txHash ?? undefined}
+          amount={createdStream.amount}
+          rate={createdStream.rate}
+          sender={createdStream.sender}
+          recipient={createdStream.recipient}
           onCreateAnother={() => {
             setIsSuccessModalOpen(false);
             setIsCreateModalOpen(true);
@@ -1408,13 +1431,15 @@ export default function Streams() {
         </>
       )}
 
-      <CreateStreamModal
-        isOpen={isCreateModalOpen}
-        onClose={handleCloseCreateModal}
-        onStreamCreated={handleStreamCreated}
-        initialDraft={restoredDraft}
-        onDraftChange={setLiveDraft}
-      />
+      <Suspense fallback={null}>
+        <CreateStreamModal
+          isOpen={isCreateModalOpen}
+          onClose={handleCloseCreateModal}
+          onStreamCreated={handleStreamCreated}
+          initialDraft={restoredDraft}
+          onDraftChange={setLiveDraft}
+        />
+      </Suspense>
       <CreateStreamFab
         onCreateStream={handleCreateStream}
         hidden={isCreateModalOpen || isSuccessModalOpen}

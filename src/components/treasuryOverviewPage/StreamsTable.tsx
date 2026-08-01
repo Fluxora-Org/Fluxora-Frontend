@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import StreamRow from "./StreamRow";
 import { Stream } from "./Stream";
 import "./StreamsTable.css";
@@ -21,6 +21,29 @@ export default function StreamsTable({ streams, onCompare }: Props) {
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showTrailingFade, setShowTrailingFade] = useState(false);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateFade = () => {
+      setShowTrailingFade(
+        container.scrollWidth > container.clientWidth + 1 &&
+          container.scrollLeft < container.scrollWidth - container.clientWidth - 1,
+      );
+    };
+
+    updateFade();
+    container.addEventListener("scroll", updateFade, { passive: true });
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(container);
+    return () => {
+      container.removeEventListener("scroll", updateFade);
+      observer.disconnect();
+    };
+  }, [streams.length, sortColumn, sortDirection]);
 
   // Legacy single-select kept for visual highlight; driven by compareIds[0].
   const selectedId = compareIds[0] ?? null;
@@ -218,7 +241,15 @@ export default function StreamsTable({ streams, onCompare }: Props) {
         </div>
       )}
 
+      <div className="streams-table-scroll-shell">
       <div
+        ref={scrollContainerRef}
+        onScroll={() => setShowTrailingFade(
+          scrollContainerRef.current
+            ? scrollContainerRef.current.scrollLeft <
+              scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth - 1
+            : false,
+        )}
         className="overflow-x-auto rounded-lg"
         style={{
           border: "1px solid var(--color-border-default)",
@@ -350,6 +381,8 @@ export default function StreamsTable({ streams, onCompare }: Props) {
             )}
           </tbody>
         </table>
+      </div>
+      {showTrailingFade && <div className="streams-table-trailing-fade" aria-hidden="true" />}
       </div>
     </div>
   );

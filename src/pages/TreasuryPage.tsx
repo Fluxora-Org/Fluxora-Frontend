@@ -90,7 +90,10 @@ export default function TreasuryPage() {
             intended for design review and QA sessions only. */}
         {IS_DEV && <ColorBlindToggle />}
 
-        <Header onExportClick={() => setShowReportBuilder(true)} />
+        <Header
+          onExportClick={() => setShowReportBuilder(true)}
+          onRefresh={refetch}
+        />
         {showReportBuilder && (
           <ReportBuilderPanel
             streams={streams || []}

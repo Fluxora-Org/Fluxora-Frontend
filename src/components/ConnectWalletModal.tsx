@@ -1,4 +1,4 @@
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
@@ -66,6 +66,11 @@ interface WalletOption {
   disabled?: boolean;
 }
 
+// Deterministic network label — memoized so it is identical across
+// rerenders even if getNetworkLabel or getExpectedStellarNetwork have
+// side effects or are replaced between renders.
+const stableExpectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork());
+
 export default function ConnectWalletModal({
   isOpen,
   onClose,
@@ -76,7 +81,7 @@ export default function ConnectWalletModal({
   onRetryConnection,
   onDownloadFreighter,
   showStateSwitcher = true,
-  expectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork()),
+  expectedNetworkLabel = stableExpectedNetworkLabel,
   actualNetworkLabel = null,
 }: ConnectWalletModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
@@ -268,6 +273,9 @@ export default function ConnectWalletModal({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (isRequestInFlight.current) {
+          return;
+        }
         onClose();
         return;
       }

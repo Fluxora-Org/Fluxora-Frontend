@@ -95,3 +95,17 @@
     transition: none;
   }
 }
+.streams-table-scroll-shell {
+  position: relative;
+}
+
+.streams-table-trailing-fade {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 2.5rem;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--color-surface-default));
+  border-radius: 0 0.5rem 0.5rem 0;
+}

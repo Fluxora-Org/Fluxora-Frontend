@@ -48,6 +48,8 @@ interface Props {
   status: StatusPillStatus;
   /** Icon size */
   iconSize?: "xs" | "sm" | "md" | "lg";
+  /** Makes the pill act as a keyboard-accessible filter chip. */
+  onClick?: () => void;
 }
 
 const statusStyles: Record<
@@ -105,8 +107,9 @@ const statusStyles: Record<
   },
 };
 
-export default function StatusPill({ status, iconSize = "xs" }: Props) {
+export default function StatusPill({ status, iconSize = "xs", onClick }: Props) {
   const { background, color, Icon, label, tokenName } = statusStyles[status];
+  const interactive = Boolean(onClick);
   const [animateClass, setAnimateClass] = useState("");
   const prevStatusRef = useRef(status);
 
@@ -125,11 +128,18 @@ export default function StatusPill({ status, iconSize = "xs" }: Props) {
   return (
     <>
       <span
-        role="status"
+        role={interactive ? "button" : "status"}
         aria-label={`${label} status`}
         tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (interactive && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            onClick?.();
+          }
+        }}
         style={{ backgroundColor: background, color }}
-        className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize} status-pill-transition ${animateClass}`}
+        className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize} status-pill-transition ${animateClass} ${interactive ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500" : ""}`}
         /*
          * data-status-token: used by design-review tooling and
          * contrastUtils.ts contrast checks to resolve the active token.

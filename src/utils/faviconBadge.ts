@@ -71,7 +71,7 @@ export function drawBaseIcon(
     ctx.arcTo((x + w) * scale, y * scale, (x + w) * scale, (y + r) * scale, r * scale);
     ctx.lineTo((x + w) * scale, (y + h - r) * scale);
     ctx.arcTo((x + w) * scale, (y + h) * scale, (x + w - r) * scale, (y + h) * scale, r * scale);
-    ctx.lineTo((x + r) * scale, (y + h) * scale);
+    ctx.lineTo((x + r) * scale, (y + h) * scale, x * scale, (y + h) * scale, r * scale);
     ctx.lineTo(x * scale, (y + r) * scale);
     ctx.arcTo(x * scale, y * scale, (x + r) * scale, y * scale, r * scale);
     ctx.closePath();
@@ -298,8 +298,7 @@ export function useFaviconBadge(
   count: number,
   options?: Partial<FaviconBadgeOptions>
 ): void {
-  const { size, badgeBgColor, textColor, borderColor, iconColor } = options ?? {};
   useEffect(() => {
-    updateFaviconBadge(count, { size, badgeBgColor, textColor, borderColor, iconColor });
-  }, [count, size, badgeBgColor, textColor, borderColor, iconColor]);
+    updateFaviconBadge(count, options);
+  }, [count, options]);
 }

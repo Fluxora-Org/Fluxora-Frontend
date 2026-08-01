@@ -16,6 +16,8 @@
  * 10. Wallet-address change resets txState / errorMsg
  * 11. Keyboard (Enter / Space) activates the withdraw button
  * 12. Withdraw button has an accessible name
+ * 13. Service error during loading → empty state with loading skeleton
+ * 14. Service error + loading → empty state (not portal) after timeout
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -280,6 +282,57 @@ describe("Recipient page — service error and retry", () => {
     expect(
       screen.getByRole("region", { name: "Recipient empty state" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows loading skeleton when both loading and error are present (loading takes precedence)", () => {
+    streamsState.loading = true;
+    streamsState.error = "Previous fetch failed";
+
+    renderRecipient();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    // The page-level loading skeleton takes precedence — error is not shown
+    // until loading resolves
+    expect(
+      screen.getByRole("status", { name: /loading recipient portal/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Recipient Portal"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("service error with loading=false shows error banner, does not show portal even after rerender", () => {
+    streamsState.error = "Gateway timeout";
+    streamsState.loading = false;
+
+    const { rerender } = renderRecipient();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    // Error state visible
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Gateway timeout");
+
+    // Simulate a silent rerender (no state change) — behavior must be stable
+    rerender(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>,
+    );
+    act(() => { vi.advanceTimersByTime(0); });
+
+    // Still the error state, not the portal
+    expect(
+      screen.getByRole("region", { name: "Recipient empty state" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Recipient Portal")).not.toBeInTheDocument();
   });
 });
 

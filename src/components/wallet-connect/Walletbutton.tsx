@@ -6,11 +6,7 @@ import { copyToClipboard } from "../../hooks/useClipboard";
 import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
-
-function truncate(addr?: string | null) {
-  if (!addr) return "";
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
+import { formatAddress } from "../common/TruncatedAddress";
 
 export default function WalletButton() {
   const { address, network, connected, disconnect } = useWallet();
@@ -127,7 +123,7 @@ export default function WalletButton() {
           )}
         >
           <span className="w-2 h-2 rounded-full bg-[var(--status-success)] shrink-0 shadow-[0_0_6px_var(--status-success)]" />
-          <span className="font-mono">{truncate(address!)}</span>
+          <span className="font-mono">{formatAddress(address!)}</span>
           <ChevronDown
             size={12}
             className={cn(

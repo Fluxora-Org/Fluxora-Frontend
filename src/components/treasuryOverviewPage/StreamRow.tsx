@@ -7,6 +7,7 @@ import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import { formatAddress } from "../common/TruncatedAddress";
 import "./StreamRow.css";
 
 interface Props {
@@ -24,12 +25,6 @@ interface Props {
   onCompareToggle?: (id: string) => void;
 }
 
-function truncateAddress(address: string) {
-  return address.length > 14
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : address;
-}
-
 function formatAccruedAmount(amount: number) {
   // Use `formatNumber` (locale-aware, no hardcoded "en-US") — issue #388
   return `${formatNumber(amount, 2)} USDC accrued`;
@@ -43,7 +38,7 @@ export default function StreamRow({
   onCompareToggle,
 }: Props) {
   const navigate = useNavigate();
-  const recipientLabel = truncateAddress(stream.recipient);
+  const recipientLabel = formatAddress(stream.recipient);
   const toast = useOptionalToast();
   const { copy } = useClipboard();
 

@@ -70,7 +70,7 @@ describe("PresenceCursorOverlay", () => {
     const { container } = render(
       <PresenceCursorOverlay viewers={[belowViewer, aboveViewer]} />,
     );
-    const wrappers = container.querySelectorAll(".presence-cursor-dot-wrapper");
+    const wrappers = container.querySelectorAll<HTMLElement>(".presence-cursor-dot-wrapper");
     expect(wrappers[0].style.top).toBe("0%");
     expect(wrappers[1].style.top).toBe("100%");
   });

@@ -7,8 +7,8 @@
  * names (e.g., "var(--color-success)") rather than resolved RGB values.
  */
 
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
 import StatusPill from "./StatusPill";
 
 describe("StatusPill", () => {
@@ -42,5 +42,17 @@ describe("StatusPill", () => {
     const style = window.getComputedStyle(pill);
     expect(style.color).toBe("var(--status-info)");
     expect(style.backgroundColor).toBe("var(--status-info-bg)");
+  });
+
+  it("supports keyboard activation when used as a filter chip", () => {
+    const onClick = vi.fn();
+    render(<StatusPill status="Active" onClick={onClick} />);
+    const chip = screen.getByRole("button", { name: "Active status" });
+
+    fireEvent.keyDown(chip, { key: "Enter" });
+    fireEvent.keyDown(chip, { key: " " });
+
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(chip.className).toContain("focus-visible:outline-cyan-500");
   });
 });

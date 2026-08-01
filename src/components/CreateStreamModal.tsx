@@ -154,6 +154,16 @@ function validateDuration(value: string, t: any): string | undefined {
 
 /** Snapshot of everything `createStream` needs, captured at submit time so a
  * queued (offline) submission replays with the exact values the user reviewed. */
+/** Data passed to the parent when a stream is successfully created. Used by the
+ * success modal to display a branded downloadable transaction receipt. */
+export interface StreamCreatedData {
+  txHash?: string | null;
+  amount: string;
+  rate: string;
+  sender: string;
+  recipient: string;
+}
+
 interface StreamSubmissionPayload {
   sender: string;
   recipient: string;
@@ -166,8 +176,9 @@ interface StreamSubmissionPayload {
 interface CreateStreamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal. */
-  onStreamCreated?: () => void | Promise<void>;
+  /** Called when user completes the flow and clicks "Create stream" on step 3. Use to show success modal.
+   * Receives transaction data (txHash, amount, rate, sender, recipient) for the downloadable receipt. */
+  onStreamCreated?: (data?: StreamCreatedData) => void | Promise<void>;
   /** Called when stream creation fails after the user confirms the review step. */
   onStreamError?: (err: unknown) => void;
   /**
@@ -235,6 +246,7 @@ export default function CreateStreamModal({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -466,16 +478,26 @@ export default function CreateStreamModal({
     }
 
     setHasCompletedConfirmation(true);
+
+    const amountNum = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+    const createdData: StreamCreatedData = {
+      txHash: submittedTxHash,
+      amount: `${amountNum.toLocaleString()} USDC`,
+      rate: `${accrualRate} USDC/day`,
+      sender: wallet.address ?? "",
+      recipient,
+    };
+
     if (flushedFromQueueRef.current) {
       flushedFromQueueRef.current = false;
       addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
         label: t("createStream.queue.viewStreamAction"),
-        onClick: () => onStreamCreated?.(),
+        onClick: () => onStreamCreated?.(createdData),
       });
     } else {
       addToast(t("createStream.success.message"), "success");
     }
-    onStreamCreated?.();
+    onStreamCreated?.(createdData);
     onClose();
   }, [
     addToast,
@@ -484,6 +506,11 @@ export default function CreateStreamModal({
     onStreamCreated,
     transactionStatus.status,
     t,
+    submittedTxHash,
+    depositAmount,
+    accrualRate,
+    wallet.address,
+    recipient,
   ]);
 
   // Auto-flush a queued submission as soon as connectivity returns. Runs even
@@ -558,43 +585,34 @@ export default function CreateStreamModal({
   };
 
   const validateStep1 = (): boolean => {
+    const fieldErrors: Record<string, string> = {};
+    
     if (!recipient.trim()) {
-      setError(t("createStream.validation.recipientRequired"));
-      return false;
+      fieldErrors.recipient = t("createStream.validation.recipientRequired");
+    } else {
+      const normalizedRecipient = recipient.trim();
+      
+      if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
+        fieldErrors.recipient = "Recipient cannot be the same as the connected wallet address.";
+      } else if (!isValidStellarAddress(normalizedRecipient)) {
+        fieldErrors.recipient = t("createStream.validation.recipientInvalid");
+      }
     }
-    const normalizedRecipient = recipient.trim();
-
-    /**
-     * Self-send rule: Reject streams where the recipient equals the connected wallet address.
-     * This prevents users from wasting a deposit on a no-op transfer to themselves.
-     */
-    if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
-      setError("Recipient cannot be the same as the connected wallet address.");
-      return false;
-    }
-
-    if (!isValidStellarAddress(normalizedRecipient)) {
-      setError(
-        t("createStream.validation.recipientInvalid"),
-      );
-      return false;
-    }
+    
     const amount = parseFloat(depositAmount.replace(/,/g, ""));
     if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
-      setError(t("createStream.validation.depositPositive"));
-      return false;
+      fieldErrors.depositAmount = t("createStream.validation.depositPositive");
     }
 
     if (contrastState === 'AA-fail-blocked') {
-      setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
-      return false;
+      fieldErrors.labelColor = "Please select a high-contrast label color or check 'Use anyway' to proceed.";
     }
 
-    setError(null);
-    return true;
+    setErrors(fieldErrors);
+    return Object.keys(fieldErrors).length === 0;
   };
 
-  const validateStep2 = (): boolean => {
+  const validateStep2 = (): Record<string, string> => {
     // Mark all active step-2 fields as touched
     const touchedFields: Record<string, boolean> = {
       accrualRate: true,
@@ -608,59 +626,60 @@ export default function CreateStreamModal({
     }
     setTouched(prev => ({ ...prev, ...touchedFields }));
 
-    if (validateAccrualRate(accrualRate, t)) {
-      return false;
+    const fieldErrors: Record<string, string> = {};
+
+    const rateError = validateAccrualRate(accrualRate, t);
+    if (rateError) {
+      fieldErrors.accrualRate = rateError;
     }
-    if (validateDuration(duration, t)) {
-      return false;
+
+    const durationError = validateDuration(duration, t);
+    if (durationError) {
+      fieldErrors.duration = durationError;
     }
-    if (
-      !Number.isFinite(requiredDepositValue) ||
-      requiredDepositValue > MAX_REQUIRED_DEPOSIT
-    ) {
-      return false;
+
+    if (!Number.isFinite(requiredDepositValue) || requiredDepositValue > MAX_REQUIRED_DEPOSIT) {
+      fieldErrors.deposits = "Required deposit exceeds maximum allowed amount.";
     }
-    // Validate deposit balance
     if (parseFloat(requiredDeposit) > userDeposit) {
-      return false;
+      fieldErrors.deposits = "Required deposit exceeds available balance.";
     }
-    // Validate custom start date
+
     if (startTimeOption === 'custom') {
       if (!customStartDate) {
-        return false;
-      }
-      if (isDateTimeInPast(customStartDate)) {
-        return false;
+        fieldErrors.customStartDate = t("createStream.validation.startDateRequired");
+      } else if (isDateTimeInPast(customStartDate)) {
+        fieldErrors.customStartDate = t("createStream.validation.startDateFuture");
       }
     }
-    // Validate cliff date
+
     if (cliffEnabled) {
       if (!cliffDate) {
-        return false;
-      }
-      if (isDateTimeInPast(cliffDate)) {
-        return false;
-      }
-      if (startTimeOption === 'custom' && customStartDate) {
-        if (isBeforeLocalDateTime(cliffDate, customStartDate)) {
-          return false;
+        fieldErrors.cliffDate = t("createStream.validation.cliffDateRequired");
+      } else if (isDateTimeInPast(cliffDate)) {
+        fieldErrors.cliffDate = t("createStream.validation.cliffDatePast");
+      } else if (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate)) {
+        fieldErrors.cliffDate = t("createStream.validation.cliffDateAfterStart");
+      } else {
+        // Cross-field: cliff must not exceed stream end date
+        const selectedCliffDate = new Date(cliffDate);
+        const startMs = startTimeOption === 'custom' && customStartDate
+          ? new Date(customStartDate).getTime()
+          : Date.now();
+        const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+        if (endDate && validateCliffBeforeEnd(selectedCliffDate, endDate) !== null) {
+          fieldErrors.cliffDate = validateCliffBeforeEnd(selectedCliffDate, endDate) || "Cliff date must be before stream end date";
         }
       }
-      // Cross-field: cliff must not exceed stream end date
-      const selectedCliffDate = new Date(cliffDate);
-      const startMs = startTimeOption === 'custom' && customStartDate
-        ? new Date(customStartDate).getTime()
-        : Date.now();
-      const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
-      if (endDate && validateCliffBeforeEnd(selectedCliffDate, endDate) !== null) {
-        return false;
-      }
     }
-    return true;
+
+    setErrors(prev => ({ ...prev, ...fieldErrors }));
+    return fieldErrors;
   };
 
   /** Combined validation for Advanced mode: runs all field validators at once. */
   const validateAllFields = (): boolean => {
+    setError(null);
     setTouched(prev => ({
       ...prev,
       recipient: true,
@@ -671,19 +690,81 @@ export default function CreateStreamModal({
       ...(cliffEnabled ? { cliffDate: true } : {}),
     }));
 
-    const recipientError = !recipient.trim() || (wallet.connected && wallet.address && recipient.trim().toLowerCase() === wallet.address.toLowerCase()) || !isValidStellarAddress(recipient.trim());
-    const depositError = !depositAmount.trim() || isNaN(parseFloat(depositAmount.replace(/,/g, ''))) || parseFloat(depositAmount.replace(/,/g, '')) <= 0;
-    const rateError = Boolean(validateAccrualRate(accrualRate, t));
-    const durationError = Boolean(validateDuration(duration, t));
-    const depositTooLarge = !Number.isFinite(requiredDepositValue) || requiredDepositValue > MAX_REQUIRED_DEPOSIT || parseFloat(requiredDeposit) > userDeposit;
-    const customDateError = startTimeOption === 'custom' && (!customStartDate || isDateTimeInPast(customStartDate));
-    const cliffError = cliffEnabled && (!cliffDate || isDateTimeInPast(cliffDate) || (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate)));
+    const step1Errors: Record<string, string> = {};
+    const step2Errors: Record<string, string> = {};
 
-    if (recipientError || depositError || rateError || durationError || depositTooLarge || customDateError || cliffError) {
+    // Step 1 validations
+    if (!recipient.trim()) {
+      step1Errors.recipient = t("createStream.validation.recipientRequired");
+    } else {
+      const normalizedRecipient = recipient.trim();
+      
+      if (wallet.connected && wallet.address && normalizedRecipient.toLowerCase() === wallet.address.toLowerCase()) {
+        step1Errors.recipient = "Recipient cannot be the same as the connected wallet address.";
+      } else if (!isValidStellarAddress(normalizedRecipient)) {
+        step1Errors.recipient = t("createStream.validation.recipientInvalid");
+      }
+    }
+    
+    const amount = parseFloat(depositAmount.replace(/,/g, ""));
+    if (!depositAmount.trim() || isNaN(amount) || amount <= 0) {
+      step1Errors.depositAmount = t("createStream.validation.depositPositive");
+    }
+
+    // Step 2 validations
+    if (validateAccrualRate(accrualRate, t)) {
+      step2Errors.accrualRate = validateAccrualRate(accrualRate, t);
+    }
+    if (validateDuration(duration, t)) {
+      step2Errors.duration = validateDuration(duration, t);
+    }
+    if (!Number.isFinite(requiredDepositValue) || requiredDepositValue > MAX_REQUIRED_DEPOSIT) {
+      step2Errors.deposits = "Required deposit exceeds maximum allowed amount.";
+    }
+    if (parseFloat(requiredDeposit) > userDeposit) {
+      step2Errors.deposits = "Required deposit exceeds available balance.";
+    }
+    
+    if (startTimeOption === 'custom') {
+      if (!customStartDate) {
+        step2Errors.customStartDate = t("createStream.validation.startDateRequired");
+      } else if (isDateTimeInPast(customStartDate)) {
+        step2Errors.customStartDate = t("createStream.validation.startDateFuture");
+      }
+    }
+    
+    if (cliffEnabled) {
+      if (!cliffDate) {
+        step2Errors.cliffDate = t("createStream.validation.cliffDateRequired");
+      } else if (isDateTimeInPast(cliffDate)) {
+        step2Errors.cliffDate = t("createStream.validation.cliffDatePast");
+      } else if (startTimeOption === 'custom' && customStartDate && isBeforeLocalDateTime(cliffDate, customStartDate)) {
+        step2Errors.cliffDate = t("createStream.validation.cliffDateAfterStart");
+      } else {
+        // Cross-field: cliff must not exceed stream end date
+        const selectedCliffDate = new Date(cliffDate);
+        const startMs = startTimeOption === 'custom' && customStartDate
+          ? new Date(customStartDate).getTime()
+          : Date.now();
+        const endDate = computeStreamEndDate(new Date(startMs), parseFloat(duration));
+        if (endDate && validateCliffBeforeEnd(selectedCliffDate, endDate) !== null) {
+          step2Errors.cliffDate = validateCliffBeforeEnd(selectedCliffDate, endDate) || "Cliff date must be before stream end date";
+        }
+      }
+    }
+
+    const hasStep1Errors = Object.keys(step1Errors).length > 0;
+    const hasStep2Errors = Object.keys(step2Errors).length > 0;
+    const hasGeneralError = contrastState === 'AA-fail-blocked';
+    
+    setErrors(step1Errors);
+
+    if (step2Errors.accrualRate || step2Errors.duration || step2Errors.deposits || step2Errors.customStartDate || step2Errors.cliffDate) {
+      setErrors(prev => ({ ...prev, ...step2Errors }));
       return false;
     }
 
-    if (contrastState === 'AA-fail-blocked') {
+    if (hasGeneralError) {
       setError("Please select a high-contrast label color or check 'Use anyway' to proceed.");
       return false;
     }
@@ -730,7 +811,8 @@ export default function CreateStreamModal({
       return;
     }
     if (currentStep === 2) {
-      if (!validateStep2()) return;
+      const step2Errors = validateStep2();
+      if (Object.keys(step2Errors).length > 0) return;
       resetTransactionState();
       setCurrentStep(3);
     } else if (currentStep === 3) {
@@ -1576,7 +1658,7 @@ export default function CreateStreamModal({
                       value={recipient}
                       onChange={(e) => {
                         setRecipient(e.target.value);
-                        if (error) setError(null);
+                        if (errors.recipient) setErrors(prev => ({ ...prev, recipient: undefined }));
                       }}
                       onBlur={() => handleBlur('recipient')}
                       placeholder={t("createStream.step1.recipientPlaceholder")}
@@ -1600,7 +1682,7 @@ export default function CreateStreamModal({
                       onChange={(e) => {
                         const v = sanitizeDepositAmountInput(e.target.value);
                         setDepositAmount(v);
-                        if (error) setError(null);
+                        if (errors.depositAmount) setErrors(prev => ({ ...prev, depositAmount: undefined }));
                       }}
                       onBlur={() => handleBlur('depositAmount')}
                       onKeyDown={(e) => {

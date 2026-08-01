@@ -51,7 +51,9 @@ vi.mock('../components/wallet-connect/Walletcontext', () => ({
     isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
+
   }),
+
 }));
 
 vi.mock('../components/voice/VoiceCommandPanel', () => ({
@@ -65,6 +67,7 @@ vi.mock('../components/voice/VoiceConfirmModal', () => ({
 describe('Embed Route Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
   });
 
   const renderAppWithRoute = (path: string) => {
