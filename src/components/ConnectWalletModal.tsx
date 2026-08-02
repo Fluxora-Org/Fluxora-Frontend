@@ -1,6 +1,7 @@
 import { MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Download, AlertCircle, AlertTriangle, ArrowLeft, RefreshCw, Timer, Loader2, Cpu, Lock, PowerOff, Smartphone, Check } from "lucide-react";
 import styles from "./ConnectWalletModal.module.css";
+import { CloseIcon, ChevronIcon } from "./icons";
 import { isConnected, requestAccess, getNetwork } from "@stellar/freighter-api";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
@@ -409,20 +410,7 @@ export default function ConnectWalletModal({
           onClick={onClose}
           aria-label="Close wallet connection dialog"
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M1 1l12 12M13 1L1 13"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+          <CloseIcon />
         </button>
 
         {/* DEFAULT STATE: Choose Wallet Provider */}
@@ -519,22 +507,7 @@ export default function ConnectWalletModal({
                       </div>
                     </div>
                     {!wallet.disabled && !isConnectingThis && (
-                      <svg
-                        className={styles.chevron}
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M6 3l5 5-5 5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      <ChevronIcon className={styles.chevron} />
                     )}
                   </button>
                 );
