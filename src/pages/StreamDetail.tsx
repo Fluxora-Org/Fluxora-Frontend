@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
@@ -54,6 +54,8 @@ export default function StreamDetail() {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isHeroSticky, setIsHeroSticky] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
   const currentDate = useTickingNow();
 
   useEffect(() => {
@@ -116,6 +118,30 @@ export default function StreamDetail() {
       window.removeEventListener("resize", handleScroll);
     };
   }, [isPresenceEnabled, updateCursor]);
+
+  // IntersectionObserver — show sticky condensed hero once the full hero
+  // scrolls out of the viewport from the top.
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // `isIntersecting` is true when ANY part of the hero is visible.
+        // Once the hero's top edge exits the viewport (i.e. the user has
+        // scrolled past it), we flip `isHeroSticky` on.
+        setIsHeroSticky(!entry.isIntersecting);
+      },
+      {
+        // Watch the top edge of the hero relative to the viewport top.
+        rootMargin: "-1px 0px 0px 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Compare mode ──────────────────────────────────────────────────────────
   if (isCompareMode && streamId && compareWithId) {
@@ -292,8 +318,94 @@ export default function StreamDetail() {
       <Breadcrumb items={breadcrumbItems} />
       <MetaTags stream={stream} />
 
+      {/* Sticky condensed hero — appears when the full hero scrolls out of view */}
+      <div
+        data-testid="sticky-hero-bar"
+        role="complementary"
+        aria-label="Stream summary"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          background: "var(--color-surface-1, #fff)",
+          borderBottom: "1px solid var(--color-border, #e5e7eb)",
+          padding: "0.75rem 1rem",
+          margin: "-1.5rem -1.5rem 1.5rem",
+          display: isHeroSticky ? "flex" : "none",
+          alignItems: "center",
+          gap: "1rem",
+          opacity: isHeroSticky ? 1 : 0,
+          transition: "opacity 0.2s ease",
+        }}
+      >
+        <Link
+          to="/app/streams"
+          style={{
+            fontSize: "0.875rem",
+            color: "var(--color-accent, #2563eb)",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ← Streams
+        </Link>
+        <span
+          style={{
+            width: 1,
+            height: 20,
+            background: "var(--color-border, #e5e7eb)",
+            flexShrink: 0,
+          }}
+          aria-hidden="true"
+        />
+        <span
+          style={{
+            fontWeight: 600,
+            fontSize: "0.9375rem",
+            color: "var(--color-text-primary, #111827)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          {stream.name}
+        </span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+            padding: "0.125rem 0.5rem",
+            borderRadius: "9999px",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            background: "var(--color-surface-2, #f3f4f6)",
+            color: healthColor[stream.health] ?? "inherit",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+          aria-label={`Health: ${stream.health}`}
+        >
+          <span aria-hidden="true">●</span>
+          {stream.health}
+        </span>
+        <span style={{ flex: 1 }} />
+        <span
+          style={{
+            fontSize: "0.8125rem",
+            color: "var(--color-text-secondary, #6b7280)",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          {stream.status}
+        </span>
+      </div>
+
       {/* Header */}
       <div
+        ref={heroRef}
         style={{
           marginTop: "1.5rem",
           marginBottom: "1.5rem",
