@@ -25,6 +25,7 @@ function renderVirtualList(count = items.length) {
 
 describe("VirtualList", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
       () =>
@@ -54,6 +55,7 @@ describe("VirtualList", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("skips virtualization below the configured threshold", () => {
@@ -89,6 +91,7 @@ describe("VirtualList", () => {
     act(() => {
       fireEvent.scroll(window);
     });
+    act(() => { vi.advanceTimersToNextFrame(); });
 
     expect(screen.queryByText("Stream 0")).not.toBeInTheDocument();
     expect(screen.getByText("Stream 8")).toBeInTheDocument();
@@ -136,6 +139,7 @@ describe("VirtualList", () => {
     act(() => {
       fireEvent.scroll(window);
     });
+    act(() => { vi.advanceTimersToNextFrame(); });
 
     expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
 
@@ -182,6 +186,7 @@ describe("VirtualList", () => {
     act(() => {
       fireEvent.scroll(window);
     });
+    act(() => { vi.advanceTimersToNextFrame(); });
 
     expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
 
@@ -229,6 +234,7 @@ describe("VirtualList", () => {
     act(() => {
       fireEvent.scroll(window);
     });
+    act(() => { vi.advanceTimersToNextFrame(); });
 
     expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
 

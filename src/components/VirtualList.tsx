@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 import "./VirtualList.css";
 
 interface VirtualRange {
@@ -72,6 +73,8 @@ export default function VirtualList<T>({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const focusedRowIndexRef = useRef<number | null>(null);
   const focusableOffsetRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldVirtualize = items.length > threshold;
   const safeEstimate = Math.max(estimateSize, 1);
   const effectiveOverscan = Math.max(prefersReducedMotion ? 1 : overscan, 0);
@@ -125,12 +128,43 @@ export default function VirtualList<T>({
     }
 
     updateRange();
-    window.addEventListener("scroll", updateRange, { passive: true });
-    window.addEventListener("resize", updateRange);
+
+    const handleScroll = () => {
+      if (typeof requestAnimationFrame === "undefined") {
+        updateRange();
+        return;
+      }
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        updateRange();
+      });
+    };
+
+    const handleResize = () => {
+      if (resizeTimerRef.current !== null) {
+        clearTimeout(resizeTimerRef.current);
+      }
+      resizeTimerRef.current = setTimeout(() => {
+        resizeTimerRef.current = null;
+        updateRange();
+      }, VIEWPORT_RESIZE_DEBOUNCE_MS);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener("scroll", updateRange);
-      window.removeEventListener("resize", updateRange);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (resizeTimerRef.current !== null) {
+        clearTimeout(resizeTimerRef.current);
+        resizeTimerRef.current = null;
+      }
     };
   }, [shouldVirtualize, updateRange]);
 
