@@ -654,6 +654,10 @@
   margin-bottom: 0;
 }
 
+.review-cost-breakdown {
+  margin-top: 1.25rem;
+}
+
 .deposit-box {
   flex: 1;
 }

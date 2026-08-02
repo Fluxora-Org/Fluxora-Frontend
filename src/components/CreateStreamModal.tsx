@@ -2467,6 +2467,20 @@ export default function CreateStreamModal({
                     </div>
                   </div>
 
+                  {/* Cost breakdown: required deposit = rate × duration */}
+                  <div className="deposit-summary review-cost-breakdown">
+                    <div className="deposit-box">
+                      <div className="deposit-label">{t("createStream.step2.requiredDepositLabel")}</div>
+                      <div className={`deposit-value ${parseFloat(requiredDeposit) > userDeposit ? 'required' : ''}`}>
+                        {requiredDeposit} USDC
+                      </div>
+                    </div>
+                    <div className="deposit-box">
+                      <div className="deposit-label">{t("createStream.step2.yourDepositLabel")}</div>
+                      <div className="deposit-value">{userDeposit.toFixed(2)} USDC</div>
+                    </div>
+                  </div>
+
                   {streamError && (
                     <div className="review-error-box" role="alert">
                       <div>
