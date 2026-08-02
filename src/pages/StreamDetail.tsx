@@ -15,6 +15,33 @@ import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
 import { Share2 } from "lucide-react";
 
 /**
+ * Runway threshold expressed in hours. When the stream's remaining treasury
+ * balance divided by its daily accrual rate drops below this value, the health
+ * badge shows an "At risk" overlay state.
+ *
+ * Exported so tests can reference the same constant without duplicating the
+ * magic number, and so the threshold can be tuned in a single location.
+ */
+export const AT_RISK_RUNWAY_HOURS = 48;
+
+/**
+ * Returns `true` when the stream's remaining funds will run out within
+ * {@link AT_RISK_RUNWAY_HOURS} at the current monthly accrual rate.
+ *
+ * The calculation treats a month as 30 days. A zero or negative monthly rate
+ * is treated as "not at risk" (defensive guard against malformed data).
+ */
+function computeIsAtRisk(stream: StreamRecord): boolean {
+  // Only active streams can be at risk — completed/paused streams are settled
+  if (stream.status !== "Active") return false;
+  if (stream.monthlyRate <= 0) return false;
+  const dailyRate = stream.monthlyRate / 30;
+  if (dailyRate <= 0) return false;
+  const remainingHours = (stream.remainingAmount / dailyRate) * 24;
+  return remainingHours < AT_RISK_RUNWAY_HOURS;
+}
+
+/**
  * StreamDetail page
  * ─────────────────────────────────────────────────────────────────────────────
  * Dedicated route for `/app/streams/:streamId`. Fetches a single
@@ -286,6 +313,8 @@ export default function StreamDetail() {
     Settled: "var(--color-text-secondary, #6b7280)",
   };
 
+  const isAtRisk = computeIsAtRisk(stream);
+
   // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
@@ -355,7 +384,7 @@ export default function StreamDetail() {
       )}
 
       {/* Health badge */}
-      <div style={{ marginBottom: "1.5rem" }}>
+      <div style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
         <span
           style={{
             display: "inline-flex",
@@ -373,6 +402,27 @@ export default function StreamDetail() {
           <span aria-hidden="true">●</span>
           {stream.health} — {stream.healthNote}
         </span>
+        {isAtRisk && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              padding: "0.25rem 0.75rem",
+              borderRadius: "9999px",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              background: "var(--color-error-subtle, #fef2f2)",
+              color: "var(--color-error, #b91c1c)",
+              border: "1px solid var(--color-error, #b91c1c)",
+            }}
+            role="status"
+            aria-label="At risk: Treasury runway below 48 hours"
+          >
+            <span aria-hidden="true" style={{ fontSize: "1rem" }}>⚠️</span>
+            At risk
+          </span>
+        )}
       </div>
 
       {/* Metrics grid */}

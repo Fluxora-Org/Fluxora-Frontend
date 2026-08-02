@@ -130,3 +130,44 @@ Read wallet address and network exclusively through `useWallet()` from
 - `docs/SR_ONLY_REVEAL_PATTERN_SPEC.md` — screen-reader-only reveal patterns
 - `src/styles/accessibility.css` — shared focus-ring and sr-only utilities
 - `CONTRIBUTING.md` — branch naming, commit conventions, and CI requirements
+
+---
+
+## StreamDetail at-risk health state
+
+The `StreamDetail` page's health badge has been extended with an "At risk" overlay that
+warns when the stream's remaining treasury runway is critically low.
+
+### Implementation
+
+- **`AT_RISK_RUNWAY_HOURS`** (exported constant, currently `48`): the threshold in hours.
+  When the stream's remaining funds will run out within this window at the current
+  monthly accrual rate, the "At risk" badge is shown.
+- **`computeIsAtRisk(stream)`**: a pure function that calculates the remaining runway
+  as `remainingAmount / (monthlyRate / 30)` and converts the result to hours. Returns
+  `true` only for **Active** streams with a positive monthly rate whose runway is
+  below the threshold.
+
+### Visual design
+
+- The existing health status pill (Healthy / Attention / Settled) is always shown.
+- The "At risk" badge is a **red pill** with a warning icon (`⚠️`), layered **next to**
+  (not replacing) the existing health pill.
+- Uses `var(--color-error)` / `var(--color-error-subtle)` tokens so it respects the
+  active theme.
+
+### Accessibility
+
+- The "At risk" badge has `role="status"` so screen readers announce it.
+- The badge has an `aria-label` describing the exact condition.
+- Color is not the only differentiator — the warning icon and bold text provide
+  a secondary cue.
+
+### Edge cases
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Monthly rate is 0 or negative | No "At risk" badge (defensive guard) |
+| `remainingAmount` is 0 | Badge appears (runway is 0 hours) |
+| Stream is not Active (Completed / Paused) | No "At risk" badge (non-active streams are settled) |
+| Stream has very large remaining amount | No "At risk" badge (runway is sufficient) |
