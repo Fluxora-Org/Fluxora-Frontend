@@ -20,6 +20,7 @@ import "./Streams.css";
 import "./Recipient.css";
 import { useFaviconBadge } from "../utils/faviconBadge";
 import { useModalAccessibility } from "../components/useModalAccessibility";
+import { Download } from "lucide-react";
 
 // (Removed top-level timeoutRef and useEffect; will be added inside component)
 
@@ -125,6 +126,7 @@ export default function Recipient() {
   const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [withdrawalHistory, setWithdrawalHistory] = useState<ReceiptData[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recipientStreams = useRecipientStreams(wallet.address);
@@ -626,6 +628,7 @@ export default function Recipient() {
       };
       setReceiptData(newReceipt);
       setShowReceiptModal(true);
+      setWithdrawalHistory((prev) => [newReceipt, ...prev]);
       addToast("Withdrawal completed successfully on-chain!", "success");
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: unknown) {
@@ -635,6 +638,39 @@ export default function Recipient() {
       addToast(`Withdrawal failed: ${error.message || error}`, "error");
     }
   };
+
+  /**
+   * Generates and downloads a CSV file from the withdrawal history.
+   * Columns: Date, Stream ID, Amount, Transaction Hash, Status.
+   * Disabled (with explanation) when there is no history yet.
+   */
+  const handleExportCSV = useCallback(() => {
+    if (withdrawalHistory.length === 0) return;
+
+    const headers = ["Date", "Stream ID", "Amount", "Transaction Hash", "Status"];
+    const rows = withdrawalHistory.map((r) => [
+      new Date(r.timestamp).toLocaleDateString(),
+      r.streamId,
+      r.amount,
+      r.txHash ?? "",
+      r.status,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `fluxora-withdrawal-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [withdrawalHistory]);
 
   const getButtonText = () => {
     switch (txState) {
@@ -817,6 +853,29 @@ export default function Recipient() {
 
       {/* ── Printable Monthly Summary ── */}
       {hasLiveStreams && <RecipientMonthlySummary streams={liveStreams} />}
+
+      {/* ── CSV Export ── */}
+      {walletConnected && (
+        <section className="streams-export-section" aria-label="Export data">
+          <div className="streams-export-card">
+            <div className="streams-export-card__copy">
+              <h3>Export withdrawal history</h3>
+              <p>Download a CSV file of your past withdrawals for personal bookkeeping or tax records.</p>
+            </div>
+            <button
+              type="button"
+              className={`streams-primary-button streams-export-btn${withdrawalHistory.length === 0 ? " opacity-50 cursor-not-allowed" : ""}`}
+              disabled={withdrawalHistory.length === 0}
+              onClick={handleExportCSV}
+              aria-label={withdrawalHistory.length === 0 ? "No withdrawal history to export" : "Export withdrawal history as CSV"}
+              title={withdrawalHistory.length === 0 ? "No withdrawals have been made yet" : undefined}
+            >
+              <Download size={16} aria-hidden="true" />
+              {withdrawalHistory.length === 0 ? "Export CSV (no history)" : `Export CSV (${withdrawalHistory.length})`}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="recipient-alerts-panel" aria-labelledby="stream-alerts-title">
         <div>

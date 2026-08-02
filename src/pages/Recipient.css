@@ -1200,3 +1200,59 @@
     font-size: 1.125rem;
   }
 }
+
+/* ── CSV Export Section ── */
+.streams-export-section {
+  margin: 0 0 2rem;
+}
+
+.streams-export-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface, rgba(255, 255, 255, 0.03));
+}
+
+.streams-export-card__copy h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.streams-export-card__copy p {
+  margin: 0;
+  color: var(--muted, #94a3b8);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.streams-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.streams-export-btn.opacity-50 {
+  opacity: 0.5;
+}
+
+.streams-export-btn.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .streams-export-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .streams-export-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
