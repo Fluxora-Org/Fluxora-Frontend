@@ -1,5 +1,6 @@
 import {
   LoadingRetryState,
+  LOADING_TEST_IDS,
   MAX_LOADING_RETRIES,
   Skeleton,
   SkeletonCard,
@@ -54,7 +55,10 @@ export default function StreamsLoading({ retryCount = 0, onRetry }: StreamsLoadi
           </thead>
           <tbody>
             {Array.from({ length: 5 }).map((_, r) => (
-              <tr key={r}>
+              <tr
+                key={r}
+                style={{ "--skeleton-delay": `${Math.min(r * 40, 200)}ms` } as any}
+              >
                 <td style={{ padding: "1rem", borderBottom: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <Skeleton height={12} width={r % 2 ? "55%" : "70%"} />

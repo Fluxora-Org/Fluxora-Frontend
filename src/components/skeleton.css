@@ -38,6 +38,7 @@
   background-size: 400% 100%;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skeleton-base) 82%, transparent);
   animation: shimmer var(--skeleton-speed) linear infinite;
+  animation-delay: var(--skeleton-delay, 0ms);
   border-radius: 6px;
   will-change: background-position;
 }
