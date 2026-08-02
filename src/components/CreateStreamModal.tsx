@@ -576,6 +576,27 @@ export default function CreateStreamModal({
     });
   }, [queuedSubmission?.id]);
 
+  // Focus the primary input field when stepping back from step 3 via the
+  // review-card "Edit" buttons, so the user can immediately start typing.
+  const prevStepRef = useRef(currentStep);
+  useEffect(() => {
+    const prev = prevStepRef.current;
+    prevStepRef.current = currentStep;
+    // Only focus when transitioning *backward* from step 3.
+    if (prev !== 3 || currentStep >= prev) return;
+    requestAnimationFrame(() => {
+      if (currentStep === 1) {
+        recipientInputRef.current?.focus();
+      } else if (currentStep === 2) {
+        // InputWithUnit doesn't forward refs, so we use the id instead.
+        const rateInput = document.getElementById('create-stream-accrual-rate');
+        if (rateInput instanceof HTMLInputElement) {
+          rateInput.focus();
+        }
+      }
+    });
+  }, [currentStep]);
+
   const resetTransactionState = () => {
     transactionStatus.reset();
     setSubmittedTxHash(null);
