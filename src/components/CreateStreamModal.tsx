@@ -1614,7 +1614,7 @@ export default function CreateStreamModal({
             </div>
           )}
           {currentStep === 1 && (
-          <>
+          <div key={currentStep} className="step-transition">
             <hr className="divider" />
             <div className="section-header">
               <h3>{t("createStream.step1.header")}</h3>
@@ -1898,7 +1898,7 @@ export default function CreateStreamModal({
                 {t("createStream.step1.infoBoxText")}
               </p>
             </div>
-          </>
+          </div>
         )}
         {currentStep === 2 && (() => {
           // Derived per-field validation state for step 2
@@ -1944,7 +1944,7 @@ export default function CreateStreamModal({
           const cliffDateSuccess = cliffEnabled && touched.cliffDate && !cliffDateError && Boolean(cliffDate);
 
           return (
-          <>
+          <div key={currentStep} className="step-transition">
             <hr className="divider" />
 
             <div className="section-header">
@@ -2184,7 +2184,7 @@ export default function CreateStreamModal({
                 <div className="deposit-value">{userDeposit.toFixed(2)} USDC</div>
               </div>
             </div>
-          </>
+          </div>
           );
         })()}
 
@@ -2194,7 +2194,7 @@ export default function CreateStreamModal({
               const reviewDeposit = formatReviewDeposit(depositAmount);
               const durationUnit = formatDurationUnit(duration, t);
               return (
-                <>
+                <div key={currentStep} className="step-transition">
                   <hr className="divider" />
                   <div className="review-cards">
                     {/* Recipient card */}
@@ -2595,7 +2595,7 @@ export default function CreateStreamModal({
                         })}
                     </div>
                   )}
-                </>
+                </div>
               );
             })()}
 

@@ -3,6 +3,12 @@ import "./skeleton.css";
 
 export const MAX_LOADING_RETRIES = 3;
 
+export const LOADING_TEST_IDS = {
+  streams: "loading-streams",
+  treasury: "loading-treasury",
+  recipient: "loading-recipient",
+} as const;
+
 export function LoadingRetryState({
   label,
   onRetry,
