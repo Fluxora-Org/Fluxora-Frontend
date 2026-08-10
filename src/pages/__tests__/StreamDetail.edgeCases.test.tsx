@@ -3,7 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
-import StreamDetail from "../StreamDetail";
+import StreamDetail, {
+  AT_RISK_RUNWAY_HOURS,
+  HOURS_PER_MONTH,
+  computeFundingRunwayHours,
+  isFundingAtRisk,
+} from "../StreamDetail";
 import * as streamsService from "../../lib/api/streamsService";
 import type { StreamRecord } from "../../data/streamRecords";
 
@@ -585,6 +590,110 @@ describe("StreamDetail - Edge Cases and Error States", () => {
       
       // Amount formatted as 0 USDC
       expect(screen.getByText("0.00 USDC")).toBeInTheDocument();
+    });
+  });
+
+  describe("Funding runway calculation", () => {
+    it("computes runway hours as remainingAmount / monthlyRate * HOURS_PER_MONTH", () => {
+      // 6000 remaining / 1000 monthly = 6 months = 4320 hours
+      expect(computeFundingRunwayHours(6000, 1000)).toBeCloseTo(6 * HOURS_PER_MONTH, 5);
+    });
+
+    it("returns Infinity when monthlyRate is zero (no accrual → no risk)", () => {
+      expect(computeFundingRunwayHours(6000, 0)).toBe(Infinity);
+    });
+
+    it("returns Infinity when monthlyRate is negative", () => {
+      expect(computeFundingRunwayHours(6000, -100)).toBe(Infinity);
+    });
+
+    it("returns 0 when remainingAmount is zero", () => {
+      expect(computeFundingRunwayHours(0, 1000)).toBe(0);
+    });
+
+    it("returns 0 when remainingAmount is negative", () => {
+      expect(computeFundingRunwayHours(-5, 1000)).toBe(0);
+    });
+  });
+
+  describe("isFundingAtRisk", () => {
+    it("is true when remaining runway is below AT_RISK_RUNWAY_HOURS", () => {
+      // remaining 100 / monthly 5000 → 100/5000 = 0.02 months = 14.4 hours < 48
+      expect(isFundingAtRisk({ status: "Active", remainingAmount: 100, monthlyRate: 5000 })).toBe(true);
+    });
+
+    it("is false when remaining runway equals or exceeds AT_RISK_RUNWAY_HOURS", () => {
+      // remaining 7000 / monthly 1000 = 7 months = 5040 hours ≥ 48
+      expect(isFundingAtRisk({ status: "Active", remainingAmount: 7000, monthlyRate: 1000 })).toBe(false);
+    });
+
+    it("is false for completed streams regardless of balance", () => {
+      expect(isFundingAtRisk({ status: "Completed", remainingAmount: 0, monthlyRate: 1000 })).toBe(false);
+      expect(isFundingAtRisk({ status: "Completed", remainingAmount: 6000, monthlyRate: 1200 })).toBe(false);
+    });
+
+    it("is false when monthlyRate is zero", () => {
+      expect(isFundingAtRisk({ status: "Active", remainingAmount: 100, monthlyRate: 0 })).toBe(false);
+    });
+  });
+
+  describe("Funding at-risk badge rendering", () => {
+    it("renders the at-risk badge when remaining runway is below threshold", async () => {
+      const atRiskStream = {
+        ...mockStream,
+        remainingAmount: 100,
+        monthlyRate: 5000,
+      };
+      vi.spyOn(streamsService, "getStreamById").mockResolvedValue(atRiskStream);
+
+      renderWithHelmet(
+        <MemoryRouter initialEntries={["/app/streams/STR-001"]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await screen.findByRole("heading", { name: "Test Stream" });
+      const badge = screen.getByTestId("funding-at-risk-badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent("Funding at risk");
+      expect(badge).toHaveTextContent(String(AT_RISK_RUNWAY_HOURS));
+    });
+
+    it("does not render the at-risk badge when remaining runway is sufficient", async () => {
+      vi.spyOn(streamsService, "getStreamById").mockResolvedValue(mockStream);
+
+      renderWithHelmet(
+        <MemoryRouter initialEntries={["/app/streams/STR-001"]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await screen.findByRole("heading", { name: "Test Stream" });
+      expect(screen.queryByTestId("funding-at-risk-badge")).not.toBeInTheDocument();
+    });
+
+    it("does not render the at-risk badge for completed streams even with low balance", async () => {
+      const completedStream = {
+        ...mockStream,
+        status: "Completed" as const,
+        remainingAmount: 0,
+      };
+      vi.spyOn(streamsService, "getStreamById").mockResolvedValue(completedStream);
+
+      renderWithHelmet(
+        <MemoryRouter initialEntries={["/app/streams/STR-001"]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await screen.findByRole("heading", { name: "Test Stream" });
+      expect(screen.queryByTestId("funding-at-risk-badge")).not.toBeInTheDocument();
     });
   });
 });

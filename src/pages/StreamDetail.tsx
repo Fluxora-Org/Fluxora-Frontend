@@ -12,7 +12,44 @@ import { MetaTags } from "../components/MetaTags";
 import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
-import { Share2 } from "lucide-react";
+import { Share2, AlertTriangle } from "lucide-react";
+
+/**
+ * Threshold in hours below which the stream's remaining funding runway is
+ * considered "at risk". Can be tuned without hunting through the component.
+ */
+export const AT_RISK_RUNWAY_HOURS = 48;
+
+/**
+ * Assumed hours per month for funding-runway calculations.
+ * Uses 30 days per month (720 hours) as a conservative baseline.
+ */
+export const HOURS_PER_MONTH = 720;
+
+/**
+ * Compute the remaining funding runway in hours based on the stream's
+ * remaining balance and monthly accrual rate.
+ * Returns `Infinity` when the rate is zero (no accrual → no risk of running out).
+ */
+export function computeFundingRunwayHours(
+  remainingAmount: number,
+  monthlyRate: number,
+): number {
+  if (monthlyRate <= 0) return Infinity;
+  if (remainingAmount <= 0) return 0;
+  return (remainingAmount / monthlyRate) * HOURS_PER_MONTH;
+}
+
+/**
+ * Returns true when the stream's remaining funding runway is below the
+ * at-risk threshold. Excludes completed streams (they are already settled).
+ */
+export function isFundingAtRisk(stream: Pick<StreamRecord, "status" | "remainingAmount" | "monthlyRate">): boolean {
+  if (stream.status === "Completed") return false;
+  if (stream.monthlyRate <= 0) return false;
+  const runwayHours = computeFundingRunwayHours(stream.remainingAmount, stream.monthlyRate);
+  return runwayHours < AT_RISK_RUNWAY_HOURS;
+}
 
 /**
  * StreamDetail page
@@ -373,6 +410,30 @@ export default function StreamDetail() {
           <span aria-hidden="true">●</span>
           {stream.health} — {stream.healthNote}
         </span>
+
+        {isFundingAtRisk(stream) && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              padding: "0.25rem 0.75rem",
+              borderRadius: "9999px",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              marginLeft: "0.5rem",
+              background: "var(--color-error-subtle, #fef2f2)",
+              color: "var(--color-error, #b91c1c)",
+              border: "1px solid var(--color-error-border, #fca5a5)",
+            }}
+            role="alert"
+            aria-label="Funding at risk"
+            data-testid="funding-at-risk-badge"
+          >
+            <AlertTriangle size={14} aria-hidden="true" />
+            <span>Funding at risk — less than {AT_RISK_RUNWAY_HOURS}h of runway</span>
+          </span>
+        )}
       </div>
 
       {/* Metrics grid */}
