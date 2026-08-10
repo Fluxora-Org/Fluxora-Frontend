@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="currentColor" role="img" aria-label="USDC">
+  <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" stroke-width="2"/>
+  <text x="20" y="25" text-anchor="middle" font-weight="bold" font-size="14" font-family="Arial, sans-serif">$</text>
+  <path d="M50 10h12c6 0 10 4 10 10s-4 10-10 10H50V10zm2 2v16h10c4.4 0 8-3.6 8-8s-3.6-8-8-8H52z" />
+  <text x="62" y="27" text-anchor="middle" font-weight="bold" font-size="9" font-family="Arial, sans-serif">USDC</text>
+  <path d="M85 8v24h2V8h-2zM100 12c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/>
+</svg>

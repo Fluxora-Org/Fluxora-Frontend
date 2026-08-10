@@ -3,11 +3,36 @@
  *
  * Uses CSS variables from design-tokens.css so colors respond
  * to the active theme (light / dark) without inline hex values.
+ *
+ * Contains a partner logo strip with lazy-loaded images for
+ * ecosystem partners (Stellar, USDC, Soroban) to improve
+ * initial page load performance and CLS.
  */
 
 interface TrustSectionProps {
   theme?: "light" | "dark";
 }
+
+const partners = [
+  {
+    src: "/logo-stellar.svg",
+    alt: "Stellar",
+    width: 120,
+    height: 40,
+  },
+  {
+    src: "/logo-usdc.svg",
+    alt: "USDC (Circle)",
+    width: 120,
+    height: 40,
+  },
+  {
+    src: "/logo-soroban.svg",
+    alt: "Soroban Smart Contracts",
+    width: 120,
+    height: 40,
+  },
+];
 
 const useCases = [
   {
@@ -157,6 +182,36 @@ export default function TrustSection({ theme = "light" }: TrustSectionProps) {
               </p>
             </div>
           ))}
+        </div>
+
+        {/* Partner logos */}
+        <div
+          className="mt-12 w-full"
+          aria-label="Built with Stellar ecosystem partners"
+        >
+          <p
+            className="text-center text-xs font-semibold uppercase tracking-widest mb-6"
+            style={{ color: "var(--color-text-tertiary)" }}
+          >
+            Trusted across the Stellar ecosystem
+          </p>
+          <ul className="flex flex-wrap items-center justify-center gap-8 sm:gap-12">
+            {partners.map((p) => (
+              <li key={p.src} className="flex items-center">
+                <img
+                  src={p.src}
+                  alt={p.alt}
+                  width={p.width}
+                  height={p.height}
+                  loading="lazy"
+                  decoding="async"
+                  role="img"
+                  className="h-10 w-auto opacity-80 transition-opacity duration-200 hover:opacity-100"
+                  style={{ color: "var(--color-text-secondary)" }}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

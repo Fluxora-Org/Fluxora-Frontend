@@ -29,6 +29,22 @@ describe("landing page hero and trust accessibility", () => {
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
   });
 
+  it("renders lazily-loaded partner logos with explicit dimensions and alt text", () => {
+    render(<TrustSection />);
+
+    const stellar = screen.getByAltText("Stellar");
+    const usdc = screen.getByAltText("USDC (Circle)");
+    const soroban = screen.getByAltText("Soroban Smart Contracts");
+
+    for (const logo of [stellar, usdc, soroban]) {
+      expect(logo).toBeInTheDocument();
+      expect(logo).toHaveAttribute("loading", "lazy");
+      expect(logo).toHaveAttribute("decoding", "async");
+      expect(logo).toHaveAttribute("width");
+      expect(logo).toHaveAttribute("height");
+    }
+  });
+
   it("has no axe violations for the landing sections", async () => {
     const { container } = render(
       <>
