@@ -11,6 +11,9 @@ import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoint
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
 
+/** localStorage key for persisting the last successfully connected wallet provider. */
+const LAST_USED_PROVIDER_KEY = "fluxora_last_used_wallet_provider";
+
 /**
  * Wraps a promise with a timeout that rejects after `ms` milliseconds.
  * The underlying timer is cleared when the promise settles, preventing
@@ -125,6 +128,26 @@ export default function ConnectWalletModal({
  const [isMobile, setIsMobile] = useState(() => isMobileViewport());
   const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
 
+  // Read the last-used provider from localStorage, refreshed each time the modal opens
+  const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(() => {
+    if (!isOpen) return null;
+    try {
+      return localStorage.getItem(LAST_USED_PROVIDER_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        setLastUsedProvider(localStorage.getItem(LAST_USED_PROVIDER_KEY));
+      } catch {
+        setLastUsedProvider(null);
+      }
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
 
@@ -179,7 +202,7 @@ export default function ConnectWalletModal({
   useEffect(() => {
     if (currentErrorState === "awaiting-device-confirmation" && isSimulatingHardwareFlow) {
       const timer = setTimeout(() => {
-        connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+        connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET", "hardware");
         setIsSimulatingHardwareFlow(false);
         if (onConnectFreighter) {
           onConnectFreighter();
@@ -236,7 +259,7 @@ export default function ConnectWalletModal({
       }
 
       // Successful connection!
-      connect(access.address, net.network);
+      connect(access.address, net.network, "freighter");
       if (onConnectFreighter) {
         onConnectFreighter();
       }
@@ -479,7 +502,9 @@ export default function ConnectWalletModal({
                     aria-label={
                       wallet.disabled
                         ? `${wallet.name} — coming soon`
-                        : `Connect with ${wallet.name}`
+                        : lastUsedProvider === wallet.id
+                          ? `Connect with ${wallet.name} — Last used`
+                          : `Connect with ${wallet.name}`
                     }
                     aria-disabled={isDisabled}
                     disabled={isDisabled}
@@ -495,22 +520,13 @@ export default function ConnectWalletModal({
                       <div className={styles.walletName}>
                         {wallet.name}
                         {wallet.disabled && (
-                          <span
-                            style={{
-                              marginLeft: "0.5rem",
-                              fontSize: "0.7em",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              color: "var(--text-tertiary, #888)",
-                              border: "1px solid currentColor",
-                              borderRadius: "4px",
-                              padding: "1px 5px",
-                              verticalAlign: "middle",
-                            }}
-                            aria-hidden="true"
-                          >
+                          <span className={styles.comingSoonBadge} aria-hidden="true">
                             coming soon
+                          </span>
+                        )}
+                        {!wallet.disabled && lastUsedProvider === wallet.id && (
+                          <span className={styles.lastUsedBadge} role="status">
+                            Last used
                           </span>
                         )}
                       </div>
@@ -940,7 +956,7 @@ export default function ConnectWalletModal({
                   type="button"
                   className={styles.primaryButton}
                   onClick={() => {
-                    connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+                    connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET", "hardware");
                     if (onConnectFreighter) onConnectFreighter();
                     onClose();
                   }}

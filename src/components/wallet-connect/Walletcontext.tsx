@@ -157,15 +157,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
-  const connect = (address: string, network: string) => {
+  const connect = (address: string, network: string, provider?: string) => {
     if (!isValidStellarAddress(address)) return;
     setState({ address, network, connected: true, error: null, loading: false });
+    if (provider) {
+      localStorage.setItem("fluxora_last_used_wallet_provider", provider);
+    }
   };
 
   const disconnect = () => {
     disconnectVersionRef.current += 1;
     clearWatcher();
     setState(DISCONNECTED);
+    localStorage.removeItem("fluxora_last_used_wallet_provider");
   };
 
   // Silently restore session if the user already approved this app.

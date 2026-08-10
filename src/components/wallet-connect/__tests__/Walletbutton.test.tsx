@@ -83,7 +83,7 @@ describe("WalletButton canonical modal", () => {
 
     expect(freighter.requestAccess).toHaveBeenCalledTimes(1);
     expect(freighter.getNetwork).toHaveBeenCalledTimes(1);
-    expect(wallet.connect).toHaveBeenCalledWith("GCONNECTED", "TESTNET");
+    expect(wallet.connect).toHaveBeenCalledWith("GCONNECTED", "TESTNET", "freighter");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { act } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -12,6 +12,23 @@ vi.mock("@stellar/freighter-api", () => {
     getNetwork: vi.fn().mockResolvedValue({ network: "TESTNET" }),
   };
 });
+
+const walletMock = vi.hoisted(() => ({
+  address: "GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222",
+  network: "TESTNET",
+  connected: false,
+  loading: false,
+  error: null,
+  expectedNetwork: "TESTNET",
+  expectedNetworkLabel: "Testnet",
+  isNetworkMismatch: false,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
+vi.mock("../../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => walletMock,
+}));
 
 let viewportWidth = 1024;
 
@@ -795,5 +812,67 @@ it("preserves exact heading copy on rerender for all error states", () => {
 
     expect(freighterTextBefore).toBe(freighterTextAfter);
     expect(albedoTextBefore).toBe(albedoTextAfter);
+  });
+
+  describe("remember last used wallet (Issue #1287)", () => {
+    const LAST_USED_KEY = "fluxora_last_used_wallet_provider";
+
+    beforeEach(() => {
+      localStorage.removeItem(LAST_USED_KEY);
+      walletMock.connect = vi.fn();
+      walletMock.disconnect = vi.fn();
+    });
+
+    afterEach(() => {
+      localStorage.removeItem(LAST_USED_KEY);
+    });
+
+    it("shows a 'Last used' badge on the Freighter option when it was previously connected", () => {
+      localStorage.setItem(LAST_USED_KEY, "freighter");
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const freighterBtn = screen.getByRole("listitem", { name: /Connect with Freighter/ });
+      expect(freighterBtn).toHaveTextContent("Last used");
+    });
+
+    it("shows a 'Last used' badge on the Hardware Wallet option when it was previously connected", () => {
+      localStorage.setItem(LAST_USED_KEY, "hardware");
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const hardwareBtn = screen.getByRole("listitem", { name: /Connect with Hardware Wallet/ });
+      expect(hardwareBtn).toHaveTextContent("Last used");
+    });
+
+    it("does not show 'Last used' badge when localStorage is empty", () => {
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      expect(screen.queryByText("Last used")).not.toBeInTheDocument();
+    });
+
+    it("updates the aria-label to include 'Last used' for the matching provider", () => {
+      localStorage.setItem(LAST_USED_KEY, "freighter");
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const freighterBtn = screen.getByRole("listitem", { name: "Connect with Freighter — Last used" });
+      expect(freighterBtn).toBeInTheDocument();
+    });
+
+    it("does not show 'Last used' badge for disabled wallet options", () => {
+      localStorage.setItem(LAST_USED_KEY, "albedo");
+      render(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+      const albedoBtn = screen.getByRole("listitem", { name: "Albedo — coming soon" });
+      expect(albedoBtn).toBeDisabled();
+      expect(albedoBtn).not.toHaveTextContent("Last used");
+    });
+
+    it("refreshes the last-used provider from localStorage when the modal re-opens", () => {
+      const { rerender } = render(
+        <ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />
+      );
+      expect(screen.queryByText("Last used")).not.toBeInTheDocument();
+
+      // Close and re-open with localStorage set
+      localStorage.setItem(LAST_USED_KEY, "freighter");
+      rerender(<ConnectWalletModal isOpen={false} onClose={vi.fn()} showStateSwitcher={false} />);
+      rerender(<ConnectWalletModal isOpen={true} onClose={vi.fn()} showStateSwitcher={false} />);
+
+      expect(screen.getByText("Last used")).toBeInTheDocument();
+    });
   });
 });
