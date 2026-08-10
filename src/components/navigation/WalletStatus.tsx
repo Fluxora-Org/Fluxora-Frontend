@@ -44,6 +44,7 @@ export default function WalletStatus({
   const [open, setOpen] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [networkTooltipOpen, setNetworkTooltipOpen] = useState(false);
   const [workspaces, setWorkspaces] = useState(() => readConnectedWorkspaces());
   const { copy, status: copyStatus } = useClipboard();
   const toast = useOptionalToast();
@@ -213,27 +214,68 @@ export default function WalletStatus({
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
-      {/* Network Badge */}
+      {/* Network Badge — focusable trigger with hover/focus tooltip + sr-only description */}
       {isWrongNetwork ? (
         <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
           <span className="w-2 h-2 rounded-full bg-red-400" />
           Expected {expectedNetwork}
         </span>
       ) : (
-        <span
-          className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border ${
-            isTestnet
-              ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
-              : "bg-emerald-400/15 text-emerald-300 border-emerald-400/30"
-          }`}
-        >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isTestnet ? "bg-amber-300" : "bg-emerald-400"
+        <div className="relative">
+          <button
+            type="button"
+            onMouseEnter={() => setNetworkTooltipOpen(true)}
+            onMouseLeave={() => setNetworkTooltipOpen(false)}
+            onFocus={() => setNetworkTooltipOpen(true)}
+            onBlur={() => setNetworkTooltipOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setNetworkTooltipOpen(false);
+            }}
+            aria-describedby="network-badge-tooltip"
+            aria-label={
+              isTestnet
+                ? "Testnet. Connected to the Stellar test network. Streamed assets are not real USDC."
+                : "Mainnet. Connected to the Stellar main network."
+            }
+            className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border cursor-help outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--navbar-bg)] ${
+              isTestnet
+                ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
+                : "bg-emerald-400/15 text-emerald-300 border-emerald-400/30"
             }`}
-          />
-          {isTestnet ? "Testnet" : "Mainnet"}
-        </span>
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isTestnet ? "bg-amber-300" : "bg-emerald-400"
+              }`}
+            />
+            {isTestnet ? "Testnet" : "Mainnet"}
+          </button>
+
+          {/* Visually-hidden description — always present for screen readers */}
+          <span className="sr-only" id="network-badge-description">
+            {isTestnet
+              ? "Connected to the Stellar test network. Streamed assets are not real USDC."
+              : "Connected to the Stellar main network."}
+          </span>
+
+          {/* Tooltip — shown on hover/focus, dismissible via Escape */}
+          {networkTooltipOpen && (
+            <div
+              id="network-badge-tooltip"
+              role="tooltip"
+              className="absolute left-0 mt-2 p-3 w-64 rounded-xl bg-[var(--tooltip-bg,var(--surface-elevated))] border border-[var(--tooltip-border,var(--border-neutral))] shadow-[var(--tooltip-shadow)] text-[var(--tooltip-text-color,var(--text-secondary))] text-xs z-[var(--tooltip-z-index,1100)] flex flex-col gap-1.5 pointer-events-none"
+            >
+              <span className="font-semibold text-[var(--tooltip-title-color,var(--text-vivid))]">
+                {isTestnet ? "Testnet" : "Mainnet"}
+              </span>
+              <span className="font-sans leading-relaxed">
+                {isTestnet
+                  ? "You are connected to the Stellar test network. Streamed assets are not real USDC and have no monetary value."
+                  : "You are connected to the Stellar main network. Streamed assets are real."}
+              </span>
+            </div>
+          )}
+        </div>
       )}
 
       {slackWorkspace && (
