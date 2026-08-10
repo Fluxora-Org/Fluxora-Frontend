@@ -1,16 +1,60 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import ValuePropositionSection from "../ValuePropositionSection";
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock lucide-react icons
-vi.mock('lucide-react', () => ({
-  Clock: () => <svg data-testid="icon" />,
-  Settings: () => <svg data-testid="icon" />,
-  PauseCircle: () => <svg data-testid="icon" />,
-  Star: () => <svg data-testid="icon" />, 
-}));
+/**
+ * Tracks the active IntersectionObserver callback so we can
+ * manually trigger it from tests.
+ */
+let activeObserver: {
+  callback: IntersectionObserverCallback;
+  disconnect: ReturnType<typeof vi.fn>;
+} | null = null;
+
+beforeEach(() => {
+  activeObserver = null;
+
+  class MockObserver implements IntersectionObserver {
+    readonly root: Element | null = null;
+    readonly rootMargin: string = "";
+    readonly thresholds: ReadonlyArray<number> = [0.1];
+    callback: IntersectionObserverCallback;
+    observe = vi.fn();
+    disconnect = vi.fn();
+    unobserve = vi.fn();
+    takeRecords = vi.fn(() => []);
+
+    constructor(cb: IntersectionObserverCallback) {
+      this.callback = cb;
+      activeObserver = { callback: cb, disconnect: this.disconnect };
+    }
+  }
+
+  vi.stubGlobal("IntersectionObserver", MockObserver);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  activeObserver = null;
+});
+
+/**
+ * Simulates the section scrolling into view.
+ */
+async function triggerIntersection() {
+  if (!activeObserver) {
+    throw new Error("No IntersectionObserver was created — did the component render?");
+  }
+  await act(async () => {
+    activeObserver!.callback(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      activeObserver! as unknown as IntersectionObserver,
+    );
+  });
+}
+
 describe("ValuePropositionSection", () => {
-  test("renders headline, subhead and all feature cards", () => {
+  it("renders headline, subhead and all feature cards", () => {
     render(<ValuePropositionSection />);
 
     // Headline and subhead
@@ -39,5 +83,48 @@ describe("ValuePropositionSection", () => {
       const matches = screen.getAllByText((_content, element) => Boolean(element?.textContent?.includes(desc)));
       expect(matches.length).toBeGreaterThan(0);
     });
+  });
+
+  it("starts with feature cards hidden (opacity 0, translateY 20px)", () => {
+    render(<ValuePropositionSection />);
+
+    // All four feature cards should begin invisible
+    const cards = screen.getAllByRole("heading", { level: 3 });
+    expect(cards).toHaveLength(4);
+
+    cards.forEach((heading) => {
+      const card = heading.closest(".rounded-2xl");
+      expect(card).toBeInTheDocument();
+      expect(card).toHaveStyle("opacity: 0");
+    });
+  });
+
+  it("reveals cards with staggered animation when section scrolls into view", async () => {
+    render(<ValuePropositionSection />);
+
+    // Verify hidden before intersection
+    const heading = screen.getByRole("heading", { level: 2, name: /Treasury streaming infrastructure/i });
+    const parentSection = heading.closest("section");
+    expect(parentSection).toBeInTheDocument();
+
+    // Trigger intersection
+    await triggerIntersection();
+
+    // After intersection, all cards should be visible
+    const cards = screen.getAllByRole("heading", { level: 3 });
+    cards.forEach((h3) => {
+      const card = h3.closest(".rounded-2xl");
+      expect(card).toHaveStyle("opacity: 1");
+    });
+  });
+
+  it("disconnects observer after first intersection (fires once)", async () => {
+    render(<ValuePropositionSection />);
+
+    // Trigger first intersection
+    await triggerIntersection();
+
+    // Verify disconnect was called
+    expect(activeObserver?.disconnect).toHaveBeenCalledTimes(1);
   });
 });
