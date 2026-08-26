@@ -12,12 +12,29 @@ import {
   DEFAULT_STREAMS_FILTERS,
 } from "../lib/streamsSessionRecovery";
 
+const TEST_WALLET_ADDRESS = "GATEST1234567890123456789012345678901234567890123456TEST";
+
 /**
  * Mutable ref that the `useTreasury` mock reads. Defaults to the real
  * `streamRecords` fixture. Individual tests can assign a custom array
  * before rendering when they need a different dataset size.
  */
 const mockStreamsRef = { current: streamRecords };
+
+vi.mock("../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => ({
+    address: TEST_WALLET_ADDRESS,
+    network: "TESTNET",
+    connected: true,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
 
 vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
   useTreasury: () => ({
@@ -336,6 +353,7 @@ describe("Streams session recovery banner", () => {
     writeStreamsSession(
       { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
       Date.now(),
+      TEST_WALLET_ADDRESS,
     );
 
     renderStreams();
@@ -358,6 +376,7 @@ describe("Streams session recovery banner", () => {
     writeStreamsSession(
       { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" }, draft: null },
       Date.now(),
+      TEST_WALLET_ADDRESS,
     );
 
     renderStreams();
@@ -366,13 +385,14 @@ describe("Streams session recovery banner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start fresh" }));
 
     expect(screen.getByText(/starting fresh/i)).toBeInTheDocument();
-    expect(readStreamsSession(Date.now())).toBeNull();
+    expect(readStreamsSession(Date.now(), TEST_WALLET_ADDRESS)).toBeNull();
   });
 
   it("hides the banner without applying anything when ignored via direct interaction", async () => {
     writeStreamsSession(
       { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
       Date.now(),
+      TEST_WALLET_ADDRESS,
     );
 
     renderStreams();
@@ -387,6 +407,9 @@ describe("Streams session recovery banner", () => {
       "aria-pressed",
       "true",
     );
+
+    // The old Active filter should remain in storage, not yet overwritten by the Paused interaction
+    expect(readStreamsSession(Date.now(), TEST_WALLET_ADDRESS)?.filters.statusFilter).toBe("Active");
   });
 
   it("shows the always-on persistence indicator and autosaves filter changes", async () => {

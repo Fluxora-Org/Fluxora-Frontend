@@ -62,6 +62,7 @@ import CreateStreamFab from "../components/CreateStreamFab";
 import { stellarExplorerUrl } from "../lib/stellar";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getSafeLinkProps } from "../utils/linkSecurity";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -819,6 +820,8 @@ export default function Streams() {
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
+  const wallet = useWallet();
+  const walletAddress = wallet.address || "";
 
   const { streams, loading, error, refetch, retryCount } = useTreasury();
   const filterLabels: Record<StatusFilter, string> = {
@@ -877,10 +880,10 @@ export default function Streams() {
   // Detect a prior session once on mount. Never auto-applies anything — only
   // decides whether to offer the recovery banner.
   useEffect(() => {
-    if (hasCheckedSessionRef.current) return;
+    if (hasCheckedSessionRef.current || !walletAddress) return;
     hasCheckedSessionRef.current = true;
 
-    const snapshot = readStreamsSession(Date.now());
+    const snapshot = readStreamsSession(Date.now(), walletAddress);
     if (
       snapshot &&
       (isFilterSnapshotMeaningful(snapshot.filters) ||
@@ -890,12 +893,25 @@ export default function Streams() {
       setDetectedSnapshot(snapshot);
       setBannerState("detected");
     }
-  }, []);
+  }, [walletAddress]);
+
+  // Clear session recovery state when wallet address changes (#1440).
+  // Prevents cross-account data leakage by invalidating detected snapshots
+  // and resetting session state when switching accounts.
+  useEffect(() => {
+    // Reset session recovery state to prevent showing old account's data
+    setDetectedSnapshot(null);
+    setBannerState(null);
+    setLiveDraft(null);
+    setRestoredDraft(null);
+    sessionResolvedRef.current = true;
+    hasCheckedSessionRef.current = false;
+  }, [walletAddress]);
 
   // Debounced autosave of filters + the live create-stream draft. Paused while
   // a detected snapshot is awaiting the user's decision (sessionResolvedRef).
   useEffect(() => {
-    if (!sessionResolvedRef.current) return;
+    if (!sessionResolvedRef.current || !walletAddress) return;
 
     const timer = window.setTimeout(() => {
       writeStreamsSession(
@@ -904,12 +920,13 @@ export default function Streams() {
           draft: liveDraft,
         },
         Date.now(),
+        walletAddress,
       );
       setLastSavedAt(Date.now());
     }, SESSION_AUTOSAVE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [statusFilter, searchQuery, sortBy, currentPage, itemsPerPage, liveDraft]);
+  }, [statusFilter, searchQuery, sortBy, currentPage, itemsPerPage, liveDraft, walletAddress]);
 
   // Brief "recently saved" pulse for the persistence indicator.
   useEffect(() => {
@@ -974,10 +991,12 @@ export default function Streams() {
   }, [detectedSnapshot]);
 
   const handleStartFreshSession = useCallback(() => {
-    clearStreamsSession();
+    if (walletAddress) {
+      clearStreamsSession(walletAddress);
+    }
     sessionResolvedRef.current = true;
     setBannerState("start-fresh");
-  }, []);
+  }, [walletAddress]);
 
   const handleDismissSessionBanner = useCallback(() => {
     sessionResolvedRef.current = true;
