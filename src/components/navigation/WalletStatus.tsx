@@ -10,9 +10,11 @@ import {
 } from "lucide-react";
 import {
   isStellarNetworkMismatch,
+import {
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import { safeWindowOpen } from "../../utils/linkSecurity";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { formatAddress } from "../common/TruncatedAddress";
@@ -325,9 +327,8 @@ export default function WalletStatus({
                 <button
                   role="menuitem"
                   onClick={() => {
-                    window.open(
+                    safeWindowOpen(
                       stellarExplorerUrl(address, network),
-                      "_blank",
                       "noopener",
                     );
                     closeMenu();

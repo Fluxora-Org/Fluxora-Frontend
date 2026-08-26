@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp, buildReceiptExplorerUrl } from "../../utils/receiptGenerator";
+import { getSafeLinkProps } from "../../utils/linkSecurity";
 import { clsx } from "clsx";
 
 export interface TransactionReceiptPreviewProps {
@@ -158,14 +159,27 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
             </span>
             <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-[var(--color-accent-primary)] truncate">
               <span className="truncate">{data.txHash}</span>
-              <a
-                href={buildReceiptExplorerUrl(data.txHash!, data.network)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
-              >
-                Explorer <ExternalLink size={12} />
-              </a>
+              {(() => {
+                const explorerUrl = buildReceiptExplorerUrl(data.txHash!, data.network);
+                const linkProps = getSafeLinkProps(explorerUrl);
+                
+                if (!linkProps) {
+                  return (
+                    <span className="text-[var(--text-muted)] text-xs font-sans">
+                      Explorer unavailable
+                    </span>
+                  );
+                }
+                
+                return (
+                  <a
+                    {...linkProps}
+                    className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
+                  >
+                    Explorer <ExternalLink size={12} />
+                  </a>
+                );
+              })()}
             </div>
           </div>
         )}

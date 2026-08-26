@@ -6,6 +6,7 @@ import { copyToClipboard } from "../../hooks/useClipboard";
 import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import { safeWindowOpen } from "../../utils/linkSecurity";
 import { formatAddress } from "../common/TruncatedAddress";
 
 export default function WalletButton() {
@@ -43,7 +44,7 @@ export default function WalletButton() {
 
   function handleExplorer() {
     if (!address) return;
-    window.open(stellarExplorerUrl(address, network), "_blank", "noopener,noreferrer");
+    safeWindowOpen(stellarExplorerUrl(address, network), "noopener,noreferrer");
     setDropdownOpen(false);
   }
 

@@ -7,6 +7,7 @@ import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import { safeWindowOpen } from "../../utils/linkSecurity";
 import { formatAddress } from "../common/TruncatedAddress";
 import "./StreamRow.css";
 
@@ -461,7 +462,7 @@ export default function StreamRow({
                   className="context-menu__item"
                   onClick={() => {
                     setIsMenuOpen(false);
-                    window.open(stellarExplorerUrl(stream.recipient), "_blank", "noopener,noreferrer");
+                    safeWindowOpen(stellarExplorerUrl(stream.recipient), "noopener,noreferrer");
                   }}
                 >
                   <ExternalLink size={16} aria-hidden="true" />

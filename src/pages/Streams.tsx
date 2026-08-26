@@ -61,6 +61,7 @@ import {
 import CreateStreamFab from "../components/CreateStreamFab";
 import { stellarExplorerUrl } from "../lib/stellar";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
+import { getSafeLinkProps } from "../utils/linkSecurity";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -572,17 +573,34 @@ function StreamDetail({
           >
             Copy recipient
           </button>
-          <a
-            className="streams-link-button"
-            href={stellarExplorerUrl(
+          {(() => {
+            const explorerUrl = stellarExplorerUrl(
               stream.recipientAddress,
               getExpectedStellarNetwork(),
-            )}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View in explorer
-          </a>
+            );
+            const linkProps = getSafeLinkProps(explorerUrl);
+            
+            if (!linkProps) {
+              return (
+                <button
+                  className="streams-link-button"
+                  disabled
+                  title="Explorer link unavailable"
+                >
+                  View in explorer
+                </button>
+              );
+            }
+            
+            return (
+              <a
+                className="streams-link-button"
+                {...linkProps}
+              >
+                View in explorer
+              </a>
+            );
+          })()}
           <button
             type="button"
             className="streams-primary-button"

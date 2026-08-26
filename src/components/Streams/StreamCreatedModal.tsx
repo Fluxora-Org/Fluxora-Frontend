@@ -4,6 +4,7 @@ import successIcon from "../../assets/images/success.svg";
 import { useModalAccessibility } from "../useModalAccessibility";
 import { useOptionalTheme } from "../../theme/ThemeProvider";
 import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview";
+import { safeWindowOpen, getSafeLinkProps } from "../../utils/linkSecurity";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { config } from "../../lib/config";
@@ -180,7 +181,7 @@ export default function StreamCreatedModal({
       return;
     }
 
-    const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
+    const newWindow = safeWindowOpen(streamUrl, "noopener,noreferrer");
     if (!newWindow) {
       setIsPopupBlocked(true);
       announce(
@@ -619,14 +620,20 @@ export default function StreamCreatedModal({
                   <div className={styles.sharePreviewRow}>
                     <dt>Stream link</dt>
                     <dd>
-                      <a
-                        href={streamUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.sharePreviewLink}
-                      >
-                        {streamUrl}
-                      </a>
+                      {(() => {
+                        const linkProps = getSafeLinkProps(streamUrl);
+                        if (!linkProps) {
+                          return <span className={styles.sharePreviewLink}>{streamUrl}</span>;
+                        }
+                        return (
+                          <a
+                            {...linkProps}
+                            className={styles.sharePreviewLink}
+                          >
+                            {streamUrl}
+                          </a>
+                        );
+                      })()}
                     </dd>
                   </div>
                 </dl>
@@ -679,14 +686,20 @@ export default function StreamCreatedModal({
         {isPopupBlocked && (
           <div className={styles.popupBlockedMessage} role="alert">
             Popup blocked.{" "}
-            <a
-              href={streamUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.fallbackLink}
-            >
-              Click here to view your stream
-            </a>
+            {(() => {
+              const linkProps = getSafeLinkProps(streamUrl);
+              if (!linkProps) {
+                return <span className={styles.fallbackLink}>Link unavailable</span>;
+              }
+              return (
+                <a
+                  {...linkProps}
+                  className={styles.fallbackLink}
+                >
+                  Click here to view your stream
+                </a>
+              );
+            })()}
           </div>
         )}
 
