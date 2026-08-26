@@ -847,6 +847,7 @@ export default function Streams() {
   const hasCheckedSessionRef = useRef(false);
 
   const walletConnected = true;
+  const abortControllerRef = useRef<AbortController | null>(null);
   const hasInitializedExpanded = useRef(false);
 
   useEffect(() => {
@@ -855,6 +856,10 @@ export default function Streams() {
       setExpandedStreamId(streams[0]!.id);
     }
   }, [streams]);
+
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   // Detect a prior session once on mount. Never auto-applies anything — only
   // decides whether to offer the recovery banner.
@@ -1070,6 +1075,15 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   }, [resolveSessionOnInteraction]);
 
+  const refetchStreams = useCallback(() => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    void (refetch as unknown as (signal?: AbortSignal) => Promise<void>)(
+      controller.signal,
+    );
+  }, [refetch]);
+
   const handleStreamCreated = useCallback((data?: StreamCreatedData) => {
     const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
@@ -1086,8 +1100,8 @@ export default function Streams() {
     // A transaction has completed — a draft must never be offered back.
     setLiveDraft(null);
     setRestoredDraft(null);
-    refetch();
-  }, [refetch, streams.length]);
+    refetchStreams();
+  }, [refetchStreams, streams.length]);
 
   const handleCopyRecipient = useCallback(
     async (stream: StreamRecord) => {
@@ -1149,21 +1163,24 @@ export default function Streams() {
     [announce],
   );
 
-  if (loading || (error && retryCount >= MAX_LOADING_RETRIES)) {
-    return <StreamsLoading retryCount={retryCount} onRetry={refetch} />;
+  const isAbortError = error instanceof Error && error.name === "AbortError";
+  const visibleError = isAbortError ? null : error;
+
+  if (loading || (visibleError && retryCount >= MAX_LOADING_RETRIES)) {
+    return <StreamsLoading retryCount={retryCount} onRetry={refetchStreams} />;
   }
 
-  if (error) {
+  if (visibleError) {
     return (
       <section className="streams-page">
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
-          {error}
+          {visibleError}
         </p>
         <button
           type="button"
           className="streams-primary-button"
-          onClick={refetch}
+          onClick={refetchStreams}
         >
           Try again
         </button>
