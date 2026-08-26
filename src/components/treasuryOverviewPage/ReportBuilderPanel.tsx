@@ -6,6 +6,7 @@ import {
   groupStreams,
   downloadReportCSV,
   printReportAsPDF,
+  validateReportDateRange,
 } from "../../utils/reportExporter";
 
 export interface ReportBuilderPanelProps {
@@ -62,11 +63,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
 
   // Validate date range
   useEffect(() => {
-    if (startDate && endDate && endDate < startDate) {
-      setDateError("End date must be on or after the start date.");
-    } else {
-      setDateError("");
-    }
+    setDateError(validateReportDateRange(startDate, endDate));
   }, [startDate, endDate]);
 
   // Deterministic preview loading: triggered on filter change, resolved
