@@ -821,6 +821,17 @@
   flex: 1;
 }
 
+.review-card-address {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.review-card-address .truncateReveal {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .review-card-title {
   font-size: 0.9375rem;
   font-weight: 600;
@@ -839,6 +850,9 @@
   color: var(--text);
   font-weight: 500;
   word-break: break-all;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .review-card-amount {
@@ -846,12 +860,16 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .review-card-unit {
   font-size: 1rem;
   font-weight: 400;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .review-card-edit {
@@ -969,6 +987,8 @@
   font-weight: 500;
   margin-left: auto;
   text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Bulk CSV — batch dry-run confirmation screen (styled after step 3 review-summary) */

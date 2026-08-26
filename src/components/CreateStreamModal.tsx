@@ -16,7 +16,7 @@ import {
   subscribeToQueue,
 } from '../lib/offlineActionQueue';
 import { createStream, getTransactionStatus } from '../lib/stellar/tx';
-import { isValidStellarAddress, maskAddress } from '../lib/stellar';
+import { isValidStellarAddress } from '../lib/stellar';
 import {
   computeStreamEndDate,
   validateCliffBeforeEnd,
@@ -29,6 +29,7 @@ import { useI18n } from '../i18n';
 import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
+import TruncatedAddress from './common/TruncatedAddress';
 import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
 import {
@@ -2247,9 +2248,10 @@ export default function CreateStreamModal({
                       </div>
                       <div className="review-card-content">
                         <div className="review-card-sublabel">{t("createStream.step3.addressLabel")}</div>
-                        <div className="review-card-value">
-                          {maskAddress(reviewRecipient)}
-                        </div>
+                        <TruncatedAddress
+                          address={reviewRecipient}
+                          className="review-card-address"
+                        />
                       </div>
                     </div>
 
@@ -3196,7 +3198,10 @@ export default function CreateStreamModal({
                             </div>
                             <div className="review-card-content">
                               <div className="review-card-sublabel">{t("createStream.step3.addressLabel")}</div>
-                              <div className="review-card-value">{maskAddress(reviewRecipient)}</div>
+                              <TruncatedAddress
+                                address={reviewRecipient}
+                                className="review-card-address"
+                              />
                             </div>
                           </div>
 

@@ -7,7 +7,7 @@ import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
 import { stellarExplorerUrl } from "../../lib/stellar";
-import { formatAddress } from "../common/TruncatedAddress";
+import TruncatedAddress from "../common/TruncatedAddress";
 import "./StreamRow.css";
 
 interface Props {
@@ -38,7 +38,6 @@ export default function StreamRow({
   onCompareToggle,
 }: Props) {
   const navigate = useNavigate();
-  const recipientLabel = formatAddress(stream.recipient);
   const toast = useOptionalToast();
   const { copy } = useClipboard();
 
@@ -326,13 +325,13 @@ export default function StreamRow({
         title={stream.recipient}
         aria-label={`Recipient ${stream.recipient}`}
       >
-        {recipientLabel}
+        <TruncatedAddress address={stream.recipient} label="" className="stream-row__address" />
       </td>
 
-      <td className="py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
-        <div>{stream.rate}</div>
+      <td className="stream-row__cell py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
+        <div className="stream-row__amount">{stream.rate}</div>
         {typeof stream.accruedAmount === "number" && (
-          <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <div className="stream-row__amount text-xs" style={{ color: "var(--color-text-muted)" }}>
             {formatAccruedAmount(stream.accruedAmount)}
           </div>
         )}

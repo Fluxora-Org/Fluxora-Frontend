@@ -34,6 +34,7 @@ describe("StreamRow", () => {
     renderRow();
 
     expect(screen.getByText("GABCDE...WXYZ")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Copy address: ${stream.recipient}` })).toBeInTheDocument();
     expect(screen.getByLabelText(`Recipient ${stream.recipient}`)).toHaveAttribute(
       "title",
       stream.recipient
