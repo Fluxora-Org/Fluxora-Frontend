@@ -14,6 +14,7 @@ export default tseslint.config(
       "*.config.ts",
       "src/**/*.test.ts",
       "src/**/*.test.tsx",
+      "scripts/**/*.test.mjs",
     ],
   },
   js.configs.recommended,
@@ -68,7 +69,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Node-built scripts (e.g. bundle-size report) need Node globals.
+  // Node-built scripts (e.g. bundle-size report, supply-chain audits) need Node globals.
   {
     files: ["scripts/**/*.mjs"],
     languageOptions: {
@@ -76,6 +77,7 @@ export default tseslint.config(
         process: "readonly",
         console: "readonly",
         URL: "readonly",
+        setTimeout: "readonly",
       },
     },
   },

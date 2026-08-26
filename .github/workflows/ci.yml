@@ -40,3 +40,26 @@ jobs:
       # predate this workflow. Fixing them is a real but separate cleanup
       # effort, not something to fold into introducing CI. Once that debt
       # is paid down, add a `run: npm run lint` step here.
+
+  supply-chain-audit:
+    name: Supply-chain audit (vulnerabilities & licenses)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Gates the production dependency tree only (--omit=dev) against a
+      # severity threshold and a checked-in baseline of currently-known,
+      # reviewed findings. See scripts/supply-chain-policy.mjs and
+      # docs/supply-chain-policy.md for the full policy and rationale.
+      - name: Audit production dependencies (vulnerabilities & licenses)
+        run: npm run audit:supply-chain
