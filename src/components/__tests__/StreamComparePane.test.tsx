@@ -206,6 +206,58 @@ describe("usePaneStream", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("ignores an out-of-order response after rapid selection changes", async () => {
+    let resolveFirst!: (value: StreamRecord) => void;
+    let resolveSecond!: (value: StreamRecord) => void;
+    getStreamById
+      .mockImplementationOnce(
+        () => new Promise<StreamRecord>((resolve) => { resolveFirst = resolve; }),
+      )
+      .mockImplementationOnce(
+        () => new Promise<StreamRecord>((resolve) => { resolveSecond = resolve; }),
+      );
+
+    const { result, rerender } = renderHook(
+      (id: string) => usePaneStream(id),
+      { initialProps: "STR-FIRST" },
+    );
+
+    rerender("STR-SECOND");
+    act(() => resolveSecond!(ALT_RECORD));
+    await waitFor(() => expect(result.current.stream).toBe(ALT_RECORD));
+
+    act(() => resolveFirst!(BASE_RECORD));
+    expect(result.current.streamId).toBe("STR-SECOND");
+    expect(result.current.stream).toBe(ALT_RECORD);
+  });
+
+  it("clears a removed pane and ignores its late response", async () => {
+    let resolveRequest!: (value: StreamRecord) => void;
+    getStreamById.mockImplementation(
+      () => new Promise<StreamRecord>((resolve) => { resolveRequest = resolve; }),
+    );
+
+    const { result, rerender } = renderHook(
+      (id: string) => usePaneStream(id),
+      { initialProps: "STR-FIRST" },
+    );
+
+    rerender("");
+    expect(result.current).toEqual({ streamId: "", stream: null, error: null });
+
+    act(() => resolveRequest!(BASE_RECORD));
+    expect(result.current).toEqual({ streamId: "", stream: null, error: null });
+  });
+
+  it("exposes a comparison error without retaining partial stream data", async () => {
+    getStreamById.mockRejectedValue(new Error("Unauthorized"));
+
+    const { result } = renderHook(() => usePaneStream("STR-PRIVATE"));
+
+    await waitFor(() => expect(result.current.error).toBe("Unauthorized"));
+    expect(result.current.stream).toBeUndefined();
+  });
+
   it("updates streamId on rerender and refetches", async () => {
     getStreamById.mockResolvedValue(BASE_RECORD);
 
