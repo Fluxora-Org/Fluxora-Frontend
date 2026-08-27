@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
+import { config } from "../lib/config";
 
 const SAFE_DEFAULT = "/app";
 
@@ -45,6 +46,10 @@ export default function RequireWallet({ children }: RequireWalletProps) {
   const wallet = useWallet();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
+
+  if (config.demoMode) {
+    return <>{children}</>;
+  }
 
   if (wallet.loading) {
     return (
