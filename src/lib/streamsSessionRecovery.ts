@@ -2,9 +2,14 @@
  * Persistence + validation for the Streams page session-recovery feature.
  * See docs/STREAMS_SESSION_RECOVERY_SPEC.md for the full design rationale —
  * in particular §2 ("what is safe to restore") before changing this file.
+ *
+ * ACCOUNT SCOPING (#1440):
+ * Session data (filters, drafts) is scoped by wallet address to prevent
+ * cross-account data leakage. Switching wallets invalidates the previous
+ * account's cached session.
  */
 
-export const STREAMS_SESSION_STORAGE_KEY = "fluxora_streams_session_v1";
+export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
 
 /** Snapshots older than this are treated as stale and never offered for restore. */
 export const STREAMS_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -36,6 +41,8 @@ export interface StreamDraftSnapshot {
 
 export interface StreamsSessionSnapshot {
   savedAt: number;
+  /** The wallet address this session belongs to. Used to invalidate on account switch. */
+  accountAddress: string;
   filters: StreamsFilterSnapshot;
   draft: StreamDraftSnapshot | null;
 }
@@ -59,6 +66,18 @@ function getLocalStorage(): Storage | null {
     return null;
   }
   return window.localStorage;
+}
+
+/**
+ * Normalizes a wallet address for the isolated session namespace.
+ */
+function normalizeAccountAddress(accountAddress: string): string | null {
+  const normalized = accountAddress.trim();
+  return normalized || null;
+}
+
+function getStorageKey(accountAddress: string): string {
+  return `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${accountAddress}`;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -104,6 +123,10 @@ function parseSnapshot(raw: string): StreamsSessionSnapshot | null {
 
   if (!isPlainObject(parsed)) return null;
   if (typeof parsed.savedAt !== "number" || !Number.isFinite(parsed.savedAt)) {
+    return null;
+  }
+  // Account address is required for v2 sessions
+  if (typeof parsed.accountAddress !== "string" || parsed.accountAddress.trim() === "") {
     return null;
   }
   if (!isPlainObject(parsed.filters)) return null;
@@ -152,25 +175,45 @@ function parseSnapshot(raw: string): StreamsSessionSnapshot | null {
     };
   }
 
-  return { savedAt: parsed.savedAt, filters, draft };
+  return {
+    savedAt: parsed.savedAt,
+    accountAddress: parsed.accountAddress.trim(),
+    filters,
+    draft,
+  };
 }
 
 /**
- * Reads the persisted streams session snapshot, discarding it if malformed or
- * older than STREAMS_SESSION_MAX_AGE_MS so a stale draft is never offered back.
+ * Reads the persisted streams session snapshot for the given account,
+ * discarding it if malformed, older than STREAMS_SESSION_MAX_AGE_MS, or
+ * belongs to a different account.
+ *
+ * @param now - Current timestamp in epoch milliseconds
+ * @param accountAddress - The wallet address to scope the session to
+ * @param storage - Storage interface (injectable for testing)
+ * @returns The snapshot if valid and matches the account, null otherwise
  */
 export function readStreamsSession(
   now: number,
+  accountAddress: string,
   storage: StorageReader | null = getLocalStorage(),
 ): StreamsSessionSnapshot | null {
-  if (!storage) return null;
+  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
+  if (!storage || !normalizedAccountAddress) return null;
 
   try {
-    const raw = storage.getItem(STREAMS_SESSION_STORAGE_KEY);
+    const storageKey = getStorageKey(normalizedAccountAddress);
+    const raw = storage.getItem(storageKey);
     if (!raw) return null;
 
     const snapshot = parseSnapshot(raw);
     if (!snapshot) return null;
+
+    // Validate account match - prevents cross-account data leakage
+    if (snapshot.accountAddress !== normalizedAccountAddress) {
+      return null;
+    }
+
     if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
     if (now < snapshot.savedAt) return null;
 
@@ -180,34 +223,56 @@ export function readStreamsSession(
   }
 }
 
-/** Persists the current filters/draft snapshot. Best-effort; failures are swallowed. */
+/**
+ * Persists the current filters/draft snapshot for the given account.
+ * Best-effort; failures are swallowed.
+ *
+ * @param snapshot - The session data to persist (without savedAt/accountAddress)
+ * @param now - Current timestamp in epoch milliseconds
+ * @param accountAddress - The wallet address to scope the session to
+ * @param storage - Storage interface (injectable for testing)
+ */
 export function writeStreamsSession(
-  snapshot: Omit<StreamsSessionSnapshot, "savedAt">,
+  snapshot: Omit<StreamsSessionSnapshot, "savedAt" | "accountAddress">,
   now: number,
+  accountAddress: string,
   storage: StorageWriter | null = getLocalStorage(),
 ): void {
-  if (!storage) return;
+  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
+  if (!storage || !normalizedAccountAddress) return;
 
   try {
-    const full: StreamsSessionSnapshot = { ...snapshot, savedAt: now };
-    storage.setItem(STREAMS_SESSION_STORAGE_KEY, JSON.stringify(full));
+    const storageKey = getStorageKey(normalizedAccountAddress);
+    const full: StreamsSessionSnapshot = {
+      ...snapshot,
+      savedAt: now,
+      accountAddress: normalizedAccountAddress,
+    };
+    storage.setItem(storageKey, JSON.stringify(full));
   } catch {
     // Storage unavailable (quota, privacy mode); treat as best-effort.
   }
 }
 
 /**
- * Clears the persisted session. Used on explicit "Start fresh", every clean
- * CreateStreamModal close path, and on successful stream creation — never
- * leave behind a draft that could imply a transaction was completed.
+ * Clears the persisted session for the given account. Used on explicit
+ * "Start fresh", every clean CreateStreamModal close path, and on successful
+ * stream creation — never leave behind a draft that could imply a transaction
+ * was completed.
+ *
+ * @param accountAddress - The wallet address whose session to clear
+ * @param storage - Storage interface (injectable for testing)
  */
 export function clearStreamsSession(
+  accountAddress: string,
   storage: StorageWriter | null = getLocalStorage(),
 ): void {
-  if (!storage) return;
+  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
+  if (!storage || !normalizedAccountAddress) return;
 
   try {
-    storage.removeItem(STREAMS_SESSION_STORAGE_KEY);
+    const storageKey = getStorageKey(normalizedAccountAddress);
+    storage.removeItem(storageKey);
   } catch {
     // Storage unavailable; treat as best-effort.
   }

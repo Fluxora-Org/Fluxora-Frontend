@@ -40,7 +40,7 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
     setLoading(true);
     setError(null);
 
-    getStreams(filtersRef.current)
+    getStreams(filtersRef.current, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setStreams(data);
@@ -108,9 +108,9 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
     setLoading(true);
     setError(null);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, { signal: controller.signal })
       .then((records) => {
-        if (!cancelled) {
+        if (!cancelled && !controller.signal.aborted) {
           setData(records);
           setLoading(false);
         }

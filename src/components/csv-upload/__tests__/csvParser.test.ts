@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../lib/stellar', () => ({
   isValidStellarAddress: vi.fn(
@@ -350,6 +350,62 @@ describe('markDuplicates', () => {
     markDuplicates(rows);
     expect(rows.every((r) => r.status === 'duplicate-recipient')).toBe(true);
     expect(rows[0].duplicateRows).toEqual([2, 3]);
+  });
+
+  it('dynamically resets resolved duplicates back to valid when an address is changed to unique', () => {
+    const rows = [
+      makeRow({ rowNumber: 1, recipient: VALID_ADDR }),
+      makeRow({ rowNumber: 2, recipient: VALID_ADDR }),
+    ];
+    markDuplicates(rows);
+    expect(rows[0].status).toBe('duplicate-recipient');
+    expect(rows[1].status).toBe('duplicate-recipient');
+
+    // Change row 2 to unique address and re-run markDuplicates
+    rows[1].recipient = VALID_ADDR_2;
+    markDuplicates(rows);
+
+    expect(rows[0].status).toBe('valid');
+    expect(rows[0].duplicateRows).toBeUndefined();
+    expect(rows[1].status).toBe('valid');
+    expect(rows[1].duplicateRows).toBeUndefined();
+  });
+
+  it('excludes skipped rows from duplicate grouping and restores the remaining row to valid', () => {
+    const rows = [
+      makeRow({ rowNumber: 1, recipient: VALID_ADDR }),
+      makeRow({ rowNumber: 2, recipient: VALID_ADDR }),
+    ];
+    markDuplicates(rows);
+    expect(rows[0].status).toBe('duplicate-recipient');
+    expect(rows[1].status).toBe('duplicate-recipient');
+
+    // Mark row 2 as skipped and re-run markDuplicates
+    rows[1].status = 'skipped';
+    markDuplicates(rows);
+
+    expect(rows[0].status).toBe('valid');
+    expect(rows[0].duplicateRows).toBeUndefined();
+    expect(rows[1].status).toBe('skipped');
+  });
+
+  it('updates duplicateRows in a 3-row group when one row is skipped', () => {
+    const rows = [
+      makeRow({ rowNumber: 1, recipient: VALID_ADDR }),
+      makeRow({ rowNumber: 2, recipient: VALID_ADDR }),
+      makeRow({ rowNumber: 3, recipient: VALID_ADDR }),
+    ];
+    markDuplicates(rows);
+    expect(rows[0].duplicateRows).toEqual([2, 3]);
+
+    rows[2].status = 'skipped';
+    markDuplicates(rows);
+
+    expect(rows[0].status).toBe('duplicate-recipient');
+    expect(rows[0].duplicateRows).toEqual([2]);
+    expect(rows[1].status).toBe('duplicate-recipient');
+    expect(rows[1].duplicateRows).toEqual([1]);
+    expect(rows[2].status).toBe('skipped');
   });
 });
 

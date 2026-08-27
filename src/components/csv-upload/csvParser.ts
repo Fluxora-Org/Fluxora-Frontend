@@ -176,13 +176,28 @@ export function validateRow(row: Omit<CsvRow, 'id' | 'rowNumber' | 'status' | 'f
 }
 
 /**
- * Marks rows whose recipient address appears in more than one row.
+ * Marks rows whose recipient address appears in more than one active row.
  * Modifies the rows array in place (status and duplicateRows).
+ *
+ * Excludes skipped rows from duplicate grouping and dynamically resets
+ * resolved duplicates back to 'valid' with duplicateRows cleared.
  */
 export function markDuplicates(rows: CsvRow[]): void {
+  // Reset previous duplicate markers for active rows before re-evaluation
+  for (const row of rows) {
+    if (row.status === 'duplicate-recipient') {
+      row.status = 'valid';
+      row.duplicateRows = undefined;
+    } else if (row.status !== 'skipped') {
+      row.duplicateRows = undefined;
+    }
+  }
+
+  // Group active (non-skipped) rows with non-empty recipients by normalized address
   const recipientRows: Record<string, number[]> = {};
 
   for (const row of rows) {
+    if (row.status === 'skipped') continue;
     const addr = row.recipient.trim().toLowerCase();
     if (!addr) continue;
     if (!recipientRows[addr]) recipientRows[addr] = [];
@@ -190,10 +205,14 @@ export function markDuplicates(rows: CsvRow[]): void {
   }
 
   for (const row of rows) {
+    if (row.status === 'skipped') continue;
     const addr = row.recipient.trim().toLowerCase();
+    if (!addr) continue;
     const group = recipientRows[addr];
-    if (group && group.length > 1 && row.status === 'valid') {
-      row.status = 'duplicate-recipient';
+    if (group && group.length > 1) {
+      if (row.status === 'valid') {
+        row.status = 'duplicate-recipient';
+      }
       row.duplicateRows = group.filter((n) => n !== row.rowNumber);
     }
   }
