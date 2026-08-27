@@ -1,4 +1,4 @@
-import { RefObject } from "react";
+import { type Ref } from "react";
 import EmptyState from "./EmptyState";
 
 interface RecipientEmptyStateProps {
@@ -8,7 +8,7 @@ interface RecipientEmptyStateProps {
   onRetry?: () => void;
   onPrimaryAction?: () => void;
   ctaDisabled?: boolean;
-  retryButtonRef?: RefObject<HTMLButtonElement>;
+  retryButtonRef?: Ref<HTMLButtonElement>;
 }
 
 export default function RecipientEmptyState({

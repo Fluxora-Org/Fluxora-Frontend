@@ -41,6 +41,7 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
     setError(null);
 
     getStreams(filtersRef.current, controller.signal)
+    getStreams(filtersRef.current, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setStreams(data);
@@ -109,6 +110,9 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
     getRecipientStreams(address, controller.signal)
       .then((records) => {
         if (!controller.signal.aborted) {
+    getRecipientStreams(address, { signal: controller.signal })
+      .then((records) => {
+        if (!cancelled && !controller.signal.aborted) {
           setData(records);
           setLoading(false);
         }

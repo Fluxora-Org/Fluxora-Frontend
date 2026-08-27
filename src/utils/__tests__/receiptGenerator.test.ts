@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   maskAddress,
   formatTimestamp,
@@ -6,6 +6,7 @@ import {
   buildReceiptExplorerUrl,
   resolveReceiptNetworkLabel,
   resolveReceiptExplorerSegment,
+  formatReceiptAmount,
   ReceiptData,
 } from "../receiptGenerator";
 
@@ -154,5 +155,168 @@ describe("receiptGenerator utility", () => {
     expect(drawnText).toContain(
       `Explorer: https://stellar.expert/explorer/${expectedSegment}/tx/${txHash}`,
     );
+  });
+});
+
+describe("formatReceiptAmount — precision-safe receipt amounts", () => {
+  afterEach(() => {
+    // Restore the default locale so other tests are unaffected.
+    Object.defineProperty(navigator, "language", {
+      value: "en-US",
+      configurable: true,
+    });
+  });
+
+  function setMockLocale(locale: string) {
+    Object.defineProperty(navigator, "language", {
+      value: locale,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  // ── Ordinary and boundary amounts (smallest-unit input) ─────────────────
+
+  it("formats a safe integer amount", () => {
+    // 1000 USDC = 10_000_000_000 smallest units at 7 decimals
+    expect(formatReceiptAmount("10000000000", 7, "USDC")).toBe(
+      "1,000.0000000 USDC",
+    );
+  });
+
+  it("formats Number.MAX_SAFE_INTEGER exactly", () => {
+    expect(formatReceiptAmount("9007199254740991", 0, "USDC")).toBe(
+      "9,007,199,254,740,991 USDC",
+    );
+  });
+
+  it("preserves MAX_SAFE_INTEGER + 1 exactly (never rounded)", () => {
+    expect(formatReceiptAmount("9007199254740992", 0, "USDC")).toBe(
+      "9,007,199,254,740,992 USDC",
+    );
+  });
+
+  it("preserves MAX_SAFE_INTEGER + 2 exactly (distinct from +1)", () => {
+    expect(formatReceiptAmount("9007199254740993", 0, "USDC")).toBe(
+      "9,007,199,254,740,993 USDC",
+    );
+  });
+
+  it("accepts a bigint amount directly", () => {
+    expect(formatReceiptAmount(9_007_199_254_740_993n, 0, "USDC")).toBe(
+      "9,007,199,254,740,993 USDC",
+    );
+  });
+
+  it("preserves a very large token amount exactly", () => {
+    expect(formatReceiptAmount("12345678901234567890", 0, "")).toBe(
+      "12,345,678,901,234,567,890",
+    );
+  });
+
+  // ── Fractional precision ────────────────────────────────────────────────
+
+  it("preserves a large amount with the token's full decimal precision", () => {
+    // 12_345_678_901_234_567_890.1234567 USDC at 7 decimals
+    expect(
+      formatReceiptAmount("123456789012345678901234567", 7, "USDC"),
+    ).toBe("12,345,678,901,234,567,890.1234567 USDC");
+  });
+
+  it("renders the smallest valid unit", () => {
+    expect(formatReceiptAmount("1", 7, "USDC")).toBe("0.0000001 USDC");
+  });
+
+  it("renders zero with the configured decimal places", () => {
+    expect(formatReceiptAmount("0", 7, "USDC")).toBe("0.0000000 USDC");
+  });
+
+  it("keeps trailing decimal zeros exactly", () => {
+    // 1.0000000 USDC = 10_000_000 smallest units at 7 decimals
+    expect(formatReceiptAmount("10000000", 7, "USDC")).toBe(
+      "1.0000000 USDC",
+    );
+  });
+
+  it("uses the documented USDC defaults (7 decimals, USDC asset)", () => {
+    // 100 USDC = 1_000_000_000 smallest units
+    expect(formatReceiptAmount("1000000000")).toBe("100.0000000 USDC");
+  });
+
+  it("supports negative amounts", () => {
+    expect(formatReceiptAmount("-1005000000", 7, "USDC")).toBe(
+      "-100.5000000 USDC",
+    );
+  });
+
+  // ── Locale formatting without precision loss ────────────────────────────
+
+  it("formats with en-US grouping and decimal separator by default", () => {
+    // 9_007_199_254_740_993.1234567 USDC at 7 decimals
+    expect(formatReceiptAmount("90071992547409931234567", 7, "USDC")).toBe(
+      "9,007,199,254,740,993.1234567 USDC",
+    );
+  });
+
+  it("respects the browser locale (de-DE) without losing precision", () => {
+    setMockLocale("de-DE");
+    expect(formatReceiptAmount("90071992547409931234567", 7, "USDC")).toBe(
+      "9.007.199.254.740.993,1234567 USDC",
+    );
+  });
+
+  // ── Invalid inputs must throw, never silently become a valid amount ─────
+
+  it.each([
+    "abc",
+    "",
+    "1.2.3",
+    "NaN",
+    "Infinity",
+    "-Infinity",
+    "1e5",
+    "12,34",
+    ".",
+    "1.",
+    "-",
+  ])("throws TypeError for malformed amount %j", (input) => {
+    expect(() => formatReceiptAmount(input, 7, "USDC")).toThrow(TypeError);
+  });
+
+  it("rejects decimal display-unit strings instead of guessing the unit", () => {
+    // "100" is ambiguous (100 USDC vs 100 stroops) — must never guess.
+    expect(() => formatReceiptAmount("100.5", 7, "USDC")).toThrow(TypeError);
+    expect(() => formatReceiptAmount("100.5", 7, "USDC")).toThrow(
+      /amountToSmallestUnits/,
+    );
+  });
+
+  // ── Receipt rendering / exported text ───────────────────────────────────
+
+  it("draws the exact large amount on the receipt canvas (exported text)", () => {
+    const mockContext = createMockContext();
+    const fillText = mockContext.fillText as ReturnType<typeof vi.fn>;
+    const canvas = document.createElement("canvas");
+    vi.spyOn(canvas, "getContext").mockReturnValue(mockContext);
+
+    const amount = formatReceiptAmount(
+      "90071992547409931234567",
+      7,
+      "USDC",
+    );
+    drawReceiptToCanvas(canvas, {
+      streamId: "STR-1422",
+      type: "Withdrawal",
+      sender: "Treasury Contract",
+      recipient: "GCD12345678901234567890123456789012345678901234567890123",
+      amount,
+      timestamp: "2026-07-23T17:48:21Z",
+      txHash: "abc123",
+      status: "confirmed",
+    });
+
+    const drawnText = fillText.mock.calls.map((call) => String(call[0]));
+    expect(drawnText).toContain("9,007,199,254,740,993.1234567 USDC");
+    expect(drawnText).not.toContain("9007199254740992"); // no rounding
   });
 });

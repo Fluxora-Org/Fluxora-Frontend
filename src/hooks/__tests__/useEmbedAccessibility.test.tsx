@@ -27,8 +27,8 @@ describe("useEmbedAccessibility announcer", () => {
     const initialAnnouncers = document.querySelectorAll('[aria-live="polite"]');
     expect(initialAnnouncers).toHaveLength(2);
 
-    const firstMessage = "Widget loaded: First";
-    const secondMessage = "Widget loaded: Second";
+    const firstMessage = "Stream widget: First";
+    const secondMessage = "Stream widget: Second";
 
     const firstNode = initialAnnouncers[0] as HTMLElement;
     const secondNode = initialAnnouncers[1] as HTMLElement;

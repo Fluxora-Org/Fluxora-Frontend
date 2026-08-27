@@ -607,3 +607,15 @@ export const _streamRecords = streamRecords;
 
 // Public alias retained for existing consumers (Streams page/tests).
 export { streamRecords };
+
+// Canonical record re-exports for precision-safe token accounting
+export type { CanonicalStreamRecord } from "./canonicalStreamRecord";
+export {
+  normalizeCanonicalStreamRecord,
+  validateCanonicalStreamRecord,
+  toCanonical,
+  readTokenAmount,
+  deriveRemainingAmount,
+  deriveCanonicalProgress,
+} from "./canonicalStreamRecord";
+

@@ -156,4 +156,66 @@ describe("CreateStreamModal transaction confirmation", () => {
     expect(callArgs[3]).toBe(expectedStart);
     expect(callArgs[5]).toBe(expectedCliff);
   });
+
+  it("preserves large precise deposits exactly on-chain and in the receipt", async () => {
+    vi.useFakeTimers();
+    vi.mocked(createStream).mockResolvedValue({
+      status: "SUCCESS",
+      txHash: "abcdef1234567890",
+    } as any);
+    vi.mocked(getTransactionStatus)
+      .mockResolvedValueOnce("pending")
+      .mockResolvedValueOnce("confirmed");
+
+    const onClose = vi.fn();
+    const onStreamCreated = vi.fn();
+    const { container } = render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={onClose}
+        onStreamCreated={onStreamCreated}
+      />,
+    );
+
+    selectSingleStreamInContainer(container);
+    fireEvent.change(
+      container.querySelector("#create-stream-recipient") as HTMLInputElement,
+      { target: { value: VALID_STELLAR } },
+    );
+    // Above Number.MAX_SAFE_INTEGER with the full 7-decimal token precision
+    fireEvent.change(
+      container.querySelector("#create-stream-deposit") as HTMLInputElement,
+      { target: { value: "9007199254740993.1234567" } },
+    );
+    fireEvent.click(within(container).getByRole("button", { name: /^next$/i }));
+    fireEvent.click(within(container).getByRole("button", { name: /^next$/i }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.click(
+      within(container).getByRole("button", { name: /^create stream$/i }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // On-chain payload is the exact smallest-unit string (no Number rounding)
+    expect(vi.mocked(createStream).mock.calls[0][2]).toBe(
+      "90071992547409931234567",
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(750);
+    });
+
+    expect(onStreamCreated).toHaveBeenCalledTimes(1);
+    const createdData = onStreamCreated.mock.calls[0][0];
+    // Receipt amount preserves the exact deposit — no rounding, no precision loss
+    expect(createdData.amount).toBe("9,007,199,254,740,993.1234567 USDC");
+  });
 });

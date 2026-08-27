@@ -51,8 +51,8 @@ function clampRange(range: VirtualRange, itemCount: number): VirtualRange {
 function getFocusableElements(element: HTMLElement): HTMLElement[] {
   return Array.from(
     element.querySelectorAll(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex=\"-1\"])"
-    )
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ),
   ) as HTMLElement[];
 }
 
@@ -70,6 +70,7 @@ export default function VirtualList<T>({
 }: VirtualListProps<T>) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const focusedRowKeyRef = useRef<string | null>(null);
   const focusedRowIndexRef = useRef<number | null>(null);
   const focusableOffsetRef = useRef<number | null>(null);
   const shouldVirtualize = items.length > threshold;
@@ -82,7 +83,9 @@ export default function VirtualList<T>({
     }
 
     const viewportHeight =
-      window.innerHeight || document.documentElement.clientHeight || safeEstimate;
+      window.innerHeight ||
+      document.documentElement.clientHeight ||
+      safeEstimate;
     const scrollTop =
       window.scrollY ||
       window.pageYOffset ||
@@ -91,7 +94,10 @@ export default function VirtualList<T>({
     const containerTop =
       (containerRef.current?.getBoundingClientRect().top ?? 0) + scrollTop;
     const viewportStart = Math.max(0, scrollTop - containerTop);
-    const viewportEnd = Math.max(viewportStart, scrollTop + viewportHeight - containerTop);
+    const viewportEnd = Math.max(
+      viewportStart,
+      scrollTop + viewportHeight - containerTop,
+    );
     const start = Math.floor(viewportStart / safeEstimate) - effectiveOverscan;
     const end = Math.ceil(viewportEnd / safeEstimate) + effectiveOverscan + 1;
 
@@ -102,7 +108,10 @@ export default function VirtualList<T>({
     clampRange(
       {
         start: 0,
-        end: Math.min(items.length, Math.ceil(800 / safeEstimate) + DEFAULT_OVERSCAN + 1),
+        end: Math.min(
+          items.length,
+          Math.ceil(800 / safeEstimate) + DEFAULT_OVERSCAN + 1,
+        ),
       },
       items.length,
     ),
@@ -111,7 +120,9 @@ export default function VirtualList<T>({
   const updateRange = useCallback(() => {
     setRange((current) => {
       const next = getRange();
-      return current.start === next.start && current.end === next.end ? current : next;
+      return current.start === next.start && current.end === next.end
+        ? current
+        : next;
     });
   }, [getRange]);
 
@@ -142,6 +153,7 @@ export default function VirtualList<T>({
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target === container) {
+        focusedRowKeyRef.current = null;
         focusedRowIndexRef.current = null;
         focusableOffsetRef.current = null;
         return;
@@ -149,6 +161,7 @@ export default function VirtualList<T>({
       const rowEl = target.closest(".virtual-list-item");
       if (rowEl) {
         const indexStr = rowEl.getAttribute("data-virtual-index");
+        focusedRowKeyRef.current = rowEl.getAttribute("data-virtual-key");
         if (indexStr !== null) {
           const index = parseInt(indexStr, 10);
           focusedRowIndexRef.current = index;
@@ -161,6 +174,7 @@ export default function VirtualList<T>({
     const handleFocusOut = (e: FocusEvent) => {
       const relatedTarget = e.relatedTarget as HTMLElement;
       if (!relatedTarget || !container.contains(relatedTarget)) {
+        focusedRowKeyRef.current = null;
         focusedRowIndexRef.current = null;
         focusableOffsetRef.current = null;
       }
@@ -174,78 +188,73 @@ export default function VirtualList<T>({
     };
   }, []);
 
-  // Handle focus retention when a focused row unmounts due to scrolling
+  // Restore focus by item identity, using the previous index only for fallback.
   useLayoutEffect(() => {
-    if (focusedRowIndexRef.current === null || focusableOffsetRef.current === null) {
+    if (
+      focusedRowKeyRef.current === null ||
+      focusedRowIndexRef.current === null ||
+      focusableOffsetRef.current === null
+    ) {
       return;
     }
 
     const { start, end } = range;
-    if (focusedRowIndexRef.current < start || focusedRowIndexRef.current >= end) {
-      // Focused row was unmounted! Find nearest still-mounted row containing focusable elements.
-      const isScrolledUp = focusedRowIndexRef.current < start;
-      let targetIndex = -1;
-      let targetRowEl: HTMLElement | null = null;
-      let focusables: HTMLElement[] = [];
+    const focusedIndex = items.findIndex(
+      (item, index) => getKey(item, index) === focusedRowKeyRef.current,
+    );
+    const focusedRowIsMounted = focusedIndex >= start && focusedIndex < end;
+    if (focusedRowIsMounted) {
+      focusedRowIndexRef.current = focusedIndex;
+      return;
+    }
 
-      if (isScrolledUp) {
-        // Scrolled upwards: search forward from 'start' to 'end - 1'
-        for (let i = start; i < end; i++) {
-          const el = containerRef.current?.querySelector(
-            `[data-virtual-index="${i}"]`
-          ) as HTMLElement;
-          if (el) {
-            const list = getFocusableElements(el);
-            if (list.length > 0) {
-              targetIndex = i;
-              targetRowEl = el;
-              focusables = list;
-              break;
-            }
-          }
-        }
-      } else {
-        // Scrolled downwards: search backward from 'end - 1' down to 'start'
-        for (let i = end - 1; i >= start; i--) {
-          const el = containerRef.current?.querySelector(
-            `[data-virtual-index="${i}"]`
-          ) as HTMLElement;
-          if (el) {
-            const list = getFocusableElements(el);
-            if (list.length > 0) {
-              targetIndex = i;
-              targetRowEl = el;
-              focusables = list;
-              break;
-            }
-          }
-        }
-      }
+    const mountedRows = Array.from(
+      containerRef.current?.querySelectorAll<HTMLElement>(
+        ".virtual-list-item",
+      ) ?? [],
+    );
+    const candidates = mountedRows
+      .map((rowEl) => ({
+        rowEl,
+        index: Number(rowEl.getAttribute("data-virtual-index")),
+        focusables: getFocusableElements(rowEl),
+      }))
+      .filter(({ focusables }) => focusables.length > 0)
+      .sort(
+        (left, right) =>
+          Math.abs(left.index - focusedRowIndexRef.current!) -
+          Math.abs(right.index - focusedRowIndexRef.current!),
+      );
+    const nearest = candidates[0];
 
-      if (targetRowEl && focusables.length > 0) {
-        const targetOffset = Math.min(
-          focusableOffsetRef.current,
-          focusables.length - 1
-        );
-        if (targetOffset >= 0 && focusables[targetOffset]) {
-          // Update tracking to the new focus target before focusing
-          focusedRowIndexRef.current = targetIndex;
-          focusableOffsetRef.current = targetOffset;
-          focusables[targetOffset].focus({ preventScroll: true });
-          return;
-        }
-      }
-
-      // Fallback: focus the list container itself if no mounted row contains focusable elements
-      if (containerRef.current) {
-        containerRef.current.focus({ preventScroll: true });
-        focusedRowIndexRef.current = null;
-        focusableOffsetRef.current = null;
+    if (nearest) {
+      const targetOffset = Math.min(
+        focusableOffsetRef.current,
+        nearest.focusables.length - 1,
+      );
+      if (targetOffset >= 0 && nearest.focusables[targetOffset]) {
+        // Update tracking to the new focus target before focusing
+        focusedRowKeyRef.current =
+          nearest.rowEl.getAttribute("data-virtual-key");
+        focusedRowIndexRef.current = nearest.index;
+        focusableOffsetRef.current = targetOffset;
+        nearest.focusables[targetOffset].focus({ preventScroll: true });
+        return;
       }
     }
-  }, [range]);
 
-  const mountedRange = shouldVirtualize ? range : { start: 0, end: items.length };
+    // Fallback: focus the list container itself if no mounted row contains focusable elements
+    if (containerRef.current) {
+      containerRef.current.focus({ preventScroll: true });
+      focusedRowKeyRef.current = null;
+      focusedRowIndexRef.current = null;
+      focusableOffsetRef.current = null;
+    }
+  }, [getKey, items, range]);
+
+  const mountedRange = shouldVirtualize
+    ? range
+    : { start: 0, end: items.length };
   const mountedItems = useMemo(
     () => items.slice(mountedRange.start, mountedRange.end),
     [items, mountedRange.end, mountedRange.start],
@@ -293,7 +302,10 @@ export default function VirtualList<T>({
                 className="virtual-list-item"
                 role="listitem"
                 data-virtual-index={index}
-                style={shouldVirtualize ? { minHeight: safeEstimate } : undefined}
+                data-virtual-key={getKey(item, index)}
+                style={
+                  shouldVirtualize ? { minHeight: safeEstimate } : undefined
+                }
               >
                 {renderItem(item, index)}
               </div>

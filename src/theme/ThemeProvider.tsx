@@ -272,6 +272,38 @@ export function applyFontPreference(easyRead: boolean): void {
 }
 
 /**
+ * Returns `true` only when `value` is a safe, normalised 3-/6-digit hex
+ * colour (`#rgb` or `#rrggbb`).
+ *
+ * This is the canonical CSS-value guard used throughout the theme subsystem.
+ * It intentionally rejects:
+ *  - Named colours and CSS functions (`rgb()`, `hsl()`, `var()`)
+ *  - Semicolons, braces, and backslashes (declaration-smuggling characters)
+ *  - `javascript:` / `data:` pseudo-schemes and Unicode escapes
+ *  - Any whitespace or non-ASCII characters
+ *
+ * @param value - Candidate CSS value.
+ */
+export function isSafeHexColor(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  // Reject any suspicious characters before the regex check (defence-in-depth).
+  if (
+    value.includes(";") ||
+    value.includes("{") ||
+    value.includes("}") ||
+    value.includes("(") ||
+    value.includes(")") ||
+    value.includes("\\") ||
+    value.includes("\n") ||
+    value.includes("\r") ||
+    value.includes("\t")
+  ) {
+    return false;
+  }
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value);
+}
+
+/**
  * Writes a set of validated token values as `--custom-*` CSS custom
  * properties directly on `<html>`.  These are picked up by the
  * `:root[data-theme="custom"]` block in `design-tokens.css`.
@@ -287,7 +319,7 @@ export function applyCustomTokens(
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   for (const [token, value] of Object.entries(tokens)) {
-    if (typeof value === "string" && /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value)) {
+    if (isSafeHexColor(value)) {
       // Write to --custom-<base-name> slot, e.g. --custom-color-accent-primary
       const slotName = token.replace(/^--/, CUSTOM_PROP_PREFIX);
       root.style.setProperty(slotName, value);

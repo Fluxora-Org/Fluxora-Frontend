@@ -202,6 +202,55 @@ describe("EmptyState — search-no-results variant", () => {
   });
 });
 
+describe("EmptyState — distinct filtered-empty vs genuinely-empty states", () => {
+  it("filtered-empty (search-no-results) exposes a reset action, not a create action", () => {
+    const onClearFilters = vi.fn();
+    render(
+      <EmptyState
+        variant="search-no-results"
+        walletConnected={true}
+        onClearFilters={onClearFilters}
+      />
+    );
+
+    expect(
+      screen.getByRole("heading", { name: /no results found/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /clear filters/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create stream/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("genuinely-empty (streams) exposes a create action, not a clear-filters action", () => {
+    render(<EmptyState variant="streams" walletConnected={true} />);
+
+    expect(
+      screen.getByRole("heading", { name: /no streams yet/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create stream/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /clear filters/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("error-empty exposes a retry action distinct from both", () => {
+    const onRetry = vi.fn();
+    render(<EmptyState variant="error" error="Load failed" onRetry={onRetry} />);
+
+    expect(
+      screen.getByRole("heading", { name: /something went wrong/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /clear filters/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create stream/i })
+    ).not.toBeInTheDocument();
+  });
+});
+
 // ── error variant ─────────────────────────────────────────────────────────────
 
 describe("EmptyState — error variant", () => {
