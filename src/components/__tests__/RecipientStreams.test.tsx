@@ -6,12 +6,17 @@ const mockData: Stream[] = [
   { id: "1", sender: "Alice", amount: "500", status: "active" },
 ];
 
+/** Wrap a Stream[] into the paginated response shape the component expects. */
+function page(streams: Stream[], nextCursor: string | null = null) {
+  return { streams, nextCursor };
+}
+
 describe("RecipientStreams Testing Engine", () => {
   it("shows safe recoverable loading elements on initial interaction", async () => {
     const fetchMock = vi
       .fn()
       .mockReturnValue(
-        new Promise((resolve) => setTimeout(() => resolve(mockData), 50)),
+        new Promise((resolve) => setTimeout(() => resolve(page(mockData)), 50)),
       );
 
     render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
@@ -36,7 +41,9 @@ describe("RecipientStreams Testing Engine", () => {
     let callCount = 0;
     const fetchMock = vi.fn().mockImplementation(() => {
       callCount++;
-      return new Promise((resolve) => setTimeout(() => resolve(mockData), 100));
+      return new Promise((resolve) =>
+        setTimeout(() => resolve(page(mockData)), 100),
+      );
     });
 
     render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
@@ -50,9 +57,11 @@ describe("RecipientStreams Testing Engine", () => {
   });
 
   it("labels pinned state with text alongside the star icon", async () => {
-    const fetchMock = vi.fn().mockResolvedValue([
-      { id: "1", sender: "Alice", amount: "10", status: "active", isPinned: true },
-    ]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        page([{ id: "1", sender: "Alice", amount: "10", status: "active", isPinned: true }]),
+      );
 
     render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
 
@@ -72,9 +81,11 @@ describe("RecipientStreams Testing Engine", () => {
       // Set data-theme explicitly to "dark" while jsdom matchMedia reports light
       document.documentElement.setAttribute("data-theme", "dark");
 
-      const fetchMock = vi.fn().mockResolvedValue([
-        { id: "1", sender: "Alice", amount: "500", status: "active" },
-      ]);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          page([{ id: "1", sender: "Alice", amount: "500", status: "active" }]),
+        );
 
       render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
       const streams = await screen.findByText(/From:/);
@@ -106,9 +117,11 @@ describe("RecipientStreams Testing Engine", () => {
       // But app explicitly sets data-theme="light"
       document.documentElement.setAttribute("data-theme", "light");
 
-      const fetchMock = vi.fn().mockResolvedValue([
-        { id: "1", sender: "Alice", amount: "500", status: "active" },
-      ]);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          page([{ id: "1", sender: "Alice", amount: "500", status: "active" }]),
+        );
 
       render(<RecipientStreams fetchStreamsFn={fetchMock} pollIntervalMs={0} />);
       const streams = await screen.findByText(/From:/);
@@ -118,7 +131,7 @@ describe("RecipientStreams Testing Engine", () => {
       const card = streams.closest(".p-6");
       expect(card?.getAttribute("style")).toContain("var(--color-bg-primary)");
 
-      // Verify error uses token colors
+      // Verify error uses token colors on the outer alert div
       const errorFetchMock = vi.fn().mockRejectedValue(new Error("fail"));
       document.documentElement.setAttribute("data-theme", "dark");
       render(<RecipientStreams fetchStreamsFn={errorFetchMock} pollIntervalMs={0} />);

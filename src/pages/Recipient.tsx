@@ -266,10 +266,13 @@ export default function Recipient() {
   }, []);
 
   const fetchIncomingStreams = useCallback(
-    async (): Promise<Stream[]> => [
-      { id: "1", sender: "Treasury", amount: "12000", status: "active" },
-      { id: "2", sender: "Payroll", amount: "8600", status: "active" },
-    ],
+    async (_cursor: string | null): Promise<{ streams: Stream[]; nextCursor: string | null }> => ({
+      streams: [
+        { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+        { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+      ],
+      nextCursor: null,
+    }),
     [],
   );
 
