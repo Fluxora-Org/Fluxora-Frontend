@@ -171,23 +171,59 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
-  const processSpokenPhrase = useCallback(
-    (phrase: string): boolean => {
-      setTranscript(phrase);
-      setState("processing");
+const processSpokenPhrase = useCallback(
+  (phrase: string): boolean => {
+    setTranscript(phrase);
+    setState("processing");
 
-      // Handle active confirmation step
-      if (pendingDestructiveCommand) {
-        const clean = phrase.trim().toLowerCase();
-        if (clean.includes("confirm") || clean.includes("yes")) {
-          confirmDestructiveAction();
-          return true;
-        }
-        if (clean.includes("cancel") || clean.includes("no") || clean.includes("abort")) {
-          cancelDestructiveAction();
-          return true;
-        }
+    // Handle active confirmation step
+    if (pendingDestructiveCommand) {
+      const clean = phrase.trim().toLowerCase();
+
+      if (clean === "confirm" || clean === "yes") {
+        confirmDestructiveAction();
+        return true;
       }
+
+      if (clean === "cancel" || clean === "no" || clean === "abort") {
+        cancelDestructiveAction();
+        return true;
+      }
+
+      // Do not process other commands while confirmation is pending
+      setState("confirming-destructive");
+      return false;
+    }
+
+    const matched = matchCommand(phrase);
+
+    if (matched) {
+      executeCommand(matched, phrase);
+      return true;
+    }
+
+    setState("command-unrecognized");
+    announce(
+      `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+    );
+
+    setTimeout(() => {
+      setState((prev) =>
+        prev === "command-unrecognized" ? "listening" : prev
+      );
+    }, 3000);
+
+    return false;
+  },
+  [
+    matchCommand,
+    executeCommand,
+    pendingDestructiveCommand,
+    confirmDestructiveAction,
+    cancelDestructiveAction,
+    announce,
+  ]
+);
 
       const matched = matchCommand(phrase);
       if (matched) {
