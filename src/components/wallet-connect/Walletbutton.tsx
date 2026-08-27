@@ -3,13 +3,13 @@ import { useWallet } from "./Walletcontext";
 import ConnectWalletModal from "../ConnectWalletModal";
 import { copyToClipboard } from "../../hooks/useClipboard";
 
-import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle } from "lucide-react";
+import { ChevronDown, Copy, Check, ExternalLink, LogOut, AlertCircle, AlertTriangle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { stellarExplorerUrl } from "../../lib/stellar";
 import { formatAddress } from "../common/TruncatedAddress";
 
 export default function WalletButton() {
-  const { address, network, connected, disconnect } = useWallet();
+  const { address, network, connected, disconnect, isNetworkMismatch, expectedNetwork, loading } = useWallet();
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -58,7 +58,17 @@ export default function WalletButton() {
     if (e.key === "Escape") setDropdownOpen(false);
   }
 
-  // ── Not connected ────────────────────────────────────────────────────────
+  // ── State precedence: loading > disconnected > wrong network > connected ──
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2" aria-label="Loading wallet…" role="status">
+        <div className="h-8 w-20 rounded-full bg-[var(--surface)] animate-pulse" />
+        <div className="h-9 w-32 rounded-full bg-[var(--surface)] animate-pulse" />
+      </div>
+    );
+  }
+
+  // ── Disconnected ────────────────────────────────────────────────────────
   if (!connected) {
     return (
       <>
@@ -80,6 +90,35 @@ export default function WalletButton() {
           showStateSwitcher={false}
         />
       </>
+    );
+  }
+
+  // ── Wrong network ────────────────────────────────────────────────────────
+  if (isNetworkMismatch) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+          <AlertTriangle size={14} />
+          Expected {expectedNetwork}
+        </span>
+        <button
+          ref={connectTriggerRef}
+          onClick={handleOpenModal}
+          className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer"
+          style={{
+            backgroundColor: "var(--color-accent-primary)",
+            boxShadow: "var(--shadow-accent-primary)",
+          }}
+        >
+          Switch Network
+        </button>
+        <ConnectWalletModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onConnectFreighter={handleConnectFreighter}
+          showStateSwitcher={false}
+        />
+      </div>
     );
   }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Type, Search, Command } from "lucide-react";
+import { Menu, X, Type, Search, Command, AlertTriangle } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
@@ -286,17 +286,10 @@ export default function AppNavbar({
     expectedNetwork,
     isNetworkMismatch,
     disconnect,
+    loading,
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
   const [routeTransitioning, setRouteTransitioning] = useState(false);
-
-  // Simulate a brief "connecting" state on first mount when wallet restores session
-  useEffect(() => {
-    setConnecting(true);
-    const t = setTimeout(() => setConnecting(false), 600);
-    return () => clearTimeout(t);
-  }, []);
 
   /**
    * Route-transition lock.
@@ -468,10 +461,32 @@ export default function AppNavbar({
             {/* Theme toggle */}
             <ThemeSegmentedControl />
 
-            {/* Wallet area */}
-            {connecting ? (
+            {/* Wallet area - State precedence: loading > disconnected > wrong network > connected */}
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
+            ) : !connected ? (
+              <Link
+                to="/connect-wallet"
+                aria-label="Connect your Stellar wallet"
+                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+              >
+                Connect Wallet
+              </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
               <WalletStatus
                 address={address}
                 network={network ?? "TESTNET"}
@@ -480,14 +495,6 @@ export default function AppNavbar({
                 onDisconnect={disconnect}
                 disabled={routeTransitioning}
               />
-            ) : (
-              <Link
-                to="/connect-wallet"
-                aria-label="Connect your Stellar wallet"
-                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
-              >
-                Connect Wallet
-              </Link>
             )}
           </div>
 
@@ -557,25 +564,33 @@ export default function AppNavbar({
               <Type size={16} aria-hidden="true" />
             </button>
 
-            <button
-              onClick={toggleEasyReadFont}
-              aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
-              aria-pressed={easyReadFont}
-              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                easyReadFont
-                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
-                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
-              }`}
-            >
-              <span className="font-bold text-xs tracking-wider uppercase" aria-hidden="true">
-                Aa
-              </span>
-            </button>
-
-            {connecting ? (
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
+            ) : !connected ? (
+              <Link
+                to="/connect-wallet"
+                onClick={() => closeMobile({ restoreFocus: true })}
+                aria-label="Connect your Stellar wallet"
+                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+              >
+                Connect Wallet
+              </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  onClick={() => closeMobile({ restoreFocus: true })}
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
               <WalletStatus
                 address={address}
                 network={network ?? "TESTNET"}
@@ -587,15 +602,6 @@ export default function AppNavbar({
                 }}
                 disabled={routeTransitioning}
               />
-            ) : (
-              <Link
-                to="/connect-wallet"
-                onClick={() => closeMobile({ restoreFocus: true })}
-                aria-label="Connect your Stellar wallet"
-                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
-              >
-                Connect Wallet
-              </Link>
             )}
           </div>
         </div>
