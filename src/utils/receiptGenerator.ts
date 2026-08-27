@@ -15,6 +15,7 @@ import {
   normalizeStellarNetwork,
 } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
+import { formatTokenAmount } from "../lib/formatters";
 
 export interface ReceiptData {
   streamId: string;
@@ -27,6 +28,65 @@ export interface ReceiptData {
   txHash?: string | null;
   status: "confirmed" | "pending";
   network?: string;
+}
+
+/**
+ * Accepted exact amount inputs for {@link formatReceiptAmount}: a `bigint` or
+ * a decimal integer `string`, both expressed in the token's **smallest unit**.
+ * JavaScript `number` is deliberately excluded so token amounts can never be
+ * routed through the lossy IEEE-754 representation.
+ *
+ * Decimal display-unit strings (with a `.`) are rejected with a `TypeError`:
+ * a bare integer string like `"100"` is ambiguous between 100 display units
+ * and 100 smallest units, and silently guessing could corrupt a receipt.
+ * Convert decimal strings first with {@link amountToSmallestUnits}.
+ */
+export type ReceiptAmountInput = bigint | string;
+
+/**
+ * Strictly parses a smallest-unit integer string, mirroring the formatters'
+ * validation conventions, so malformed values throw instead of ever reaching
+ * the rendered receipt.
+ */
+function parseSmallestUnitsString(value: string): bigint {
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    const hint = trimmed.includes(".")
+      ? " Convert decimal display-unit strings with amountToSmallestUnits() first."
+      : "";
+    throw new TypeError(
+      `formatReceiptAmount: cannot parse "${trimmed}" as a smallest-unit integer string.${hint}`,
+    );
+  }
+  return BigInt(trimmed);
+}
+
+/**
+ * Format the exact token amount displayed on a receipt using the precision-safe
+ * {@link formatTokenAmount} pipeline (BigInt arithmetic + locale-aware Intl
+ * formatting). No JavaScript `number` conversion is involved, so amounts at or
+ * beyond `Number.MAX_SAFE_INTEGER` and amounts with the token's full decimal
+ * precision are preserved exactly.
+ *
+ * @param amount   - The exact amount in the token's **smallest unit**, as a
+ *                  `bigint` or decimal integer `string` (e.g. the withdrawal
+ *                  amount `"42000000000"` for 4,200 USDC at 7 decimals).
+ * @param decimals - Decimal places the token uses (7 for USDC on Stellar).
+ * @param asset    - Asset ticker appended to the formatted amount.
+ *
+ * @example
+ * // 9_007_199_254_740_993.1234567 USDC at 7 decimals
+ * formatReceiptAmount("90071992547409931234567", 7, "USDC")
+ *   // → "9,007,199,254,740,993.1234567 USDC"  (en-US, exact)
+ */
+export function formatReceiptAmount(
+  amount: ReceiptAmountInput,
+  decimals = 7,
+  asset = "USDC",
+): string {
+  const smallestUnits =
+    typeof amount === "bigint" ? amount : parseSmallestUnitsString(amount);
+  return formatTokenAmount(smallestUnits, decimals, asset);
 }
 
 /**

@@ -629,6 +629,25 @@ describe("PresenceBadge — edge cases", () => {
     expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
+  it("registers exactly one outside-click listener and removes it on unmount", () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
+    const removeSpy = vi.spyOn(document, "removeEventListener");
+
+    const { unmount } = render(<PresenceBadge viewers={[mockViewer1]} />);
+
+    // One mousedown listener is attached while the badge is mounted.
+    const added = addSpy.mock.calls.filter((c) => c[0] === "mousedown");
+    expect(added).toHaveLength(1);
+
+    unmount();
+
+    // The same listener is removed on unmount — no listener leaks after the
+    // badge leaves the route.
+    const removed = removeSpy.mock.calls.filter((c) => c[0] === "mousedown");
+    expect(removed).toHaveLength(1);
+    expect(removed[0][1]).toBe(added[0][1]);
+  });
+
   it("announcement is cleared after 3 seconds", () => {
     const { rerender } = render(<PresenceBadge viewers={[mockViewer1]} />);
     const liveRegion = screen.getByRole("status", { hidden: true });

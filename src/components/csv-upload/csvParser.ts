@@ -202,24 +202,39 @@ export function markDuplicates(rows: CsvRow[]): void {
 // ─── Main parser ─────────────────────────────────────────────────────────────
 
 /**
- * Parses raw CSV text and returns a `ParseResult`.
+ * Shared, pure preparation step for a CSV parse: normalises the raw text,
+ * detects headers, builds the auto-mapping, and resolves the effective column
+ * mapping. Returns the pieces both the synchronous {@link parseAndValidateCsv}
+ * and the off-main-thread worker pipeline need, so the two can never drift
+ * apart.
  *
- * When `mapping` is provided the function uses those columns; otherwise it
- * attempts to auto-detect columns and sets `headersMatch` accordingly.
+ * `parseError` is only set for the top-level rejections (empty file,
+ * header-only file, row count over {@link MAX_CSV_ROWS}). In those cases
+ * `autoMapping` stays `{}` to match the historical return shape.
  */
-export function parseAndValidateCsv(
+export interface PreparedCsvParse {
+  detectedHeaders: string[];
+  dataLines: string[];
+  autoMapping: Partial<ColumnMapping>;
+  effectiveMapping: Partial<ColumnMapping>;
+  headersMatch: boolean;
+  parseError?: string;
+}
+
+export function prepareCsvParse(
   rawText: string,
   mapping?: Partial<ColumnMapping>,
-): ParseResult {
+): PreparedCsvParse {
   const text = normaliseLineEndings(stripBom(rawText));
   const lines = text.split('\n').filter((l) => l.trim().length > 0);
 
   if (lines.length === 0) {
     return {
       detectedHeaders: [],
-      headersMatch: false,
+      dataLines: [],
       autoMapping: {},
-      rows: [],
+      effectiveMapping: {},
+      headersMatch: false,
       parseError: 'The CSV file has no data rows.',
     };
   }
@@ -230,9 +245,10 @@ export function parseAndValidateCsv(
   if (dataLines.length === 0) {
     return {
       detectedHeaders,
-      headersMatch: false,
+      dataLines: [],
       autoMapping: {},
-      rows: [],
+      effectiveMapping: {},
+      headersMatch: false,
       parseError: 'The CSV file has no data rows.',
     };
   }
@@ -240,9 +256,10 @@ export function parseAndValidateCsv(
   if (dataLines.length > MAX_CSV_ROWS) {
     return {
       detectedHeaders,
-      headersMatch: false,
+      dataLines,
       autoMapping: {},
-      rows: [],
+      effectiveMapping: {},
+      headersMatch: false,
       parseError: `This CSV has ${dataLines.length} rows. Maximum is ${MAX_CSV_ROWS}.`,
     };
   }
@@ -260,60 +277,105 @@ export function parseAndValidateCsv(
   const effectiveMapping: Partial<ColumnMapping> = mapping ?? autoMapping;
   const headersMatch = CANONICAL_HEADERS.every((c) => Boolean(effectiveMapping[c]));
 
-  if (!headersMatch && !mapping) {
+  return {
+    detectedHeaders,
+    dataLines,
+    autoMapping,
+    effectiveMapping,
+    headersMatch,
+  };
+}
+
+/**
+ * Parses a single CSV data line into a validated {@link CsvRow} using the
+ * resolved column mapping. Pure per-row work shared by the synchronous parser
+ * and the worker pipeline so both produce byte-identical rows.
+ */
+export function parseRow(
+  line: string,
+  lineIndex: number,
+  effectiveMapping: Partial<ColumnMapping>,
+  headerIndex: Record<string, number>,
+): CsvRow {
+  const cells = splitCsvLine(line);
+  const get = (canonical: CanonicalHeader): string => {
+    const colName = effectiveMapping[canonical] ?? '';
+    const idx = headerIndex[colName];
+    return idx !== undefined ? (cells[idx] ?? '').trim() : '';
+  };
+
+  const recipient = get('recipient');
+  const depositAmount = get('deposit_amount');
+  const accrualRatePerDay = get('accrual_rate_per_day');
+  const durationDays = get('duration_days');
+
+  const { fieldErrors, isValid } = validateRow({
+    recipient,
+    depositAmount,
+    accrualRatePerDay,
+    durationDays,
+  });
+
+  return {
+    id: `row-${lineIndex + 1}-${Math.random().toString(36).slice(2, 7)}`,
+    rowNumber: lineIndex + 1,
+    recipient,
+    depositAmount,
+    accrualRatePerDay,
+    durationDays,
+    status: isValid ? 'valid' : 'needs-fix',
+    fieldErrors,
+  };
+}
+
+/**
+ * Parses raw CSV text and returns a `ParseResult`.
+ *
+ * When `mapping` is provided the function uses those columns; otherwise it
+ * attempts to auto-detect columns and sets `headersMatch` accordingly.
+ */
+export function parseAndValidateCsv(
+  rawText: string,
+  mapping?: Partial<ColumnMapping>,
+): ParseResult {
+  const prep = prepareCsvParse(rawText, mapping);
+
+  if (prep.parseError) {
+    return {
+      detectedHeaders: prep.detectedHeaders,
+      headersMatch: false,
+      autoMapping: prep.autoMapping,
+      rows: [],
+      parseError: prep.parseError,
+    };
+  }
+
+  if (!prep.headersMatch && !mapping) {
     // Return early without rows; caller will show mapping step
     return {
-      detectedHeaders,
+      detectedHeaders: prep.detectedHeaders,
       headersMatch: false,
-      autoMapping,
+      autoMapping: prep.autoMapping,
       rows: [],
     };
   }
 
   // Parse rows using the effective mapping
   const headerIndex: Record<string, number> = {};
-  detectedHeaders.forEach((h, i) => {
+  prep.detectedHeaders.forEach((h, i) => {
     headerIndex[h] = i;
   });
 
-  const rows: CsvRow[] = dataLines.map((line, lineIndex) => {
-    const cells = splitCsvLine(line);
-    const get = (canonical: CanonicalHeader): string => {
-      const colName = effectiveMapping[canonical] ?? '';
-      const idx = headerIndex[colName];
-      return idx !== undefined ? (cells[idx] ?? '').trim() : '';
-    };
-
-    const recipient = get('recipient');
-    const depositAmount = get('deposit_amount');
-    const accrualRatePerDay = get('accrual_rate_per_day');
-    const durationDays = get('duration_days');
-
-    const { fieldErrors, isValid } = validateRow({
-      recipient,
-      depositAmount,
-      accrualRatePerDay,
-      durationDays,
-    });
-
-    return {
-      id: `row-${lineIndex + 1}-${Math.random().toString(36).slice(2, 7)}`,
-      rowNumber: lineIndex + 1,
-      recipient,
-      depositAmount,
-      accrualRatePerDay,
-      durationDays,
-      status: isValid ? 'valid' : 'needs-fix',
-      fieldErrors,
-    };
-  });
+  const rows: CsvRow[] = prep.dataLines.map((line, lineIndex) =>
+    parseRow(line, lineIndex, prep.effectiveMapping, headerIndex),
+  );
 
   markDuplicates(rows);
 
   return {
-    detectedHeaders,
-    headersMatch,
-    autoMapping,
+    detectedHeaders: prep.detectedHeaders,
+    headersMatch: prep.headersMatch,
+    autoMapping: prep.autoMapping,
     rows,
   };
 }

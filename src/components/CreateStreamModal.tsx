@@ -31,6 +31,9 @@ import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import TruncatedAddress from './common/TruncatedAddress';
 import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
+import { parseCsvNumber } from './csv-upload/csvParser';
+import { CsvParseCancelledError, parseCsvAsync } from './csv-upload/csvParseClient';
+import type { CsvParseTask } from './csv-upload/csvParseClient';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
 import {
   DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
@@ -41,6 +44,8 @@ import {
   evaluateContrast,
   THEME_BACKGROUNDS,
 } from '../utils/contrastUtils';
+import { formatReceiptAmount } from '../utils/receiptGenerator';
+import { amountToSmallestUnits } from '../lib/formatters';
 
 /** Top-level flow mode: choose between single-stream or bulk-CSV. */
 type FlowMode = 'choose' | 'single' | 'bulk';
@@ -219,7 +224,20 @@ export default function CreateStreamModal({
   const [bulkRows, setBulkRows] = useState<CsvRow[]>([]);
   const [bulkMapping, setBulkMapping] = useState<Partial<ColumnMapping>>({});
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  // True while the worker re-parses the raw CSV after the user confirms a
+  // column mapping; PreviewValidateStep renders its loading state meanwhile.
+  const [isBulkReparsing, setIsBulkReparsing] = useState(false);
+  const [bulkPreviewError, setBulkPreviewError] = useState<string | null>(null);
+  const bulkReparseTaskRef = useRef<CsvParseTask | null>(null);
   const [bulkDryRunConfirmed, setBulkDryRunConfirmed] = useState(false);
+
+  // Abort any in-flight worker re-parse when the modal unmounts.
+  useEffect(() => {
+    return () => {
+      bulkReparseTaskRef.current?.cancel();
+      bulkReparseTaskRef.current = null;
+    };
+  }, []);
   const [bulkDryRunTotals, setBulkDryRunTotals] = useState<{
     totalStreams: number;
     totalDeposit: string;
@@ -422,8 +440,12 @@ export default function CreateStreamModal({
 
   const buildSubmissionPayload = (): StreamSubmissionPayload => {
     const sender = wallet.address!;
-    const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
-    const amount = Math.floor(parsedAmount * 10_000_000).toString();
+    // Scale the exact deposit string to smallest units with BigInt string
+    // arithmetic — no Number conversion, so large/precise deposits are exact.
+    const amount = amountToSmallestUnits(
+      depositAmount,
+      USDC_DECIMAL_PLACES,
+    ).toString();
 
     const start = startTimeOption === "now"
       ? Math.floor(Date.now() / 1000)
@@ -480,10 +502,13 @@ export default function CreateStreamModal({
 
     setHasCompletedConfirmation(true);
 
-    const amountNum = parseFloat(depositAmount.replace(/,/g, "")) || 0;
     const createdData: StreamCreatedData = {
       txHash: submittedTxHash,
-      amount: `${amountNum.toLocaleString()} USDC`,
+      amount: formatReceiptAmount(
+        amountToSmallestUnits(depositAmount, USDC_DECIMAL_PLACES),
+        USDC_DECIMAL_PLACES,
+        "USDC",
+      ),
       rate: `${accrualRate} USDC/day`,
       sender: wallet.address ?? "",
       recipient,
@@ -512,6 +537,29 @@ export default function CreateStreamModal({
     accrualRate,
     wallet.address,
     recipient,
+  ]);
+
+  useEffect(() => {
+    if (transactionStatus.status !== "failed" || !submittedTxHash) {
+      return;
+    }
+
+    const message =
+      transactionStatus.error ??
+      t("createStream.step3.statusFailed", {
+        error: "Transaction confirmation failed. Please retry.",
+      });
+    setStreamError(message);
+    setSubmittedTxHash(null);
+    setHasCompletedConfirmation(false);
+    flushedFromQueueRef.current = false;
+    onStreamError?.(new Error(message));
+  }, [
+    onStreamError,
+    submittedTxHash,
+    t,
+    transactionStatus.error,
+    transactionStatus.status,
   ]);
 
   // Auto-flush a queued submission as soon as connectivity returns. Runs even
@@ -760,6 +808,10 @@ export default function CreateStreamModal({
     
     setErrors(step1Errors);
 
+    // Invalid recipient/deposit fields must block submission — otherwise a
+    // malformed amount could silently reach the on-chain payload as 0.
+    if (Object.keys(step1Errors).length > 0) return false;
+
     if (step2Errors.accrualRate || step2Errors.duration || step2Errors.deposits || step2Errors.customStartDate || step2Errors.cliffDate) {
       setErrors(prev => ({ ...prev, ...step2Errors }));
       return false;
@@ -913,12 +965,16 @@ export default function CreateStreamModal({
   // ── Bulk CSV handlers ─────────────────────────────────────────────────────
 
   const resetBulkState = () => {
+    bulkReparseTaskRef.current?.cancel();
+    bulkReparseTaskRef.current = null;
     setBulkStep('upload');
     setBulkParseResult(null);
     setBulkRawText('');
     setBulkRows([]);
     setBulkMapping({});
     setIsBulkSubmitting(false);
+    setIsBulkReparsing(false);
+    setBulkPreviewError(null);
   };
 
   const handleBulkParsed = (result: ParseResult, _fileName: string, rawText: string) => {
@@ -935,11 +991,30 @@ export default function CreateStreamModal({
 
   const handleBulkMappingConfirmed = (mapping: ColumnMapping) => {
     setBulkMapping(mapping);
-    if (bulkRawText) {
-      const result = parseAndValidateCsv(bulkRawText, mapping);
-      setBulkRows(result.rows);
+    if (!bulkRawText) {
+      setBulkStep('preview');
+      return;
     }
+    // Re-parse the raw CSV with the user's mapping on the worker so the UI
+    // stays responsive; PreviewValidateStep shows a loading state meanwhile.
+    bulkReparseTaskRef.current?.cancel();
+    setBulkPreviewError(null);
+    setIsBulkReparsing(true);
     setBulkStep('preview');
+    const task = parseCsvAsync(bulkRawText, mapping);
+    bulkReparseTaskRef.current = task;
+    void task.promise
+      .then((result) => {
+        setBulkRows(result.rows);
+        setIsBulkReparsing(false);
+      })
+      .catch((err) => {
+        if (err instanceof CsvParseCancelledError) return;
+        setBulkPreviewError(
+          'Failed to re-parse the CSV with the selected mapping. Please try again.',
+        );
+        setIsBulkReparsing(false);
+      });
   };
 
   const handleBulkReplaceFile = () => {
@@ -1468,6 +1543,13 @@ export default function CreateStreamModal({
                     onRowsChange={setBulkRows}
                     onReview={handleBulkReview}
                     onReplaceFile={handleBulkReplaceFile}
+                    isLoading={isBulkReparsing}
+                    error={bulkPreviewError}
+                    onRetry={() => {
+                      if (bulkMapping && Object.keys(bulkMapping).length > 0) {
+                        handleBulkMappingConfirmed(bulkMapping as ColumnMapping);
+                      }
+                    }}
                   />
                 )}
 
