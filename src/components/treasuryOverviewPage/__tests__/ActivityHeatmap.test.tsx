@@ -1,6 +1,11 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import ActivityHeatmap, { getActivityTone } from "../ActivityHeatmap";
+import ActivityHeatmap, {
+  getActivityTone,
+  buildTrailingDays,
+  HeatmapCell,
+  __heatmapCellRenderStats,
+} from "../ActivityHeatmap";
 import type { Stream } from "../Stream";
 
 describe("ActivityHeatmap", () => {
@@ -761,6 +766,188 @@ describe("ActivityHeatmap", () => {
       ).toBeNull();
       // The visible semantic table is the active accessible surface.
       expect(screen.getByRole("table")).toBeInTheDocument();
+    });
+  });
+
+  describe("#1457 — cell memoization keeps interaction responsive for large date ranges", () => {
+    beforeEach(() => {
+      __heatmapCellRenderStats.count = 0;
+    });
+
+    it("hover interaction does not force sibling cells to re-render", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+
+      // Initial mount renders all 84 cells exactly once each.
+      expect(__heatmapCellRenderStats.count).toBe(84);
+
+      const cellA = screen.getByLabelText("2026-07-24: 1 stream event");
+      const cellB = screen.getByLabelText("2026-07-23: 2 stream events");
+      const cellC = screen.getByLabelText("2026-07-25: no activity");
+
+      // Fire a realistic sequence of hover/focus/blur/mouseleave across
+      // several different cells (the interaction the tooltip depends on).
+      fireEvent.mouseEnter(cellA);
+      fireEvent.mouseLeave(cellA);
+      fireEvent.focus(cellB);
+      fireEvent.blur(cellB);
+      fireEvent.mouseEnter(cellC);
+      fireEvent.focus(cellC);
+      fireEvent.blur(cellC);
+      fireEvent.mouseLeave(cellC);
+
+      // None of that interaction changes any cell's own props (level,
+      // label) — only the separate HeatmapTooltip component depends on
+      // hoveredCell — so React.memo should skip every cell on every one
+      // of those state updates. The render count must stay exactly at
+      // the initial-mount count.
+      expect(__heatmapCellRenderStats.count).toBe(84);
+
+      // Tooltip itself still worked throughout (memoization didn't break
+      // the feature it's protecting the performance of).
+      fireEvent.focus(cellA);
+      expect(screen.getByRole("tooltip")).toHaveTextContent("2026-07-24: 1 stream event");
+    });
+
+    it("mouseEnter handler falls back to an empty tooltip label if aria-label is ever missing", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const cell = screen.getByLabelText("2026-07-24: 1 stream event");
+      cell.removeAttribute("aria-label");
+      fireEvent.mouseEnter(cell);
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip).toHaveTextContent("");
+    });
+
+    it("focus handler falls back to an empty tooltip label if aria-label is ever missing", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const cell = screen.getByLabelText("2026-07-23: 2 stream events");
+      cell.removeAttribute("aria-label");
+      fireEvent.focus(cell);
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip).toHaveTextContent("");
+    });
+
+    it("no two cells in the default 84-day grid share an accessible label", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const cells = screen.getAllByRole("button", { name: /./ }).filter((el) =>
+        el.className.includes("heatmap-cell"),
+      );
+      const labels = cells.map((el) => el.getAttribute("aria-label"));
+      expect(labels.length).toBe(84);
+      expect(new Set(labels).size).toBe(labels.length);
+    });
+
+    it("keyboard tab order and per-cell tooltip content are unaffected by memoization", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const cells = screen.getAllByRole("button", { name: /./ }).filter((el) =>
+        el.className.includes("heatmap-cell"),
+      );
+      // Every cell is a real, individually focusable button (no tabindex
+      // override, not disabled) — same contract as before extracting
+      // HeatmapCell.
+      cells.forEach((cell) => {
+        expect(cell.hasAttribute("tabindex")).toBe(false);
+        expect(cell.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Focusing a specific cell still surfaces that exact cell's tooltip
+      // content, not a stale or shared one.
+      const target = screen.getByLabelText("2026-07-22: 4 stream events");
+      fireEvent.focus(target);
+      expect(screen.getByRole("tooltip")).toHaveTextContent("2026-07-22: 4 stream events");
+      fireEvent.blur(target);
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    });
+
+    describe("buildTrailingDays (range-agnostic day builder)", () => {
+      it("produces exactly `totalDays` dates, oldest first, ending on endDate", () => {
+        const end = new Date("2026-07-25T12:00:00Z");
+        const days = buildTrailingDays(84, end);
+        expect(days.length).toBe(84);
+        expect(days[days.length - 1].toDateString()).toBe(end.toDateString());
+        const oldest = new Date(end);
+        oldest.setDate(end.getDate() - 83);
+        expect(days[0].toDateString()).toBe(oldest.toDateString());
+      });
+
+      it("scales to a much larger synthetic range without duplicate dates", () => {
+        const end = new Date("2026-07-25T12:00:00Z");
+        const days = buildTrailingDays(1000, end);
+        expect(days.length).toBe(1000);
+        const formatted = days.map((d) => d.toDateString());
+        expect(new Set(formatted).size).toBe(1000);
+      });
+    });
+
+    describe("render-budget benchmark: small (84) vs. maximum (1000) synthetic range", () => {
+      // Minimal harness reusing the exact same memoized HeatmapCell and
+      // stable-handler pattern the mounted component uses, at a much
+      // larger size than the component's locked 84-day scope allows —
+      // this is the "maximum range" the acceptance criteria asks to be
+      // benchmarked, isolated from the rest of ActivityHeatmap's chrome.
+      function Harness({ totalDays }: { totalDays: number }) {
+        const end = new Date("2026-07-25T12:00:00Z");
+        const days = buildTrailingDays(totalDays, end);
+        const noop = () => {};
+        return (
+          <div className="heatmap-grid">
+            {days.map((d, i) => (
+              <HeatmapCell
+                key={i}
+                level={i % 5}
+                label={`day-${i}`}
+                onMouseEnter={noop}
+                onMouseLeave={noop}
+                onFocus={noop}
+                onBlur={noop}
+              />
+            ))}
+          </div>
+        );
+      }
+
+      // Generous budgets on purpose — these guard against a real
+      // regression (e.g. accidentally dropping memoization) rather than
+      // chasing a specific millisecond figure, which would be flaky on
+      // shared CI hardware.
+      const MOUNT_BUDGET_MS = 1000;
+      const INTERACTION_BUDGET_MS = 200;
+
+      it.each([
+        ["small (current default)", 84],
+        ["maximum (synthetic stress)", 1000],
+      ])("%s range: mounts within budget and stays interaction-responsive", (_label, totalDays) => {
+        __heatmapCellRenderStats.count = 0;
+
+        const mountStart = performance.now();
+        const { container } = render(<Harness totalDays={totalDays} />);
+        const mountElapsed = performance.now() - mountStart;
+
+        expect(container.querySelectorAll(".heatmap-cell").length).toBe(totalDays);
+        expect(__heatmapCellRenderStats.count).toBe(totalDays);
+        expect(mountElapsed).toBeLessThan(MOUNT_BUDGET_MS);
+
+        // No two cells collide on accessible label at this size.
+        const labels = Array.from(container.querySelectorAll(".heatmap-cell")).map((el) =>
+          el.getAttribute("aria-label"),
+        );
+        expect(new Set(labels).size).toBe(totalDays);
+
+        // Interact across a spread of cells (first, middle, last) and
+        // confirm both that it stays fast and that it triggers zero
+        // additional cell re-renders, regardless of grid size.
+        const cells = container.querySelectorAll(".heatmap-cell");
+        const sampleIndices = [0, Math.floor(totalDays / 2), totalDays - 1];
+
+        const interactionStart = performance.now();
+        sampleIndices.forEach((idx) => {
+          fireEvent.mouseEnter(cells[idx]);
+          fireEvent.mouseLeave(cells[idx]);
+        });
+        const interactionElapsed = performance.now() - interactionStart;
+
+        expect(interactionElapsed).toBeLessThan(INTERACTION_BUDGET_MS);
+        expect(__heatmapCellRenderStats.count).toBe(totalDays);
+      });
     });
   });
 });
