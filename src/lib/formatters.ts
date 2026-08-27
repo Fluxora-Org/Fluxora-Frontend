@@ -234,6 +234,44 @@ function parseToBigInt(raw: TokenAmountInput): bigint {
 }
 
 /**
+ * Convert an exact decimal amount string into the token's **smallest unit**
+ * using BigInt string arithmetic, so large and highly precise amounts never
+ * pass through JavaScript `number` (which loses precision beyond
+ * `Number.MAX_SAFE_INTEGER`).
+ *
+ * This is the inverse of {@link formatTokenAmount} for decimal strings: it
+ * scales the value by `10^decimals` exactly and returns the result as a
+ * `bigint`, ready for {@link formatTokenAmount} or for on-chain payloads that
+ * expect smallest-unit integer strings.
+ *
+ * Validation is strict — only an optional leading minus followed by digits
+ * with an optional single decimal point is accepted. Malformed inputs such as
+ * `""`, `"abc"`, `"1.2.3"`, `"NaN"`, `"Infinity"`, or `"1e5"` throw a
+ * `TypeError` so corrupt values can never silently become valid amounts.
+ *
+ * Fractional digits beyond `decimals` are truncated, matching the app's input
+ * sanitization policy (e.g. stream deposits are capped at 7 decimal places).
+ *
+ * @example
+ * amountToSmallestUnits("100.5", 7)             // → 1005000000n
+ * amountToSmallestUnits("0.0000001", 7)         // → 1n
+ * amountToSmallestUnits("9007199254740993.1234567", 7) // → 90071992547409931234567n
+ */
+export function amountToSmallestUnits(value: string, decimals: number): bigint {
+  const trimmed = value.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    throw new TypeError(
+      `amountToSmallestUnits: cannot parse "${trimmed}" as a decimal amount string.`,
+    );
+  }
+  const [integerPart, fractionPart = ""] = trimmed.split(".");
+  const sign = integerPart.startsWith("-") ? "-" : "";
+  const absInteger = integerPart.replace(/^-/, "");
+  const fraction = fractionPart.slice(0, decimals).padEnd(decimals, "0");
+  return BigInt(`${sign}${absInteger}${fraction}`);
+}
+
+/**
  * Format a token amount expressed in the token's **smallest unit** with
  * precision-safe BigInt arithmetic.
  *

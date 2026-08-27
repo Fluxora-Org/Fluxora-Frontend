@@ -7,6 +7,7 @@ import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview"
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { config } from "../../lib/config";
+import { getSafeExternalUrl } from "../../lib/safeExternalUrl";
 import {
   type ShareFlowState,
   type ShareProvider,
@@ -110,6 +111,7 @@ export default function StreamCreatedModal({
     shareFlow === "sending" ||
     shareFlow === "sent" ||
     shareFlow === "send-failed";
+  const safeStreamUrl = getSafeExternalUrl(streamUrl);
 
   const announce = (message: string, clearMs = 2000) => {
     setAnnouncement(message);
@@ -169,18 +171,23 @@ export default function StreamCreatedModal({
    * Detects popup-blocker null return and shows an accessible inline link fallback.
    */
   const handleViewStream = () => {
-    try {
-      const parsedUrl = new URL(streamUrl);
-      if (parsedUrl.protocol !== "https:") {
-        console.error("Invalid URL scheme. Only https is allowed.");
+    if (!safeStreamUrl) {
+      try {
+        const parsedUrl = new URL(streamUrl);
+        if (parsedUrl.protocol !== "https:") {
+          console.error("Invalid URL scheme. Only https is allowed.");
+          return;
+        }
+      } catch {
+        console.error("Invalid URL provided.");
         return;
       }
-    } catch {
+
       console.error("Invalid URL provided.");
       return;
     }
 
-    const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
+    const newWindow = window.open(safeStreamUrl, "_blank", "noopener,noreferrer");
     if (!newWindow) {
       setIsPopupBlocked(true);
       announce(
@@ -619,14 +626,18 @@ export default function StreamCreatedModal({
                   <div className={styles.sharePreviewRow}>
                     <dt>Stream link</dt>
                     <dd>
-                      <a
-                        href={streamUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.sharePreviewLink}
-                      >
-                        {streamUrl}
-                      </a>
+                      {safeStreamUrl ? (
+                        <a
+                          href={safeStreamUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.sharePreviewLink}
+                        >
+                          {streamUrl}
+                        </a>
+                      ) : (
+                        <span className={styles.sharePreviewLink}>{streamUrl}</span>
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -676,11 +687,11 @@ export default function StreamCreatedModal({
           />
         </div>
 
-        {isPopupBlocked && (
+        {isPopupBlocked && safeStreamUrl && (
           <div className={styles.popupBlockedMessage} role="alert">
             Popup blocked.{" "}
             <a
-              href={streamUrl}
+              href={safeStreamUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.fallbackLink}

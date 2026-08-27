@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Type, Search, Command } from "lucide-react";
+import { Menu, X, Type, Search, Command, AlertTriangle } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
@@ -286,18 +286,39 @@ export default function AppNavbar({
     expectedNetwork,
     isNetworkMismatch,
     disconnect,
+    loading,
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
 
-  // Simulate a brief "connecting" state on first mount when wallet restores session
+  /**
+   * Route-transition lock.
+   *
+   * Design decision: a route change settles asynchronously (data fetches,
+   * lazy routes, pending renders). Until it settles we mark the navbar as
+   * `routeTransitioning` for a short window. While transitioning:
+   *   - Wallet/account *action* controls (disconnect, copy address, explorer,
+   *     workspace links) are locked so an action bound to the previous route's
+   *     context cannot be invoked against the new one.
+   *   - Wallet *identity* (network badge + address, including a wrong-network
+   *     badge) stays visible so the user keeps orientation.
+   *   - Global controls (theme, easy-read font, search, voice) remain available.
+   *
+   * The timer is re-armed on every pathname change, so rapid navigation keeps
+   * the lock active until the last transition settles, and browser
+   * back/forward re-arms it for the restored route.
+   */
+  const location = useLocation();
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    setConnecting(true);
-    const t = setTimeout(() => setConnecting(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+    setRouteTransitioning(true);
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = setTimeout(() => setRouteTransitioning(false), 250);
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, [location.pathname]);
 
-const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
   const breadcrumbs = useBreadcrumbs(location.pathname);
   const showBreadcrumb = isAppView && breadcrumbs.length > 1;
@@ -440,18 +461,10 @@ const location = useLocation();
             {/* Theme toggle */}
             <ThemeSegmentedControl />
 
-            {/* Wallet area */}
-            {connecting ? (
+            {/* Wallet area - State precedence: loading > disconnected > wrong network > connected */}
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
-              <WalletStatus
-                address={address}
-                network={network ?? "TESTNET"}
-                expectedNetwork={expectedNetwork}
-                isNetworkMismatch={isNetworkMismatch}
-                onDisconnect={disconnect}
-              />
-            ) : (
+            ) : !connected ? (
               <Link
                 to="/connect-wallet"
                 aria-label="Connect your Stellar wallet"
@@ -459,6 +472,29 @@ const location = useLocation();
               >
                 Connect Wallet
               </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
+              <WalletStatus
+                address={address}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={disconnect}
+                disabled={routeTransitioning}
+              />
             )}
           </div>
 
@@ -528,25 +564,33 @@ const location = useLocation();
               <Type size={16} aria-hidden="true" />
             </button>
 
-            <button
-              onClick={toggleEasyReadFont}
-              aria-label={`Switch to ${!easyReadFont ? "easy-read dyslexia-friendly" : "default"} font`}
-              aria-pressed={easyReadFont}
-              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
-                easyReadFont
-                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
-                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
-              }`}
-            >
-              <span className="font-bold text-xs tracking-wider uppercase" aria-hidden="true">
-                Aa
-              </span>
-            </button>
-
-            {connecting ? (
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
+            ) : !connected ? (
+              <Link
+                to="/connect-wallet"
+                onClick={() => closeMobile({ restoreFocus: true })}
+                aria-label="Connect your Stellar wallet"
+                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+              >
+                Connect Wallet
+              </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  onClick={() => closeMobile({ restoreFocus: true })}
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
               <WalletStatus
                 address={address}
                 network={network ?? "TESTNET"}
@@ -556,16 +600,8 @@ const location = useLocation();
                   disconnect();
                   closeMobile({ restoreFocus: true });
                 }}
+                disabled={routeTransitioning}
               />
-            ) : (
-              <Link
-                to="/connect-wallet"
-                onClick={() => closeMobile({ restoreFocus: true })}
-                aria-label="Connect your Stellar wallet"
-                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
-              >
-                Connect Wallet
-              </Link>
             )}
           </div>
         </div>

@@ -213,6 +213,82 @@ describe('CsvDropZone', () => {
     expect(clickSpy).not.toHaveBeenCalled();
   });
 
+  it('rejects a drop of multiple files with an explicit message', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--parse-error');
+  });
+
+  it('rejects multiple files selected through the file input', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.change(input, { target: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('restores focus to the drop zone after a rejected file', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const badFile = makeFile('not a csv', 'notes.pdf', 'application/pdf');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [badFile] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only .csv files are accepted.',
+      );
+    });
+
+    // Focus is returned to the drop zone so keyboard/screen-reader users can
+    // retry without hunting for the control.
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('restores focus to the drop zone when the file picker is cancelled', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+
+    // Cancel: fire change with no files (dialog dismissed without selection).
+    fireEvent.change(input, { target: { files: [] } });
+
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--empty');
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('keeps focus on the drop zone after a keyboard-open with no selection', () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+
+    zone.focus();
+    fireEvent.keyDown(zone, { key: 'Enter' });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(zone).toHaveFocus();
+  });
+
   it('downloads the CSV template when the template button is clicked', () => {
     render(<CsvDropZone onParsed={onParsed} />);
 

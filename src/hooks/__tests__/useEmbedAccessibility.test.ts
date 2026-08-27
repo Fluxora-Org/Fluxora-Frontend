@@ -332,7 +332,7 @@ describe("useEmbedAccessibility hook", () => {
   });
 
   describe("setupEmbedFocusManagement helper", () => {
-    it("traps Tab and Shift+Tab focus navigation within container", () => {
+    it("traps Tab and Shift+Tab focus navigation within container when trapFocus is enabled", () => {
       const container = document.createElement("div");
       const btn1 = document.createElement("button");
       const btn2 = document.createElement("button");
@@ -340,7 +340,7 @@ describe("useEmbedAccessibility hook", () => {
       container.appendChild(btn2);
       document.body.appendChild(container);
 
-      const cleanup = setupEmbedFocusManagement(container);
+      const cleanup = setupEmbedFocusManagement(container, { trapFocus: true });
 
       btn2.focus();
       const tabEvent = new KeyboardEvent("keydown", {
@@ -428,7 +428,7 @@ describe("useEmbedAccessibility hook", () => {
       cleanup();
     });
 
-    it("does not cycle focus on Tab keypress when activeElement is not an edge element", () => {
+    it("does not cycle focus on Tab keypress when activeElement is not an edge element (trapFocus enabled)", () => {
       const container = document.createElement("div");
       const btn1 = document.createElement("button");
       const btn2 = document.createElement("button");
@@ -438,7 +438,7 @@ describe("useEmbedAccessibility hook", () => {
       container.appendChild(btn3);
       document.body.appendChild(container);
 
-      const cleanup = setupEmbedFocusManagement(container);
+      const cleanup = setupEmbedFocusManagement(container, { trapFocus: true });
 
       btn2.focus();
 
@@ -482,6 +482,297 @@ describe("useEmbedAccessibility hook", () => {
 
       cleanup();
     });
+
+    it("leaves edge Tab keypresses to the browser by default (focus can exit to the host page)", () => {
+      const container = document.createElement("div");
+      const btn1 = document.createElement("button");
+      const btn2 = document.createElement("button");
+      container.appendChild(btn1);
+      container.appendChild(btn2);
+      document.body.appendChild(container);
+
+      const cleanup = setupEmbedFocusManagement(container);
+
+      // Tab from the last element: default (non-trapping) behaviour must not
+      // intercept the keypress, so the browser moves focus out of the widget.
+      btn2.focus();
+      const tabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: false,
+        bubbles: true,
+      });
+      const tabSpy = vi.spyOn(tabEvent, "preventDefault");
+      container.dispatchEvent(tabEvent);
+
+      expect(tabSpy).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(btn2);
+
+      // Shift+Tab from the first element is likewise left to the browser.
+      btn1.focus();
+      const shiftTabEvent = new KeyboardEvent("keydown", {
+        key: "Tab",
+        shiftKey: true,
+        bubbles: true,
+      });
+      const shiftTabSpy = vi.spyOn(shiftTabEvent, "preventDefault");
+      container.dispatchEvent(shiftTabEvent);
+
+      expect(shiftTabSpy).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(btn1);
+
+      cleanup();
+    });
+
+    it("calls onEscape when Escape is pressed and no close control exists", () => {
+      const container = document.createElement("div");
+      const btn = document.createElement("button");
+      container.appendChild(btn);
+      document.body.appendChild(container);
+
+      const onEscape = vi.fn();
+      const cleanup = setupEmbedFocusManagement(container, { onEscape });
+
+      const escEvent = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      });
+      container.dispatchEvent(escEvent);
+
+      expect(onEscape).toHaveBeenCalledTimes(1);
+
+      cleanup();
+    });
+
+    it("activates a close control instead of onEscape when one exists", () => {
+      const container = document.createElement("div");
+      const closeBtn = document.createElement("button");
+      closeBtn.setAttribute("data-close", "");
+      const clickSpy = vi.fn();
+      closeBtn.addEventListener("click", clickSpy);
+      container.appendChild(closeBtn);
+      document.body.appendChild(container);
+
+      const onEscape = vi.fn();
+      const cleanup = setupEmbedFocusManagement(container, { onEscape });
+
+      const escEvent = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+      });
+      container.dispatchEvent(escEvent);
+
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(onEscape).not.toHaveBeenCalled();
+
+      cleanup();
+    });
+  });
+
+  describe("focus entry/exit contract", () => {
+    it("restores focus to the previously focused element on unmount", () => {
+      const origin = document.createElement("button");
+      origin.textContent = "Open widget";
+      document.body.appendChild(origin);
+
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      origin.focus();
+      expect(document.activeElement).toBe(origin);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      // Focus entry: focus moves into the widget container.
+      expect(article.getAttribute("tabindex")).toBe("-1");
+      expect(document.activeElement).toBe(article);
+
+      unmount();
+
+      // Focus restoration: focus returns to the element that owned it before.
+      expect(document.activeElement).toBe(origin);
+    });
+
+    it("does not move or restore focus when isMainContent is false", () => {
+      const origin = document.createElement("button");
+      document.body.appendChild(origin);
+
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      origin.focus();
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: false })
+      );
+
+      expect(article.hasAttribute("tabindex")).toBe(false);
+      expect(document.activeElement).toBe(origin);
+
+      unmount();
+
+      expect(document.activeElement).toBe(origin);
+    });
+
+    it("Escape restores focus to the focus origin when focus is inside the widget", () => {
+      const origin = document.createElement("button");
+      document.body.appendChild(origin);
+
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      origin.focus();
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      expect(document.activeElement).toBe(article);
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      expect(document.activeElement).toBe(origin);
+
+      unmount();
+    });
+
+    it("Escape refocuses the container and announces exit guidance when there is no same-document origin", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      // In an iframe-like context nothing meaningful had focus before the
+      // widget, so the container is focused on entry.
+      expect(document.activeElement).toBe(article);
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      // Focus stays on the container and exit guidance is announced.
+      expect(document.activeElement).toBe(article);
+      const announcer = document.querySelector('[aria-live="polite"]');
+      expect(announcer?.textContent).toContain(
+        "Press Tab to return to the host page"
+      );
+
+      unmount();
+    });
+
+    it("Escape activates a close button when one exists inside the widget", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const closeBtn = document.createElement("button");
+      closeBtn.setAttribute("aria-label", "Close widget");
+      const clickSpy = vi.fn();
+      closeBtn.addEventListener("click", clickSpy);
+      article.appendChild(closeBtn);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      closeBtn.focus();
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+
+      unmount();
+    });
+
+    it("Escape is ignored while a dialog is open", () => {
+      const origin = document.createElement("button");
+      document.body.appendChild(origin);
+
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      document.body.appendChild(dialog);
+
+      origin.focus();
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      // The open dialog owns Escape: the widget must not restore focus.
+      expect(document.activeElement).toBe(article);
+
+      unmount();
+    });
+
+    it("Escape is ignored when focus is outside the widget", () => {
+      const origin = document.createElement("button");
+      document.body.appendChild(origin);
+
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      origin.focus();
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      // User moves focus back out to the host page.
+      origin.focus();
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      // Escape outside the widget must never be hijacked.
+      expect(document.activeElement).toBe(origin);
+
+      unmount();
+    });
+
+    it("non-Escape keys do not trigger exit behaviour", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const closeBtn = document.createElement("button");
+      closeBtn.setAttribute("aria-label", "Close widget");
+      const clickSpy = vi.fn();
+      closeBtn.addEventListener("click", clickSpy);
+      article.appendChild(closeBtn);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+      );
+
+      expect(clickSpy).not.toHaveBeenCalled();
+
+      unmount();
+    });
   });
 
   describe("edge cases", () => {
@@ -490,6 +781,39 @@ describe("useEmbedAccessibility hook", () => {
       const { unmount } = renderHook(() =>
         useEmbedAccessibility({ title: "No Container" })
       );
+      // Escape with no widget container is a safe no-op.
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+      expect(() => unmount()).not.toThrow();
+    });
+
+    it("handles a null focus origin at mount without crashing", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      // Simulate a browsing context where no element holds focus when the
+      // widget mounts (e.g. a freshly loaded iframe document).
+      const activeElementSpy = vi
+        .spyOn(document, "activeElement", "get")
+        .mockReturnValue(null);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+      activeElementSpy.mockRestore();
+
+      // Focus entry still works when there is no focus origin to restore.
+      expect(document.activeElement).toBe(article);
+
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+
+      // No origin to restore: focus stays on the container.
+      expect(document.activeElement).toBe(article);
+
       expect(() => unmount()).not.toThrow();
     });
 

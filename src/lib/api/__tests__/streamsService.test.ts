@@ -152,7 +152,68 @@ describe("streamsService live mode", () => {
     controller.abort();
 
     await expect(promise).rejects.toThrow();
-    expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
+  });
+
+  it("times out slow requests and throws StreamsServiceError with kind 'timeout'", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getStreams(undefined, { timeoutMs: 1000 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      name: "StreamsServiceError",
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry when a request times out", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "3");
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getTreasuryMetrics({ timeoutMs: 500 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    await assertion;
+    // Exactly 1 attempt, no retries on timeout
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports passing StreamsRequestOptions to getRecipientStreams and getStreamById", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getRecipientStreams(VALID_RECIPIENT, { timeoutMs: 800 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(800);
+    await assertion;
   });
 
   it("validates recipient addresses before issuing a request", async () => {
