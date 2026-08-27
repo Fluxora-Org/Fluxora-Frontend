@@ -298,7 +298,7 @@ describe('RecentStreams – untrusted metadata security', () => {
     unmount();
   });
 
-  it('View link renders with no inline event handlers regardless of detailUrl', () => {
+  it('View link renders with no inline event handlers and rejects dangerous detailUrl schemes', () => {
     const { unmount } = renderWithRouter(
       <RecentStreams
         streams={[
@@ -314,6 +314,8 @@ describe('RecentStreams – untrusted metadata security', () => {
     expect(viewLink.getAttribute('onclick')).toBeNull();
     expect(viewLink.getAttribute('onmouseover')).toBeNull();
     expect(viewLink.getAttribute('onload')).toBeNull();
+    // Enforces safe navigation fallback when dangerous scheme is passed
+    expect(viewLink.getAttribute('href')).toBe('/app/streams/safe-id');
     unmount();
   });
 });

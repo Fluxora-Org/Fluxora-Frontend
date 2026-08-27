@@ -16,6 +16,7 @@ import {
   getShareProviderLabel,
   isProviderConnected,
 } from "../../lib/shareWorkspaces";
+import { isSafeUrl } from "../../utils/security";
 
 interface StreamCreatedModalProps {
   isOpen: boolean;
@@ -620,7 +621,7 @@ export default function StreamCreatedModal({
                     <dt>Stream link</dt>
                     <dd>
                       <a
-                        href={streamUrl}
+                        href={isSafeUrl(streamUrl) ? streamUrl : "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={styles.sharePreviewLink}
