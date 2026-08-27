@@ -8,6 +8,27 @@ The `PresenceBadge` component and its associated hooks (`usePresenceViewers`) ma
 - **Fade Out (29s):** If a viewer hasn't been active for 29 seconds, they are marked with `fadingOut: true`. This triggers CSS animations (`.fading-out` class in `Presence.css`) to gradually hide their avatar.
 - **Eviction (30s):** If a viewer hasn't been active for 30 seconds, they are completely removed from the `viewers` array.
 
+## Subscription Lifecycle & Cleanup (Issue #1428)
+
+`usePresenceViewers` owns a single presence subscription — the eviction
+interval today, and a real transport listener once wired — scoped to the
+`(streamId, accountId)` tuple:
+
+- **Route change (`streamId`)** and **account switch (`accountId`)**: the
+  previous subscription is torn down (its `clearInterval` cleanup runs) BEFORE a
+  fresh one is established, and any stale viewer state is reset to `[]`
+  synchronously so a prior route or wallet identity cannot leak through.
+- **Wallet disconnect (`accountId` → `undefined`) or leaving a stream
+  (`streamId` → `undefined`)**: with no remaining viewer source the subscription
+  is torn down entirely and viewers reset to `[]`.
+- **Unmount**: the interval is cleared and a `mounted` guard makes any late tick
+  a no-op, so no state update occurs after unmount.
+
+Before this change the eviction interval was created once on mount and ran
+unconditionally for the component's lifetime, regardless of the active route or
+wallet identity. It is now created only while a viewer source exists and is
+rebound whenever the route or identity changes.
+
 ## Edge Cases & State Management
 
 - **Empty State:** If there are 0 other viewers (`viewers.length === 0`), the component returns `null` and renders nothing. This implicitly handles "loading" or "empty" states before viewers join.

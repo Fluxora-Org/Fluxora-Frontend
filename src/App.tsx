@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { lazy, Suspense, useState, type ReactElement } from "react";
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import { VoiceProvider } from "./components/voice/VoiceContext";
 import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
+import { getRecipientRouteKey } from "./pages/recipientRouteKey";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -42,6 +43,11 @@ function LegacyStreamRedirect() {
       replace
     />
   );
+}
+
+function RecipientRoute() {
+  const location = useLocation();
+  return <Recipient key={getRecipientRouteKey(location.pathname, location.search)} />;
 }
 
 function AppRouteFallback() {
@@ -136,7 +142,7 @@ export default function App() {
                       <Route index element={lazyAppRoute(<Dashboard />)} />
                       <Route path="streams" element={lazyAppRoute(<Streams />)} />
                       <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
-                      <Route path="recipient" element={lazyAppRoute(<Recipient />)} />
+                      <Route path="recipient" element={lazyAppRoute(<RecipientRoute />)} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (

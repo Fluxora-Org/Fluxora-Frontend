@@ -302,13 +302,11 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const fixButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const validCount = rows.filter((r) => r.status === 'valid' || r.status === 'duplicate-recipient').length;
+  const validCount = rows.filter((r) => r.status === 'valid').length;
   const errorCount = rows.filter((r) => r.status === 'needs-fix').length;
   const dupCount = rows.filter((r) => r.status === 'duplicate-recipient').length;
   const skippedCount = rows.filter((r) => r.status === 'skipped').length;
-  const submitCount = rows.filter(
-    (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
-  ).length;
+  const submitCount = validCount;
   const canSubmit = submitCount > 0;
 
   const openEdit = useCallback((rowId: string) => {
@@ -373,6 +371,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
       const newRows = rows.map((r) =>
         r.id === rowId ? { ...r, status: 'skipped' as const } : r,
       );
+      markDuplicates(newRows);
       onRowsChange(newRows);
     },
     [rows, onRowsChange],
@@ -382,6 +381,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
     const newRows = rows.map((r) =>
       r.status === 'needs-fix' ? { ...r, status: 'skipped' as const } : r,
     );
+    markDuplicates(newRows);
     onRowsChange(newRows);
     setLiveMessage(`${errorCount} invalid rows skipped.`);
   }, [rows, onRowsChange, errorCount]);
@@ -584,7 +584,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
                             {row.status === 'needs-fix' ? 'Fix' : 'Edit'}
                           </button>
                         )}
-                        {row.status === 'needs-fix' && (
+                        {(row.status === 'needs-fix' || row.status === 'duplicate-recipient') && (
                           <button
                             type="button"
                             className="csv-skip-btn"

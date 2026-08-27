@@ -249,6 +249,7 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+        onStreamError={refetch}
       />
 
       <CreateStreamFab

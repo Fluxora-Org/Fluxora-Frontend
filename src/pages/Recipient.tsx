@@ -1,43 +1,57 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import RecipientEmptyState from "../components/RecipientEmptyState";
-import { RecipientStreams, type Stream } from "../components/recipient/RecipientStreams";
+import {
+  RecipientStreams,
+  type Stream,
+} from "../components/recipient/RecipientStreams";
 import RecipientLoading from "../components/RecipientLoading";
-import { MAX_LOADING_RETRIES } from "../components/Skeleton";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useToast } from "../components/toast/ToastProvider";
-import { useRecipientStreams } from "../components/treasuryOverviewPage/useTreasury";
 import { formatAssetAmount } from "../lib/formatters";
 import type { StreamRecord } from "../data/streamRecords";
 import { withdraw } from "../lib/stellar/tx";
 import { getStreamStatusNotificationContent } from "../components/ToastNotification";
 import { TransactionReceiptPreview } from "../components/receipt/TransactionReceiptPreview";
-import type { ReceiptData } from "../utils/receiptGenerator";
+import {
+  formatReceiptAmount,
+  type ReceiptData,
+} from "../utils/receiptGenerator";
 import { config } from "../lib/config";
-import { Shield, Fingerprint, Lock, Key, CheckCircle2, XCircle, AlertCircle, X } from "lucide-react";
+import {
+  Shield,
+  Fingerprint,
+  Lock,
+  Key,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  X,
+} from "lucide-react";
 import RecipientMonthlySummary from "../components/recipient/RecipientMonthlySummary";
 import "./Streams.css";
 import "./Recipient.css";
 import { useFaviconBadge } from "../utils/faviconBadge";
 import { useModalAccessibility } from "../components/useModalAccessibility";
+import { useRecipientPageData } from "./useRecipientPageData";
 
 // (Removed top-level timeoutRef and useEffect; will be added inside component)
 
 // Demo balances used as a UI fallback when the service returns no recipient
 // streams (no live backend yet, or no seeded match for the connected address).
-const DEMO_BALANCE = 22600.0;
-const DEMO_ACTIVE = 2;
-const DEMO_TOTAL_ACCRUED = 43250.0;
-const DEMO_TOTAL_WITHDRAWN = 20650.0;
 const USDC_SCALE = 10_000_000;
+const USDC_DECIMALS = 7;
+const DEMO_BALANCE = 22600.0;
 const MAX_U64 = 18_446_744_073_709_551_615n;
 const RECIPIENT_PAGE_TITLE = "Fluxora — Recipient portal";
 const ALERTS_STORAGE_KEY = "fluxora.stream-alerts.enabled";
 
-export type NotificationPermissionState = "default" | "granted" | "denied" | "unsupported";
+export type NotificationPermissionState =
+  "default" | "granted" | "denied" | "unsupported";
 
 function getBrowserNotificationPermission(): NotificationPermissionState {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  if (typeof window === "undefined" || !("Notification" in window))
+    return "unsupported";
   return window.Notification.permission;
 }
 
@@ -104,6 +118,28 @@ export function getRecipientPageTitle(
 export default function Recipient() {
   const wallet = useWallet();
   const { addToast } = useToast();
+  const recipientData = useRecipientPageData({
+    address: wallet.address,
+    connected: wallet.connected,
+  });
+  const {
+    streams: liveStreams,
+    hasLiveStreams,
+    hasStreams,
+    walletConnected,
+    balance,
+    activeStreams,
+    totalAccrued,
+    totalWithdrawn,
+    pageLoading,
+    effectiveEmptyStateLoading,
+    isRetryingDisabled,
+    error: streamsError,
+    retryCount,
+    isRetryExhausted,
+    retryButtonRef: pageRetryButtonRef,
+    refetch: handlePageRefetch,
+  } = recipientData;
 
   const [txState, setTxState] = useState<
     "idle" | "signing" | "submitting" | "confirmed" | "error"
@@ -112,7 +148,8 @@ export default function Recipient() {
   const [isTabFocused, setIsTabFocused] = useState<boolean>(() =>
     typeof window === "undefined" ? true : document.hasFocus(),
   );
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(getBrowserNotificationPermission);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>(getBrowserNotificationPermission);
   const [alertsEnabled, setAlertsEnabled] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -122,18 +159,16 @@ export default function Recipient() {
     }
   });
   const [isPrimingNotifications, setIsPrimingNotifications] = useState(false);
-  const [notificationState, setNotificationState] = useState<"not-yet-asked" | "priming-shown" | "permission-granted" | "permission-denied" | "permission-denied-recovery-hint">("not-yet-asked");
+  const [notificationState, setNotificationState] = useState<
+    | "not-yet-asked"
+    | "priming-shown"
+    | "permission-granted"
+    | "permission-denied"
+    | "permission-denied-recovery-hint"
+  >("not-yet-asked");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const recipientStreams = useRecipientStreams(wallet.address);
-
-  const [minLoadingElapsed, setMinLoadingElapsed] = useState(false);
-  const minLoadingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pageRefetchState, setPageRefetchState] = useState<"idle" | "retrying">("idle");
-  const prevStreamsErrorRef = useRef<string | null>(null);
-  const pageRetryButtonRef = useRef<HTMLButtonElement>(null);
 
   // ── Local Security Gate States ──
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
@@ -149,16 +184,16 @@ export default function Recipient() {
 
   // Enrollment Modal States
   const [isEnrollmentModalOpen, setIsEnrollmentModalOpen] = useState(false);
-  const [enrollmentStep, setEnrollmentStep] = useState('check-support');
+  const [enrollmentStep, setEnrollmentStep] = useState("check-support");
   const [pinValue, setPinValue] = useState("");
   const [confirmPinValue, setConfirmPinValue] = useState("");
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
   // Verification Modal States
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
-  const [verifyState, setVerifyState] = useState('prompt-active');
+  const [verifyState, setVerifyState] = useState("prompt-active");
   const [verifyPinValue, setVerifyPinValue] = useState("");
-  const [verifyActionType, setVerifyActionType] = useState('withdraw');
+  const [verifyActionType, setVerifyActionType] = useState("withdraw");
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Refs for modal accessibility
@@ -186,7 +221,8 @@ export default function Recipient() {
     const checkSupport = async () => {
       if (typeof window !== "undefined" && window.PublicKeyCredential) {
         try {
-          const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          const isAvailable =
+            await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
           setIsBiometricSupported(isAvailable);
         } catch {
           setIsBiometricSupported(false);
@@ -197,38 +233,6 @@ export default function Recipient() {
     };
     checkSupport();
   }, []);
-
-  const MIN_LOADING_MS = 300;
-
-  useEffect(() => {
-    minLoadingRef.current = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
-    return () => {
-      if (minLoadingRef.current) {
-        clearTimeout(minLoadingRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const hadError = Boolean(prevStreamsErrorRef.current);
-    const hasError = Boolean(recipientStreams.error);
-
-    if (!hadError && hasError && pageRetryButtonRef.current) {
-      pageRetryButtonRef.current.focus();
-    }
-
-    prevStreamsErrorRef.current = recipientStreams.error ?? null;
-  }, [recipientStreams.error]);
-
-  const handlePageRefetch = useCallback(async () => {
-    setPageRefetchState("retrying");
-    try {
-      recipientStreams.refetch();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    } finally {
-      setPageRefetchState("idle");
-    }
-  }, [recipientStreams]);
 
   /**
    * Resets transaction state when the active wallet address changes.
@@ -241,12 +245,6 @@ export default function Recipient() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setMinLoadingElapsed(false);
-    if (minLoadingRef.current) {
-      clearTimeout(minLoadingRef.current);
-    }
-    minLoadingRef.current = setTimeout(() => setMinLoadingElapsed(true), MIN_LOADING_MS);
-    prevStreamsErrorRef.current = null;
   }, [wallet.address]);
 
   useEffect(() => {
@@ -263,42 +261,17 @@ export default function Recipient() {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-      if (minLoadingRef.current) {
-        clearTimeout(minLoadingRef.current);
-      }
-
       document.title = RECIPIENT_PAGE_TITLE;
     };
   }, []);
 
-  const fetchIncomingStreams = useCallback(async (): Promise<Stream[]> => [
-    { id: "1", sender: "Treasury", amount: "12000", status: "active" },
-    { id: "2", sender: "Payroll", amount: "8600", status: "active" },
-  ], []);
-
-  const liveStreams = recipientStreams.streams;
-  // A service error means we cannot confirm the recipient has no streams —
-  // treat it the same as "no streams yet" so we show the error+retry path
-  // instead of silently falling through to demo balance values.
-  const hasLiveStreams = liveStreams.length > 0 && !recipientStreams.error;
-
-  const walletConnected = wallet.connected;
-
-  const pageLoading = useMemo(() => {
-    if (!walletConnected) return false;
-    const dataLoading = recipientStreams.loading;
-    if (dataLoading) return true;
-    if (!minLoadingElapsed) return true;
-    return false;
-  }, [walletConnected, recipientStreams.loading, minLoadingElapsed]);
-
-  const effectiveEmptyStateLoading = useMemo(() => {
-    if (!walletConnected) return false;
-    if (recipientStreams.error) return false;
-    return recipientStreams.loading || pageRefetchState === "retrying";
-  }, [walletConnected, recipientStreams.loading, recipientStreams.error, pageRefetchState]);
-
-  const isRetryingDisabled = pageRefetchState === "retrying" || recipientStreams.loading;
+  const fetchIncomingStreams = useCallback(
+    async (): Promise<Stream[]> => [
+      { id: "1", sender: "Treasury", amount: "12000", status: "active" },
+      { id: "2", sender: "Payroll", amount: "8600", status: "active" },
+    ],
+    [],
+  );
 
   const demoWithdrawStream: WithdrawStreamCandidate = {
     id: "1",
@@ -318,25 +291,6 @@ export default function Recipient() {
       isValidWithdrawStreamId(stream.id),
   ).length;
   const selectedWithdrawStream = selectWithdrawStream(withdrawStreamCandidates);
-
-  const balance = hasLiveStreams
-    ? liveStreams.reduce((sum, stream) => sum + stream.withdrawableAmount, 0)
-    : DEMO_BALANCE;
-  const activeStreams = hasLiveStreams
-    ? liveStreams.filter((stream) => stream.status === "Active").length
-    : DEMO_ACTIVE;
-  const totalAccrued = hasLiveStreams
-    ? liveStreams.reduce((sum, stream) => sum + stream.streamedAmount, 0)
-    : DEMO_TOTAL_ACCRUED;
-  const totalWithdrawn = hasLiveStreams
-    ? liveStreams.reduce(
-        (sum, stream) =>
-          sum + Math.max(0, stream.streamedAmount - stream.withdrawableAmount),
-        0,
-      )
-    : DEMO_TOTAL_WITHDRAWN;
-
-  const hasStreams = activeStreams > 0;
 
   const networkMismatch = wallet.connected && wallet.isNetworkMismatch;
 
@@ -368,7 +322,10 @@ export default function Recipient() {
       setNotificationPermission("unsupported");
       setNotificationState("permission-denied-recovery-hint");
       setIsPrimingNotifications(false);
-      addToast("Browser notifications are not available here. Stream updates remain in Fluxora.", "info");
+      addToast(
+        "Browser notifications are not available here. Stream updates remain in Fluxora.",
+        "info",
+      );
       return;
     }
 
@@ -380,12 +337,22 @@ export default function Recipient() {
       setStoredAlertsEnabled(true);
       addToast("Stream alerts are enabled.", "success");
     } else {
-      setNotificationState(permission === "denied" ? "permission-denied-recovery-hint" : "permission-denied");
-      addToast("No browser permission was granted. You can try again from stream settings.", "info");
+      setNotificationState(
+        permission === "denied"
+          ? "permission-denied-recovery-hint"
+          : "permission-denied",
+      );
+      addToast(
+        "No browser permission was granted. You can try again from stream settings.",
+        "info",
+      );
     }
   };
 
-  const notificationPreview = getStreamStatusNotificationContent("new-stream", "a new USDC stream");
+  const notificationPreview = getStreamStatusNotificationContent(
+    "new-stream",
+    "a new USDC stream",
+  );
 
   // Zero-accrual: connected + streams exist + no withdrawable balance yet
   const isZeroAccrual = walletConnected && hasStreams && balance === 0;
@@ -402,7 +369,11 @@ export default function Recipient() {
   const handleToggleSecurityGate = () => {
     if (isSecurityGateEnabled) {
       setVerifyActionType("disable_gate");
-      setVerifyState(isBiometricEnrolled && isBiometricSupported ? "prompt-active" : "unsupported-device-fallback");
+      setVerifyState(
+        isBiometricEnrolled && isBiometricSupported
+          ? "prompt-active"
+          : "unsupported-device-fallback",
+      );
       setVerifyPinValue("");
       setVerifyError(null);
       setIsVerifyModalOpen(true);
@@ -426,7 +397,11 @@ export default function Recipient() {
   const triggerBiometricEnrollment = async () => {
     setEnrollmentError(null);
     try {
-      if (typeof window !== "undefined" && window.PublicKeyCredential && navigator.credentials?.create) {
+      if (
+        typeof window !== "undefined" &&
+        window.PublicKeyCredential &&
+        navigator.credentials?.create
+      ) {
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
         const options = {
@@ -436,15 +411,15 @@ export default function Recipient() {
             user: {
               id: new Uint8Array([1, 2, 3, 4]),
               name: "recipient@fluxora.xyz",
-              displayName: "Recipient"
+              displayName: "Recipient",
             },
             pubKeyCredParams: [{ type: "public-key", alg: -7 }],
             authenticatorSelection: {
               authenticatorAttachment: "platform",
-              userVerification: "required"
+              userVerification: "required",
             },
-            timeout: 60000
-          }
+            timeout: 60000,
+          },
         } as CredentialCreationOptions;
         await navigator.credentials.create(options);
       } else {
@@ -453,25 +428,30 @@ export default function Recipient() {
       localStorage.setItem("fluxora_biometric_enrolled", "true");
       setIsBiometricEnrolled(true);
       setEnrollmentStep("set-pin");
-} catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to register biometrics.";
-        setEnrollmentError(message);
-      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to register biometrics.";
+      setEnrollmentError(message);
+    }
   };
 
   const triggerBiometricVerification = async () => {
     setVerifyState("prompt-active");
     setVerifyError(null);
     try {
-      if (typeof window !== "undefined" && window.PublicKeyCredential && navigator.credentials?.get) {
+      if (
+        typeof window !== "undefined" &&
+        window.PublicKeyCredential &&
+        navigator.credentials?.get
+      ) {
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
         const options = {
           publicKey: {
             challenge,
             timeout: 60000,
-            userVerification: "required" as const
-          }
+            userVerification: "required" as const,
+          },
         } as CredentialRequestOptions;
         await navigator.credentials.get(options);
       } else {
@@ -512,7 +492,8 @@ export default function Recipient() {
   const handleEnrollPinKeyPress = (key: string) => {
     setEnrollmentError(null);
     const activePin = enrollmentStep === "set-pin" ? pinValue : confirmPinValue;
-    const setActivePin = enrollmentStep === "set-pin" ? setPinValue : setConfirmPinValue;
+    const setActivePin =
+      enrollmentStep === "set-pin" ? setPinValue : setConfirmPinValue;
 
     if (key === "backspace") {
       setActivePin(activePin.slice(0, -1));
@@ -584,7 +565,11 @@ export default function Recipient() {
 
     if (isSecurityGateEnabled) {
       setVerifyActionType("withdraw");
-      setVerifyState(isBiometricEnrolled && isBiometricSupported ? "prompt-active" : "unsupported-device-fallback");
+      setVerifyState(
+        isBiometricEnrolled && isBiometricSupported
+          ? "prompt-active"
+          : "unsupported-device-fallback",
+      );
       setVerifyPinValue("");
       setVerifyError(null);
       setIsVerifyModalOpen(true);
@@ -618,7 +603,7 @@ export default function Recipient() {
         type: "Withdrawal",
         sender: "Treasury Smart Contract",
         recipient: recipientAddr,
-        amount: formatAssetAmount(balance, "USDC"),
+        amount: formatReceiptAmount(amountStr, USDC_DECIMALS, "USDC"),
         timestamp: new Date().toISOString(),
         txHash: typeof txRes === "string" ? txRes : null,
         status: typeof txRes === "string" ? "confirmed" : "pending",
@@ -651,12 +636,9 @@ export default function Recipient() {
     }
   };
 
-  if (pageLoading || (recipientStreams.error && recipientStreams.retryCount >= MAX_LOADING_RETRIES)) {
+  if (pageLoading || isRetryExhausted) {
     return (
-      <RecipientLoading
-        retryCount={recipientStreams.retryCount}
-        onRetry={handlePageRefetch}
-      />
+      <RecipientLoading retryCount={retryCount} onRetry={handlePageRefetch} />
     );
   }
 
@@ -664,7 +646,7 @@ export default function Recipient() {
   //   - wallet is disconnected, OR
   //   - no active streams for the connected wallet (including service errors,
   //     where we must not silently fall through to demo-balance values)
-  const serviceError = walletConnected ? recipientStreams.error : null;
+  const serviceError = walletConnected ? streamsError : null;
   if (!walletConnected || !hasStreams || serviceError) {
     return (
       <main aria-labelledby="recipient-page-title">
@@ -680,7 +662,7 @@ export default function Recipient() {
         <RecipientEmptyState
           walletConnected={walletConnected}
           loading={effectiveEmptyStateLoading}
-          error={walletConnected ? recipientStreams.error : null}
+          error={walletConnected ? streamsError : null}
           onRetry={walletConnected ? handlePageRefetch : undefined}
           ctaDisabled={isRetryingDisabled}
           retryButtonRef={pageRetryButtonRef}
@@ -688,7 +670,10 @@ export default function Recipient() {
 
         {/* ── Local Security Gate (shown even without streams) ── */}
         {walletConnected && (
-          <section className="security-gate-section" aria-labelledby="security-gate-title">
+          <section
+            className="security-gate-section"
+            aria-labelledby="security-gate-title"
+          >
             <div className="security-gate-card">
               <div className="security-gate-card__header">
                 <div className="security-gate-icon-container">
@@ -697,24 +682,24 @@ export default function Recipient() {
                 <div>
                   <h2 id="security-gate-title">Local Security Gate</h2>
                   <p className="security-gate-description">
-                    Add an optional biometric or PIN confirmation step before each
-                    withdrawal. This is a local UX gate only and does not replace
-                    your wallet's cryptographic signing prompt.
+                    Add an optional biometric or PIN confirmation step before
+                    each withdrawal. This is a local UX gate only and does not
+                    replace your wallet's cryptographic signing prompt.
                   </p>
                 </div>
               </div>
               <div className="security-gate-card__actions">
                 <div className="security-gate-status">
-                <span className="security-status-label">Status:</span>
-                <span
-                  className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
-                  aria-live="polite"
-                  role="status"
-                  aria-label={`Local Security Gate status: ${isSecurityGateEnabled ? "Active" : "Disabled"}`}
-                >
-                  {isSecurityGateEnabled ? "Active" : "Disabled"}
-                </span>
-              </div>
+                  <span className="security-status-label">Status:</span>
+                  <span
+                    className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
+                    aria-live="polite"
+                    role="status"
+                    aria-label={`Local Security Gate status: ${isSecurityGateEnabled ? "Active" : "Disabled"}`}
+                  >
+                    {isSecurityGateEnabled ? "Active" : "Disabled"}
+                  </span>
+                </div>
                 <button
                   type="button"
                   className={`streams-primary-button security-gate-toggle-btn ${isSecurityGateEnabled ? "danger" : ""}`}
@@ -818,56 +803,118 @@ export default function Recipient() {
       {/* ── Printable Monthly Summary ── */}
       {hasLiveStreams && <RecipientMonthlySummary streams={liveStreams} />}
 
-      <section className="recipient-alerts-panel" aria-labelledby="stream-alerts-title">
+      <section
+        className="recipient-alerts-panel"
+        aria-labelledby="stream-alerts-title"
+      >
         <div>
           <p className="recipient-alerts-eyebrow">Optional alerts</p>
           <h2 id="stream-alerts-title">Know when your stream changes</h2>
-          <p>Get a browser notification when a cliff passes, a stream is fully accrued, or a new stream arrives.</p>
+          <p>
+            Get a browser notification when a cliff passes, a stream is fully
+            accrued, or a new stream arrives.
+          </p>
         </div>
         {alertsEnabled && notificationPermission === "granted" ? (
-          <button type="button" className="recipient-alerts-toggle" onClick={() => setStoredAlertsEnabled(false)} aria-pressed="true">
+          <button
+            type="button"
+            className="recipient-alerts-toggle"
+            onClick={() => setStoredAlertsEnabled(false)}
+            aria-pressed="true"
+          >
             Alerts on · Turn off
           </button>
         ) : (
-          <button type="button" className="recipient-alerts-toggle" onClick={openNotificationPriming}>
+          <button
+            type="button"
+            className="recipient-alerts-toggle"
+            onClick={openNotificationPriming}
+          >
             Notify me
           </button>
         )}
         {notificationState === "permission-denied-recovery-hint" && (
           <p className="recipient-alerts-recovery" role="status">
-            Permission is blocked by your browser. Allow notifications for Fluxora in site settings, then choose Notify me again.
+            Permission is blocked by your browser. Allow notifications for
+            Fluxora in site settings, then choose Notify me again.
           </p>
         )}
       </section>
 
       {isPrimingNotifications && (
-        <div className="recipient-alerts-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setIsPrimingNotifications(false);
-        }}>
-          <section className="recipient-alerts-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-priming-title" aria-describedby="notification-priming-description">
-            <p className="recipient-alerts-eyebrow">Before browser permission</p>
-            <h2 id="notification-priming-title">Keep stream milestones in view</h2>
-            <p id="notification-priming-description">Fluxora will notify you only when one of these happens:</p>
+        <div
+          className="recipient-alerts-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget)
+              setIsPrimingNotifications(false);
+          }}
+        >
+          <section
+            className="recipient-alerts-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-priming-title"
+            aria-describedby="notification-priming-description"
+          >
+            <p className="recipient-alerts-eyebrow">
+              Before browser permission
+            </p>
+            <h2 id="notification-priming-title">
+              Keep stream milestones in view
+            </h2>
+            <p id="notification-priming-description">
+              Fluxora will notify you only when one of these happens:
+            </p>
             <ul>
               <li>A stream cliff passes</li>
               <li>A stream becomes fully accrued</li>
               <li>You receive a new stream</li>
             </ul>
-            <div className="recipient-alerts-preview" aria-label="Example notification">
-              <img src={notificationPreview.icon} alt="" width="24" height="24" />
-              <span><strong>{notificationPreview.title}</strong><small>{notificationPreview.body}</small></span>
+            <div
+              className="recipient-alerts-preview"
+              aria-label="Example notification"
+            >
+              <img
+                src={notificationPreview.icon}
+                alt=""
+                width="24"
+                height="24"
+              />
+              <span>
+                <strong>{notificationPreview.title}</strong>
+                <small>{notificationPreview.body}</small>
+              </span>
             </div>
-            <p className="recipient-alerts-note">You can turn Fluxora alerts off here later. Browser permission can be changed in your site settings.</p>
+            <p className="recipient-alerts-note">
+              You can turn Fluxora alerts off here later. Browser permission can
+              be changed in your site settings.
+            </p>
             <div className="recipient-alerts-actions">
-              <button type="button" className="recipient-alerts-secondary" onClick={() => setIsPrimingNotifications(false)}>Not now</button>
-              <button type="button" className="recipient-alerts-primary" onClick={() => void enableNotifications()}>Allow stream alerts</button>
+              <button
+                type="button"
+                className="recipient-alerts-secondary"
+                onClick={() => setIsPrimingNotifications(false)}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="recipient-alerts-primary"
+                onClick={() => void enableNotifications()}
+              >
+                Allow stream alerts
+              </button>
             </div>
           </section>
         </div>
       )}
 
       {/* ── Local Security Gate Settings ── */}
-      <section className="security-gate-section" aria-labelledby="security-gate-title">
+      <section
+        className="security-gate-section"
+        aria-labelledby="security-gate-title"
+      >
         <div className="security-gate-card">
           <div className="security-gate-card__header">
             <div className="security-gate-icon-container">
@@ -957,14 +1004,20 @@ export default function Recipient() {
               {enrollmentStep === "check-support" && (
                 <>
                   <div className="security-visual-container">
-                    <Fingerprint className="security-visual-icon security-visual-icon--pulse" aria-hidden="true" />
+                    <Fingerprint
+                      className="security-visual-icon security-visual-icon--pulse"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
-                    Register your device biometrics (Touch ID, Face ID, or Windows
-                    Hello) as an additional confirmation step before each withdrawal.
+                    Register your device biometrics (Touch ID, Face ID, or
+                    Windows Hello) as an additional confirmation step before
+                    each withdrawal.
                   </p>
                   {enrollmentError && (
-                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                    <div className="security-modal__error" role="alert">
+                      {enrollmentError}
+                    </div>
                   )}
                   <div className="security-modal__actions">
                     <button
@@ -972,7 +1025,8 @@ export default function Recipient() {
                       className="streams-primary-button"
                       onClick={triggerBiometricEnrollment}
                     >
-                      <Fingerprint size={16} aria-hidden="true" /> Register Device Biometrics
+                      <Fingerprint size={16} aria-hidden="true" /> Register
+                      Device Biometrics
                     </button>
                     <button
                       type="button"
@@ -996,9 +1050,14 @@ export default function Recipient() {
                     unavailable on your device.
                   </p>
                   {enrollmentError && (
-                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                    <div className="security-modal__error" role="alert">
+                      {enrollmentError}
+                    </div>
                   )}
-                  <div className="pin-display-dots" aria-label={`PIN entry: ${pinValue.length} of 4 digits entered`}>
+                  <div
+                    className="pin-display-dots"
+                    aria-label={`PIN entry: ${pinValue.length} of 4 digits entered`}
+                  >
                     {[0, 1, 2, 3].map((i) => (
                       <span
                         key={i}
@@ -1007,16 +1066,57 @@ export default function Recipient() {
                       />
                     ))}
                   </div>
-                  <div className="pin-keypad" role="group" aria-label="PIN keypad">
+                  <div
+                    className="pin-keypad"
+                    role="group"
+                    aria-label="PIN keypad"
+                  >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                      <button key={n} type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress(String(n))}>
+                      <button
+                        key={n}
+                        type="button"
+                        className="pin-key"
+                        onClick={() => handleEnrollPinKeyPress(String(n))}
+                      >
                         {n}
                       </button>
                     ))}
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("clear")} aria-label="Clear">Clear</button>
-                    <button type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress("0")}>0</button>
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("backspace")} aria-label="Backspace">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleEnrollPinKeyPress("clear")}
+                      aria-label="Clear"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key"
+                      onClick={() => handleEnrollPinKeyPress("0")}
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleEnrollPinKeyPress("backspace")}
+                      aria-label="Backspace"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                        <line x1="18" y1="9" x2="12" y2="15" />
+                        <line x1="12" y1="9" x2="18" y2="15" />
+                      </svg>
                     </button>
                   </div>
                 </>
@@ -1032,9 +1132,14 @@ export default function Recipient() {
                     Re-enter your 4-digit PIN to confirm.
                   </p>
                   {enrollmentError && (
-                    <div className="security-modal__error" role="alert">{enrollmentError}</div>
+                    <div className="security-modal__error" role="alert">
+                      {enrollmentError}
+                    </div>
                   )}
-                  <div className="pin-display-dots" aria-label={`PIN confirmation: ${confirmPinValue.length} of 4 digits entered`}>
+                  <div
+                    className="pin-display-dots"
+                    aria-label={`PIN confirmation: ${confirmPinValue.length} of 4 digits entered`}
+                  >
                     {[0, 1, 2, 3].map((i) => (
                       <span
                         key={i}
@@ -1043,16 +1148,57 @@ export default function Recipient() {
                       />
                     ))}
                   </div>
-                  <div className="pin-keypad" role="group" aria-label="PIN confirmation keypad">
+                  <div
+                    className="pin-keypad"
+                    role="group"
+                    aria-label="PIN confirmation keypad"
+                  >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                      <button key={n} type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress(String(n))}>
+                      <button
+                        key={n}
+                        type="button"
+                        className="pin-key"
+                        onClick={() => handleEnrollPinKeyPress(String(n))}
+                      >
                         {n}
                       </button>
                     ))}
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("clear")} aria-label="Clear">Clear</button>
-                    <button type="button" className="pin-key" onClick={() => handleEnrollPinKeyPress("0")}>0</button>
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleEnrollPinKeyPress("backspace")} aria-label="Backspace">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleEnrollPinKeyPress("clear")}
+                      aria-label="Clear"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key"
+                      onClick={() => handleEnrollPinKeyPress("0")}
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleEnrollPinKeyPress("backspace")}
+                      aria-label="Backspace"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                        <line x1="18" y1="9" x2="12" y2="15" />
+                        <line x1="12" y1="9" x2="18" y2="15" />
+                      </svg>
                     </button>
                   </div>
                 </>
@@ -1062,11 +1208,15 @@ export default function Recipient() {
               {enrollmentStep === "success" && (
                 <>
                   <div className="security-visual-container">
-                    <CheckCircle2 className="security-visual-icon security-visual-icon--success" aria-hidden="true" />
+                    <CheckCircle2
+                      className="security-visual-icon security-visual-icon--success"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
                     Your local security gate is now active. You'll be asked to
-                    confirm with biometrics or your backup PIN before each withdrawal.
+                    confirm with biometrics or your backup PIN before each
+                    withdrawal.
                   </p>
                   <div className="security-modal__actions">
                     <button
@@ -1128,7 +1278,8 @@ export default function Recipient() {
                 {verifyState === "prompt-succeeded" && "Verification Passed"}
                 {verifyState === "prompt-failed" && "Verification Failed"}
                 {verifyState === "prompt-cancelled" && "Verification Cancelled"}
-                {verifyState === "unsupported-device-fallback" && "Enter Backup PIN"}
+                {verifyState === "unsupported-device-fallback" &&
+                  "Enter Backup PIN"}
               </h2>
             </div>
 
@@ -1137,7 +1288,10 @@ export default function Recipient() {
               {verifyState === "prompt-active" && (
                 <>
                   <div className="security-visual-container">
-                    <Fingerprint className="security-visual-icon security-visual-icon--pulse" aria-hidden="true" />
+                    <Fingerprint
+                      className="security-visual-icon security-visual-icon--pulse"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
                     Confirm your identity using your device biometrics.
@@ -1161,7 +1315,10 @@ export default function Recipient() {
               {verifyState === "prompt-succeeded" && (
                 <>
                   <div className="security-visual-container">
-                    <CheckCircle2 className="security-visual-icon security-visual-icon--success" aria-hidden="true" />
+                    <CheckCircle2
+                      className="security-visual-icon security-visual-icon--success"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
                     Identity verified. Proceeding to withdrawal…
@@ -1173,13 +1330,19 @@ export default function Recipient() {
               {verifyState === "prompt-failed" && (
                 <>
                   <div className="security-visual-container">
-                    <XCircle className="security-visual-icon security-visual-icon--error" aria-hidden="true" />
+                    <XCircle
+                      className="security-visual-icon security-visual-icon--error"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
-                    Biometric verification failed. You can try again or use your backup PIN.
+                    Biometric verification failed. You can try again or use your
+                    backup PIN.
                   </p>
                   {verifyError && (
-                    <div className="security-modal__error" role="alert">{verifyError}</div>
+                    <div className="security-modal__error" role="alert">
+                      {verifyError}
+                    </div>
                   )}
                   <div className="security-modal__actions">
                     <button
@@ -1192,7 +1355,9 @@ export default function Recipient() {
                     <button
                       type="button"
                       className="streams-secondary-button"
-                      onClick={() => setVerifyState("unsupported-device-fallback")}
+                      onClick={() =>
+                        setVerifyState("unsupported-device-fallback")
+                      }
                     >
                       Use Backup PIN
                     </button>
@@ -1204,10 +1369,14 @@ export default function Recipient() {
               {verifyState === "prompt-cancelled" && (
                 <>
                   <div className="security-visual-container">
-                    <AlertCircle className="security-visual-icon security-visual-icon--warning" aria-hidden="true" />
+                    <AlertCircle
+                      className="security-visual-icon security-visual-icon--warning"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="security-modal__text">
-                    Verification was cancelled. You can try again or use your backup PIN.
+                    Verification was cancelled. You can try again or use your
+                    backup PIN.
                   </p>
                   <div className="security-modal__actions">
                     <button
@@ -1220,7 +1389,9 @@ export default function Recipient() {
                     <button
                       type="button"
                       className="streams-secondary-button"
-                      onClick={() => setVerifyState("unsupported-device-fallback")}
+                      onClick={() =>
+                        setVerifyState("unsupported-device-fallback")
+                      }
                     >
                       Use Backup PIN
                     </button>
@@ -1238,9 +1409,14 @@ export default function Recipient() {
                     Enter your 4-digit backup PIN to confirm this withdrawal.
                   </p>
                   {verifyError && (
-                    <div className="security-modal__error" role="alert">{verifyError}</div>
+                    <div className="security-modal__error" role="alert">
+                      {verifyError}
+                    </div>
                   )}
-                  <div className="pin-display-dots" aria-label={`PIN entry: ${verifyPinValue.length} of 4 digits entered`}>
+                  <div
+                    className="pin-display-dots"
+                    aria-label={`PIN entry: ${verifyPinValue.length} of 4 digits entered`}
+                  >
                     {[0, 1, 2, 3].map((i) => (
                       <span
                         key={i}
@@ -1249,16 +1425,57 @@ export default function Recipient() {
                       />
                     ))}
                   </div>
-                  <div className="pin-keypad" role="group" aria-label="Backup PIN keypad">
+                  <div
+                    className="pin-keypad"
+                    role="group"
+                    aria-label="Backup PIN keypad"
+                  >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                      <button key={n} type="button" className="pin-key" onClick={() => handleVerifyPinKeyPress(String(n))}>
+                      <button
+                        key={n}
+                        type="button"
+                        className="pin-key"
+                        onClick={() => handleVerifyPinKeyPress(String(n))}
+                      >
                         {n}
                       </button>
                     ))}
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleVerifyPinKeyPress("clear")} aria-label="Clear">Clear</button>
-                    <button type="button" className="pin-key" onClick={() => handleVerifyPinKeyPress("0")}>0</button>
-                    <button type="button" className="pin-key pin-key--util" onClick={() => handleVerifyPinKeyPress("backspace")} aria-label="Backspace">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleVerifyPinKeyPress("clear")}
+                      aria-label="Clear"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key"
+                      onClick={() => handleVerifyPinKeyPress("0")}
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      className="pin-key pin-key--util"
+                      onClick={() => handleVerifyPinKeyPress("backspace")}
+                      aria-label="Backspace"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                        <line x1="18" y1="9" x2="12" y2="15" />
+                        <line x1="12" y1="9" x2="18" y2="15" />
+                      </svg>
                     </button>
                   </div>
                   {isBiometricSupported && isBiometricEnrolled && (
@@ -1270,7 +1487,8 @@ export default function Recipient() {
                         triggerBiometricVerification();
                       }}
                     >
-                      <Fingerprint size={16} aria-hidden="true" /> Use Biometrics Instead
+                      <Fingerprint size={16} aria-hidden="true" /> Use
+                      Biometrics Instead
                     </button>
                   )}
                 </>
@@ -1278,8 +1496,8 @@ export default function Recipient() {
             </div>
 
             <p className="security-modal__disclaimer">
-              This is a local UX gate only. The wallet's own signing prompt handles
-              cryptographic transaction authorization.
+              This is a local UX gate only. The wallet's own signing prompt
+              handles cryptographic transaction authorization.
             </p>
           </div>
         </div>
@@ -1313,7 +1531,10 @@ export default function Recipient() {
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={20} className="text-emerald-400" />
-                <h2 id="withdrawal-receipt-title" className="text-base font-bold text-[var(--text-vivid)]">
+                <h2
+                  id="withdrawal-receipt-title"
+                  className="text-base font-bold text-[var(--text-vivid)]"
+                >
                   Withdrawal Confirmed
                 </h2>
               </div>

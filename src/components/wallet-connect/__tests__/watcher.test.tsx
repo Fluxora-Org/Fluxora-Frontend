@@ -66,6 +66,9 @@ function WalletHarness({
   );
 }
 
+const TEST_WALLET_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("WALLET_WATCH_INTERVAL_MS constant derivation", () => {
@@ -138,9 +141,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
     getNetwork.mockReset();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("constructs WatchWalletChanges with the default interval (2000) on connect", async () => {
+  it("constructs WatchWalletChanges with the default interval (2000) on connect", async () => {
     const { WalletProvider, useWallet, WALLET_WATCH_INTERVAL_MS } =
       await import("../Walletcontext");
 
@@ -148,7 +149,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -169,9 +170,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
     expect(MockWatchWalletChanges).toHaveBeenCalledWith(2000);
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("does NOT construct WatchWalletChanges with the bare literal 2000 independently of the constant", async () => {
+  it("does NOT construct WatchWalletChanges with the bare literal 2000 independently of the constant", async () => {
     /**
      * This test exists to catch any future regression where someone hardcodes
      * the literal again. It verifies the argument IS the exported constant, not
@@ -193,7 +192,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -226,16 +225,14 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     getNetwork.mockReset();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("starts the watcher on connect and stops it on disconnect", async () => {
+  it("starts the watcher on connect and stops it on disconnect", async () => {
     const { WalletProvider, useWallet } = await import("../Walletcontext");
 
     function Harness() {
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -265,16 +262,14 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     expect(instance.stop).toHaveBeenCalledTimes(1);
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("stops the watcher on unmount", async () => {
+  it("stops the watcher on unmount", async () => {
     const { WalletProvider, useWallet } = await import("../Walletcontext");
 
     function Harness() {
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -323,9 +318,7 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     expect(MockWatchWalletChanges).not.toHaveBeenCalled();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("clamps a below-minimum configured interval and still constructs the watcher", async () => {
+  it("clamps a below-minimum configured interval and still constructs the watcher", async () => {
     vi.stubEnv("VITE_WALLET_WATCH_INTERVAL_MS", "50");
     vi.resetModules();
 
@@ -339,7 +332,7 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );

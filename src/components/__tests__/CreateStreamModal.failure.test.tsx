@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, render, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
 import { createStream, getTransactionStatus } from '../../lib/stellar/tx';
 import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
@@ -124,11 +124,13 @@ describe('CreateStreamModal submit failure handling', () => {
     mockedCreateStream
       .mockRejectedValueOnce(new Error('Network timeout'))
       .mockImplementationOnce(() => new Promise<never>(() => {}));
+    const onStreamCreated = vi.fn();
 
     const { container } = render(
       <CreateStreamModal
         isOpen={true}
         onClose={() => {}}
+        onStreamCreated={onStreamCreated}
       />,
     );
 
@@ -147,6 +149,45 @@ describe('CreateStreamModal submit failure handling', () => {
       expect(mockedCreateStream).toHaveBeenCalledTimes(2);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
+    expect(onStreamCreated).not.toHaveBeenCalled();
+  });
+
+  it('does not revive a rejected submit as confirmed after the modal remounts', async () => {
+    const submitError = new Error('User rejected the wallet request');
+    const onStreamCreated = vi.fn();
+    mockedCreateStream.mockRejectedValue(submitError);
+
+    const firstRender = render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={() => {}}
+        onStreamCreated={onStreamCreated}
+      />,
+    );
+
+    advanceToStep3(firstRender.container);
+    fireEvent.click(
+      within(firstRender.container).getByRole('button', { name: /^create stream$/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'User rejected the wallet request',
+      );
+    });
+    expect(onStreamCreated).not.toHaveBeenCalled();
+
+    firstRender.unmount();
+    render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={() => {}}
+        onStreamCreated={onStreamCreated}
+      />,
+    );
+
+    expect(screen.queryByText(/stream created/i)).not.toBeInTheDocument();
+    expect(onStreamCreated).not.toHaveBeenCalled();
   });
 
   it('guards against duplicate submissions while the request is pending', () => {
@@ -181,12 +222,14 @@ describe('CreateStreamModal submit failure handling', () => {
 
     const onClose = vi.fn();
     const onStreamCreated = vi.fn();
+    const onStreamError = vi.fn();
 
     const { container } = render(
       <CreateStreamModal
         isOpen={true}
         onClose={onClose}
         onStreamCreated={onStreamCreated}
+        onStreamError={onStreamError}
       />,
     );
 
@@ -203,5 +246,61 @@ describe('CreateStreamModal submit failure handling', () => {
 
     expect(onStreamCreated).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+    expect(onStreamError).toHaveBeenCalledTimes(1);
+    expect(onStreamError.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Transaction failed before confirmation.',
+    });
+  });
+
+  it('rolls back a confirmation timeout and keeps retry on a fresh submit path', async () => {
+    vi.useFakeTimers();
+    mockedCreateStream.mockResolvedValue({
+      status: 'SUCCESS',
+      txHash: 'tx-timeout-hash-123',
+    } as any);
+    mockedGetTransactionStatus.mockResolvedValue('pending');
+
+    const onClose = vi.fn();
+    const onStreamCreated = vi.fn();
+    const onStreamError = vi.fn();
+
+    const { container } = render(
+      <CreateStreamModal
+        isOpen={true}
+        onClose={onClose}
+        onStreamCreated={onStreamCreated}
+        onStreamError={onStreamError}
+      />,
+    );
+
+    advanceToStep3(container);
+    fireEvent.click(
+      within(container).getByRole('button', { name: /^create stream$/i }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Transaction confirmation timed out.',
+    );
+
+    expect(onStreamCreated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onStreamError).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /^try again$/i }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockedCreateStream).toHaveBeenCalledTimes(2);
+    expect(onStreamCreated).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import EmptyState from "../EmptyState";
 import { Skeleton, SkeletonCard } from "../Skeleton";
-import VirtualList from "../VirtualList";
 import "../skeleton.css";
 
 // Types matching stream properties across testing matrix & app contracts
@@ -78,19 +77,12 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [internalError, setInternalError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StreamFilter>("All");
-  /** Tracks how many consecutive retry attempts have been made without a
-   *  successful response so the banner can escalate its message. */
   const [retryCount, setRetryCount] = useState<number>(0);
-  /** True while a user-initiated retry fetch is in flight (distinct from the
-   *  background-poll isRefreshing so the button state is independently tracked). */
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
   /** Displays a short-lived confirmation when a refresh succeeds. */
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Ref tracking to block concurrent overlapping requests
   const isFetchingRef = useRef<boolean>(false);
-  /** Ref to the Retry button so focus can be moved to it when the error banner
-   *  first mounts (WCAG 2.4.3 Focus Order, 3.3.1 Error Identification). */
   const retryButtonRef = useRef<HTMLButtonElement>(null);
   /** Tracks the previous error value so we can detect the transition from
    *  null -> error (new error mount) without running focus logic on every render. */
@@ -101,9 +93,11 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   /** Handle for clearing the success-message timer. */
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /**
-   * Main data worker executing secure background refresh calls.
-   */
+  // Debounced screen-reader announcement state
+  const [announcement, setAnnouncement] = useState<string>("");
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstAnnouncementRender = useRef(false);
+
   const handleRefresh = useCallback(async () => {
     if (!fetchStreamsFn || isFetchingRef.current) return;
 
@@ -123,7 +117,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
       // Successful fetch resets the retry counter.
       setRetryCount(0);
-      setInternalStreams((prevStreams) => {
+      setInternalStreams(prevStreams => {
         const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
         return updatedStreams.map((stream) => ({
           ...stream,
@@ -151,14 +145,12 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     }
   }, [fetchStreamsFn, timeoutMs]);
 
-  // Initial load hook when fetchStreamsFn is provided
   useEffect(() => {
     if (fetchStreamsFn) {
       handleRefresh();
     }
   }, [fetchStreamsFn, handleRefresh]);
 
-  // Background interval polling hook
   useEffect(() => {
     if (!pollIntervalMs || !fetchStreamsFn) return;
 
@@ -182,12 +174,6 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const effectiveError = externalError ?? internalError;
   const effectiveStreams = externalStreams ?? internalStreams;
 
-  /**
-   * Move focus to the Retry button when the error banner first appears.
-   * This runs only when effectiveError transitions from null/undefined to
-   * a truthy string so the focus shift does not repeat on re-renders while
-   * the banner is already visible.
-   */
   useEffect(() => {
     const hadError = Boolean(prevErrorRef.current);
     const hasError = Boolean(effectiveError);
@@ -199,11 +185,6 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     prevErrorRef.current = effectiveError ?? null;
   }, [effectiveError]);
 
-  /**
-   * Handles the Retry button click.
-   * Sets isRetrying while in flight so the button can show a loading state
-   * and increments retryCount to track repeated failures.
-   */
   const handleRetryAction = async () => {
     setRetryCount((c) => c + 1);
 
@@ -235,22 +216,65 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     }
   };
 
-  // State 1: Loading state (skeleton composition consistent with RecipientLoading.tsx)
+  const filteredStreams = effectiveStreams.filter((stream) => {
+    if (filter === "All") return true;
+    return stream.status?.toLowerCase() === filter.toLowerCase();
+  });
+
+  // Stable rendering sort strategy: pinned streams bubble up first
+  const sortedStreams = [...filteredStreams].sort(
+    (a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+  );
+
+  // For very large lists, render only a subset (virtualization shim)
+  const visibleStreams = effectiveStreams.length > 50 ? sortedStreams.slice(0, 50) : sortedStreams;
+
+  const sortOrderKey = sortedStreams.map((s) => s.id).join(",");
+
+  // Debounced announcement for filter/sort changes
+  useEffect(() => {
+    if (isFirstAnnouncementRender.current) {
+      isFirstAnnouncementRender.current = false;
+      return;
+    }
+
+    if (announceTimerRef.current) {
+      clearTimeout(announceTimerRef.current);
+    }
+
+    announceTimerRef.current = setTimeout(() => {
+      setAnnouncement(
+        `${filter === "All" ? "all" : filter.toLowerCase()} streams`
+      );
+    }, 500);
+
+    return () => {
+      if (announceTimerRef.current) {
+        clearTimeout(announceTimerRef.current);
+      }
+    };
+  }, [filter, sortOrderKey]);
+
+  const errorMessage =
+    retryCount >= 2
+      ? "Still unable to load your streams. Check your connection or try again later."
+      : (effectiveError ?? "Failed to sync latest stream data. Please try again.");
+
   if (isLoading) {
     return (
       <div
         role="status"
         aria-label="Loading recipient portal"
         aria-busy="true"
-        className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
+        className="p-6 max-w-4 mx-auto rounded-2xl shadow-sm"
         style={{ backgroundColor: "var(--color-bg-primary)" }}
       >
         <span className="sr-only">Loading recipient portal…</span>
 
         <div className="flex justify-between items-center mb-6">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Skeleton width={180} height={24} borderRadius={8} />
-            <Skeleton width={260} height={14} borderRadius={6} />
+            <Skeleton width={180} height={24} borderRadius={12} />
+            <Skeleton width={260} height={14} borderRadius={12} />
           </div>
           {fetchStreamsFn && (
             <Skeleton width={120} height={38} borderRadius={12} />
@@ -284,32 +308,20 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     );
   }
 
-  const filteredStreams = effectiveStreams.filter((stream) => {
-    if (filter === "All") return true;
-    return stream.status?.toLowerCase() === filter.toLowerCase();
-  });
-
-  // Stable rendering sort strategy: pinned streams bubble up first
-  const sortedStreams = [...filteredStreams].sort(
-    (a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
-  );
-
-  /**
-   * Determine the banner message based on retry history.
-   * After two or more failed attempts we surface a more specific message
-   * so the recipient knows to check connectivity or contact support.
-   */
-  const errorMessage =
-    retryCount >= 2
-      ? "Still unable to load your streams. Check your connection or try again later."
-      : (effectiveError ?? "Failed to sync latest stream data. Please try again.");
-
   return (
     <div
-      className="p-6 max-w-4xl mx-auto rounded-2xl shadow-sm"
+      className="p-6 max-w-4 mx-auto rounded-2xl shadow-sm"
       style={{ backgroundColor: "var(--color-bg-primary)" }}
     >
-      {/* Header and Filters */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
+
       <div className="mb-6 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -350,8 +362,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
         
         {/* Filter Controls */}
         {effectiveStreams.length > 0 && (
-          <div 
-            role="group" 
+          <div
+            role="group"
             aria-label="Filter streams by status"
             className="flex flex-wrap gap-2"
           >
@@ -437,12 +449,16 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
       {/* Stream list */}
       {effectiveStreams.length > 0 && (
-        <VirtualList
-          items={sortedStreams}
-          height={420}
-          itemHeight={72}
-          renderItem={(stream) => (
+        <div
+          role="list"
+          aria-label="Incoming streams"
+          data-virtualized={effectiveStreams.length > 50 ? "true" : undefined}
+          className="space-y-2"
+        >
+          {visibleStreams.map((stream) => (
             <div
+              key={stream.id}
+              role="listitem"
               className="flex items-center justify-between px-4 py-3 rounded-xl mb-2"
               style={{ backgroundColor: "var(--color-bg-secondary)" }}
             >
@@ -463,8 +479,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 {stream.isPinned ? "📌" : "📌"}
               </button>
             </div>
-          )}
-        />
+          ))}
+        </div>
       )}
     </div>
   );
