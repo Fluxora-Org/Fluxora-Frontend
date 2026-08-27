@@ -129,7 +129,7 @@ export function buildReceiptExplorerUrl(
   network?: string | null,
 ): string {
   const segment = resolveReceiptExplorerSegment(network);
-  return `https://stellar.expert/explorer/${segment}/tx/${txHash}`;
+  return `https://stellar.expert/explorer/${segment}/tx/${encodeURIComponent(txHash)}`;
 }
 
 export function formatTimestamp(isoOrTimestamp?: string): string {

@@ -579,7 +579,7 @@ function StreamDetail({
               getExpectedStellarNetwork(),
             )}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             View in explorer
           </a>
