@@ -118,7 +118,7 @@ export function usePaneStream(streamId: string): PaneState {
   });
 
   useEffect(() => {
-    // If streamId is empty (pane was removed), skip fetching and mark as null
+    // If streamId is empty (pane was removed), skip fetching and mark as null.
     if (!streamId) {
       setState({ streamId: '', stream: null, error: null });
       return;
@@ -129,6 +129,8 @@ export function usePaneStream(streamId: string): PaneState {
 
     getStreamById(decodeURIComponent(streamId))
       .then((result) => {
+        // Each effect owns one request. A response from a previous selection
+        // must never overwrite the current pane, even if it resolves later.
         if (!cancelled) setState({ streamId, stream: result, error: null });
       })
       .catch((err: unknown) => {
