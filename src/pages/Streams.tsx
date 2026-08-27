@@ -43,6 +43,7 @@ import {
   getUrgencyLevel,
 } from "../lib/timePresentation";
 import { formatUsdc } from "../lib/formatters";
+import { sortStreams, type StreamSortMode } from "../lib/streamSorting";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
@@ -66,7 +67,7 @@ import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
-const SORT_OPTIONS = ["recent", "name", "rate"];
+const SORT_OPTIONS: StreamSortMode[] = ["recent", "name", "rate"];
 const DISCLOSURE_DURATION_MS = 200;
 const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
@@ -811,7 +812,7 @@ export default function Streams() {
   };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("recent");
+  const [sortBy, setSortBy] = useState<StreamSortMode>("recent");
   const [expandedStreamId, setExpandedStreamId] = useState<string>("");
   const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -942,7 +943,7 @@ export default function Streams() {
       ? (filters.statusFilter as StatusFilter)
       : "All";
     const restoredSortBy = SORT_OPTIONS.includes(filters.sortBy)
-      ? filters.sortBy
+      ? (filters.sortBy as StreamSortMode)
       : "recent";
 
     setStatusFilter(restoredStatusFilter);
@@ -995,8 +996,8 @@ export default function Streams() {
   const visibleStreams = useMemo(() => {
     const normalizedSearch = searchQuery.toLowerCase();
 
-    return streams
-      .filter((stream) => {
+    return sortStreams(
+      streams.filter((stream) => {
         const matchesStatus =
           statusFilter === "All" || stream.status === statusFilter;
         const matchesSearch =
@@ -1004,13 +1005,9 @@ export default function Streams() {
           stream.id.toLowerCase().includes(normalizedSearch) ||
           stream.recipientName.toLowerCase().includes(normalizedSearch);
         return matchesStatus && matchesSearch;
-      })
-      .sort((a, b) => {
-        if (sortBy === "name") return a.name.localeCompare(b.name);
-        if (sortBy === "rate") return b.monthlyRate - a.monthlyRate;
-        // Default to recent (higher ID first for demo)
-        return b.id.localeCompare(a.id);
-      });
+      }),
+      sortBy,
+    );
   }, [searchQuery, sortBy, statusFilter, streams]);
 
   // Reset currentPage when the total pages shrink below the current page.
