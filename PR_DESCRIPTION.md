@@ -1,26 +1,22 @@
-## Closes #1133 - Document CSV preview validation and rendering edge cases
+## Documentation: clarify rendering verification scope
 
 ## Summary
 
-This PR documents the CSV preview validation behavior and locks down the
-regression surface around empty values, long recipient addresses, large token
-amounts, keyboard interaction, modal replacement, and responsive rendering.
+This PR updates `PR_DESCRIPTION.md` with the rendering policy and verification
+evidence associated with the documentation review.
 
-No production component behavior is changed by the CSV documentation and test
-updates.
+This PR changes only `PR_DESCRIPTION.md`. It does not contain the rendering
+implementation or regression tests required by #1443, and it is not the issue
+deliverable for #1443. Those changes must remain in a separate implementation
+PR.
 
 ## Changes
 
-- Added `docs/CSV_UPLOAD_PREVIEW_VALIDATION_SPEC.md` as the behavior reference
-  for `PreviewValidateStep`.
-- Updated `src/components/csv-upload/__tests__/PreviewValidateStep.test.tsx`
-  with edge-case and interaction coverage, including the real `ConfirmModal`
-  path instead of a stale `window.confirm` mock.
-- Added/retained regression coverage for exact large-amount formatting,
-  address shortening, and 400% zoom overflow protection in the formatter and
-  treasury overview tests.
-- Updated this PR description with the rendering policy and verification
-  evidence.
+- Documented the intended rendering policy for long recipient addresses, large
+  amounts, narrow layouts, and zoom behavior.
+- Recorded the verification evidence supplied for the policy review.
+- Clarified that implementation and regression-test work for #1443 belongs in a
+  separate PR.
 
 ## Rendering Policy
 
@@ -58,18 +54,9 @@ updates.
 
 ## Regression Coverage
 
-The relevant tests cover:
-
-- CSV preview empty rows, empty cells, status combinations, multiple field
-  errors, review gating, inline edit save/cancel/keyboard flows, skip actions,
-  live-region announcements, and Replace CSV confirm/cancel/Escape behavior.
-- Long-address shortening with the full recipient value retained, including
-  the boundary between long and short labels.
-- Exact large-amount output at and beyond `Number.MAX_SAFE_INTEGER` using
-  `bigint` and decimal-string inputs; rejection of unsafe integer `number`
-  inputs; decimal shifting; grouping; and negative/zero values.
-- Metric-card overflow-safe styles and treasury table behavior at narrow
-  widths/400% zoom.
+This PR adds no implementation or regression tests. The rendering behavior and
+regression coverage described below are requirements for the separate #1443
+implementation PR, not deliverables of this documentation PR.
 
 Responsive CSS media-query behavior is not fully measurable in jsdom; the
 responsive policy is documented in the relevant spec and covered by browser
@@ -77,7 +64,7 @@ test/manual verification requirements.
 
 ## Verification Evidence
 
-Commands run from the repository root:
+Commands documented or previously run for the rendering work:
 
 | Check | Result |
 |---|---|
