@@ -51,6 +51,7 @@ export default defineConfig({
         "src/lib/recentStreamMapper.ts",
         "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
+        "src/theme/themeBootstrap.ts",
         // Colour-blind simulation module
         "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",

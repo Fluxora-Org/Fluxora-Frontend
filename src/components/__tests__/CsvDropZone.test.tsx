@@ -6,6 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CsvDropZone } from '../csv-upload/CsvDropZone';
 import * as csvParser from '../csv-upload/csvParser';
+import * as csvParseClient from '../csv-upload/csvParseClient';
 import { MAX_CSV_FILE_SIZE_BYTES, MAX_CSV_ROWS, parseAndValidateCsv } from '../csv-upload/csvParser';
 
 describe('CsvDropZone — file size guard (#928)', () => {
@@ -14,7 +15,9 @@ describe('CsvDropZone — file size guard (#928)', () => {
 
   beforeEach(() => {
     textSpy = vi.spyOn(File.prototype, 'text');
-    parseSpy = vi.spyOn(csvParser, 'parseAndValidateCsv');
+    // Parsing now runs through the worker client; the size guard must reject
+    // oversized files before any parse is even requested.
+    parseSpy = vi.spyOn(csvParseClient, 'parseCsvAsync');
   });
 
   afterEach(() => {

@@ -57,9 +57,15 @@
         Note: Server-side CSP overrides are mandatory because client-side meta tags
         do not support frame-ancestors restrictions.
     -->
+    <!--
+      The 'sha256-...' hash in script-src covers only the inline theme-bootstrap
+      script immediately below. Recompute the hash whenever the script body
+      changes:
+        node -e "const c=require('crypto'),s=require('fs').readFileSync('index.html','utf8').match(/<script id=\"theme-bootstrap\">([\s\S]*?)<\/script>/)[1];console.log('sha256-'+c.createHash('sha256').update(s).digest('base64'))"
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
+      content="default-src 'self'; script-src 'self' 'sha256-rYHtv2kv2J9mGq+H5er2MOudnal5QmHotnNLc03Df6s='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
     />
 
     <!--
@@ -100,6 +106,56 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Theme Bootstrap Script
+      ──────────────────────
+      Runs synchronously before any ES module is parsed so the correct
+      data-theme / data-font attributes land on <html> on the very first paint,
+      preventing a flash of the wrong theme (FOUC).
+
+      Resolution order:
+        1. Persisted custom theme  → data-theme="custom" + --custom-* tokens
+        2. Persisted built-in pref → data-theme="light|dark|cyberpunk"
+        3. OS prefers-color-scheme → data-theme="light|dark"
+
+      CSS injection prevention:
+        • Only 3-/6-digit lowercase hex colours (#rgb / #rrggbb) are accepted
+          for custom token values. Any other value is silently dropped before
+          it can reach the DOM.
+        • The built-in theme is validated against a strict allowlist
+          (light, dark, cyberpunk). Any other localStorage value is ignored.
+
+      CSP compliance:
+        The script hash in script-src covers this exact script body.
+        Recompute when the script changes (see comment above the CSP meta tag).
+    -->
+    <script id="theme-bootstrap">(function(){
+  var VALID=['light','dark','cyberpunk'];
+  var THEME_KEY='theme';
+  var CUSTOM_KEY='theme:custom';
+  var FONT_KEY='easy-read-font';
+  function safeHex(v){return typeof v==='string'&&/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(v);}
+  var root=document.documentElement;
+  try{
+    var raw=localStorage.getItem(CUSTOM_KEY);
+    if(raw){
+      var p=JSON.parse(raw);
+      if(p&&typeof p==='object'&&p.validatedTokens&&typeof p.validatedTokens==='object'){
+        var tokens=p.validatedTokens;
+        for(var k in tokens){if(Object.prototype.hasOwnProperty.call(tokens,k)&&safeHex(tokens[k])){root.style.setProperty(k.replace(/^--/,'--custom-'),tokens[k]);}}
+        root.setAttribute('data-theme','custom');
+        root.setAttribute('data-font',localStorage.getItem(FONT_KEY)==='true'?'easy-read':'default');
+        return;
+      }
+    }
+  }catch(e){}
+  try{
+    var stored=localStorage.getItem(THEME_KEY);
+    var theme=(stored&&VALID.indexOf(stored)!==-1)?stored:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    root.setAttribute('data-theme',theme);
+    root.setAttribute('data-font',localStorage.getItem(FONT_KEY)==='true'?'easy-read':'default');
+  }catch(e){root.setAttribute('data-theme','light');root.setAttribute('data-font','default');}
+})();</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
