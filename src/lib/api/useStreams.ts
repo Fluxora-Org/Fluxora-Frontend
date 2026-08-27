@@ -40,7 +40,7 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
     setLoading(true);
     setError(null);
 
-    getStreams(filtersRef.current)
+    getStreams(filtersRef.current, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
           setStreams(data);
@@ -103,20 +103,18 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
     }
 
     const controller = new AbortController();
-    let cancelled = false;
-
     setLoading(true);
     setError(null);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, controller.signal)
       .then((records) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setData(records);
           setLoading(false);
         }
       })
       .catch((err) => {
-        if (cancelled || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
         setError(
           err instanceof StreamsServiceError
             ? err
@@ -125,10 +123,7 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [address, triggerRef.current]);
 
   return { data, loading, error, refetch };
