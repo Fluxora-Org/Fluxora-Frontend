@@ -66,3 +66,15 @@ describe("ToastNotification undo action", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+
+describe("ToastNotification keyboard interactions", () => {
+  it("dismisses the toast when Escape key is pressed", () => {
+    const onClose = vi.fn();
+    render(
+      <ToastNotification message="Escape me" variant="info" onClose={onClose} />,
+    );
+    
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
