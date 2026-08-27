@@ -61,6 +61,7 @@ import {
 import CreateStreamFab from "../components/CreateStreamFab";
 import { stellarExplorerUrl } from "../lib/stellar";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 
 type StatusFilter = "All" | StreamStatus;
@@ -801,8 +802,10 @@ export default function Streams() {
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
-
+  const wallet = useWallet();
+  const walletAddress = wallet.address?.trim() ?? "";
   const { streams, loading, error, refetch, retryCount } = useTreasury();
+
   const filterLabels: Record<StatusFilter, string> = {
     All: t("streams.filter.all"),
     Active: t("streams.filter.active"),
@@ -845,7 +848,10 @@ export default function Streams() {
   // flipped false only if mount-detection finds a snapshot worth offering.
   const sessionResolvedRef = useRef(true);
   const hasCheckedSessionRef = useRef(false);
+  const recoveryAccountRef = useRef<string | null>(null);
 
+  // Keep the existing page authorization behavior; wallet identity is used
+  // only to scope and gate session recovery below.
   const walletConnected = true;
   const hasInitializedExpanded = useRef(false);
 
@@ -856,13 +862,37 @@ export default function Streams() {
     }
   }, [streams]);
 
-  // Detect a prior session once on mount. Never auto-applies anything — only
-  // decides whether to offer the recovery banner.
-  useEffect(() => {
-    if (hasCheckedSessionRef.current) return;
-    hasCheckedSessionRef.current = true;
+  // Verify the wallet identity before reading or restoring any persisted data.
+  // The same boundary resets all recovery state on account changes so an old
+  // account's filters/draft cannot render while the new account is resolved.
+  useLayoutEffect(() => {
+    if (wallet.loading) return;
 
-    const snapshot = readStreamsSession(Date.now());
+    const accountAddress = walletAddress || null;
+    if (
+      recoveryAccountRef.current === accountAddress &&
+      hasCheckedSessionRef.current
+    ) {
+      return;
+    }
+
+    recoveryAccountRef.current = accountAddress;
+    hasCheckedSessionRef.current = true;
+    sessionResolvedRef.current = true;
+    setDetectedSnapshot(null);
+    setBannerState(null);
+    setLiveDraft(null);
+    setRestoredDraft(null);
+    setStatusFilter("All");
+    setSearchQuery("");
+    setSortBy("recent");
+    setCurrentPage(1);
+    setItemsPerPage(10);
+    setLastSavedAt(null);
+
+    if (!accountAddress) return;
+
+    const snapshot = readStreamsSession(Date.now(), accountAddress);
     if (
       snapshot &&
       (isFilterSnapshotMeaningful(snapshot.filters) ||
@@ -872,12 +902,15 @@ export default function Streams() {
       setDetectedSnapshot(snapshot);
       setBannerState("detected");
     }
-  }, []);
+  }, [wallet.loading, walletAddress]);
+
+  const recoveryIdentityMatches =
+    recoveryAccountRef.current === (walletAddress || null) && !wallet.loading;
 
   // Debounced autosave of filters + the live create-stream draft. Paused while
   // a detected snapshot is awaiting the user's decision (sessionResolvedRef).
   useEffect(() => {
-    if (!sessionResolvedRef.current) return;
+    if (!sessionResolvedRef.current || !walletAddress || wallet.loading) return;
 
     const timer = window.setTimeout(() => {
       writeStreamsSession(
@@ -886,12 +919,22 @@ export default function Streams() {
           draft: liveDraft,
         },
         Date.now(),
+        walletAddress,
       );
       setLastSavedAt(Date.now());
     }, SESSION_AUTOSAVE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [statusFilter, searchQuery, sortBy, currentPage, itemsPerPage, liveDraft]);
+  }, [
+    statusFilter,
+    searchQuery,
+    sortBy,
+    currentPage,
+    itemsPerPage,
+    liveDraft,
+    walletAddress,
+    wallet.loading,
+  ]);
 
   // Brief "recently saved" pulse for the persistence indicator.
   useEffect(() => {
@@ -933,7 +976,13 @@ export default function Streams() {
   }, []);
 
   const handleRestoreSession = useCallback(() => {
-    if (!detectedSnapshot) return;
+    if (
+      !detectedSnapshot ||
+      detectedSnapshot.accountAddress !== walletAddress ||
+      !recoveryIdentityMatches
+    ) {
+      return;
+    }
     const { filters } = detectedSnapshot;
 
     const restoredStatusFilter = (STATUS_FILTERS as string[]).includes(
@@ -953,13 +1002,15 @@ export default function Streams() {
 
     sessionResolvedRef.current = true;
     setBannerState("restored");
-  }, [detectedSnapshot]);
+  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress]);
 
   const handleStartFreshSession = useCallback(() => {
-    clearStreamsSession();
+    if (walletAddress) {
+      clearStreamsSession(walletAddress);
+    }
     sessionResolvedRef.current = true;
     setBannerState("start-fresh");
-  }, []);
+  }, [walletAddress]);
 
   const handleDismissSessionBanner = useCallback(() => {
     sessionResolvedRef.current = true;
@@ -967,11 +1018,17 @@ export default function Streams() {
   }, []);
 
   const handleResumeDraft = useCallback(() => {
-    if (!detectedSnapshot?.draft) return;
+    if (
+      !detectedSnapshot?.draft ||
+      detectedSnapshot.accountAddress !== walletAddress ||
+      !recoveryIdentityMatches
+    ) {
+      return;
+    }
     setRestoredDraft(detectedSnapshot.draft);
     setIsCreateModalOpen(true);
     setBannerState(null);
-  }, [detectedSnapshot]);
+  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress]);
 
   const handleCloseCreateModal = useCallback(() => {
     setIsCreateModalOpen(false);
@@ -1203,7 +1260,7 @@ export default function Streams() {
             onClose={handleCloseCreateModal}
             onStreamCreated={handleStreamCreated}
             onStreamError={handleStreamError}
-            initialDraft={restoredDraft}
+            initialDraft={recoveryIdentityMatches ? restoredDraft : null}
             onDraftChange={setLiveDraft}
           />
         </Suspense>
@@ -1284,7 +1341,7 @@ export default function Streams() {
           </section>
 
           {/* Session recovery — see docs/STREAMS_SESSION_RECOVERY_SPEC.md */}
-          {bannerState && (
+          {bannerState && recoveryIdentityMatches && (
             <SessionRecoveryBanner
               state={bannerState}
               savedAt={detectedSnapshot?.savedAt ?? Date.now()}
