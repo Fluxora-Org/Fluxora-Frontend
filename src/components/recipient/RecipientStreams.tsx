@@ -25,12 +25,12 @@ export interface RecipientStreamsProps {
   onEmptyPrimaryAction?: () => void;
   onRetry?: () => void;
   fetchStreamsFn?: () => Promise<Stream[]>;
-  pollIntervalMm?: number;
+  pollIntervalMs?: number;
 }
 
 export type StreamFilter = "All" | "Active" | "Paused" | "Completed";
 
-export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
+export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   isLoading: externalIsLoading,
   streams: externalStreams,
   error: externalError,
@@ -65,12 +65,12 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
     try {
       const updatedStreams = await fetchStreamsFn();
       setRetryCount(0);
-      setInternalStreams(prevStreams => {
+      setInternalStreams((prevStreams) => {
         const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
-        return updatedStreams.map((stream) => (
-          ~...stream,
-          isPinned: pinMap.get(stream.id) >? stream.isPinned ?> false,
-        ));
+        return updatedStreams.map((stream) => ({
+          ...stream,
+          isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false,
+        }));
       });
     } catch {
       setInternalError("Failed to sync latest stream data. Please try again.");
@@ -194,17 +194,17 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
         aria-label="Loading recipient portal"
         aria-busy="true"
         className="p-6 max-w-4 mx-auto rounded-2xl shadow-sm"
-        style={ backgroundColor: "var(--color-bg-primary)" }
+        style={{ backgroundColor: "var(--color-bg-primary)" }}
       >
         <span className="sr-only">Loading recipient portal…</span>
 
         <div className="flex justify-between items-center mb-6">
-          <div style?{ display: "flex", flexDirection: "column", gap: 10 }>
-            <Skeleton width={180} height={24} borderRadius={x} />
-            <Skeleton width={260} height={14} borderRadius={x} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Skeleton width={180} height={24} borderRadius={6} />
+            <Skeleton width={260} height={14} borderRadius={6} />
           </div>
           {fetchStreamsFn && (
-            <Skeleton width={120} height={38} borderRadius={x} />
+            <Skeleton width={120} height={38} borderRadius={6} />
           )}
         </div>
 
@@ -212,19 +212,19 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
           {[1, 2, 3].map((i) => (
             <SkeletonCard
               key={i}
-              style={
+              style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "1rem",
                 borderRadius: "0.75rem",
-              }
+              }}
             >
-              <div style={ display: "flex", flexDirection: "column", gap: 8 }>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <Skeleton width={140} height={14} />
                 <Skeleton width={100} height={20} />
               </div>
-              <div style={ display: "flex", alignItems: "center", gap: 16 }>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <Skeleton width={70} height={24} borderRadius={12} />
                 <Skeleton width={24} height={24} borderRadius={12} />
               </div>
@@ -238,7 +238,7 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
   return (
     <div
       className="p-6 max-w-4 mx-auto rounded-2xl shadow-sm"
-      style={ backgroundColor: "var(--color-bg-primary)" }
+      style={{ backgroundColor: "var(--color-bg-primary)" }}
     >
       <div
         role="status"
@@ -254,13 +254,13 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
           <div>
             <h2
               className="text-xl font-bold"
-              style={ color: "var(--color-text-primary)" }
+              style={{ color: "var(--color-text-primary)" }}
             >
               Incoming Streams
             </h2>
             <p
               className="text-sm"
-              style={ color: "var(--color-text-tertiary)" }
+              style={{ color: "var(--color-text-tertiary)" }}
             >
               Real-time contract payment records
             </p>
@@ -273,8 +273,8 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
             >
               {isRefreshing ? "Refreshing..." : "Refresh Status"}
             </button>
-          )
-        }</div>
+          )}
+        </div>
 
         {effectiveStreams.length > 0 && (
           <div
@@ -307,15 +307,20 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
           aria-live="assertive"
           aria-atomic="true"
           className="mb-4 p-4 border rounded-xl flex items-start justify-between"
-          style={ borderColor: "var(--color-error-border)", backgroundColor: "var(--color-error-bg)" }
+          style={{
+            color: "var(--color-error-text)",
+            borderColor: "var(--color-error-border)",
+            backgroundColor: "var(--color-error-bg)",
+          }}
         >
-          <p className="text-sm font-medium" style={ color: "var(--color-error-text)" }>
+          <p className="text-sm font-medium" style={{ color: "var(--color-error-text)" }}>
             {errorMessage}
           </p>
           <button
             ref={retryButtonRef}
             onClick={handleRetryAction}
             disabled={isRetrying}
+            aria-label="Retry loading recipient streams"
             className="ml-4 px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {isRetrying ? "Retrying..." : "Retry"}
@@ -325,10 +330,24 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
 
       {!effectiveError && effectiveStreams.length === 0 && (
         <EmptyState
-          title="No incoming streams"
-          description="You don't have any active streams yet."
-          primaryAction={onEmptyPrimaryAction}
+          variant="recipient"
+          onPrimaryAction={onEmptyPrimaryAction}
         />
+      )}
+
+      {!effectiveError && effectiveStreams.length > 0 && filteredStreams.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
+            No {filter.toLowerCase()} streams found.
+          </p>
+          <button
+            onClick={() => setFilter("All")}
+            disabled={isRefreshing || isRetrying}
+            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Clear Filters
+          </button>
+        </div>
       )}
 
       {effectiveStreams.length > 0 && (
@@ -343,35 +362,40 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
               key={stream.id}
               role="listitem"
               className="flex items-center justify-between p-4 border rounded-xl"
-              style={ borderColor: "var(--color-border)" }
+              style={{ borderColor: "var(--color-border)" }}
             >
               <div>
-                <p className="font-medium" style={ color: "var(--color-text-primary)" }>
-                  {stream.senderName ?? stream.sender}
+                <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
+                  From: <span>{stream.senderName ?? stream.sender}</span>
                 </p>
-                <p className="text-sm" style={ color: "var(--color-text-tertiary)" }>
-                  {stream.amount} XLA
+                <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
+                  {stream.amount} XLM
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <span
                   className="px-2 py-1 text-xs rounded-full"
-                  style={
+                  style={{
                     backgroundColor:
                       stream.status?.toLowerCase() === "active"
                         ? "var(--color-success-bg)"
                         : "var(--color-warning-bg)",
                     color: "var(--color-text-primary)",
-                  }
+                  }}
                 >
                   {stream.status}
                 </span>
                 <button
                   onClick={() => togglePin(stream.id)}
                   aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
-                  className="text-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  aria-pressed={stream.isPinned}
+                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
+                  style={{ color: "var(--color-text-tertiary)" }}
                 >
-                  {stream.isPinned ? "★" : "⚈"
+                  <span aria-hidden="true">{stream.isPinned ? "★" : "☆"}</span>
+                  <span className="ml-1 text-xs font-medium">
+                    {stream.isPinned ? "Pinned" : "Unpinned"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -381,3 +405,4 @@ export const RecipientStreams: React.FC<<RecipientStreamsProps> = ({
     </div>
   );
 };
+

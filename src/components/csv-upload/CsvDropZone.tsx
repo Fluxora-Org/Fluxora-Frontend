@@ -120,13 +120,6 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         if (task && inFlightParseRef.current === task) {
           inFlightParseRef.current = null;
         }
-      } catch (err) {
-        if (err instanceof CsvParseCancelledError) return;
-        reject('Failed to read the file. Please try again.');
-      } finally {
-        if (task && inFlightParseRef.current === task) {
-          inFlightParseRef.current = null;
-        }
       }
     },
     [onParsed, reject],
