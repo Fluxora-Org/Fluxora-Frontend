@@ -11,6 +11,7 @@ import { useTickingNow } from "../hooks/useTickingNow";
 import { MetaTags } from "../components/MetaTags";
 import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
 import { Share2 } from "lucide-react";
 
@@ -42,7 +43,12 @@ import { Share2 } from "lucide-react";
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { viewers, isPresenceEnabled, updateCursor, isLoading } = usePresenceViewers(streamId);
+  const { address: accountId } = useWallet();
+  const { viewers, isPresenceEnabled, updateCursor, isLoading } = usePresenceViewers(
+    streamId,
+    undefined,
+    accountId ?? undefined,
+  );
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");

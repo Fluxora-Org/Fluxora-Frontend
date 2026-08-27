@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getAddress,
@@ -26,24 +26,39 @@ const mockedGetAddress = vi.mocked(getAddress);
 const mockedGetNetwork = vi.mocked(getNetwork);
 const mockedWatchWalletChanges = vi.mocked(WatchWalletChanges);
 
+// Checksum-valid ed25519 StrKey fixture (same one used by the sibling
+// outOfBandDisconnect/networkMismatch suites). The provider refuses to trust
+// any address that fails isValidStellarAddress, so restore mocks must return
+// a real-format address for the success paths to be reachable.
+const APPROVED_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+
 function WalletProbe() {
-  const { address, connected, error, network, loading } = useWallet();
+  const { address, connected, error, network, loading, connect } = useWallet();
 
   return (
-    <output aria-label="wallet state">
-      {JSON.stringify({
-        address,
-        connected,
-        error: error?.type ?? null,
-        network,
-        loading,
-      })}
-    </output>
+    <>
+      <output aria-label="wallet state">
+        {JSON.stringify({
+          address,
+          connected,
+          error: error?.type ?? null,
+          network,
+          loading,
+        })}
+      </output>
+      <button
+        type="button"
+        onClick={() => connect(APPROVED_ADDRESS, "TESTNET")}
+      >
+        reconnect
+      </button>
+    </>
   );
 }
 
 function renderWalletProvider() {
-  render(
+  return render(
     <WalletProvider>
       <WalletProbe />
     </WalletProvider>,
@@ -74,21 +89,51 @@ describe("WalletProvider restore errors", () => {
     );
   });
 
-  // Skipped: pre-existing timing/mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("restores an approved wallet and clears previous errors", async () => {
+  it("restores an approved wallet and clears previous errors", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: APPROVED_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
       networkPassphrase: "Test SDF Network ; September 2015",
     });
 
+    const { unmount } = renderWalletProvider();
+
+    // A previously-approved wallet restores cleanly with no error attached.
+    await waitFor(() =>
+      expect(walletState()).toEqual({
+        address: APPROVED_ADDRESS,
+        connected: true,
+        error: null,
+        network: "TESTNET",
+        loading: false,
+      }),
+    );
+
+    unmount();
+
+    // Simulate a later visit where a transient RPC failure poisons the
+    // restore, then the user reconnects. The stale error must be gone once
+    // the connection succeeds.
+    mockedIsConnected.mockResolvedValueOnce({
+      isConnected: false,
+      error: { code: 500, message: "Network RPC timeout" },
+    });
+
     renderWalletProvider();
 
     await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "network_error",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /reconnect/i }));
+
+    await waitFor(() =>
       expect(walletState()).toEqual({
-        address: "GAPPROVEDADDRESS",
+        address: APPROVED_ADDRESS,
         connected: true,
         error: null,
         network: "TESTNET",
@@ -133,11 +178,9 @@ describe("WalletProvider restore errors", () => {
     expect(mockedGetNetwork).not.toHaveBeenCalled();
   });
 
-  // Skipped: pre-existing timing/mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("records network_error when network lookup fails", async () => {
+  it("records network_error when network lookup fails", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: APPROVED_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "",
       networkPassphrase: "",
@@ -189,11 +232,9 @@ describe("WalletProvider restore loading", () => {
     );
   });
 
-  // Skipped: pre-existing timing/mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("clears loading after restoring a verified address", async () => {
+  it("clears loading after restoring a verified address", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
-    mockedGetAddress.mockResolvedValue({ address: "GAPPROVEDADDRESS" });
+    mockedGetAddress.mockResolvedValue({ address: APPROVED_ADDRESS });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
       networkPassphrase: "Test SDF Network ; September 2015",
@@ -203,10 +244,50 @@ describe("WalletProvider restore loading", () => {
 
     await waitFor(() =>
       expect(walletState()).toMatchObject({
-        address: "GAPPROVEDADDRESS",
+        address: APPROVED_ADDRESS,
         connected: true,
         loading: false,
       }),
+    );
+  });
+
+  it("clears loading after a rejected restore", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({
+      address: "",
+      error: { code: -4, message: "User declined access" },
+    });
+
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        error: "rejected",
+        loading: false,
+      }),
+    );
+  });
+
+  it("clears loading without leaking state after unmount", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({
+      address: "GAFTAVL2T7COSDRTLB62FR7MCE3FXAFFZLXRIOK6QOUM34QXHRQYMVIT",
+    });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
+
+    const { unmount } = render(
+      <WalletProvider>
+        <WalletProbe />
+      </WalletProvider>,
+    );
+    unmount();
+
+    await waitFor(() =>
+      expect(screen.queryByLabelText("wallet state")).toBeNull(),
     );
   });
 });

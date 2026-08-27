@@ -1,4 +1,4 @@
-import React, { RefObject } from "react";
+import React, { type Ref } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ export interface EmptyStateProps {
    *  Used by callers that need to move focus programmatically when an error
    *  first mounts (WCAG 2.4.3 Focus Order).
    */
-  retryButtonRef?: RefObject<HTMLButtonElement>;
+  retryButtonRef?: Ref<HTMLButtonElement>;
 }
 
 // ── Per-variant copy & icon config ───────────────────────────────────────────

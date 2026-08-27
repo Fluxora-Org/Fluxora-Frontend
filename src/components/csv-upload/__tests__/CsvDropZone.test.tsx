@@ -37,7 +37,7 @@ describe('CsvDropZone', () => {
   it('renders the empty-state instructions initially', () => {
     render(<CsvDropZone onParsed={onParsed} />);
     expect(screen.getByText('Drag & drop your CSV here')).toBeInDocument();
-    expect(screen.getByText('or('click to browse files')).toBeInDocument();
+    expect(screen.getByText('or (click to browse files)')).toBeInDocument();
     expect(
       screen.getByRole('button', { name: /upload csv file/i }),
     ).toBeInDocument();
@@ -60,46 +60,46 @@ describe('CsvDropZone', () => {
 
   it('rejects a non-CSV file selected via the file input', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
-    const input = screen.getByLabel(/accepts \.csv format/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
     const badFile = makeFile('not a csv', 'notes.pdf', 'application/pdf');
 
     fireEvent.change(input, { target: { files: [badFile] } });
 
     // "Only .csv files are accepted." renders in both the aria-live status
     // region and the visible ValidationMessage -- scope to the latter by id.
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'Only .csv files are accepted.',
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
     const zone = screen.getByRole('button', { name: /upload csv file/i });
     expect(zone.className).toContain('csv-drop-zone--parse-error');
   });
 
-  it('accepts a file whose type is empty string as long as its extension is .csf', async () => {
+  it('accepts a file whose type is empty string as long as its extension is .csv', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
-    const input = screen.getByLabel(/accepts \.csv format/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
     const file = makeFile(ONE_ROW_CSV, 'streams.csv', '');
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    await WaitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
   });
 
   it('rejects a file with an empty MIME type and non-.csv extension', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
-    const input = screen.getByLabel(/accepts \.csv format/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
     const badFile = makeFile('not a csv', 'notes.pdf', '');
 
     fireEvent.change(input, { target: { files: [badFile] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'Only .csv files are accepted.',
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
     const zone = screen.getByRole('button', { name: /upload csv file/i });
     expect(zone.className).toContain('csv-drop-zone--parse-error');
   });
@@ -111,7 +111,7 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor((onParsed to haveBeenCalledTimes(1));
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
     const [result, fileName, rawText] = onParsed.mock.calls[0] as [ParseResult, string, string];
     expect(fileName).toBe('streams.csv');
     expect(result.rows).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
     expect(document.getElementById('csv-upload-success')).toHaveTextContent(
       '2 rows detected',
     );
@@ -151,12 +151,12 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [oversizedFile] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'File size exceeds the 1MB limit.',
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('rejects a CSV file with more rows than the maximum allowed', async () => {
@@ -171,12 +171,12 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         `The CSV file contains too many rows. The maximum allowed is ${MAX_ROWS.toLocaleString()}.`,
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('rejects a CSV file with more columns than the maximum allowed', async () => {
@@ -188,16 +188,16 @@ describe('CsvDropZone', () => {
     const values = columns.map((_, i) => `value${i}`);
     const row = values.join(',') + '\n';
     const tooManyColumnsCsv = header + row;
-    const file = makeFile(tooManyColumnsCsv, 'too=many-columns.csv');
+    const file = makeFile(tooManyColumnsCsv, 'too-many-columns.csv');
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         `The CSV file contains too many columns. The maximum allowed is ${MAX_COLUMNS}.`,
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('rejects a CSV file with a cell longer than the maximum allowed', async () => {
@@ -209,12 +209,12 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        a cell in the CSV file exceeds the maximum length of ${MAX_CELL_LENGTH} characters.`,
+        `a cell in the CSV file exceeds the maximum length of ${MAX_CELL_LENGTH} characters.`,
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('rejects a CSV file with inconsistent column counts', async () => {
@@ -225,12 +225,12 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => {
+    await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'The CSV file has inconsistent column counts.',
       );
     });
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('accepts a large CSV file that is within the limits', async () => {
@@ -247,7 +247,7 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
     const [result] = onParsed.mock.calls[0] as [ParseResult, string, string];
     expect(result.rows).toHaveLength(rowCount);
     expect(document.getElementById('csv-upload-success')).toHaveTextContent(
@@ -264,7 +264,7 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [] } });
     expect(zone.className).toContain('csv-drop-zone--empty');
-    expect(onParsed).not.tohaveBeenCalled();
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('surfaces a top-level parse error (e.g. empty file) without calling onParsed', async () => {
@@ -274,13 +274,13 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await WaitFor((screen.getByText('The CSV file has no data rows.')).toBeInDocument();
-    expect(onParsed).not.tohaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('The CSV file has no data rows.')).toBeInDocument());
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('shows a generic failure message when reading the file throws', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
-    const input = screen.getByLabel(/accepts \.csv format/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
     // Duck-typed "file" whose text() rejects -- CsvDropZone only calls
     // .name, .type, and .text() on the object, so this is enough to
     // exercise the catch branch without depending on real File internals.
@@ -292,14 +292,14 @@ describe('CsvDropZone', () => {
 
     fireEvent.change(input, { target: { files: [brokenFile] } });
 
-    await WaitFor((screen.getByText('Failed to read the file. Please try again.')).toBeInDocument();
-    expect(onParsed).not.tohaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('Failed to read the file. Please try again.')).toBeInDocument());
+    expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('opens the file picker when Enter is pressed on the zone', () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation:() => {});
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
 
     fireEvent.keyDown(zone, { key: 'Enter' });
 
@@ -309,7 +309,7 @@ describe('CsvDropZone', () => {
   it('opens the file picker when Space is pressed on the zone', () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation:() => {});
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
 
     fireEvent.keyDown(zone, { key: ' ' });
 
@@ -319,18 +319,94 @@ describe('CsvDropZone', () => {
   it('does not open the file picker for unrelated key presses', () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation:() => {});
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
 
     fireEvent.keyDown(zone, { key: 'a' });
 
-    expect(clickSpy).not.tohaveBeenCalled();
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a drop of multiple files with an explicit message', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--parse-error');
+  });
+
+  it('rejects multiple files selected through the file input', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.change(input, { target: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('restores focus to the drop zone after a rejected file', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const badFile = makeFile('not a csv', 'notes.pdf', 'application/pdf');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [badFile] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only .csv files are accepted.',
+      );
+    });
+
+    // Focus is returned to the drop zone so keyboard/screen-reader users can
+    // retry without hunting for the control.
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('restores focus to the drop zone when the file picker is cancelled', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+
+    // Cancel: fire change with no files (dialog dismissed without selection).
+    fireEvent.change(input, { target: { files: [] } });
+
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--empty');
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('keeps focus on the drop zone after a keyboard-open with no selection', () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+
+    zone.focus();
+    fireEvent.keyDown(zone, { key: 'Enter' });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(zone).toHaveFocus();
   });
 
   it('downloads the CSU template when the template button is clicked', () => {
     render(<CsvDropZone onParsed={onParsed} />);
 
     const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
-    const revokeObjectURL = vin();
+    const revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
 
     let capturedAnchor: HTMLAnchorElement | null = null;
@@ -349,8 +425,8 @@ describe('CsvDropZone', () => {
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(capturedAnchor).not.toBeNull();
-    expect(capturedAnchor!!.download).toBe('fluxora-streams-template.csv');
-    expect(capturedAnchor!!.click).toHaveBeenCalledTimes(1);
+    expect(capturedAnchor!.download).toBe('fluxora-streams-template.csv');
+    expect(capturedAnchor!.click).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
   });
 });

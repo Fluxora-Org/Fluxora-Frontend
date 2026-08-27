@@ -31,17 +31,47 @@ export interface StreamsFilters {
 }
 
 /**
- * Error thrown by the streams service when an upstream request fails or
- * returns an unexpected payload. Carrying a discriminant makes it easier for
+ * Options accepted by streamsService read functions to configure timeout,
+ * cancellation signal, and retry behavior.
+ */
+export interface StreamsRequestOptions {
+  /**
+   * Request timeout in milliseconds. If the request does not complete within
+   * this time, it is aborted and a `StreamsServiceError` with `kind: "timeout"`
+   * is thrown. Defaults to `VITE_API_TIMEOUT_MS` env var or 10,000ms.
+   * Pass `0` or `Infinity` to disable timeout.
+   */
+  timeoutMs?: number;
+  /**
+   * Optional external `AbortSignal`. When aborted by caller, an `AbortError`
+   * is thrown and in-flight requests / retry timers are cancelled immediately.
+   */
+  signal?: AbortSignal;
+  /**
+   * Maximum number of retry attempts on transient network errors.
+   * Note: Timeouts and caller aborts are NOT retried.
+   */
+  maxRetries?: number;
+  /**
+   * Initial delay in milliseconds before the first retry.
+   */
+  initialDelayMs?: number;
+}
+
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+/**
+ * Error thrown by the streams service when an upstream request fails, times out,
+ * or returns an unexpected payload. Carrying a discriminant makes it easier for
  * the hook layer to surface specific copy without inspecting message strings.
  */
 export class StreamsServiceError extends Error {
-  readonly kind: "network" | "http" | "shape";
+  readonly kind: "network" | "http" | "shape" | "timeout";
   readonly status?: number;
 
   constructor(
     message: string,
-    kind: "network" | "http" | "shape",
+    kind: "network" | "http" | "shape" | "timeout",
     status?: number,
   ) {
     super(message);
@@ -88,25 +118,8 @@ function readFiniteEnvInt(
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-/** Options controlling retry behaviour of {@link fetchJson}. */
-export interface FetchJsonOptions {
-  /**
-   * Maximum number of retry attempts on transient network errors.
-   * Defaults to `VITE_FETCH_MAX_RETRIES` env var or `3`.
-   */
-  maxRetries?: number;
-  /**
-   * Initial delay in milliseconds before the first retry.
-   * Subsequent delays follow exponential backoff capped at 8 seconds.
-   * Defaults to `VITE_FETCH_INITIAL_DELAY_MS` env var or `500`.
-   */
-  initialDelayMs?: number;
-  /**
-   * Optional `AbortSignal`. When fired, any pending retry timer is cancelled
-   * and the returned promise rejects with an `AbortError`.
-   */
-  signal?: AbortSignal;
-}
+/** Options controlling retry and timeout behaviour of {@link fetchJson}. */
+export interface FetchJsonOptions extends StreamsRequestOptions {}
 
 /**
  * Sleeps for `ms` milliseconds, but resolves immediately if the provided
@@ -139,23 +152,23 @@ function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
  * unwrapped `data` field from the JSON envelope.
  *
  * Retries up to `maxRetries` times on `kind: "network"` errors using
- * exponential backoff (capped at 8 seconds). HTTP and shape errors are
- * propagated immediately without retrying because they are not transient.
+ * exponential backoff (capped at 8 seconds). HTTP, shape, and timeout errors
+ * are propagated immediately without retrying because they are not transient.
  *
  * @param path - API path, e.g. `/streams`.
  * @param init - Optional `RequestInit` merged into every fetch call.
- * @param options - Retry and abort configuration.
+ * @param options - Retry, timeout, and abort configuration.
  *
- * @throws {StreamsServiceError} On network failure after all retries, or on
- *   HTTP / shape errors.
- * @throws {DOMException} With `name === "AbortError"` if the signal fires.
+ * @throws {StreamsServiceError} On network failure after all retries, timeout,
+ *   or HTTP / shape errors.
+ * @throws {DOMException} With `name === "AbortError"` if caller aborts.
  */
 async function fetchJson<T>(
   path: string,
   init?: RequestInit,
   options: FetchJsonOptions = {},
 ): Promise<T> {
-  const { baseUrl, fetchMaxRetries, fetchInitialDelayMs } = {
+  const { baseUrl, fetchMaxRetries, fetchInitialDelayMs, defaultTimeoutMs } = {
     ...readEnv(),
     fetchMaxRetries: readFiniteEnvInt(
       import.meta.env.VITE_FETCH_MAX_RETRIES,
@@ -165,90 +178,144 @@ async function fetchJson<T>(
       import.meta.env.VITE_FETCH_INITIAL_DELAY_MS,
       500,
     ),
+    defaultTimeoutMs: readFiniteEnvInt(
+      import.meta.env.VITE_API_TIMEOUT_MS,
+      DEFAULT_TIMEOUT_MS,
+    ),
   };
 
   const maxRetries = options.maxRetries ?? fetchMaxRetries;
   const initialDelayMs = options.initialDelayMs ?? fetchInitialDelayMs;
-  const signal = options.signal;
+  const callerSignal = options.signal;
+  const timeoutMs = options.timeoutMs !== undefined ? options.timeoutMs : defaultTimeoutMs;
 
   const url = joinUrl(baseUrl, path);
   const MAX_DELAY_MS = 8_000;
 
-  let attempt = 0;
+  // Set up timeout controller & combined abort signal
+  const timeoutController = new AbortController();
+  let timedOut = false;
+  let timerId: ReturnType<typeof setTimeout> | undefined;
 
-  while (true) {
-    if (signal?.aborted) {
+  if (timeoutMs > 0 && Number.isFinite(timeoutMs)) {
+    timerId = setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, timeoutMs);
+  }
+
+  const onCallerAbort = () => {
+    timeoutController.abort();
+  };
+
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      if (timerId !== undefined) clearTimeout(timerId);
       throw new DOMException("Aborted", "AbortError");
     }
+    callerSignal.addEventListener("abort", onCallerAbort, { once: true });
+  }
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        ...init,
-        signal,
-        headers: {
-          Accept: "application/json",
-          ...(init?.headers ?? {}),
-        },
-      });
-    } catch (error) {
-      // Abort errors must propagate immediately without retrying.
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw error;
+  const effectiveSignal = timeoutController.signal;
+
+  let attempt = 0;
+
+  try {
+    while (true) {
+      if (callerSignal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
       }
-
-      const message =
-        error instanceof Error
-          ? `Streams service request failed: ${error.message}`
-          : "Streams service request failed";
-      const networkError = new StreamsServiceError(message, "network");
-
-      if (attempt >= maxRetries) {
-        throw networkError;
-      }
-
-      const delayMs = Math.min(initialDelayMs * 2 ** attempt, MAX_DELAY_MS);
-      attempt++;
-
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
-          error,
+      if (timedOut) {
+        throw new StreamsServiceError(
+          `Request to ${path} timed out after ${timeoutMs}ms`,
+          "timeout",
         );
       }
 
-      await sleepWithAbort(delayMs, signal);
-      continue;
-    }
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          ...init,
+          signal: effectiveSignal,
+          headers: {
+            Accept: "application/json",
+            ...(init?.headers ?? {}),
+          },
+        });
+      } catch (error) {
+        // If timed out, throw timeout error immediately (not retried)
+        if (timedOut) {
+          throw new StreamsServiceError(
+            `Request to ${path} timed out after ${timeoutMs}ms`,
+            "timeout",
+          );
+        }
 
-    if (!response.ok) {
-      // HTTP errors (4xx / 5xx) are not transient — propagate immediately.
-      throw new StreamsServiceError(
-        `Streams service responded with ${response.status} ${response.statusText}`.trim(),
-        "http",
-        response.status,
-      );
-    }
+        // Caller-initiated abort must propagate immediately without retrying.
+        if (callerSignal?.aborted || (error instanceof DOMException && error.name === "AbortError" && !timedOut)) {
+          throw new DOMException("Aborted", "AbortError");
+        }
 
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      // Shape errors are not transient — propagate immediately.
-      throw new StreamsServiceError(
-        "Streams service returned a non-JSON payload",
-        "shape",
-      );
-    }
+        const message =
+          error instanceof Error
+            ? `Streams service request failed: ${error.message}`
+            : "Streams service request failed";
+        const networkError = new StreamsServiceError(message, "network");
 
-    if (!payload || typeof payload !== "object" || !("data" in payload)) {
-      throw new StreamsServiceError(
-        "Streams service returned an unexpected payload shape",
-        "shape",
-      );
-    }
+        if (attempt >= maxRetries) {
+          throw networkError;
+        }
 
-    return (payload as { data: T }).data;
+        const delayMs = Math.min(initialDelayMs * 2 ** attempt, MAX_DELAY_MS);
+        attempt++;
+
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
+            error,
+          );
+        }
+
+        await sleepWithAbort(delayMs, effectiveSignal);
+        continue;
+      }
+
+      if (!response.ok) {
+        // HTTP errors (4xx / 5xx) are not transient — propagate immediately.
+        throw new StreamsServiceError(
+          `Streams service responded with ${response.status} ${response.statusText}`.trim(),
+          "http",
+          response.status,
+        );
+      }
+
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        // Shape errors are not transient — propagate immediately.
+        throw new StreamsServiceError(
+          "Streams service returned a non-JSON payload",
+          "shape",
+        );
+      }
+
+      if (!payload || typeof payload !== "object" || !("data" in payload)) {
+        throw new StreamsServiceError(
+          "Streams service returned an unexpected payload shape",
+          "shape",
+        );
+      }
+
+      return (payload as { data: T }).data;
+    }
+  } finally {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+    if (callerSignal) {
+      callerSignal.removeEventListener("abort", onCallerAbort);
+    }
   }
 }
 
@@ -359,12 +426,16 @@ function buildStreamsQuery(filters?: StreamsFilters): string {
  * `VITE_USE_MOCKS` is enabled the metrics are derived from the seeded
  * {@link StreamRecord} data so the dashboard renders consistent demo values
  * without contacting the network.
+ *
+ * @param options - Timeout, cancellation signal, and retry configuration.
  */
-export async function getTreasuryMetrics(): Promise<Metric[]> {
+export async function getTreasuryMetrics(
+  options?: StreamsRequestOptions,
+): Promise<Metric[]> {
   if (isMockMode()) {
     return deriveMockMetrics(seededStreamRecords);
   }
-  const raw = await fetchJson<unknown[]>("/treasury/metrics");
+  const raw = await fetchJson<unknown[]>("/treasury/metrics", undefined, options);
   if (!Array.isArray(raw)) {
     throw new StreamsServiceError(
       "Treasury metrics payload was not an array",
@@ -381,15 +452,19 @@ export async function getTreasuryMetrics(): Promise<Metric[]> {
  * filtered by status, recipient, or treasury address. Filter values are
  * URL-encoded before they reach the wire so untrusted strings cannot inject
  * additional query parameters.
+ *
+ * @param filters - Optional status, recipient, or treasury filters.
+ * @param options - Timeout, cancellation signal, and retry configuration.
  */
 export async function getStreams(
   filters?: StreamsFilters,
+  options?: StreamsRequestOptions,
 ): Promise<StreamRecord[]> {
   if (isMockMode()) {
     return applyStreamFilters(seededStreamRecords, filters);
   }
   const path = `/streams${buildStreamsQuery(filters)}`;
-  const raw = await fetchJson<unknown[]>(path);
+  const raw = await fetchJson<unknown[]>(path, undefined, options);
   if (!Array.isArray(raw)) {
     throw new StreamsServiceError(
       "Streams payload was not an array",
@@ -405,21 +480,26 @@ export async function getStreams(
  * URL-encoded before being interpolated into the path.
  *
  * @param id - Stream identifier.
- * @param signal - Optional AbortSignal to cancel the request.
+ * @param signalOrOptions - Optional AbortSignal or StreamsRequestOptions.
  */
 export async function getStreamById(
   id: string,
-  signal?: AbortSignal,
+  signalOrOptions?: AbortSignal | StreamsRequestOptions,
 ): Promise<StreamRecord | null> {
   if (typeof id !== "string" || id.length === 0) return null;
   if (isMockMode()) {
     return seededStreamRecords.find((record) => record.id === id) ?? null;
   }
+  const options: StreamsRequestOptions =
+    signalOrOptions instanceof AbortSignal
+      ? { signal: signalOrOptions }
+      : signalOrOptions ?? {};
+
   try {
     const raw = await fetchJson<unknown>(
       `/streams/${encodeURIComponent(id)}`,
       undefined,
-      { signal },
+      options,
     );
     return normalizeStreamRecord(raw);
   } catch (error) {
@@ -435,9 +515,13 @@ export async function getStreamById(
  * validated and sanitized via {@link sanitizeStellarAddress} before any
  * request is issued, so an invalid address short-circuits to an empty array
  * instead of hitting the network.
+ *
+ * @param address - Stellar recipient address.
+ * @param options - Timeout, cancellation signal, and retry configuration.
  */
 export async function getRecipientStreams(
   address: string,
+  options?: StreamsRequestOptions,
 ): Promise<StreamRecord[]> {
   const safe = sanitizeStellarAddress(address);
   if (safe === "") return [];
@@ -448,6 +532,8 @@ export async function getRecipientStreams(
   }
   const raw = await fetchJson<unknown[]>(
     `/recipients/${encodeURIComponent(safe)}/streams`,
+    undefined,
+    options,
   );
   if (!Array.isArray(raw)) {
     throw new StreamsServiceError(
@@ -457,3 +543,4 @@ export async function getRecipientStreams(
   }
   return raw.map(normalizeStreamRecord);
 }
+
