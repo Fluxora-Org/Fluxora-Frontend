@@ -31,6 +31,13 @@ interface WalletStatusProps {
   expectedNetwork?: string;
   isNetworkMismatch?: boolean;
   onDisconnect?: () => void;
+  /**
+   * When true (e.g. during a route transition), the wallet *action* controls
+   * are locked: the trigger is disabled, the menu cannot open, and any open
+   * menu is force-closed. The *identity* (network badge + address) stays
+   * visible so the user is not disoriented mid-navigation.
+   */
+  disabled?: boolean;
 }
 
 
@@ -40,6 +47,7 @@ export default function WalletStatus({
   expectedNetwork = "TESTNET",
   isNetworkMismatch = isStellarNetworkMismatch(network, expectedNetwork),
   onDisconnect,
+  disabled = false,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -86,6 +94,7 @@ export default function WalletStatus({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
     if (!open) {
       if (
         document.activeElement === triggerRef.current &&
@@ -144,6 +153,16 @@ export default function WalletStatus({
     const timer = setTimeout(() => setAnnouncement(""), 1000);
     return () => clearTimeout(timer);
   }, [address]);
+
+  // Locking: when disabled (e.g. a route transition is settling), the wallet
+  // action menu must not be openable and any in-flight menu is dismissed so no
+  // action from the previous context can be invoked against the new route.
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      setConfirmingDisconnect(false);
+    }
+  }, [disabled]);
 
   useEffect(() => {
     const syncWorkspaces = () => setWorkspaces(readConnectedWorkspaces());
@@ -258,10 +277,20 @@ export default function WalletStatus({
         <button
           ref={triggerRef}
           onClick={() => setOpen((o) => !o)}
+          disabled={disabled}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Wallet ${formatAddress(address)}. Open wallet options.`}
-          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
+          aria-disabled={disabled || undefined}
+          aria-label={`${
+            disabled
+              ? "Wallet controls unavailable while navigating. "
+              : ""
+          }Wallet ${formatAddress(address)}. Open wallet options.`}
+          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName} ${
+            disabled
+              ? "opacity-60 cursor-not-allowed hover:border-[var(--border)]"
+              : ""
+          }`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span className="font-mono text-xs">

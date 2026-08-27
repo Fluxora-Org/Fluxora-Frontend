@@ -289,6 +289,7 @@ export default function AppNavbar({
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
 
   // Simulate a brief "connecting" state on first mount when wallet restores session
   useEffect(() => {
@@ -297,7 +298,34 @@ export default function AppNavbar({
     return () => clearTimeout(t);
   }, []);
 
-const location = useLocation();
+  /**
+   * Route-transition lock.
+   *
+   * Design decision: a route change settles asynchronously (data fetches,
+   * lazy routes, pending renders). Until it settles we mark the navbar as
+   * `routeTransitioning` for a short window. While transitioning:
+   *   - Wallet/account *action* controls (disconnect, copy address, explorer,
+   *     workspace links) are locked so an action bound to the previous route's
+   *     context cannot be invoked against the new one.
+   *   - Wallet *identity* (network badge + address, including a wrong-network
+   *     badge) stays visible so the user keeps orientation.
+   *   - Global controls (theme, easy-read font, search, voice) remain available.
+   *
+   * The timer is re-armed on every pathname change, so rapid navigation keeps
+   * the lock active until the last transition settles, and browser
+   * back/forward re-arms it for the restored route.
+   */
+  const location = useLocation();
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    setRouteTransitioning(true);
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = setTimeout(() => setRouteTransitioning(false), 250);
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, [location.pathname]);
+
   const isAppView = connected && location.pathname.startsWith("/app");
   const breadcrumbs = useBreadcrumbs(location.pathname);
   const showBreadcrumb = isAppView && breadcrumbs.length > 1;
@@ -450,6 +478,7 @@ const location = useLocation();
                 expectedNetwork={expectedNetwork}
                 isNetworkMismatch={isNetworkMismatch}
                 onDisconnect={disconnect}
+                disabled={routeTransitioning}
               />
             ) : (
               <Link
@@ -556,6 +585,7 @@ const location = useLocation();
                   disconnect();
                   closeMobile({ restoreFocus: true });
                 }}
+                disabled={routeTransitioning}
               />
             ) : (
               <Link
