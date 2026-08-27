@@ -31,6 +31,7 @@ vi.mock("../../../hooks/useTickingNow", () => ({
 // Wallet mock — reset per describe block via walletOverrides
 const defaultWallet = {
   connected: false,
+  loading: false,
   address: undefined as string | undefined,
   network: undefined as string | undefined,
   expectedNetwork: "TESTNET",
@@ -426,6 +427,8 @@ describe("G: Easy-read font toggle", () => {
 
 describe("H: Connecting skeleton (wallet session restore)", () => {
   it("shows a 'Connecting wallet…' status region while connecting", () => {
+    // Set loading to true to trigger the skeleton
+    walletOverrides = { loading: true };
     // Do NOT flush timers — check the interim state
     render(
       <ThemeProvider>
@@ -438,6 +441,7 @@ describe("H: Connecting skeleton (wallet session restore)", () => {
   });
 
   it("hides the skeleton and shows the CTA after the timer resolves (anon)", () => {
+    walletOverrides = { loading: false };
     renderNavbar(); // flushes timers
     expect(
       screen.queryByRole("status", { name: /connecting wallet/i }),
@@ -449,6 +453,7 @@ describe("H: Connecting skeleton (wallet session restore)", () => {
 
   it("hides the skeleton and shows WalletStatus after the timer resolves (connected)", () => {
     walletOverrides = {
+      loading: false,
       connected: true,
       address: "GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12",
       network: "TESTNET",
