@@ -6,6 +6,12 @@
 
 export const STREAMS_SESSION_STORAGE_KEY = "fluxora_streams_session_v1";
 
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "./browserStorage";
+
 /** Snapshots older than this are treated as stale and never offered for restore. */
 export const STREAMS_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -165,19 +171,15 @@ export function readStreamsSession(
 ): StreamsSessionSnapshot | null {
   if (!storage) return null;
 
-  try {
-    const raw = storage.getItem(STREAMS_SESSION_STORAGE_KEY);
-    if (!raw) return null;
+  const raw = readBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
+  if (!raw) return null;
 
-    const snapshot = parseSnapshot(raw);
-    if (!snapshot) return null;
-    if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
-    if (now < snapshot.savedAt) return null;
+  const snapshot = parseSnapshot(raw);
+  if (!snapshot) return null;
+  if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
+  if (now < snapshot.savedAt) return null;
 
-    return snapshot;
-  } catch {
-    return null;
-  }
+  return snapshot;
 }
 
 /** Persists the current filters/draft snapshot. Best-effort; failures are swallowed. */
@@ -188,12 +190,12 @@ export function writeStreamsSession(
 ): void {
   if (!storage) return;
 
-  try {
-    const full: StreamsSessionSnapshot = { ...snapshot, savedAt: now };
-    storage.setItem(STREAMS_SESSION_STORAGE_KEY, JSON.stringify(full));
-  } catch {
-    // Storage unavailable (quota, privacy mode); treat as best-effort.
-  }
+  const full: StreamsSessionSnapshot = { ...snapshot, savedAt: now };
+  writeBrowserStorage(
+    STREAMS_SESSION_STORAGE_KEY,
+    JSON.stringify(full),
+    storage,
+  );
 }
 
 /**
@@ -206,9 +208,5 @@ export function clearStreamsSession(
 ): void {
   if (!storage) return;
 
-  try {
-    storage.removeItem(STREAMS_SESSION_STORAGE_KEY);
-  } catch {
-    // Storage unavailable; treat as best-effort.
-  }
+  removeBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
 }

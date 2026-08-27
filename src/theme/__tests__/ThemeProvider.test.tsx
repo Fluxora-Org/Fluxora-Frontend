@@ -727,6 +727,24 @@ describe("ThemeProvider — themePreference and setThemePreference", () => {
     expect(screen.getByTestId("theme")).toHaveTextContent("light");
   });
 
+  it("keeps the selected theme when localStorage rejects the write", async () => {
+    const user = userEvent.setup();
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = vi.fn(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    try {
+      render(<ThemeProbe />, { wrapper: Wrapper });
+      await user.click(screen.getByText("set-pref-light"));
+
+      expect(screen.getByTestId("theme-pref")).toHaveTextContent("light");
+      expect(screen.getByTestId("theme")).toHaveTextContent("light");
+    } finally {
+      localStorage.setItem = originalSetItem;
+    }
+  });
+
   it("Cross-tab: storage event with newValue === null sets preference to 'auto' and applies OS theme", () => {
     localStorage.setItem(THEME_STORAGE_KEY, "dark");
     mockMatchMedia(false); // OS prefers light
