@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
@@ -62,6 +62,12 @@ export default function StreamDetail() {
   const [loading, setLoading] = useState(true);
   const currentDate = useTickingNow();
 
+  // Tracks the cancel function of whichever fetch (initial load or a
+  // manual retry) is currently in flight, so a newer fetch can cancel a
+  // still-pending older one before it has a chance to resolve and
+  // overwrite state.
+  const activeCancelRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     // In compare mode the individual panes manage their own fetches
     if (isCompareMode) {
@@ -75,8 +81,17 @@ export default function StreamDetail() {
       return;
     }
 
+    // Cancel any still-pending fetch from a previous route/retry before
+    // starting this one.
+    activeCancelRef.current?.();
+
     let cancelled = false;
     const controller = new AbortController();
+    const cancelThisFetch = () => {
+      cancelled = true;
+      controller.abort();
+    };
+    activeCancelRef.current = cancelThisFetch;
 
     setLoading(true);
     setError(null);
@@ -87,6 +102,9 @@ export default function StreamDetail() {
           setStream(result);
           setLoading(false);
         }
+        if (activeCancelRef.current === cancelThisFetch) {
+          activeCancelRef.current = null;
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -95,11 +113,16 @@ export default function StreamDetail() {
           );
           setLoading(false);
         }
+        if (activeCancelRef.current === cancelThisFetch) {
+          activeCancelRef.current = null;
+        }
       });
 
     return () => {
-      cancelled = true;
-      controller.abort();
+      cancelThisFetch();
+      if (activeCancelRef.current === cancelThisFetch) {
+        activeCancelRef.current = null;
+      }
     };
   }, [streamId, isCompareMode]);
 
@@ -176,20 +199,44 @@ export default function StreamDetail() {
   if (error) {
     const handleRetry = () => {
       if (!streamId) return;
+      
+      // Same guard as the effect above: cancel any still-pending fetch
+      // before starting a new one, so a slow earlier retry (or a route
+      // change that happens before this retry resolves) can never
+      // overwrite the view with stale data.
+      activeCancelRef.current?.();
+
+      let cancelled = false;
+      const controller = new AbortController();
+      const cancelThisFetch = () => {
+        cancelled = true;
+        controller.abort();
+      };
+      activeCancelRef.current = cancelThisFetch;
+
       setLoading(true);
       setError(null);
 
-      const controller = new AbortController();
       getStreamById(decodeURIComponent(streamId), controller.signal)
         .then((result) => {
-          setStream(result);
-          setLoading(false);
+          if (!cancelled) {
+            setStream(result);
+            setLoading(false);
+          }
+          if (activeCancelRef.current === cancelThisFetch) {
+            activeCancelRef.current = null;
+          }
         })
         .catch((err: unknown) => {
-          setError(
-            err instanceof Error ? err.message : "Failed to load stream.",
-          );
-          setLoading(false);
+          if (!cancelled) {
+            setError(
+              err instanceof Error ? err.message : "Failed to load stream.",
+            );
+            setLoading(false);
+          }
+          if (activeCancelRef.current === cancelThisFetch) {
+            activeCancelRef.current = null;
+          }
         });
     };
 
