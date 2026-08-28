@@ -13,6 +13,11 @@ import {
   type AllowedTokenKey,
   type TokenValidationError,
 } from "./contrastUtils";
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "../lib/browserStorage";
 
 // ─── 1. Core "light | dark" union (unchanged) ────────────────────────────────
 
@@ -118,7 +123,7 @@ export function isThemePreference(value: unknown): value is ThemePreference {
 function getStoredTheme(): ThemePreference | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const stored = readBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
     return isThemePreference(stored) ? stored : null;
   } catch {
     return null;
@@ -140,7 +145,7 @@ export function resolveThemeFromPreference(pref: ThemePreference): Theme {
 export function getStoredFontPreference(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    const stored = window.localStorage.getItem(FONT_STORAGE_KEY);
+    const stored = readBrowserStorage(FONT_STORAGE_KEY, window.localStorage);
     return isEasyReadFont(stored) ? stored === "true" || stored === true : false;
   } catch {
     return false;
@@ -167,7 +172,7 @@ function getSystemTheme(): Theme {
 function getStoredCustomTheme(): RegisteredTheme | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
+    const raw = readBrowserStorage(CUSTOM_THEME_STORAGE_KEY, window.localStorage);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (
@@ -483,15 +488,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemePreferenceState(pref);
     hasExplicitChoiceRef.current = pref !== "auto";
     if (pref === "auto") {
-      try {
-        window.localStorage.removeItem(THEME_STORAGE_KEY);
-      } catch { /* ignore quota errors */ }
+      removeBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
       const systemTheme = getSystemTheme();
       setThemeState(systemTheme);
     } else {
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, pref);
-      } catch { /* ignore quota errors */ }
+      writeBrowserStorage(THEME_STORAGE_KEY, pref, window.localStorage);
       setThemeState(pref);
     }
   }, []);
@@ -501,9 +502,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setThemePreference(next);
     } else {
       hasExplicitChoiceRef.current = true;
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, next);
-      } catch { /* ignore quota errors */ }
+      writeBrowserStorage(THEME_STORAGE_KEY, next, window.localStorage);
       setThemeState(next);
     }
   }, [setThemePreference]);
@@ -517,11 +516,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-font-transitioning", "true");
     }
-    try {
-      window.localStorage.setItem(FONT_STORAGE_KEY, String(next));
-    } catch {
-      // Ignore persistence failures.
-    }
+    writeBrowserStorage(FONT_STORAGE_KEY, String(next), window.localStorage);
     setEasyReadState(next);
     setTimeout(() => {
       if (typeof document !== "undefined") {
@@ -722,20 +717,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const applyCustomTheme = useCallback(() => {
     if (customTheme && customThemeState === "custom-pending-preview") {
-      try {
-        window.localStorage.setItem(
-          CUSTOM_THEME_STORAGE_KEY,
-          JSON.stringify(customTheme),
-        );
-      } catch { /* ignore */ }
+      writeBrowserStorage(
+        CUSTOM_THEME_STORAGE_KEY,
+        JSON.stringify(customTheme),
+        window.localStorage,
+      );
       setCustomThemeState("custom-applied");
     }
   }, [customTheme, customThemeState]);
 
   const clearCustomTheme = useCallback(() => {
-    try {
-      window.localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY);
-    } catch { /* ignore */ }
+    removeBrowserStorage(CUSTOM_THEME_STORAGE_KEY, window.localStorage);
     clearCustomTokens();
     setCustomTheme(null);
     setCustomThemeState("default");
