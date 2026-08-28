@@ -28,15 +28,46 @@ export interface RecipientStreamsProps {
   error?: string | null;
   onEmptyPrimaryAction?: () => void;
   onRetry?: () => void;
-  fetchStreamsFn?: (cursor: string | null) => Promise<{ streams: Stream[]; nextCursor: string | null }>;
-  /** Pass 0 to disable background polling (useful in tests). */
+  fetchStreamsFn?: () => Promise<Stream[]>;
   pollIntervalMs?: number;
+  timeoutMs?: number;
+}
+
+/**
+ * Transaction status model shared across transaction flows.
+ * 'idle' - no transaction in flight
+ * 'pending' - transaction submitted and waiting on chain
+ * 'success' - transaction confirmed
+ * 'error' - transaction failed
+ * 'timeout' - transaction timed out (no confirmation within threshold)
+ */
+export type TransactionStatus = "idle" | "pending" | "success" | "error" | "timeout";
+
+const SUCCESS_MESSAGE_DURATION = 3000;
+const DEFAULT_TIMEOUT_MS = 8000;
+
+/**
+ * Race a promise against a timeout. Rejects with a TimeoutError if the
+ * underlying promise does not settle within `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error("Request timed out");
+      error.name = "TimeoutError";
+      reject(error);
+    }, ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 }
 
 export type StreamFilter = "All" | "Active" | "Paused" | "Completed";
 
 export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
-  recipientId,
   isLoading: externalIsLoading,
   streams: externalStreams,
   error: externalError,
@@ -44,6 +75,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   onRetry,
   fetchStreamsFn,
   pollIntervalMs = 10000,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }) => {
   const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -51,6 +83,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   const [filter, setFilter] = useState<StreamFilter>("All");
   const [retryCount, setRetryCount] = useState<number>(0);
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
+  /** Displays a short-lived confirmation when a refresh succeeds. */
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   /**
    * Pagination cursor.
@@ -80,7 +114,14 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
   const isFetchingRef = useRef<boolean>(false);
   const retryButtonRef = useRef<HTMLButtonElement>(null);
+  /** Tracks the previous error value so we can detect the transition from
+   *  null -> error (new error mount) without running focus logic on every render. */
   const prevErrorRef = useRef<string | null>(null);
+  /** Monotonic counter used to discard stale responses after a timeout or
+   *  duplicate submission. */
+  const requestIdRef = useRef<number>(0);
+  /** Handle for clearing the success-message timer. */
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track previous recipientId to detect identity changes.
   const prevRecipientIdRef = useRef<string | undefined>(recipientId);
@@ -137,25 +178,47 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     isFetchingRef.current = true;
     setIsRefreshing(true);
     setInternalError(null);
+    setSuccessMessage(null);
+
+    const requestId = ++requestIdRef.current;
 
     try {
-      const result = await fetchStreamsFn(cursorRef.current);
+      const updatedStreams = await withTimeout(fetchStreamsFn(), timeoutMs);
+
+      // Ignore stale responses (e.g., a previous request timed out and a newer
+      // one is now in flight).
+      if (requestId !== requestIdRef.current) return;
+
+      // Successful fetch resets the retry counter.
       setRetryCount(0);
       setCursor(result.nextCursor);
       setInternalStreams((prevStreams) => {
         const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
-        return result.streams.map((stream) => ({
+        return updatedStreams.map((stream) => ({
           ...stream,
           isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false,
         }));
       });
-    } catch {
-      setInternalError("Failed to sync latest stream data. Please try again.");
+
+      setSuccessMessage("Stream data updated");
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = setTimeout(() => setSuccessMessage(null), SUCCESS_MESSAGE_DURATION);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+
+      const isTimeout = error instanceof Error && error.name === "TimeoutError";
+      setInternalError(
+        isTimeout
+          ? "Request timed out. Please try again."
+          : "Failed to sync latest stream data. Please try again."
+      );
     } finally {
-      isFetchingRef.current = false;
-      setIsRefreshing(false);
+      if (requestId === requestIdRef.current) {
+        isFetchingRef.current = false;
+        setIsRefreshing(false);
+      }
     }
-  }, [fetchStreamsFn]);
+  }, [fetchStreamsFn, timeoutMs]);
 
   useEffect(() => {
     if (fetchStreamsFn) {
@@ -177,6 +240,14 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     return () => clearInterval(interval);
   }, [fetchStreamsFn, handleRefresh, pollIntervalMs]);
 
+  // Cleanup success-message timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, []);
+
+  // Determine effective state inputs (external props take precedence if provided)
   const isLoading = externalIsLoading ?? false;
   const effectiveError = externalError ?? internalError;
   const effectiveStreams = externalStreams ?? internalStreams;
@@ -286,11 +357,11 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
         <div className="flex justify-between items-center mb-6">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Skeleton width={180} height={24} borderRadius={6} />
-            <Skeleton width={260} height={14} borderRadius={6} />
+            <Skeleton width={180} height={24} borderRadius={12} />
+            <Skeleton width={260} height={14} borderRadius={12} />
           </div>
           {fetchStreamsFn && (
-            <Skeleton width={120} height={38} borderRadius={6} />
+            <Skeleton width={120} height={38} borderRadius={12} />
           )}
         </div>
 
@@ -351,17 +422,29 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
               Real-time contract payment records
             </p>
           </div>
-          {fetchStreamsFn && (
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition w-full sm:w-auto"
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh Status"}
-            </button>
-          )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {successMessage && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="text-sm text-green-600 dark:text-green-400"
+              >
+                {successMessage}
+              </span>
+            )}
+            {fetchStreamsFn && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || isRetrying}
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition w-full sm:w-auto"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh Status"}
+              </button>
+            )}
+          </div>
         </div>
-
+        
+        {/* Filter Controls */}
         {effectiveStreams.length > 0 && (
           <div
             role="group"
@@ -387,59 +470,69 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
         )}
       </div>
 
+      {/*
+       * Error banner
+       *
+       * role="alert" + aria-live="assertive" + aria-atomic="true":
+       *   Assertive is chosen over polite because this is a foreground data-sync
+       *   failure — the recipient cannot see their streams until it is resolved.
+       *   A background poll that silently retries would warrant polite.
+       *   aria-atomic="true" ensures the entire banner is announced as a unit
+       *   so screen readers do not speak fragmented sentences.
+       */}
       {effectiveError && (
         <div
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
-          className="mb-4 p-4 border rounded-xl flex items-start justify-between"
+          className="mb-6 p-4 rounded-xl border"
           style={{
-            borderColor: "var(--color-error-border)",
             backgroundColor: "var(--color-error-bg)",
-            color: "var(--color-error-text)",
+            borderColor: "var(--color-error-border)",
           }}
         >
-          <p className="text-sm font-medium" style={{ color: "var(--color-error-text)" }}>
-            {errorMessage}
-          </p>
-          <button
-            ref={retryButtonRef}
-            onClick={handleRetryAction}
-            disabled={isRetrying}
-            aria-label="Retry loading recipient streams"
-            className="ml-4 px-3 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isRetrying ? "Retrying..." : "Retry"}
-          </button>
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 text-lg" aria-hidden="true">⚠️</span>
+            <div className="flex-1">
+              <p
+                className="text-sm font-medium"
+                style={{ color: "var(--color-error-text)" }}
+              >
+                Unable to load streams
+              </p>
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--color-error-text-muted)" }}
+              >
+                {errorMessage}
+              </p>
+            </div>
+            {fetchStreamsFn && (
+              <button
+                ref={retryButtonRef}
+                onClick={handleRetryAction}
+                disabled={isRetrying || isRefreshing}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {isRetrying ? "Retrying..." : "Retry"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
+      {/* Empty state */}
       {!effectiveError && effectiveStreams.length === 0 && (
         <EmptyState
-          variant="recipient"
-          onPrimaryAction={onEmptyPrimaryAction}
+          title="No incoming streams"
+          description="When someone starts a stream to you, it'll show up here."
+          actionLabel={onEmptyPrimaryAction ? "View Activity" : undefined}
+          onAction={onEmptyPrimaryAction}
         />
       )}
 
-      {effectiveStreams.length > 0 && filteredStreams.length === 0 && !effectiveError && (
-        <div className="mt-4 text-center space-y-3">
-          <p
-            className="text-sm"
-            style={{ color: "var(--color-text-tertiary)" }}
-          >
-            {filterEmptyLabel}
-          </p>
-          <button
-            onClick={() => setFilter("All")}
-            className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            style={{ color: "var(--color-text-primary)" }}
-          >
-            Clear Filters
-          </button>
-        </div>
-      )}
-
-      {effectiveStreams.length > 0 && filteredStreams.length > 0 && (
+      {/* Stream list */}
+      {effectiveStreams.length > 0 && (
         <div
           role="list"
           aria-label="Incoming streams"
@@ -450,47 +543,25 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             <div
               key={stream.id}
               role="listitem"
-              className="flex items-center justify-between p-4 border rounded-xl"
-              style={{ borderColor: "var(--color-border)" }}
+              className="flex items-center justify-between px-4 py-3 rounded-xl mb-2"
+              style={{ backgroundColor: "var(--color-bg-secondary)" }}
             >
-              <div>
-                <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-                  From: {stream.senderName ?? stream.sender}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: "var(--color-text-primary)" }}>
+                  {stream.senderName || stream.sender || "Unknown sender"}
                 </p>
-                <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
-                  {stream.amount} XLM
+                <p className="text-xs truncate" style={{ color: "var(--color-text-tertiary)" }}>
+                  {stream.amount} {stream.status}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className="px-2 py-1 text-xs rounded-full"
-                  style={{
-                    backgroundColor:
-                      stream.status?.toLowerCase() === "active"
-                        ? "var(--color-success-bg)"
-                        : "var(--color-warning-bg)",
-                    color: "var(--color-text-primary)",
-                  }}
-                >
-                  {stream.status}
-                </span>
-                {stream.isPinned && (
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: "var(--color-text-tertiary)" }}
-                  >
-                    Pinned
-                  </span>
-                )}
-                <button
-                  onClick={() => togglePin(stream.id)}
-                  aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
-                  aria-pressed={stream.isPinned ? "true" : "false"}
-                  className="text-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                >
-                  {stream.isPinned ? "★" : "☆"}
-                </button>
-              </div>
+              <button
+                onClick={() => togglePin(stream.id)}
+                aria-pressed={stream.isPinned ?? false}
+                aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
+                className="ml-4 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
+              >
+                {stream.isPinned ? "📌" : "📌"}
+              </button>
             </div>
           ))}
         </div>
