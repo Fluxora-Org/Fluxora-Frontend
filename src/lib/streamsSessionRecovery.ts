@@ -207,11 +207,16 @@ export function readStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!storage || !normalizedAccountAddress) return null;
 
-  const raw = readBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
+  const storageKey = getStorageKey(normalizedAccountAddress);
+  const raw = readBrowserStorage(storageKey, storage);
   if (!raw) return null;
 
   const snapshot = parseSnapshot(raw);
   if (!snapshot) return null;
+  if (snapshot.accountAddress !== normalizedAccountAddress) {
+    removeBrowserStorage(storageKey, storage);
+    return null;
+  }
   if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
   if (now < snapshot.savedAt) return null;
 
@@ -238,8 +243,8 @@ export function writeStreamsSession(
 
   const full: StreamsSessionSnapshot = { ...snapshot, savedAt: now };
   writeBrowserStorage(
-    STREAMS_SESSION_STORAGE_KEY,
-    JSON.stringify(full),
+    getStorageKey(normalizedAccountAddress),
+    JSON.stringify({ ...full, accountAddress: normalizedAccountAddress }),
     storage,
   );
 }
@@ -260,5 +265,5 @@ export function clearStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!storage || !normalizedAccountAddress) return;
 
-  removeBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
+  removeBrowserStorage(getStorageKey(normalizedAccountAddress), storage);
 }
