@@ -36,9 +36,9 @@ export interface StreamTimelineProps {
 
 type TransactionStatus = "idle" | "pending" | "confirmed" | "rejected" | "timeout";
 
-const TransactionDemo: React.FC< {
+const TransactionDemo: React.FC<{
   mockOutcome: Exclude<TransactionStatus, "idle" | "pending">;
-} = ({ mockOutcome }) => {
+}> = ({ mockOutcome }) => {
   const [status, setStatus] = React.useState<TransactionStatus>("idle");
   const [message, setMessage] = React.useState(
     "Transaction state idle. Click submit to start.",
@@ -98,7 +98,7 @@ const TransactionDemo: React.FC< {
         >
           Reset
         </button>
-      )
+      )}
     </div>
   );
 };
@@ -252,9 +252,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         {cliff && cliffPercent > 0 && (
           <div
             className={`stream-timeline-bar__segment stream-timeline-bar__segment--cliff is-${status}`}
-            style={ width: `${cliffPercent}%` }
+            style={{ width: `${cliffPercent}%` }}
             role="img"
-            aria-label={{Cliff period: ${formatDate(start)} to ${formatDate(cliff)}`}
+            aria-label={`Cliff period: ${formatDate(start)} to ${formatDate(cliff)}`}
           >
             {cliffPercent > 5 && (
               <span className="stream-timeline-bar__segment-label">
@@ -268,9 +268,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         {accrualPercent > cliffPercent && (
           <div
             className={`stream-timeline-bar__segment stream-timeline-bar__segment--accrual is-${status}`}
-            style={ width: `${accrualPercent - cliffPercent}%` }
+            style={{ width: `${accrualPercent - cliffPercent}%` }}
             role="img"
-            aria-label={{Accrual period: ${cliff ? formatDate(cliff) : formatDate(start)} to ${formatDate(current)}`}
+            aria-label={`Accrual period: ${cliff ? formatDate(cliff) : formatDate(start)} to ${formatDate(current)}`}
           >
             {accrualPercent - cliffPercent > 8 && (
               <span className="stream-timeline-bar__segment-label">
@@ -284,9 +284,9 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         {accrualPercent < 100 && (
           <div
             className={`stream-timeline-bar__segment stream-timeline-bar__segment--remaining is-${status}`}
-            style={ width: `{100 - accrualPercent}%` }
+            style={{ width: `${100 - accrualPercent}%` }}
             role="img"
-            aria-label={{Remaining period: ${formatDate(current)} to ${formatDate(end)}`}
+            aria-label={`Remaining period: ${formatDate(current)} to ${formatDate(end)}`}
           />
         )}
 
@@ -296,7 +296,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
             className={`stream-timeline-bar__marker is-${status} ${animateClass}`}
             style={{ left: `${accrualPercent}%` }}
             role="img"
-            aria-label={{Current date: ${formatDate(current)}`}}
+            aria-label={`Current date: ${formatDate(current)}`}
           />
         )}
       </div>
@@ -356,12 +356,12 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
           <span className="stream-timeline__loading-spinner" />
           <span>Loading timeline...</span>
         </div>
-      ))}
+      )}
 
       {/* Transaction state demo (optional) */}
       {showTransactionDemo && (
         <TransactionDemo mockOutcome={transactionDemoOutcome} />
-      ))}
+      )}
     </div>
   );
 };

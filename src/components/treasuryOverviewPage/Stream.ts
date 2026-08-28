@@ -5,7 +5,7 @@ export interface Stream {
   id: string;
   recipient: string;
   rate: string;
-  accruedAmount?: number;
+  accruedAmount?: string | number;
   status: StreamStatus;
   startDate?: string;
 }

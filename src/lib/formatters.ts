@@ -346,6 +346,74 @@ export function formatTokenAmount(
   return `${displayStr}${asset ? ` ${asset}` : ""}${suffix}`;
 }
 
+// ─── BigInt Arithmetic Utilities ─────────────────────────────────────────────
+
+/**
+ * Parse a raw token amount string to `BigInt` for arithmetic.
+ * Accepts only integer strings (with optional leading minus).
+ * Returns `0n` for empty, whitespace-only, or non-numeric input.
+ *
+ * Unlike {@link parseToBigInt}, this helper never throws — it is designed for
+ * aggregation pipelines where a single malformed value should not abort the
+ * entire computation.
+ *
+ * @internal
+ */
+function safeTokenBigInt(value: string): bigint {
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") return 0n;
+  // Strip fractional part (keep only integer portion for whole-unit arithmetic)
+  const intPart = trimmed.split(".")[0];
+  if (!/^-?\d+$/.test(intPart)) return 0n;
+  return BigInt(intPart);
+}
+
+/**
+ * Sum an array of raw token-amount strings using BigInt arithmetic.
+ * Returns the total as a decimal integer string. Malformed entries are
+ * treated as `0` so a single bad value cannot corrupt the total.
+ *
+ * @example
+ * sumTokenAmounts(["9007199254740993", "1"]) // → "9007199254740994"
+ * sumTokenAmounts([])                         // → "0"
+ */
+export function sumTokenAmounts(amounts: string[]): string {
+  let total = 0n;
+  for (const a of amounts) {
+    total += safeTokenBigInt(a);
+  }
+  return total.toString();
+}
+
+/**
+ * Compare two raw token-amount strings using BigInt arithmetic.
+ * Returns `-1`, `0`, or `1` — suitable as an `Array.prototype.sort` comparator.
+ *
+ * @example
+ * compareTokenAmounts("9007199254740993", "9007199254740992") // → 1
+ * compareTokenAmounts("100", "100")                           // → 0
+ */
+export function compareTokenAmounts(a: string, b: string): number {
+  const bigA = safeTokenBigInt(a);
+  const bigB = safeTokenBigInt(b);
+  if (bigA < bigB) return -1;
+  if (bigA > bigB) return 1;
+  return 0;
+}
+
+/**
+ * Subtract `b` from `a` using BigInt arithmetic.
+ * Returns `max(0, a - b)` as a decimal integer string (clamped to zero).
+ *
+ * @example
+ * subtractTokenAmounts("1000", "300") // → "700"
+ * subtractTokenAmounts("100", "999")  // → "0"
+ */
+export function subtractTokenAmounts(a: string, b: string): string {
+  const diff = safeTokenBigInt(a) - safeTokenBigInt(b);
+  return (diff >= 0n ? diff : 0n).toString();
+}
+
 /**
  * Detect the decimal separator for the current locale (e.g. `.` in en-US,
  * `,` in de-DE) by formatting a known value and extracting the separator.
