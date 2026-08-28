@@ -6,8 +6,8 @@ import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 import { useWallet } from './wallet-connect/Walletcontext';
 import { useToast } from './toast/ToastProvider';
-import { useTransactionStatus } from '../hooks/useTransactionStatus';
-import { createStream, getTransactionStatus } from '../lib/stellar/tx';
+import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
+import { createStream } from '../lib/stellar/tx';
 import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 import {
   computeStreamEndDate,
@@ -139,13 +139,10 @@ export default function CreateStreamModal({
   const [error, setError] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const [hasCompletedConfirmation, setHasCompletedConfirmation] =
     useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
-  const submitInFlightRef = useRef(false);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -155,18 +152,52 @@ export default function CreateStreamModal({
   const durationValue = parseFloat(duration || "0");
   const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
-  const transactionStatus = useTransactionStatus(submittedTxHash, {
-    enabled: currentStep === 3 && Boolean(submittedTxHash),
-    getStatus: getTransactionStatus,
+  const txSubmission = useTransactionSubmission({
+    submit: async (idempotencyKey) => {
+      const sender = wallet.address!;
+      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+      const start = startTimeOption === "now"
+        ? Math.floor(Date.now() / 1000)
+        : Math.floor(new Date(customStartDate).getTime() / 1000);
+      const durationDays = parseFloat(duration) || 0;
+      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+      const end = start + durationSeconds;
+      const cliffTime = cliffEnabled && cliffDate
+        ? Math.floor(new Date(cliffDate).getTime() / 1000)
+        : undefined;
+      const response = await createStream(
+        sender,
+        recipient.trim(),
+        amountStr,
+        start,
+        end,
+        cliffTime,
+      );
+      if (!response.txHash) {
+        throw new Error("Missing transaction hash from Stellar RPC.");
+      }
+      return { txHash: response.txHash };
+    },
+    params: {
+      recipient: recipient.trim(),
+      depositAmount,
+      accrualRate,
+      duration,
+      startTimeOption,
+      customStartDate,
+      cliffEnabled,
+      cliffDate,
+    },
   });
-  const isConfirmationPending = transactionStatus.status === "pending";
-  const isBusyCreating = isSubmitting || isConfirmationPending;
+  const isConfirmationPending = txSubmission.status === "pending";
+  const isBusyCreating = txSubmission.isSubmitting;
   const submitButtonLabel =
-    currentStep === 3 && isSubmitting
+    currentStep === 3 && txSubmission.status === "submitting"
       ? t("createStream.button.submitting")
       : currentStep === 3 && isConfirmationPending
         ? t("createStream.button.confirming")
-        : currentStep === 3 && transactionStatus.status === "failed"
+        : currentStep === 3 && txSubmission.status === "timeout"
           ? t("createStream.button.retry")
           : currentStep === 2
             ? t("createStream.button.next")
@@ -181,7 +212,7 @@ export default function CreateStreamModal({
 
   useEffect(() => {
     if (
-      transactionStatus.status !== "confirmed" ||
+      txSubmission.status !== "confirmed" ||
       hasCompletedConfirmation
     ) {
       return;
@@ -196,13 +227,12 @@ export default function CreateStreamModal({
     hasCompletedConfirmation,
     onClose,
     onStreamCreated,
-    transactionStatus.status,
     t,
+    txSubmission.status,
   ]);
 
   const resetTransactionState = () => {
-    transactionStatus.reset();
-    setSubmittedTxHash(null);
+    txSubmission.reset();
     setHasCompletedConfirmation(false);
   };
 
@@ -323,7 +353,9 @@ export default function CreateStreamModal({
       resetTransactionState();
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      if (submitInFlightRef.current) return;
+      if (txSubmission.status === "submitting" || txSubmission.status === "pending") {
+        return;
+      }
 
       if (!wallet.connected) {
         setError(t("createStream.validation.walletNotConnected"));
@@ -340,48 +372,14 @@ export default function CreateStreamModal({
       setError(null);
       setStreamError(null);
       resetTransactionState();
-      submitInFlightRef.current = true;
-      setIsSubmitting(true);
-
-      const sender = wallet.address!;
-      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
-      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
-
-      const start = startTimeOption === "now"
-        ? Math.floor(Date.now() / 1000)
-        : Math.floor(new Date(customStartDate).getTime() / 1000);
-
-      const durationDays = parseFloat(duration) || 0;
-      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
-      const end = start + durationSeconds;
-
-      const cliffTime = cliffEnabled && cliffDate
-        ? Math.floor(new Date(cliffDate).getTime() / 1000)
-        : undefined;
 
       try {
-        const response = await createStream(
-          sender,
-          recipient.trim(),
-          amountStr,
-          start,
-          end,
-          cliffTime,
-        );
-        if (!response.txHash) {
-          throw new Error("Missing transaction hash from Stellar RPC.");
-        }
-        // Hand off to the confirmation poller; the success toast,
-        // onStreamCreated, and onClose fire once polling reports `confirmed`.
-        setSubmittedTxHash(response.txHash);
+        await txSubmission.submit();
       } catch (err) {
         const message = getStreamErrorMessage(err);
         setStreamError(message);
         addToast(t("createStream.error.failedWithMessage", { message }), "error");
         onStreamError?.(err);
-      } finally {
-        submitInFlightRef.current = false;
-        setIsSubmitting(false);
       }
     }
   };
@@ -1154,68 +1152,68 @@ export default function CreateStreamModal({
                     </div>
                   </div>
 
-                  {streamError && (
-                    <div className="review-error-box" role="alert">
-                      <div>
-                        <strong>{t("createStream.step3.errorTitle")}</strong>
-                        <p>{streamError}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="review-error-retry"
-                        onClick={handleNext}
-                        disabled={isSubmitting}
-                      >
-                        {t("createStream.step3.tryAgainBtn")}
-                      </button>
-                    </div>
-                  )}
+                   {streamError && (
+                     <div className="review-error-box" role="alert">
+                       <div>
+                         <strong>{t("createStream.step3.errorTitle")}</strong>
+                         <p>{streamError}</p>
+                       </div>
+                       <button
+                         type="button"
+                         className="review-error-retry"
+                         onClick={handleNext}
+                         disabled={txSubmission.status === "submitting" || txSubmission.status === "pending"}
+                       >
+                         {t("createStream.step3.tryAgainBtn")}
+                       </button>
+                     </div>
+                   )}
 
-                  <div
-                    className="review-warning-box"
-                    role="region"
-                    aria-live="polite"
-                  >
-                    <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
-                    {t("createStream.step3.warningText", { reviewDeposit })}
-                  </div>
-                  {isSubmitting && (
-                    <div
-                      className="transaction-status-box"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {t("createStream.step3.statusSubmitting")}
-                    </div>
-                  )}
-                  {!isSubmitting && transactionStatus.status === "pending" && (
-                    <div
-                      className="transaction-status-box"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {t("createStream.step3.statusWaiting")}
-                      <span className="transaction-status-detail">
-                        {t("createStream.step3.statusDetail", {
-                          attempts: transactionStatus.attempts,
-                          txHash: submittedTxHash
-                            ? `${submittedTxHash.slice(0, 10)}...${submittedTxHash.slice(-8)}`
-                            : "",
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {transactionStatus.status === "failed" && (
-                    <div
-                      className="transaction-status-box transaction-status-box--error"
-                      role="alert"
-                    >
-                      {transactionStatus.error ??
-                        t("createStream.step3.statusFailed", {
-                          error: "Transaction confirmation failed. Please retry.",
-                        })}
-                    </div>
-                  )}
+                   <div
+                     className="review-warning-box"
+                     role="region"
+                     aria-live="polite"
+                   >
+                     <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
+                     {t("createStream.step3.warningText", { reviewDeposit })}
+                   </div>
+                   {txSubmission.status === "submitting" && (
+                     <div
+                       className="transaction-status-box"
+                       role="status"
+                       aria-live="polite"
+                     >
+                       {t("createStream.step3.statusSubmitting")}
+                     </div>
+                   )}
+                   {txSubmission.status === "pending" && (
+                     <div
+                       className="transaction-status-box"
+                       role="status"
+                       aria-live="polite"
+                     >
+                       {t("createStream.step3.statusWaiting")}
+                       <span className="transaction-status-detail">
+                         {t("createStream.step3.statusDetail", {
+                           attempts: txSubmission.attempts,
+                           txHash: txSubmission.txHash
+                             ? `${txSubmission.txHash.slice(0, 10)}...${txSubmission.txHash.slice(-8)}`
+                             : "",
+                         })}
+                       </span>
+                     </div>
+                   )}
+                   {(txSubmission.status === "timeout" || txSubmission.status === "failed") && (
+                     <div
+                       className="transaction-status-box transaction-status-box--error"
+                       role="alert"
+                     >
+                       {txSubmission.error ??
+                         t("createStream.step3.statusFailed", {
+                           error: "Transaction confirmation failed. Please retry.",
+                         })}
+                     </div>
+                   )}
                 </>
               );
             })()}
