@@ -28,15 +28,13 @@ export interface RecipientStreamsProps {
   error?: string | null;
   onEmptyPrimaryAction?: () => void;
   onRetry?: () => void;
-  fetchStreamsFn?: (cursor: string | null) => Promise<{ streams: Stream[]; nextCursor: string | null }>;
-  /** Pass 0 to disable background polling (useful in tests). */
+  fetchStreamsFn?: () => Promise<Stream[]>;
   pollIntervalMs?: number;
 }
 
 export type StreamFilter = "All" | "Active" | "Paused" | "Completed";
 
 export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
-  recipientId,
   isLoading: externalIsLoading,
   streams: externalStreams,
   error: externalError,
@@ -141,10 +139,9 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     try {
       const result = await fetchStreamsFn(cursorRef.current);
       setRetryCount(0);
-      setCursor(result.nextCursor);
       setInternalStreams((prevStreams) => {
         const pinMap = new Map(prevStreams.map((s) => [s.id, s.isPinned]));
-        return result.streams.map((stream) => ({
+        return updatedStreams.map((stream) => ({
           ...stream,
           isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false,
         }));
@@ -394,9 +391,9 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           aria-atomic="true"
           className="mb-4 p-4 border rounded-xl flex items-start justify-between"
           style={{
+            color: "var(--color-error-text)",
             borderColor: "var(--color-error-border)",
             backgroundColor: "var(--color-error-bg)",
-            color: "var(--color-error-text)",
           }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--color-error-text)" }}>
@@ -421,25 +418,22 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
         />
       )}
 
-      {effectiveStreams.length > 0 && filteredStreams.length === 0 && !effectiveError && (
-        <div className="mt-4 text-center space-y-3">
-          <p
-            className="text-sm"
-            style={{ color: "var(--color-text-tertiary)" }}
-          >
-            {filterEmptyLabel}
+      {!effectiveError && effectiveStreams.length > 0 && filteredStreams.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
+            No {filter.toLowerCase()} streams found.
           </p>
           <button
             onClick={() => setFilter("All")}
-            className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            style={{ color: "var(--color-text-primary)" }}
+            disabled={isRefreshing || isRetrying}
+            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Clear Filters
           </button>
         </div>
       )}
 
-      {effectiveStreams.length > 0 && filteredStreams.length > 0 && (
+      {effectiveStreams.length > 0 && (
         <div
           role="list"
           aria-label="Incoming streams"
@@ -455,7 +449,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             >
               <div>
                 <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-                  From: {stream.senderName ?? stream.sender}
+                  From: <span>{stream.senderName ?? stream.sender}</span>
                 </p>
                 <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
                   {stream.amount} XLM
@@ -485,10 +479,14 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 <button
                   onClick={() => togglePin(stream.id)}
                   aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
-                  aria-pressed={stream.isPinned ? "true" : "false"}
-                  className="text-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  aria-pressed={stream.isPinned}
+                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
+                  style={{ color: "var(--color-text-tertiary)" }}
                 >
-                  {stream.isPinned ? "★" : "☆"}
+                  <span aria-hidden="true">{stream.isPinned ? "★" : "☆"}</span>
+                  <span className="ml-1 text-xs font-medium">
+                    {stream.isPinned ? "Pinned" : "Unpinned"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -498,3 +496,4 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     </div>
   );
 };
+
