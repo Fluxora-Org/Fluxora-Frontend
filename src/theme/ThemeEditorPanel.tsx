@@ -173,7 +173,7 @@ function ColorField({
           id={textId}
           type="text"
           value={value}
-          maxLength={7}
+          maxLength={9}
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
