@@ -31,6 +31,13 @@ import {
   type Stream,
 } from "../recipient/RecipientStreams";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Wrap a Stream[] into the paginated response shape the component expects. */
+function page(streams: Stream[], nextCursor: string | null = null) {
+  return { streams, nextCursor };
+}
+
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const activeStream: Stream = {
@@ -69,7 +76,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^active$/i, { selector: 'span' });
+    const badge = await screen.findByText(/^active$/i, { selector: "span" });
     expect(badge).toBeInTheDocument();
     // The badge must use the semantic success token, not a hardcoded colour.
     expect(badge.getAttribute("style")).toContain("var(--color-success-bg)");
@@ -82,7 +89,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^paused$/i, { selector: 'span' });
+    const badge = await screen.findByText(/^paused$/i, { selector: "span" });
     expect(badge).toBeInTheDocument();
     expect(badge.getAttribute("style")).toContain("var(--color-warning-bg)");
   });
@@ -95,7 +102,7 @@ describe("RecipientStreams — status badge rendering", () => {
       />,
     );
     // 'Completed' lowercases to !== 'active' so the warning-bg branch applies.
-    const badge = await screen.findByText(/^Completed$/, { selector: 'span' });
+    const badge = await screen.findByText(/^Completed$/, { selector: "span" });
     expect(badge).toBeInTheDocument();
     expect(badge.getAttribute("style")).toContain("var(--color-warning-bg)");
   });
@@ -108,7 +115,7 @@ describe("RecipientStreams — status badge rendering", () => {
         pollIntervalMs={0}
       />,
     );
-    const badge = await screen.findByText(/^Active$/, { selector: 'span' });
+    const badge = await screen.findByText(/^Active$/, { selector: "span" });
     expect(badge.getAttribute("style")).toContain("var(--color-success-bg)");
   });
 });
@@ -156,7 +163,7 @@ describe("RecipientStreams — pin-sort ordering", () => {
 
   it("toggling a stream's pin moves it to the top of the list", async () => {
     const user = userEvent.setup();
-    const fetchFn = vi.fn().mockResolvedValue([activeStream, pausedStream]);
+    const fetchFn = vi.fn().mockResolvedValue(page([activeStream, pausedStream]));
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
 
     // Wait for both streams to appear.
@@ -181,9 +188,9 @@ describe("RecipientStreams — pin-sort ordering", () => {
 
 describe("RecipientStreams — external props precedence", () => {
   it("external `streams` prop overrides anything fetched internally", async () => {
-    const fetchFn = vi.fn().mockResolvedValue([
-      { ...activeStream, senderName: "Internal Data" },
-    ]);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(page([{ ...activeStream, senderName: "Internal Data" }]));
     render(
       <RecipientStreams
         fetchStreamsFn={fetchFn}
@@ -234,7 +241,7 @@ describe("RecipientStreams — external props precedence", () => {
 
 describe("RecipientStreams — empty state", () => {
   it("renders the empty state when fetchFn resolves to an empty array", async () => {
-    const fetchFn = vi.fn().mockResolvedValue([]);
+    const fetchFn = vi.fn().mockResolvedValue(page([]));
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
     // The EmptyState component is shown once loading completes with no streams.
     // We test that neither a stream card nor an error banner is rendered.
@@ -269,8 +276,8 @@ describe("RecipientStreams — populated state", () => {
         pollIntervalMs={0}
       />,
     );
-    expect(await screen.findByText("Vendor Inc")).toBeInTheDocument();
-    expect(screen.getByText("GABC123")).toBeInTheDocument();
+    expect(await screen.findByText(/From:.*Vendor Inc/)).toBeInTheDocument();
+    expect(screen.getByText(/From:.*GABC123/)).toBeInTheDocument();
   });
 
   it("renders amount followed by 'XLM' suffix", async () => {
@@ -310,7 +317,7 @@ describe("RecipientStreams — keyboard accessibility", () => {
     // Use fetchStreamsFn so internalStreams owns the data and the pin toggle
     // can mutate it (when externalStreams is set, effectiveStreams always
     // returns the external prop, so pin changes are not reflected in the DOM).
-    const fetchFn = vi.fn().mockResolvedValue([activeStream]);
+    const fetchFn = vi.fn().mockResolvedValue(page([activeStream]));
     render(
       <RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />,
     );
@@ -339,31 +346,31 @@ describe("RecipientStreams — keyboard accessibility", () => {
 
   it("filter buttons are disabled during refresh operations", async () => {
     // Need a deferred fetch to keep it "in flight"
-    const deferreds: { resolve: (v: Stream[]) => void }[] = [];
+    const deferreds: { resolve: (v: { streams: Stream[]; nextCursor: string | null }) => void }[] = [];
     const fetchFn = vi.fn().mockImplementation(() => {
-      return new Promise<Stream[]>((resolve) => deferreds.push({ resolve }));
+      return new Promise<{ streams: Stream[]; nextCursor: string | null }>((resolve) =>
+        deferreds.push({ resolve }),
+      );
     });
-    
+
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
-    
-    // Initial fetch is in flight, so buttons shouldn't even render if streams are empty.
-    // So let's provide streams externally while internal is refreshing, or resolve initial
-    // then trigger a refresh.
-    deferreds[0].resolve([activeStream]);
-    
+
+    // Resolve initial fetch so streams + filter buttons appear.
+    deferreds[0].resolve(page([activeStream]));
+
     const activeBtn = await screen.findByRole("button", { name: "Active" });
     expect(activeBtn).not.toBeDisabled();
-    
+
     // Trigger refresh
     const refreshBtn = screen.getByRole("button", { name: /refresh status/i });
     await userEvent.click(refreshBtn);
-    
+
     // While refresh is in flight, filter buttons should be disabled
     expect(activeBtn).toBeDisabled();
-    
+
     // Resolve refresh
-    deferreds[1].resolve([activeStream]);
-    
+    deferreds[1].resolve(page([activeStream]));
+
     await waitFor(() => expect(activeBtn).not.toBeDisabled());
   });
 });
@@ -406,20 +413,24 @@ describe("RecipientStreams — poll scheduling", () => {
   });
 
   it("does not fire a background poll when pollIntervalMs is 0", async () => {
-    const fetchFn = vi.fn().mockResolvedValue([activeStream]);
+    const fetchFn = vi.fn().mockResolvedValue(page([activeStream]));
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);
-    await act(async () => { vi.advanceTimersByTime(60_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
     // Only the initial load call — no poll calls.
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it("skips the poll tick when document is hidden", async () => {
-    const fetchFn = vi.fn().mockResolvedValue([activeStream]);
+    const fetchFn = vi.fn().mockResolvedValue(page([activeStream]));
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={5000} />);
 
     // Simulate hidden document.
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
-    await act(async () => { vi.advanceTimersByTime(15_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+    });
 
     // Poll fired 3 times but was skipped each time; only the initial call ran.
     expect(fetchFn).toHaveBeenCalledTimes(1);
@@ -439,7 +450,7 @@ describe("RecipientStreams — error auto-clear on recovery", () => {
     const fetchFn = vi.fn().mockImplementation(() => {
       callCount++;
       if (callCount === 1) return Promise.reject(new Error("initial failure"));
-      return Promise.resolve([activeStream]);
+      return Promise.resolve(page([activeStream]));
     });
 
     render(<RecipientStreams fetchStreamsFn={fetchFn} pollIntervalMs={0} />);

@@ -1041,9 +1041,7 @@ export default function CreateStreamModal({
   // ── Dry-run review: calculate aggregate totals and transition to dry‑run confirmation ──
 
   const handleBulkReview = useCallback(() => {
-    const validRows = bulkRows.filter(
-      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
-    );
+    const validRows = bulkRows.filter((r) => r.status === 'valid');
     if (validRows.length === 0) return;
     const totalDeposit = validRows.reduce((sum, r) => {
       return sum + (parseFloat(r.depositAmount.replace(/,/g, '')) || 0);
@@ -1060,9 +1058,7 @@ export default function CreateStreamModal({
 
   const renderDryRunStep = () => {
     const totals = bulkDryRunTotals;
-    const validCount = bulkRows.filter(
-      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
-    ).length;
+    const validCount = bulkRows.filter((r) => r.status === 'valid').length;
     const errorCount = bulkRows.filter(
       (r) => r.status === 'needs-fix',
     ).length;
@@ -1152,7 +1148,7 @@ export default function CreateStreamModal({
             </div>
 
             {/* ── Partial-failure risk preview ── */}
-            {errorCount > 0 && (
+            {(errorCount > 0 || dupCount > 0) && (
               <div
                 className="dry-run-partial-warning"
                 role="alert"
@@ -1174,7 +1170,7 @@ export default function CreateStreamModal({
                 </svg>
                 <span>
                   {t("csvUpload.dryRun.partialFailureWarning", {
-                    failed: errorCount,
+                    failed: errorCount + dupCount,
                     total: bulkRows.length,
                   })}
                 </span>
@@ -1217,7 +1213,9 @@ export default function CreateStreamModal({
                       ? t("csvUpload.dryRun.statusSuccess")
                       : row.status === 'duplicate-recipient'
                         ? t("csvUpload.dryRun.statusWarning")
-                        : t("csvUpload.dryRun.statusError");
+                        : row.status === 'skipped'
+                          ? t("csvUpload.dryRun.skippedRows")
+                          : t("csvUpload.dryRun.statusError");
                   return (
                     <tr key={row.id}>
                       <td className="csv-td csv-td--num">
@@ -1279,7 +1277,7 @@ export default function CreateStreamModal({
           <button
             type="button"
             className="btn btn-next dry-run-submit-btn"
-            disabled={!bulkDryRunConfirmed || isBulkSubmitting}
+            disabled={!bulkDryRunConfirmed || isBulkSubmitting || validCount === 0}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}
           >
@@ -1293,9 +1291,7 @@ export default function CreateStreamModal({
   };
 
   const handleBulkSubmit = async (rows: CsvRow[]) => {
-    const validRows = rows.filter(
-      (r) => r.status === 'valid' || r.status === 'duplicate-recipient',
-    );
+    const validRows = rows.filter((r) => r.status === 'valid');
     if (validRows.length === 0) return;
     if (!wallet.connected) {
       addToast(t('createStream.validation.walletNotConnected'), 'error');

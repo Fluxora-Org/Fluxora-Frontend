@@ -14,6 +14,7 @@ export interface Stream {
 
 import StreamsLoading from './StreamsLoading';
 import EmptyState from './EmptyState';
+import { isSafeUrl } from '../utils/security';
 
 interface RecentStreamsProps {
   streams: Stream[];
@@ -142,7 +143,7 @@ export default function RecentStreams({
                 </td>
                 <td style={td}>
                   <Link 
-                    to={stream.detailUrl || `/app/streams/${stream.id}`} 
+                    to={stream.detailUrl && isSafeUrl(stream.detailUrl) ? stream.detailUrl : `/app/streams/${stream.id}`} 
                     style={viewLink}
                     aria-label={`View details for ${stream.name}`}
                   >

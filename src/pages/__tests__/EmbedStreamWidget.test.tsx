@@ -55,6 +55,14 @@ describe('EmbedStreamWidget', () => {
     vi.restoreAllMocks();
   });
 
+  const sendMessage = (data: unknown, origin = window.location.origin) => {
+    window.dispatchEvent(new MessageEvent("message", {
+      data,
+      origin,
+      source: window,
+    }));
+  };
+
   const renderEmbedWidget = (streamId: string, searchParams?: string) => {
     const path = `/embed/streams/${streamId}${searchParams ? `?${searchParams}` : ''}`;
     
@@ -172,6 +180,32 @@ describe('EmbedStreamWidget', () => {
   describe('Success State', () => {
     beforeEach(() => {
       (getStreamById as any).mockResolvedValue(mockStream);
+    });
+
+    it('ignores forged, wrong-origin, opaque, and oversized messages', async () => {
+      renderEmbedWidget('STR-001');
+      await screen.findByRole('article');
+      const container = screen.getByRole('article').closest('.embed-widget-container');
+
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 500 }, window.location.origin);
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 700 }, 'https://evil.example');
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 900 }, 'null');
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 1000, padding: 'x'.repeat(5000) });
+
+      expect(container).not.toHaveStyle({ minHeight: '700px' });
+      expect(container).toHaveStyle({ minHeight: '500px' });
+    });
+
+    it('applies valid bounded resize and theme messages from the parent', async () => {
+      renderEmbedWidget('STR-001');
+      await screen.findByRole('article');
+      const container = screen.getByRole('article').closest('.embed-widget-container');
+
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', width: 640, height: 1 });
+      sendMessage({ type: 'fluxora:embed', version: 1, action: 'theme', theme: 'dark' });
+
+      expect(container).toHaveStyle({ maxWidth: '640px', minHeight: '1px' });
+      expect(container).toHaveAttribute('data-theme', 'dark');
     });
 
     it('renders card preset by default', async () => {

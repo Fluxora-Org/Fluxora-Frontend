@@ -595,6 +595,21 @@ describe("useEmbedAccessibility hook", () => {
       expect(document.activeElement).toBe(origin);
     });
 
+    it("does not restore focus to a non-focusable body origin on unmount", () => {
+      const article = document.createElement("div");
+      article.setAttribute("role", "article");
+      document.body.appendChild(article);
+
+      const { unmount } = renderHook(() =>
+        useEmbedAccessibility({ title: "Widget Title", isMainContent: true })
+      );
+
+      expect(document.activeElement).toBe(article);
+      unmount();
+
+      expect(article.hasAttribute("tabindex")).toBe(false);
+    });
+
     it("does not move or restore focus when isMainContent is false", () => {
       const origin = document.createElement("button");
       document.body.appendChild(origin);

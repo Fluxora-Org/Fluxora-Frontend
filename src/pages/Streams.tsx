@@ -43,6 +43,7 @@ import {
   getUrgencyLevel,
 } from "../lib/timePresentation";
 import { formatUsdc } from "../lib/formatters";
+import { sortStreams, type StreamSortMode } from "../lib/streamSorting";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
@@ -61,12 +62,13 @@ import {
 import CreateStreamFab from "../components/CreateStreamFab";
 import { stellarExplorerUrl } from "../lib/stellar";
 import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 
 type StatusFilter = "All" | StreamStatus;
 
 const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
-const SORT_OPTIONS = ["recent", "name", "rate"];
+const SORT_OPTIONS: StreamSortMode[] = ["recent", "name", "rate"];
 const DISCLOSURE_DURATION_MS = 200;
 const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
@@ -579,7 +581,7 @@ function StreamDetail({
               getExpectedStellarNetwork(),
             )}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             View in explorer
           </a>
@@ -801,8 +803,10 @@ export default function Streams() {
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
-
+  const wallet = useWallet();
+  const walletAddress = wallet.address?.trim() ?? "";
   const { streams, loading, error, refetch, retryCount } = useTreasury();
+
   const filterLabels: Record<StatusFilter, string> = {
     All: t("streams.filter.all"),
     Active: t("streams.filter.active"),
@@ -811,7 +815,7 @@ export default function Streams() {
   };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("recent");
+  const [sortBy, setSortBy] = useState<StreamSortMode>("recent");
   const [expandedStreamId, setExpandedStreamId] = useState<string>("");
   const [selectedStreamId, setSelectedStreamId] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -845,8 +849,12 @@ export default function Streams() {
   // flipped false only if mount-detection finds a snapshot worth offering.
   const sessionResolvedRef = useRef(true);
   const hasCheckedSessionRef = useRef(false);
+  const recoveryAccountRef = useRef<string | null>(null);
 
+  // Keep the existing page authorization behavior; wallet identity is used
+  // only to scope and gate session recovery below.
   const walletConnected = true;
+  const abortControllerRef = useRef<AbortController | null>(null);
   const hasInitializedExpanded = useRef(false);
 
   useEffect(() => {
@@ -856,13 +864,41 @@ export default function Streams() {
     }
   }, [streams]);
 
-  // Detect a prior session once on mount. Never auto-applies anything — only
-  // decides whether to offer the recovery banner.
   useEffect(() => {
-    if (hasCheckedSessionRef.current) return;
-    hasCheckedSessionRef.current = true;
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
-    const snapshot = readStreamsSession(Date.now());
+  // Verify the wallet identity before reading or restoring any persisted data.
+  // The same boundary resets all recovery state on account changes so an old
+  // account's filters/draft cannot render while the new account is resolved.
+  useLayoutEffect(() => {
+    if (wallet.loading) return;
+
+    const accountAddress = walletAddress || null;
+    if (
+      recoveryAccountRef.current === accountAddress &&
+      hasCheckedSessionRef.current
+    ) {
+      return;
+    }
+
+    recoveryAccountRef.current = accountAddress;
+    hasCheckedSessionRef.current = true;
+    sessionResolvedRef.current = true;
+    setDetectedSnapshot(null);
+    setBannerState(null);
+    setLiveDraft(null);
+    setRestoredDraft(null);
+    setStatusFilter("All");
+    setSearchQuery("");
+    setSortBy("recent");
+    setCurrentPage(1);
+    setItemsPerPage(10);
+    setLastSavedAt(null);
+
+    if (!accountAddress) return;
+
+    const snapshot = readStreamsSession(Date.now(), accountAddress);
     if (
       snapshot &&
       (isFilterSnapshotMeaningful(snapshot.filters) ||
@@ -872,12 +908,15 @@ export default function Streams() {
       setDetectedSnapshot(snapshot);
       setBannerState("detected");
     }
-  }, []);
+  }, [wallet.loading, walletAddress]);
+
+  const recoveryIdentityMatches =
+    recoveryAccountRef.current === (walletAddress || null) && !wallet.loading;
 
   // Debounced autosave of filters + the live create-stream draft. Paused while
   // a detected snapshot is awaiting the user's decision (sessionResolvedRef).
   useEffect(() => {
-    if (!sessionResolvedRef.current) return;
+    if (!sessionResolvedRef.current || !walletAddress || wallet.loading) return;
 
     const timer = window.setTimeout(() => {
       writeStreamsSession(
@@ -886,12 +925,22 @@ export default function Streams() {
           draft: liveDraft,
         },
         Date.now(),
+        walletAddress,
       );
       setLastSavedAt(Date.now());
     }, SESSION_AUTOSAVE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [statusFilter, searchQuery, sortBy, currentPage, itemsPerPage, liveDraft]);
+  }, [
+    statusFilter,
+    searchQuery,
+    sortBy,
+    currentPage,
+    itemsPerPage,
+    liveDraft,
+    walletAddress,
+    wallet.loading,
+  ]);
 
   // Brief "recently saved" pulse for the persistence indicator.
   useEffect(() => {
@@ -933,7 +982,13 @@ export default function Streams() {
   }, []);
 
   const handleRestoreSession = useCallback(() => {
-    if (!detectedSnapshot) return;
+    if (
+      !detectedSnapshot ||
+      detectedSnapshot.accountAddress !== walletAddress ||
+      !recoveryIdentityMatches
+    ) {
+      return;
+    }
     const { filters } = detectedSnapshot;
 
     const restoredStatusFilter = (STATUS_FILTERS as string[]).includes(
@@ -942,7 +997,7 @@ export default function Streams() {
       ? (filters.statusFilter as StatusFilter)
       : "All";
     const restoredSortBy = SORT_OPTIONS.includes(filters.sortBy)
-      ? filters.sortBy
+      ? (filters.sortBy as StreamSortMode)
       : "recent";
 
     setStatusFilter(restoredStatusFilter);
@@ -953,13 +1008,15 @@ export default function Streams() {
 
     sessionResolvedRef.current = true;
     setBannerState("restored");
-  }, [detectedSnapshot]);
+  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress]);
 
   const handleStartFreshSession = useCallback(() => {
-    clearStreamsSession();
+    if (walletAddress) {
+      clearStreamsSession(walletAddress);
+    }
     sessionResolvedRef.current = true;
     setBannerState("start-fresh");
-  }, []);
+  }, [walletAddress]);
 
   const handleDismissSessionBanner = useCallback(() => {
     sessionResolvedRef.current = true;
@@ -967,11 +1024,17 @@ export default function Streams() {
   }, []);
 
   const handleResumeDraft = useCallback(() => {
-    if (!detectedSnapshot?.draft) return;
+    if (
+      !detectedSnapshot?.draft ||
+      detectedSnapshot.accountAddress !== walletAddress ||
+      !recoveryIdentityMatches
+    ) {
+      return;
+    }
     setRestoredDraft(detectedSnapshot.draft);
     setIsCreateModalOpen(true);
     setBannerState(null);
-  }, [detectedSnapshot]);
+  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress]);
 
   const handleCloseCreateModal = useCallback(() => {
     setIsCreateModalOpen(false);
@@ -995,8 +1058,8 @@ export default function Streams() {
   const visibleStreams = useMemo(() => {
     const normalizedSearch = searchQuery.toLowerCase();
 
-    return streams
-      .filter((stream) => {
+    return sortStreams(
+      streams.filter((stream) => {
         const matchesStatus =
           statusFilter === "All" || stream.status === statusFilter;
         const matchesSearch =
@@ -1004,13 +1067,9 @@ export default function Streams() {
           stream.id.toLowerCase().includes(normalizedSearch) ||
           stream.recipientName.toLowerCase().includes(normalizedSearch);
         return matchesStatus && matchesSearch;
-      })
-      .sort((a, b) => {
-        if (sortBy === "name") return a.name.localeCompare(b.name);
-        if (sortBy === "rate") return b.monthlyRate - a.monthlyRate;
-        // Default to recent (higher ID first for demo)
-        return b.id.localeCompare(a.id);
-      });
+      }),
+      sortBy,
+    );
   }, [searchQuery, sortBy, statusFilter, streams]);
 
   // Reset currentPage when the total pages shrink below the current page.
@@ -1070,6 +1129,15 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   }, [resolveSessionOnInteraction]);
 
+  const refetchStreams = useCallback(() => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    void (refetch as unknown as (signal?: AbortSignal) => Promise<void>)(
+      controller.signal,
+    );
+  }, [refetch]);
+
   const handleStreamCreated = useCallback((data?: StreamCreatedData) => {
     const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
@@ -1086,8 +1154,8 @@ export default function Streams() {
     // A transaction has completed — a draft must never be offered back.
     setLiveDraft(null);
     setRestoredDraft(null);
-    refetch();
-  }, [refetch, streams.length]);
+    refetchStreams();
+  }, [refetchStreams, streams.length]);
 
   const handleStreamError = useCallback(() => {
     refetch();
@@ -1153,6 +1221,9 @@ export default function Streams() {
     [announce],
   );
 
+  const isAbortError = error instanceof Error && error.name === "AbortError";
+  const visibleError = isAbortError ? null : error;
+
   /**
    * Filtered-empty recovery action: reset all active filters and return to the
    * first page of results. Stays on the same route (/app/streams) and keeps the
@@ -1166,21 +1237,21 @@ export default function Streams() {
     setCurrentPage(1);
   }, [resolveSessionOnInteraction]);
 
-  if (loading || (error && retryCount >= MAX_LOADING_RETRIES)) {
-    return <StreamsLoading retryCount={retryCount} onRetry={refetch} />;
+  if (loading || (visibleError && retryCount >= MAX_LOADING_RETRIES)) {
+    return <StreamsLoading retryCount={retryCount} onRetry={refetchStreams} />;
   }
 
-  if (error) {
+  if (visibleError) {
     return (
       <section className="streams-page">
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
-          {error}
+          {visibleError}
         </p>
         <button
           type="button"
           className="streams-primary-button"
-          onClick={refetch}
+          onClick={refetchStreams}
         >
           Try again
         </button>
@@ -1203,7 +1274,7 @@ export default function Streams() {
             onClose={handleCloseCreateModal}
             onStreamCreated={handleStreamCreated}
             onStreamError={handleStreamError}
-            initialDraft={restoredDraft}
+            initialDraft={recoveryIdentityMatches ? restoredDraft : null}
             onDraftChange={setLiveDraft}
           />
         </Suspense>
@@ -1284,7 +1355,7 @@ export default function Streams() {
           </section>
 
           {/* Session recovery — see docs/STREAMS_SESSION_RECOVERY_SPEC.md */}
-          {bannerState && (
+          {bannerState && recoveryIdentityMatches && (
             <SessionRecoveryBanner
               state={bannerState}
               savedAt={detectedSnapshot?.savedAt ?? Date.now()}

@@ -7,6 +7,7 @@ import {
   cancelStream,
   getTransactionStatus,
   TransactionError,
+  decodeContractError,
   withTimeout,
   FREIGHTER_NETWORK_TIMEOUT_MS,
 } from "../tx";
@@ -277,7 +278,7 @@ describe("Soroban transaction layer (tx.ts)", () => {
     await expect(
       createStream(mockAddress, mockAddress, "1000", 100, 1000)
     ).rejects.toThrowError(
-      new TransactionError("rejected", "Transaction signature request was declined by the user.")
+      new TransactionError("rejected", "Transaction signature request was declined by the user.", { retryable: true })
     );
   });
 
@@ -297,7 +298,8 @@ describe("Soroban transaction layer (tx.ts)", () => {
       ).rejects.toThrowError(
         new TransactionError(
           "rejected",
-          "Transaction signature request was declined by the user."
+          "Transaction signature request was declined by the user.",
+          { retryable: true },
         )
       );
     });
@@ -336,6 +338,61 @@ describe("Soroban transaction layer (tx.ts)", () => {
     ).rejects.toThrowError(
       new TransactionError("simulation", "Transaction simulation failed: Simulation failed: insufficient auth")
     );
+  });
+
+  describe("contract error decoding", () => {
+    it("maps known authorization contract codes without exposing raw details", () => {
+      const error = decodeContractError("HostError: Error(Contract, #Unauthorized) wallet=GABC secret=xdr-data");
+
+      expect(error).toMatchObject({
+        type: "contract",
+        details: { category: "authorization", code: "Unauthorized", retryable: false },
+      });
+      expect(error?.message).toContain("authorized");
+      expect(error?.message).not.toContain("GABC");
+      expect(error?.message).not.toContain("xdr-data");
+    });
+
+    it("maps known balance contract codes with retry guidance", () => {
+      const error = decodeContractError("Error(Contract, #InsufficientBalance)");
+
+      expect(error).toMatchObject({
+        type: "contract",
+        details: { category: "balance", code: "InsufficientBalance", retryable: true },
+      });
+      expect(error?.message).toContain("available balance");
+    });
+
+    it("uses a safe unknown-code fallback", () => {
+      const error = decodeContractError("Error(Contract, #42) raw-xdr=AAAA wallet=GABC");
+
+      expect(error).toMatchObject({
+        type: "contract",
+        details: { category: "unknown", code: "42", retryable: true },
+      });
+      expect(error?.message).toBe("The smart contract rejected this transaction. Check the transaction details and try again if the problem persists.");
+      expect(error?.message).not.toContain("AAAA");
+      expect(error?.message).not.toContain("GABC");
+    });
+
+    it("leaves transport and user rejection errors in their existing categories with retry guidance", async () => {
+      serverInstance.simulateTransaction.mockRejectedValue(new Error("RPC unavailable"));
+      await expect(createStream(mockAddress, mockAddress, "1000", 100, 1000)).rejects.toMatchObject({
+        type: "rpc",
+        details: { retryable: true },
+      });
+
+      serverInstance.simulateTransaction.mockResolvedValue({
+        error: null,
+        minResourceFee: "100",
+        transactionData: "mock_tx_data",
+      });
+      vi.mocked(freighter.signTransaction).mockRejectedValue(new Error("User rejected request"));
+      await expect(createStream(mockAddress, mockAddress, "1000", 100, 1000)).rejects.toMatchObject({
+        type: "rejected",
+        details: { retryable: true },
+      });
+    });
   });
 
   it("should poll multiple times and throw timeout error if transaction fails to confirm", async () => {

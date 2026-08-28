@@ -17,6 +17,7 @@ import { VoiceProvider } from "./components/voice/VoiceContext";
 import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 import { getRecipientRouteKey } from "./pages/recipientRouteKey";
+import RequireWalletAction from "./components/RequireWalletAction";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -25,6 +26,7 @@ const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
 const EmbedStreamWidget = lazy(() => import("./pages/EmbedStreamWidget"));
 import { IS_DEV } from "./utils/env";
+import { configError } from "./lib/config";
 
 const EmptyStateDemo = IS_DEV
   ? lazy(() => import("./pages/EmptyStateDemo"))
@@ -105,6 +107,17 @@ function lazyAppRoute(element: ReactElement) {
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  if (configError) {
+    return (
+      <ErrorPage
+        type="validation"
+        headline="Configuration needs attention"
+        errorMessage={`Fluxora cannot start safely. ${configError.message} Update your VITE_* variables and restart the development server or rebuild the application.`}
+        primaryCtaText="Reload"
+      />
+    );
+  }
+
   const handleSidebarToggle = () => {
     setIsSidebarOpen((prev) => !prev);
   };
@@ -140,9 +153,9 @@ export default function App() {
                       }
                     >
                       <Route index element={lazyAppRoute(<Dashboard />)} />
-                      <Route path="streams" element={lazyAppRoute(<Streams />)} />
-                      <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
-                      <Route path="recipient" element={lazyAppRoute(<RecipientRoute />)} />
+                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<Streams />)}</RequireWalletAction>} />
+                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />)}</RequireWalletAction>} />
+                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />)}</RequireWalletAction>} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (

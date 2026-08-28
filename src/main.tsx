@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initTheme } from './theme/ThemeProvider';
+import './index.css'; /* Tailwind, design tokens, and global app styles */
 import './styles/accessibility.css'; /* Global focus management & a11y */
 import { HelmetProvider } from 'react-helmet-async';
 

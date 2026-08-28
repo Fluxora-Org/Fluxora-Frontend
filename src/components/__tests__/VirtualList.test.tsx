@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import VirtualList from "../VirtualList";
 
@@ -77,6 +78,62 @@ describe("VirtualList", () => {
     });
   });
 
+  it("keeps keyboard navigation in DOM order across mounted rows", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items}
+        renderItem={(item, index) => (
+          <button data-testid={`button-${index}`}>Action {item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    const button0 = screen.getByTestId("button-0");
+    button0.focus();
+    await user.tab();
+
+    expect(screen.getByTestId("button-1")).toHaveFocus();
+  });
+
+  it("retains focus on the same keyed item when filtering shifts its index", () => {
+    const { rerender } = render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items}
+        renderItem={(item) => (
+          <button data-testid={`button-${item.id}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    const focusedButton = screen.getByTestId("button-item-2");
+    focusedButton.focus();
+
+    rerender(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items.filter((item) => item.id !== "item-0")}
+        renderItem={(item) => (
+          <button data-testid={`button-${item.id}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    expect(screen.getByTestId("button-item-2")).toHaveFocus();
+  });
+
   it("updates the mounted window as the page scrolls", () => {
     renderVirtualList();
 
@@ -144,10 +201,13 @@ describe("VirtualList", () => {
   });
 
   it("scans and focuses the nearest mounted row with focusable elements if the closest one has none", () => {
-    const itemsWithSelectiveButtons = Array.from({ length: 30 }, (_, index) => ({
-      id: `item-${index}`,
-      name: `Stream ${index}`,
-    }));
+    const itemsWithSelectiveButtons = Array.from(
+      { length: 30 },
+      (_, index) => ({
+        id: `item-${index}`,
+        name: `Stream ${index}`,
+      }),
+    );
 
     render(
       <VirtualList
@@ -161,7 +221,9 @@ describe("VirtualList", () => {
           <article>
             <span>{item.name}</span>
             {/* Index 8 has no focusable elements, index 9 does */}
-            {index !== 8 && <button data-testid={`button-${index}`}>Action {index}</button>}
+            {index !== 8 && (
+              <button data-testid={`button-${index}`}>Action {index}</button>
+            )}
           </article>
         )}
         testId="virtual-streams"
@@ -191,10 +253,13 @@ describe("VirtualList", () => {
   });
 
   it("falls back to focusing the list container when no mounted rows contain focusable elements", () => {
-    const itemsWithSelectiveButtons = Array.from({ length: 30 }, (_, index) => ({
-      id: `item-${index}`,
-      name: `Stream ${index}`,
-    }));
+    const itemsWithSelectiveButtons = Array.from(
+      { length: 30 },
+      (_, index) => ({
+        id: `item-${index}`,
+        name: `Stream ${index}`,
+      }),
+    );
 
     render(
       <VirtualList
@@ -208,7 +273,9 @@ describe("VirtualList", () => {
           <article>
             <span>{item.name}</span>
             {/* Only index 0 has a button; all other rows are non-focusable */}
-            {index === 0 && <button data-testid={`button-${index}`}>Action {index}</button>}
+            {index === 0 && (
+              <button data-testid={`button-${index}`}>Action {index}</button>
+            )}
           </article>
         )}
         testId="virtual-streams"
@@ -235,5 +302,38 @@ describe("VirtualList", () => {
     // No mounted rows have buttons, so focus should land on the virtual list container
     const container = screen.getByRole("list", { name: "Virtual streams" });
     expect(document.activeElement).toBe(container);
+  });
+
+  it("moves focus to the nearest remaining item when the focused item is filtered out", () => {
+    const { rerender } = render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items}
+        renderItem={(item) => (
+          <button data-testid={`button-${item.id}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    const focusedButton = screen.getByTestId("button-item-2");
+    focusedButton.focus();
+
+    rerender(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items.filter((item) => item.id !== "item-2")}
+        renderItem={(item) => (
+          <button data-testid={`button-${item.id}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    expect(screen.getByTestId("button-item-3")).toHaveFocus();
   });
 });

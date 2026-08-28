@@ -9,8 +9,50 @@ const FIELD_LABELS: Record<Field, string> = {
   status: "Status",
 };
 
+export const MAX_REPORT_RANGE_DAYS = 366;
+export const MAX_REPORT_ROWS = 10_000;
+const ALLOWED_FIELDS = new Set<Field>(Object.keys(FIELD_LABELS) as Field[]);
+
+export class ReportExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ReportExportError";
+  }
+}
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new ReportExportError("Report export was canceled.");
+  }
+}
+
+function validateFields(fields: Field[]): void {
+  if (fields.length === 0 || fields.some((field) => !ALLOWED_FIELDS.has(field))) {
+    throw new ReportExportError("Report contains an unsupported field.");
+  }
+}
+
+export function validateReportDateRange(startDate: string, endDate: string): string {
+  if (!startDate && !endDate) return "";
+  const rangeStart = parseDate(startDate);
+  const rangeEnd = parseDate(endDate);
+  if ((startDate && !rangeStart) || (endDate && !rangeEnd)) {
+    return "Enter valid start and end dates.";
+  }
+  if (rangeStart && rangeEnd && rangeEnd < rangeStart) {
+    return "End date must be on or after the start date.";
+  }
+  if (rangeStart && rangeEnd) {
+    const days = (rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000 + 1;
+    if (days > MAX_REPORT_RANGE_DAYS) {
+      return `Date range cannot exceed ${MAX_REPORT_RANGE_DAYS} days.`;
+    }
+  }
+  return "";
+}
+
 function parseDate(dateStr?: string): Date | null {
-  if (!dateStr) return null;
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
   const d = new Date(dateStr + "T00:00:00Z");
   return isNaN(d.getTime()) ? null : d;
 }
@@ -25,9 +67,11 @@ export function filterStreamsByDateRange(
   startDate: string,
   endDate: string
 ): Stream[] {
+  const dateError = validateReportDateRange(startDate, endDate);
+  if (dateError) return [];
   const rangeStart = parseDate(startDate);
   const rangeEnd = parseDate(endDate);
-  if (!rangeStart && !rangeEnd) return streams;
+  if (!rangeStart && !rangeEnd) return streams.slice(0, MAX_REPORT_ROWS);
 
   return streams.filter((s) => {
     const streamStart = parseDate(s.startDate);
@@ -35,7 +79,7 @@ export function filterStreamsByDateRange(
     if (rangeStart && streamStart < rangeStart) return false;
     if (rangeEnd && streamStart > rangeEnd) return false;
     return true;
-  });
+  }).slice(0, MAX_REPORT_ROWS);
 }
 
 function groupKeyFor(stream: Stream, grouping: Grouping): string {
@@ -69,24 +113,35 @@ export function groupStreams(
 }
 
 function escapeCsvCell(value: string): string {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (/[",\n]/.test(safeValue)) {
+    return `"${safeValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safeValue;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
 }
 
 function fieldValue(stream: Stream, field: Field): string {
   switch (field) {
     case "name":
-      return stream.name;
+      return String(stream.name ?? "");
     case "recipient":
-      return stream.recipient;
+      return String(stream.recipient ?? "");
     case "rate":
-      return stream.rate;
+      return String(stream.rate ?? "");
     case "accruedAmount":
       return stream.accruedAmount != null ? String(stream.accruedAmount) : "";
     case "status":
-      return stream.status;
+      return String(stream.status ?? "");
   }
 }
 
@@ -97,16 +152,21 @@ function fieldValue(stream: Stream, field: Field): string {
 export function buildReportCSV(
   streams: Stream[],
   fields: Field[],
-  grouping: Grouping
+  grouping: Grouping,
+  signal?: AbortSignal,
 ): string {
+  assertNotAborted(signal);
+  validateFields(fields);
   const header = fields.map((f) => escapeCsvCell(FIELD_LABELS[f])).join(",");
   const lines: string[] = [header];
 
-  for (const [groupName, groupStreamsList] of groupStreams(streams, grouping)) {
+  for (const [groupName, groupStreamsList] of groupStreams(streams.slice(0, MAX_REPORT_ROWS), grouping)) {
+    assertNotAborted(signal);
     if (grouping !== "None") {
       lines.push(`# ${escapeCsvCell(groupName || "Ungrouped")}`);
     }
     for (const s of groupStreamsList) {
+      assertNotAborted(signal);
       lines.push(fields.map((f) => escapeCsvCell(fieldValue(s, f))).join(","));
     }
   }
@@ -130,9 +190,11 @@ export function downloadReportCSV(
   streams: Stream[],
   fields: Field[],
   grouping: Grouping,
-  fileNamePrefix: string = "Fluxora-Treasury-Report"
+  fileNamePrefix: string = "Fluxora-Treasury-Report",
+  signal?: AbortSignal,
 ): void {
-  const csv = buildReportCSV(streams, fields, grouping);
+  const csv = buildReportCSV(streams, fields, grouping, signal);
+  assertNotAborted(signal);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   triggerBlobDownload(blob, `${fileNamePrefix}-${Date.now()}.csv`);
 }
@@ -146,8 +208,11 @@ export function downloadReportCSV(
 export function printReportAsPDF(
   streams: Stream[],
   fields: Field[],
-  grouping: Grouping
+  grouping: Grouping,
+  signal?: AbortSignal,
 ): void {
+  assertNotAborted(signal);
+  validateFields(fields);
   const printWindow = window.open("", "_blank", "width=900,height=700");
   if (!printWindow) {
     throw new Error(
@@ -155,19 +220,20 @@ export function printReportAsPDF(
     );
   }
 
-  const rows = groupStreams(streams, grouping)
+  const rows = groupStreams(streams.slice(0, MAX_REPORT_ROWS), grouping)
     .map(([groupName, groupStreamsList]) => {
+      assertNotAborted(signal);
       const groupHeader =
         grouping !== "None"
-          ? `<tr><td colspan="${fields.length}" style="font-weight:bold;padding:8px 4px;">${
-              groupName || "Ungrouped"
-            }</td></tr>`
+          ? `<tr><td colspan="${fields.length}" style="font-weight:bold;padding:8px 4px;">${escapeHtml(
+              groupName || "Ungrouped",
+            )}</td></tr>`
           : "";
       const dataRows = groupStreamsList
         .map(
           (s) =>
             `<tr>${fields
-              .map((f) => `<td style="padding:4px 8px;border-top:1px solid #ddd;">${fieldValue(s, f)}</td>`)
+              .map((f) => `<td style="padding:4px 8px;border-top:1px solid #ddd;">${escapeHtml(fieldValue(s, f))}</td>`)
               .join("")}</tr>`
         )
         .join("");
@@ -175,7 +241,7 @@ export function printReportAsPDF(
     })
     .join("");
 
-  const headerCells = fields.map((f) => `<th style="text-align:left;padding:4px 8px;">${FIELD_LABELS[f]}</th>`).join("");
+  const headerCells = fields.map((f) => `<th style="text-align:left;padding:4px 8px;">${escapeHtml(FIELD_LABELS[f])}</th>`).join("");
 
   printWindow.document.write(`
     <html>

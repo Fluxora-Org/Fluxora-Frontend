@@ -18,7 +18,8 @@
     "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"
   },
   "dependencies": {
     "react-helmet-async": "^2.0.5",

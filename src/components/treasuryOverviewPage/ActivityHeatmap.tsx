@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { Stream } from "./Stream";
 import "./ActivityHeatmap.css";
 
@@ -129,6 +129,85 @@ const getCellLabel = (dateStr: string, count: number): string => {
 };
 
 /**
+ * Builds the trailing `totalDays` calendar days ending on `endDate`
+ * (inclusive), oldest first. Pure and range-agnostic on purpose: the
+ * mounted component always calls this with `totalDays = 84` (the range is
+ * intentionally locked — see `docs/TREASURY_ACTIVITY_HEATMAP_SPEC.md` §2),
+ * but keeping the builder itself range-agnostic lets the regression suite
+ * exercise a much larger synthetic grid to benchmark the "maximum range"
+ * case from #1457 without changing production behavior.
+ */
+export function buildTrailingDays(totalDays: number, endDate: Date): Date[] {
+  const dates: Date[] = [];
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const d = new Date(endDate);
+    d.setDate(endDate.getDate() - i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+interface HeatmapCellProps {
+  level: number;
+  label: string;
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave: () => void;
+  onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
+  onBlur: () => void;
+}
+
+/**
+ * Test-only render counter incremented on every `HeatmapCell` render. Not
+ * read anywhere in application code — it exists purely so the regression
+ * suite (`__tests__/ActivityHeatmap.test.tsx`, "Cell memoization") can
+ * assert that hover/focus interaction does not force cell re-renders.
+ * Incrementing an integer is negligible overhead in production.
+ */
+export const __heatmapCellRenderStats = { count: 0 };
+
+/**
+ * A single date cell in the heatmap grid.
+ *
+ * Memoized (#1457): `ActivityHeatmap`'s `hoveredCell` state changes on
+ * every hover/focus/blur/mouseleave, but only `HeatmapTooltip` actually
+ * depends on that state — none of the 84+ sibling cells' own visual output
+ * does. Each cell's props (`level`, `label`) only change when `streams`
+ * changes, and the four event-handler props are stable references
+ * (`useCallback` with an empty dependency array in the parent), so
+ * `React.memo`'s shallow prop comparison reliably skips re-rendering every
+ * cell that isn't the one being interacted with.
+ *
+ * Memoization was chosen over virtualization or a bounded/configurable
+ * range (the other two options #1457 called out) because it requires no
+ * new range prop and, unlike virtualizing the grid (removing off-screen
+ * cells from the DOM), it exactly preserves the existing keyboard tab
+ * order across every cell and the existing per-cell tooltip behavior
+ * (§5.1, §13 of the spec) — nothing about interaction changes, only how
+ * much render work a hover triggers.
+ */
+export const HeatmapCell = React.memo(function HeatmapCell({
+  level,
+  label,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+}: HeatmapCellProps) {
+  __heatmapCellRenderStats.count++;
+  return (
+    <button
+      type="button"
+      className={`heatmap-cell heatmap-cell--level-${level}`}
+      aria-label={label}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    />
+  );
+});
+
+/**
  * Classifies the data into one of three descriptive tones, exposed via the
  * `data-activity-tone` attribute on the container for QA annotation and
  * future styling hooks. The classifier does NOT change visual rendering —
@@ -207,6 +286,20 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
     localStorage.setItem(LOCAL_STORAGE_KEY, nextMode);
   };
 
+  // Stable across renders (empty dep arrays) so `HeatmapCell`'s
+  // `React.memo` comparison isn't defeated by new function identities on
+  // every hover-driven re-render. The cell's own aria-label already holds
+  // the exact string the tooltip needs, so we read it off the DOM node
+  // instead of closing over a per-cell `label` value.
+  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    setHoveredCell({ element: e.currentTarget, label: e.currentTarget.getAttribute("aria-label") || "" });
+  }, []);
+  const handleCellMouseLeave = useCallback(() => setHoveredCell(null), []);
+  const handleCellFocus = useCallback((e: React.FocusEvent<HTMLButtonElement>) => {
+    setHoveredCell({ element: e.currentTarget, label: e.currentTarget.getAttribute("aria-label") || "" });
+  }, []);
+  const handleCellBlur = useCallback(() => setHoveredCell(null), []);
+
   if (error) {
     return (
       <div className="activity-heatmap-container" data-activity-tone="error">
@@ -235,12 +328,7 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
   const endDate = new Date(today);
   endDate.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
 
-  const dates: Date[] = [];
-  for (let i = 83; i >= 0; i--) {
-    const d = new Date(endDate);
-    d.setDate(endDate.getDate() - i);
-    dates.push(d);
-  }
+  const dates: Date[] = buildTrailingDays(84, endDate);
 
   // Calculate activity counts
   const counts: Record<string, number> = {};
@@ -363,15 +451,14 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
                   const label = getCellLabel(formatted, count);
 
                   return (
-                    <button
+                    <HeatmapCell
                       key={formatted}
-                      type="button"
-                      className={`heatmap-cell heatmap-cell--level-${level}`}
-                      aria-label={label}
-                      onMouseEnter={(e) => setHoveredCell({ element: e.currentTarget, label })}
-                      onMouseLeave={() => setHoveredCell(null)}
-                      onFocus={(e) => setHoveredCell({ element: e.currentTarget, label })}
-                      onBlur={() => setHoveredCell(null)}
+                      level={level}
+                      label={label}
+                      onMouseEnter={handleCellMouseEnter}
+                      onMouseLeave={handleCellMouseLeave}
+                      onFocus={handleCellFocus}
+                      onBlur={handleCellBlur}
                     />
                   );
                 })}

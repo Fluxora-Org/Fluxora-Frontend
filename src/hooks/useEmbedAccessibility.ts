@@ -91,6 +91,8 @@ export function useEmbedAccessibility({
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const widgetContainer = document.querySelector<HTMLElement>(WIDGET_CONTAINER_SELECTOR);
+    const focusOriginWasFocusable =
+      focusOrigin !== null && focusOrigin.tabIndex >= 0;
 
     // One live region per widget instance: entry and exit announcements
     // overwrite each other and are removed together on cleanup.
@@ -201,7 +203,7 @@ export function useEmbedAccessibility({
 
       // Restore focus to the element that owned it before the widget took it
       // (browser-level contract for focus restoration).
-      if (isMainContent && !isInsideWidget(focusOrigin)) {
+      if (isMainContent && focusOriginWasFocusable && !isInsideWidget(focusOrigin)) {
         restoreFocusToOrigin();
       }
     };
