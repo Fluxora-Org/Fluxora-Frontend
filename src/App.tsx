@@ -17,6 +17,7 @@ import { VoiceProvider } from "./components/voice/VoiceContext";
 import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 import { getRecipientRouteKey } from "./pages/recipientRouteKey";
+import RequireWalletAction from "./components/RequireWalletAction";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -140,9 +141,9 @@ export default function App() {
                       }
                     >
                       <Route index element={lazyAppRoute(<Dashboard />)} />
-                      <Route path="streams" element={lazyAppRoute(<Streams />)} />
-                      <Route path="streams/:streamId" element={lazyAppRoute(<StreamDetail />)} />
-                      <Route path="recipient" element={lazyAppRoute(<RecipientRoute />)} />
+                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<Streams />)}</RequireWalletAction>} />
+                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />)}</RequireWalletAction>} />
+                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />)}</RequireWalletAction>} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (
