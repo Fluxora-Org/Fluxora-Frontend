@@ -16,6 +16,11 @@ import {
   EmbedWidgetLayoutCompact 
 } from "../components/embed/EmbedWidgetLayouts";
 import { useEmbedAccessibility } from "../hooks/useEmbedAccessibility";
+import {
+  getAllowedEmbedOrigins,
+  isAuthorizedEmbedMessage,
+  parseEmbedMessage
+} from "../lib/embedMessagePolicy";
 
 /**
  * EmbedStreamWidget - Dedicated embed page for stream status widget
@@ -40,6 +45,8 @@ export default function EmbedStreamWidget() {
   const [stream, setStream] = useState<StreamRecord | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [messageTheme, setMessageTheme] = useState<ThemeConfig | null>(null);
+  const [resize, setResize] = useState<{ width?: number; height?: number }>({});
   // retryCount is bumped by the retry button and used as a useEffect dependency
   // so a re-fetch is triggered without remounting the component.
   const [retryCount, setRetryCount] = useState(0);
@@ -70,9 +77,29 @@ export default function EmbedStreamWidget() {
   }, [searchParams]);
   
   // Apply theme configuration to document using shared helper
+  const activeThemeConfig = messageTheme ?? themeConfig;
+
   useEffect(() => {
-    return applyThemeConfigSafely(themeConfig);
-  }, [themeConfig]);
+    return applyThemeConfigSafely(activeThemeConfig);
+  }, [activeThemeConfig]);
+
+  useEffect(() => {
+    const allowedOrigins = getAllowedEmbedOrigins();
+    const handleMessage = (event: MessageEvent) => {
+      if (!isAuthorizedEmbedMessage(event, allowedOrigins)) return;
+      const message = parseEmbedMessage(event.data);
+      if (!message) return;
+
+      if (message.action === "theme") {
+        setMessageTheme({ theme: message.theme, accentColor: null });
+      } else {
+        setResize({ width: message.width, height: message.height });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   // Stable retry callback — does not close over changing state.
   const handleRetry = useCallback(() => {
@@ -127,7 +154,7 @@ export default function EmbedStreamWidget() {
   // Loading state
   if (loading) {
     return (
-      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
+      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
         <EmbedWidgetSkeleton widgetPreset={widgetPreset} />
       </EmbedWidgetContainer>
     );
@@ -136,7 +163,7 @@ export default function EmbedStreamWidget() {
   // Error state (invalid stream ID or network error)
   if (error || !stream) {
     return (
-      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
+      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
         <EmbedWidgetErrorState 
           error={error || "Stream not found"}
           widgetPreset={widgetPreset}
@@ -151,11 +178,11 @@ export default function EmbedStreamWidget() {
   const widgetProps = {
     stream,
     currentDate,
-    themeConfig
+    themeConfig: activeThemeConfig
   };
   
   return (
-    <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
+    <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
       {widgetPreset === "banner" ? (
         <EmbedWidgetLayoutBanner {...widgetProps} />
       ) : widgetPreset === "compact" ? (
@@ -175,6 +202,7 @@ interface EmbedWidgetContainerProps {
   children: React.ReactNode;
   widgetPreset: "card" | "banner" | "compact";
   themeConfig: ThemeConfig;
+  resize: { width?: number; height?: number };
 }
 
 /**
@@ -188,7 +216,8 @@ interface EmbedWidgetContainerProps {
 function EmbedWidgetContainer({ 
   children, 
   widgetPreset, 
-  themeConfig 
+  themeConfig,
+  resize
 }: EmbedWidgetContainerProps) {
   return (
     <div 
@@ -200,7 +229,8 @@ function EmbedWidgetContainer({
         // width: 100% lets the inner layout element own its own min/max-width
         // rules via CSS, avoiding inline-style vs. stylesheet specificity fights.
         width: "100%",
-        height: "auto",
+        ...(resize.width ? { maxWidth: `${resize.width}px` } : {}),
+        ...(resize.height ? { minHeight: `${resize.height}px` } : {}),
         backgroundColor: "var(--color-bg-primary, #ffffff)",
         color: "var(--color-text-primary, #1a1f36)",
         isolation: "isolate"
