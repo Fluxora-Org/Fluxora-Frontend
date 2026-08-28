@@ -31,6 +31,39 @@ export interface RecipientStreamsProps {
   onRetry?: () => void;
   fetchStreamsFn?: () => Promise<Stream[]>;
   pollIntervalMs?: number;
+  timeoutMs?: number;
+}
+
+/**
+ * Transaction status model shared across transaction flows.
+ * 'idle' - no transaction in flight
+ * 'pending' - transaction submitted and waiting on chain
+ * 'success' - transaction confirmed
+ * 'error' - transaction failed
+ * 'timeout' - transaction timed out (no confirmation within threshold)
+ */
+export type TransactionStatus = "idle" | "pending" | "success" | "error" | "timeout";
+
+const SUCCESS_MESSAGE_DURATION = 3000;
+const DEFAULT_TIMEOUT_MS = 8000;
+
+/**
+ * Race a promise against a timeout. Rejects with a TimeoutError if the
+ * underlying promise does not settle within `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error("Request timed out");
+      error.name = "TimeoutError";
+      reject(error);
+    }, ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 }
 
 /**
@@ -61,6 +94,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   onRetry,
   fetchStreamsFn,
   pollIntervalMs = 10000,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }) => {
   const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -72,6 +106,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   /** True while a user-initiated retry fetch is in flight (distinct from the
    *  background-poll isRefreshing so the button state is independently tracked). */
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
+  /** Displays a short-lived confirmation when a refresh succeeds. */
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Ref tracking to block concurrent overlapping requests
   const isFetchingRef = useRef<boolean>(false);
@@ -79,8 +115,13 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
    *  first mounts (WCAG 2.4.3 Focus Order, 3.3.1 Error Identification). */
   const retryButtonRef = useRef<HTMLButtonElement>(null);
   /** Tracks the previous error value so we can detect the transition from
-   *  null → error (new error mount) without running focus logic on every render. */
+   *  null -> error (new error mount) without running focus logic on every render. */
   const prevErrorRef = useRef<string | null>(null);
+  /** Monotonic counter used to discard stale responses after a timeout or
+   *  duplicate submission. */
+  const requestIdRef = useRef<number>(0);
+  /** Handle for clearing the success-message timer. */
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Main data worker executing secure background refresh calls.
@@ -91,9 +132,16 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     isFetchingRef.current = true;
     setIsRefreshing(true);
     setInternalError(null);
+    setSuccessMessage(null);
+
+    const requestId = ++requestIdRef.current;
 
     try {
-      const updatedStreams = await fetchStreamsFn();
+      const updatedStreams = await withTimeout(fetchStreamsFn(), timeoutMs);
+
+      // Ignore stale responses (e.g., a previous request timed out and a newer
+      // one is now in flight).
+      if (requestId !== requestIdRef.current) return;
 
       // Successful fetch resets the retry counter.
       setRetryCount(0);
@@ -104,13 +152,26 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           isPinned: pinMap.get(stream.id) ?? stream.isPinned ?? false,
         }));
       });
-    } catch {
-      setInternalError("Failed to sync latest stream data. Please try again.");
+
+      setSuccessMessage("Stream data updated");
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = setTimeout(() => setSuccessMessage(null), SUCCESS_MESSAGE_DURATION);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+
+      const isTimeout = error instanceof Error && error.name === "TimeoutError";
+      setInternalError(
+        isTimeout
+          ? "Request timed out. Please try again."
+          : "Failed to sync latest stream data. Please try again."
+      );
     } finally {
-      isFetchingRef.current = false;
-      setIsRefreshing(false);
+      if (requestId === requestIdRef.current) {
+        isFetchingRef.current = false;
+        setIsRefreshing(false);
+      }
     }
-  }, [fetchStreamsFn]);
+  }, [fetchStreamsFn, timeoutMs]);
 
   // Initial load hook when fetchStreamsFn is provided
   useEffect(() => {
@@ -133,6 +194,13 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
     return () => clearInterval(interval);
   }, [fetchStreamsFn, handleRefresh, pollIntervalMs]);
+
+  // Cleanup success-message timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, []);
 
   // Determine effective state inputs (external props take precedence if provided)
   const isLoading = externalIsLoading ?? false;
@@ -206,8 +274,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
 
         <div className="flex justify-between items-center mb-6">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Skeleton width={180} height={24} borderRadius={8} />
-            <Skeleton width={260} height={14} borderRadius={6} />
+            <Skeleton width={180} height={24} borderRadius={12} />
+            <Skeleton width={260} height={14} borderRadius={12} />
           </div>
           {fetchStreamsFn && (
             <Skeleton width={120} height={38} borderRadius={12} />
@@ -283,15 +351,26 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
               Real-time contract payment records
             </p>
           </div>
-          {fetchStreamsFn && (
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition w-full sm:w-auto"
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh Status"}
-            </button>
-          )}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {successMessage && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="text-sm text-green-600 dark:text-green-400"
+              >
+                {successMessage}
+              </span>
+            )}
+            {fetchStreamsFn && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || isRetrying}
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-xl disabled:bg-blue-400 hover:bg-blue-700 transition w-full sm:w-auto"
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh Status"}
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Filter Controls */}
@@ -321,114 +400,67 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
       </div>
 
       {/*
-       * State 2: Error banner
+       * Error banner
        *
        * role="alert" + aria-live="assertive" + aria-atomic="true":
        *   Assertive is chosen over polite because this is a foreground data-sync
        *   failure — the recipient cannot see their streams until it is resolved.
        *   A background poll that silently retries would warrant polite.
        *   aria-atomic="true" ensures the entire banner is announced as a unit
-       *   so screen readers do not speak a partial update.
-       *
-       * Visual tokens:
-       *   --color-error-bg    light #fef2f2  / dark rgba(220,38,38,0.1)
-       *   --color-error-text  light #b91c1c  / dark #fca5a5
-       *   --color-error-border light #dc2626 / dark #ef4444
-       *
-       * Repeated-failure state (retryCount >= 2):
-       *   Message escalates and the banner uses a slightly thicker border
-       *   (via box-shadow) to increase visual urgency without changing layout.
-       *
-       * Retry-in-flight state (isRetrying):
-       *   Button label changes to "Retrying…" and the button is disabled so
-       *   the recipient cannot trigger duplicate concurrent fetches.
-       *
-       * Recovery (auto-clear):
-       *   Once handleRefresh() succeeds it calls setInternalError(null) and
-       *   setRetryCount(0), which removes the banner from the DOM. No manual
-       *   dismiss is offered — success is the only exit so recipients are never
-       *   left in a silently-failed-but-dismissed state.
+       *   so screen readers do not speak fragmented sentences.
        */}
       {effectiveError && (
         <div
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
-          className="p-4 mb-6 text-sm rounded-xl flex items-start justify-between gap-3 border"
+          className="mb-6 p-4 rounded-xl border"
           style={{
-            color: "var(--color-error-text)",
-            borderColor: "var(--color-error-border)",
             backgroundColor: "var(--color-error-bg)",
+            borderColor: "var(--color-error-border)",
           }}
         >
-          <div className="flex items-start gap-2" style={{ minWidth: 0 }}>
-            {/* Warning icon — aria-hidden because the role="alert" text conveys the meaning */}
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-              focusable="false"
-              style={{ flexShrink: 0, marginTop: 1 }}
-            >
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-              <path
-                d="M8 5v3.5M8 10.5v.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span>{errorMessage}</span>
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 text-lg" aria-hidden="true">⚠️</span>
+            <div className="flex-1">
+              <p
+                className="text-sm font-medium"
+                style={{ color: "var(--color-error-text)" }}
+              >
+                Unable to load streams
+              </p>
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--color-error-text-muted)" }}
+              >
+                {errorMessage}
+              </p>
+            </div>
+            {fetchStreamsFn && (
+              <button
+                ref={retryButtonRef}
+                onClick={handleRetryAction}
+                disabled={isRetrying || isRefreshing}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {isRetrying ? "Retrying..." : "Retry"}
+              </button>
+            )}
           </div>
-          {(onRetry || fetchStreamsFn) && (
-            <button
-              ref={retryButtonRef}
-              onClick={handleRetryAction}
-              disabled={isRetrying}
-              aria-label="Retry loading recipient streams"
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg transition border"
-              style={{
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-                color: "var(--color-error-text)",
-                borderColor: "var(--color-error-border)",
-                backgroundColor: "transparent",
-                opacity: isRetrying ? 0.65 : 1,
-                cursor: isRetrying ? "not-allowed" : "pointer",
-              }}
-            >
-              {isRetrying ? "Retrying…" : "Retry"}
-            </button>
-          )}
         </div>
       )}
 
-      {/* State 3: Empty State (Shared EmptyState illustration pattern & Connect wallet CTA) */}
-      {!effectiveError && effectiveStreams.length === 0 ? (
+      {/* Empty state */}
+      {!effectiveError && effectiveStreams.length === 0 && (
         <EmptyState
-          variant="recipient"
-          walletConnected={false}
-          onPrimaryAction={onEmptyPrimaryAction}
+          title="No incoming streams"
+          description="When someone starts a stream to you, it'll show up here."
+          actionLabel={onEmptyPrimaryAction ? "View Activity" : undefined}
+          onAction={onEmptyPrimaryAction}
         />
       )}
 
-      {!effectiveError && effectiveStreams.length > 0 && filteredStreams.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
-            No {filter.toLowerCase()} streams found.
-          </p>
-          <button
-            onClick={() => setFilter("All")}
-            disabled={isRefreshing || isRetrying}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            Clear Filters
-          </button>
-        </div>
-      )}
-
+      {/* Stream list */}
       {effectiveStreams.length > 0 && (
         <div
           role="list"
@@ -438,61 +470,28 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
         >
           {visibleStreams.map((stream) => (
             <div
-              className="p-4 rounded-xl flex justify-between items-center"
-              style={{ border: "1px solid var(--color-border-default)" }}
+              key={stream.id}
+              role="listitem"
+              className="flex items-center justify-between px-4 py-3 rounded-xl mb-2"
+              style={{ backgroundColor: "var(--color-bg-secondary)" }}
             >
-              <div>
-                <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-                  From: <span>{stream.senderName ?? stream.sender}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: "var(--color-text-primary)" }}>
+                  {stream.senderName || stream.sender || "Unknown sender"}
                 </p>
-                <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
-                  {stream.amount} XLM
+                <p className="text-xs truncate" style={{ color: "var(--color-text-tertiary)" }}>
+                  {stream.amount} {stream.status}
                 </p>
                 <p className="text-lg font-bold">{stream.amount} XLM</p>
               </div>
-              <div className="flex items-center gap-4">
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    stream.status?.toLowerCase() === "active"
-                      ? "status-badge--active"
-                      : "status-badge--paused"
-                  }`}
-                  style={{
-                    backgroundColor:
-                      stream.status?.toLowerCase() === "active"
-                        ? "var(--color-success-bg)"
-                        : "var(--color-warning-bg)",
-                    color:
-                      stream.status?.toLowerCase() === "active"
-                        ? "var(--color-success)"
-                        : "var(--color-warning)",
-                  }}
-                >
-                  {stream.status}
-                </span>
-                {stream.isPinned && (
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: "var(--color-text-tertiary)" }}
-                  >
-                    Pinned
-                  </span>
-                )}
-                <button
-                  onClick={() => togglePin(stream.id)}
-                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
-                  style={{ color: "var(--color-text-tertiary)" }}
-                  aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
-                  aria-pressed={stream.isPinned}
-                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
-                  style={{ color: "var(--color-text-tertiary)" }}
-                >
-                  <span aria-hidden="true">{stream.isPinned ? "★" : "☆"}</span>
-                  <span className="ml-1 text-xs font-medium">
-                    {stream.isPinned ? "Pinned" : "Unpinned"}
-                  </span>
-                </button>
-              </div>
+              <button
+                onClick={() => togglePin(stream.id)}
+                aria-pressed={stream.isPinned ?? false}
+                aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
+                className="ml-4 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
+              >
+                {stream.isPinned ? "📌" : "📌"}
+              </button>
             </div>
           )}
         />
@@ -500,4 +499,3 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
     </div>
   );
 };
-
