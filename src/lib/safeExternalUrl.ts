@@ -1,10 +1,15 @@
 /**
- * Returns a normalized URL only when the input is an absolute HTTPS URL.
+ * Returns a canonical URL only when the input is an absolute HTTPS URL.
  *
  * Contract-derived values are untrusted input. Relative URLs are intentionally
  * rejected because they can navigate within the application, while javascript:,
  * data:, file:, and other non-HTTPS schemes are never valid external links.
  */
+export const SAFE_EXTERNAL_LINK_ATTRIBUTES = {
+  target: "_blank",
+  rel: "noopener noreferrer",
+} as const;
+
 export function getSafeExternalUrl(
   value: string | null | undefined,
 ): string | null {
@@ -15,7 +20,7 @@ export function getSafeExternalUrl(
 
   try {
     const url = new URL(trimmed);
-    return url.protocol === "https:" ? trimmed : null;
+    return url.protocol === "https:" ? url.href : null;
   } catch {
     return null;
   }

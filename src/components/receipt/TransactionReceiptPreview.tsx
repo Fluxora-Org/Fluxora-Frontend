@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp, buildReceiptExplorerUrl } from "../../utils/receiptGenerator";
 import { clsx } from "clsx";
+import { SAFE_EXTERNAL_LINK_ATTRIBUTES } from "../../lib/safeExternalUrl";
 
 export interface TransactionReceiptPreviewProps {
   data: ReceiptData;
@@ -36,7 +37,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
       setDownloadState("success");
       if (onDownloaded) onDownloaded();
       setTimeout(() => setDownloadState("idle"), 3000);
-    } catch (err: any) {
+    } catch {
       setDownloadState("error");
       setErrorMsg("Failed to export receipt. Please try again.");
     }
@@ -160,8 +161,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
               <span className="truncate">{data.txHash}</span>
               <a
                 href={buildReceiptExplorerUrl(data.txHash!, data.network)}
-                target="_blank"
-                rel="noopener noreferrer"
+                {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
                 className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
               >
                 Explorer <ExternalLink size={12} />

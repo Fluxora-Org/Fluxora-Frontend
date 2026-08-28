@@ -7,7 +7,10 @@ import { TransactionReceiptPreview } from "../receipt/TransactionReceiptPreview"
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { config } from "../../lib/config";
-import { getSafeExternalUrl } from "../../lib/safeExternalUrl";
+import {
+  getSafeExternalUrl,
+  SAFE_EXTERNAL_LINK_ATTRIBUTES,
+} from "../../lib/safeExternalUrl";
 import {
   type ShareFlowState,
   type ShareProvider,
@@ -629,8 +632,7 @@ export default function StreamCreatedModal({
                       {safeStreamUrl ? (
                         <a
                           href={safeStreamUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
                           className={styles.sharePreviewLink}
                         >
                           {streamUrl}
@@ -692,8 +694,7 @@ export default function StreamCreatedModal({
             Popup blocked.{" "}
             <a
               href={safeStreamUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
               className={styles.fallbackLink}
             >
               Click here to view your stream
