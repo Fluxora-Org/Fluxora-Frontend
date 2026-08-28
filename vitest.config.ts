@@ -73,6 +73,8 @@ export default defineConfig({
         "src/components/csv-upload/CsvDropZone.tsx",
         "src/components/csv-upload/ColumnMappingStep.tsx",
         "src/components/csv-upload/PreviewValidateStep.tsx",
+        // Security headers (CSP + browser security header definitions, #1408)
+        "src/lib/securityHeaders.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
