@@ -38,6 +38,7 @@ interface ToastContextValue {
     variant: ToastVariant,
     timeout?: number,
     action?: ToastAction,
+    id?: string,
   ) => string;
   /** Manually dismiss a toast by id. */
   dismiss: (id: string) => void;
@@ -68,6 +69,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     getStoredToastSoundPreference,
   );
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const recentToasts = useRef<{message: string; variant: ToastVariant; timestamp: number}[]>([]);
 
   // Listen for storage changes across tabs
   useEffect(() => {
@@ -109,11 +111,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       variant: ToastVariant,
       timeout = DEFAULT_TIMEOUT,
       action?: ToastAction,
+      id?: string,
     ): string => {
-      const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, variant, timeout, action }]);
+      const toastId = id || crypto.randomUUID();
+      const now = Date.now();
+      const DEDUPE_WINDOW = 1000;
+      
+      if (!id) {
+        recentToasts.current = recentToasts.current.filter(t => now - t.timestamp < DEDUPE_WINDOW);
+        if (recentToasts.current.some(t => t.message === message && t.variant === variant)) {
+          return toastId;
+        }
+        recentToasts.current.push({ message, variant, timestamp: now });
+      }
+
+      setToasts((prev) => {
+        const existingIdx = prev.findIndex(t => t.id === toastId);
+        if (existingIdx >= 0) {
+          const next = [...prev];
+          next[existingIdx] = { id: toastId, message, variant, timeout, action };
+          return next;
+        }
+        return [...prev, { id: toastId, message, variant, timeout, action }];
+      });
       playToastSound(variant, soundPreference);
-      return id;
+      return toastId;
     },
     [soundPreference],
   );

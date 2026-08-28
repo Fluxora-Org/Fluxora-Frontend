@@ -437,3 +437,89 @@ describe("DEFAULTS — every value is a valid hex colour", () => {
     }
   });
 });
+
+// ─── 16. Boundary tests: invalid and translucent colors ──────────────────────
+
+describe("ThemeEditorPanel — invalid and translucent color boundaries", () => {
+  it("translucent 8-digit hex input fails registration and surfaces alert", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const hexInputs = screen.getAllByPlaceholderText("#RRGGBB");
+    await user.clear(hexInputs[0]);
+    await user.type(hexInputs[0], "#0097a780"); // 8-digit hex with alpha
+
+    await user.click(screen.getByRole("button", { name: /preview theme/i }));
+
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(alerts[0].textContent).toMatch(/not a valid hex colour/i);
+  });
+
+  it("translucent 4-digit hex input fails registration and surfaces alert", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const hexInputs = screen.getAllByPlaceholderText("#RRGGBB");
+    await user.clear(hexInputs[0]);
+    await user.type(hexInputs[0], "#09af"); // 4-digit hex with alpha
+
+    await user.click(screen.getByRole("button", { name: /preview theme/i }));
+
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.length).toBeGreaterThan(0);
+  });
+
+  it("translucent draft values in PreviewStrip safely fall back to defaults", () => {
+    const values: Partial<Record<AllowedTokenKey, string>> = {
+      "--navbar-bg": "#ffffff00", // translucent white
+      "--color-cta-primary-bg": "#1234", // translucent 4-digit
+    };
+    render(<PreviewStrip values={values} />);
+    expect(screen.getByLabelText(/navbar preview/i)).toBeInTheDocument();
+    expect(screen.getByText("Fluxora")).toBeInTheDocument();
+  });
+});
+
+// ─── 17. Authorization and undo/reset boundary ───────────────────────────────
+
+describe("ThemeEditorPanel — authorization and undo/reset", () => {
+  it("renders authorization alert and disables editing when isAuthorized is false", () => {
+    render(
+      <ThemeProvider>
+        <ThemeEditorPanel isAuthorized={false} />
+      </ThemeProvider>,
+    );
+
+    expect(
+      screen.getByText(/do not have administrative permission/i),
+    ).toBeInTheDocument();
+
+    const nameInput = screen.getByLabelText(/display name/i);
+    expect(nameInput).toBeDisabled();
+
+    const submitBtn = screen.getByRole("button", { name: /preview theme/i });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it("reset to default restores draft fields back to default values", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    // Modify a field
+    const hexInputs = screen.getAllByPlaceholderText("#RRGGBB");
+    await user.clear(hexInputs[0]);
+    await user.type(hexInputs[0], "#112233");
+
+    // Preview
+    await user.click(screen.getByRole("button", { name: /preview theme/i }));
+
+    // Reset to default
+    await user.click(screen.getByRole("button", { name: /reset to default/i }));
+
+    // Draft input should be restored to default value
+    const firstTokenDefault = DEFAULTS[TOKEN_FIELDS[0].key] ?? "";
+    expect(hexInputs[0]).toHaveValue(firstTokenDefault);
+  });
+});
+

@@ -180,7 +180,7 @@ describe("disconnect during a transition is blocked", () => {
 
 // ─── Wrong network ────────────────────────────────────────────────────────────
 
-describe("wrong-network identity stays visible while actions are locked", () => {
+describe("wrong-network identity stays visible while on a wrong network", () => {
   beforeEach(() => {
     walletOverrides = {
       network: "MAINNET",
@@ -190,21 +190,33 @@ describe("wrong-network identity stays visible while actions are locked", () => 
     };
   });
 
-  it("keeps the expected-network badge visible during the transition but locks actions", () => {
+  it("keeps the expected-network badge visible during the transition", () => {
     const result = mountNavbar();
     // Identity is shown, badge reflects the mismatch.
     expect(screen.getByText(/expected testnet/i)).toBeInTheDocument();
-    expect(getWalletTrigger()).toBeEnabled();
+
+    // Wrong-network mode renders a dedicated Switch Network control instead of
+    // the WalletStatus trigger, so there is no wallet action menu to lock
+    // (see navbar state precedence: loading > disconnected > wrong network >
+    // connected).
+    expect(
+      screen.queryByRole("button", { name: /open wallet options/i }),
+    ).not.toBeInTheDocument();
+    const switchNetwork = screen.getByRole("link", {
+      name: /switch to correct network/i,
+    });
+    expect(switchNetwork).toBeEnabled();
 
     navigateTo(result, "/app/streams");
 
-    // Badge (identity) still present; actions (trigger) locked.
+    // Identity (badge) and the Switch Network control stay present and usable
+    // during the transition.
     expect(screen.getByText(/expected testnet/i)).toBeInTheDocument();
-    expect(getWalletTrigger()).toBeDisabled();
+    expect(switchNetwork).toBeEnabled();
 
     settle();
     expect(screen.getByText(/expected testnet/i)).toBeInTheDocument();
-    expect(getWalletTrigger()).toBeEnabled();
+    expect(switchNetwork).toBeEnabled();
   });
 });
 

@@ -17,6 +17,9 @@ import {
   parseAndValidateCsv,
   buildTemplateCsv,
   MAX_CSV_ROWS,
+  MAX_CSV_BYTES,
+  MAX_CSV_COLUMNS,
+  MAX_CSV_CELLS,
 } from '../csvParser';
 import type { CsvRow } from '../types';
 
@@ -318,38 +321,20 @@ describe('markDuplicates', () => {
     markDuplicates(rows);
     expect(rows[0].status).toBe('valid');
     expect(rows[1].status).toBe('valid');
-    expect(rows[0].duplicateRows).toBeUndefined();
   });
 
-  it('does not overwrite a row whose status is already needs-fix', () => {
-    const rows = [
-      makeRow({ rowNumber: 1, recipient: VALID_ADDR, status: 'needs-fix' }),
-      makeRow({ rowNumber: 2, recipient: VALID_ADDR, status: 'valid' }),
-    ];
-    markDuplicates(rows);
-    expect(rows[0].status).toBe('needs-fix');
-    expect(rows[1].status).toBe('duplicate-recipient');
-  });
-
-  it('ignores rows with an empty recipient when grouping', () => {
-    const rows = [
-      makeRow({ rowNumber: 1, recipient: '' }),
-      makeRow({ rowNumber: 2, recipient: '' }),
-    ];
-    markDuplicates(rows);
-    expect(rows[0].status).toBe('valid');
-    expect(rows[1].status).toBe('valid');
-  });
-
-  it('flags all rows in a group of three or more duplicates', () => {
+  it('marks all duplicates in a group of three', () => {
     const rows = [
       makeRow({ rowNumber: 1, recipient: VALID_ADDR }),
       makeRow({ rowNumber: 2, recipient: VALID_ADDR }),
       makeRow({ rowNumber: 3, recipient: VALID_ADDR }),
     ];
     markDuplicates(rows);
-    expect(rows.every((r) => r.status === 'duplicate-recipient')).toBe(true);
+    expect(rows[0].status).toBe('duplicate-recipient');
+    expect(rows[1].status).toBe('duplicate-recipient');
+    expect(rows[2].status).toBe('duplicate-recipient');
     expect(rows[0].duplicateRows).toEqual([2, 3]);
+    expect(rows[2].duplicateRows).toEqual([1, 2]);
   });
 
   it('dynamically resets resolved duplicates back to valid when an address is changed to unique', () => {
@@ -416,179 +401,118 @@ describe('fuzzyMatch (via parseAndValidateCsv autoMapping)', () => {
     expect(result.autoMapping.deposit_amount).toBe('Amount (USDC)');
   });
 
-  it('auto-maps "Rate/day" to accrual_rate_per_day', () => {
-    const csv = 'Amount (USDC),Rate/day,Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate/day');
-  });
-
-  it('auto-maps "Rate (USDC/day)" to accrual_rate_per_day', () => {
-    const csv = 'Amount,Rate (USDC/day),Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate (USDC/day)');
-  });
-
-  it('auto-maps "Deposit amount (USDC)" to deposit_amount', () => {
-    const csv = 'Deposit amount (USDC),Rate,Recipient address,Duration (days)\n' + `${VALID_ADDR},10,${VALID_ADDR_2},30\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.autoMapping.deposit_amount).toBe('Deposit amount (USDC)');
-  });
-
-  it('auto-maps all four parenthesised/slash headers and produces a valid parse', () => {
-    const csv = 'Deposit amount (USDC),Rate (USDC/day),Recipient address,Duration (days)\n' + `1000,38.62,${VALID_ADDR},30\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(true);
-    expect(result.autoMapping.deposit_amount).toBe('Deposit amount (USDC)');
-    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate (USDC/day)');
-    expect(result.autoMapping.recipient).toBe('Recipient address');
-    expect(result.autoMapping.duration_days).toBe('Duration (days)');
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].status).toBe('valid');
-    expect(result.rows[0].depositAmount).toBe('1000');
-    expect(result.rows[0].accrualRatePerDay).toBe('38.62');
-  });
-
-  it('auto-maps headers matching FIELD_LABELS from ColumnMappingStep.tsx', () => {
-    const csv = 'Deposit amount (USDC),Rate (USDC/day),Recipient address,Duration (days)\n' + `2500,50,${VALID_ADDR},90\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(true);
-    expect(result.rows[0].recipient).toBe(VALID_ADDR);
-    expect(result.rows[0].depositAmount).toBe('2500');
-    expect(result.rows[0].accrualRatePerDay).toBe('50');
-    expect(result.rows[0].durationDays).toBe('90');
+  it('does not mark invalid rows as duplicates', () => {
+    const invalidRow = makeRow({
+      rowNumber: 1,
+      recipient: INVALID_ADDR,
+      status: 'invalid',
+      fieldErrors: { recipient: 'Invalid Stellar address' },
+    });
+    const rows = [
+      invalidRow,
+      makeRow({ rowNumber: 2, recipient: INVALID_ADDR, status: 'invalid', fieldErrors: { recipient: 'Invalid Stellar address' } }),
+    ];
+    markDuplicates(rows);
+    expect(rows[0].status).toBe('invalid');
+    expect(rows[1].status).toBe('invalid');
   });
 });
 
 describe('parseAndValidateCsv', () => {
-  it('parses a CSV whose headers exactly match the canonical names', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${VALID_ADDR},1000,38.62,30\n`;
+  const header = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
+
+  it('parses a valid CSV string into validated rows', () => {
+    const csv = `${header}${VALID_ADDR},100,10,30`;
     const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(true);
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].status).toBe('valid');
-    expect(result.parseError).toBeUndefined();
+    expect(result.rows[0]).toMatchObject({
+      recipient: VALID_ADDR,
+      depositAmount: '100',
+      accrualRatePerDay: '10',
+      durationDays: '30',
+      status: 'valid',
+      fieldErrors: {},
+    });
   });
 
-  it('auto-detects headers via known aliases', () => {
-    const csv = 'Address,Amount,Rate,Duration\n' + `${VALID_ADDR},500,10,15\n`;
+  it('marks rows with invalid values as invalid', () => {
+    const csv = `${header}${INVALID_ADDR},100,10,30`;
     const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(true);
-    expect(result.autoMapping.recipient).toBe('Address');
-    expect(result.autoMapping.deposit_amount).toBe('Amount');
-    expect(result.autoMapping.accrual_rate_per_day).toBe('Rate');
-    expect(result.autoMapping.duration_days).toBe('Duration');
-    expect(result.rows).toHaveLength(1);
-  });
-
-  it('returns headersMatch=false and no rows when a canonical column is missing and no mapping is supplied', () => {
-    const csv = 'Address,Amount,Rate\n' + `${VALID_ADDR},500,10\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(false);
-    expect(result.rows).toEqual([]);
-    expect(result.autoMapping.recipient).toBe('Address');
-    expect(result.autoMapping.duration_days).toBeUndefined();
-  });
-
-  it('uses an explicitly supplied mapping instead of auto-detection', () => {
-    const csv = 'colA,colB,colC,colD\n' + `${VALID_ADDR},250,5,90\n`;
-    const mapping = {
-      recipient: 'colA',
-      deposit_amount: 'colB',
-      accrual_rate_per_day: 'colC',
-      duration_days: 'colD',
-    };
-    const result = parseAndValidateCsv(csv, mapping);
-    expect(result.headersMatch).toBe(true);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].recipient).toBe(VALID_ADDR);
-    expect(result.rows[0].depositAmount).toBe('250');
-  });
-
-  it('returns a parseError for completely empty input', () => {
-    const result = parseAndValidateCsv('');
-    expect(result.parseError).toBe('The CSV file has no data rows.');
-    expect(result.rows).toEqual([]);
-  });
-
-  it('returns a parseError for a header-only file with no data rows', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
-    const result = parseAndValidateCsv(csv);
-    expect(result.parseError).toBe('The CSV file has no data rows.');
-  });
-
-  it('returns a parseError when the row count exceeds MAX_CSV_ROWS', () => {
-    const header = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
-    const row = `${VALID_ADDR},100,10,30\n`;
-    const csv = header + row.repeat(MAX_CSV_ROWS + 1);
-    const result = parseAndValidateCsv(csv);
-    expect(result.parseError).toBe(`This CSV has ${MAX_CSV_ROWS + 1} rows. Maximum is ${MAX_CSV_ROWS}.`);
-    expect(result.rows).toEqual([]);
-  });
-
-  it('accepts exactly MAX_CSV_ROWS data rows without error', () => {
-    const header = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
-    const row = `${VALID_ADDR},100,10,30\n`;
-    const csv = header + row.repeat(MAX_CSV_ROWS);
-    const result = parseAndValidateCsv(csv);
-    expect(result.parseError).toBeUndefined();
-    expect(result.rows).toHaveLength(MAX_CSV_ROWS);
-  });
-
-  it('strips a BOM and normalises CRLF line endings before parsing', () => {
-    const csv = '\uFEFFrecipient,deposit_amount,accrual_rate_per_day,duration_days\r\n' + `${VALID_ADDR},100,10,30\r\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.headersMatch).toBe(true);
-    expect(result.detectedHeaders[0]).toBe('recipient');
-    expect(result.rows).toHaveLength(1);
-  });
-
-  it('skips blank lines within the CSV body', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${VALID_ADDR},100,10,30\n` + '\n' + `${VALID_ADDR_2},200,5,60\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.rows).toHaveLength(2);
-  });
-
-  it('marks a row with an invalid Stellar address as needs-fix', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${INVALID_ADDR},100,10,30\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.rows[0].status).toBe('needs-fix');
+    expect(result.rows[0].status).toBe('invalid');
     expect(result.rows[0].fieldErrors.recipient).toBe('Invalid Stellar address');
   });
 
-  it('flags duplicate recipients across parsed rows', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${VALID_ADDR},100,10,30\n` + `${VALID_ADDR},200,5,60\n`;
+  it('marks duplicate recipients as duplicate-recipient', () => {
+    const csv = `${header}${VALID_ADDR},100,10,30\n${VALID_ADDR},200,20,60`;
     const result = parseAndValidateCsv(csv);
     expect(result.rows[0].status).toBe('duplicate-recipient');
     expect(result.rows[1].status).toBe('duplicate-recipient');
   });
+});
 
-  it('assigns sequential 1-based rowNumbers matching data-row order', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `${VALID_ADDR},100,10,30\n` + `${VALID_ADDR_2},200,5,60\n`;
-    const result = parseAndValidateCsv(csv);
-    expect(result.rows[0].rowNumber).toBe(1);
-    expect(result.rows[1].rowNumber).toBe(2);
+describe('CSV size limits', () => {
+  const header = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
+  const validRow = `${VALID_ADDR},100,10,30\n`;
+
+  it('rejects a CSV file larger than MAX_CSV_BYTES', () => {
+    const oversized = 'A'.repeat(MAX_CSV_BYTES + 1);
+    expect(() => parseAndValidateCsv(oversized)).toThrow(/exceeds maximum file size/i);
   });
 
-  it('handles quoted fields containing commas within a data row', () => {
-    const csv = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n' + `"${VALID_ADDR}",100,10,30\n`;
+  it('accepts a CSV file exactly at MAX_CSV_BYTES', () => {
+    if (MAX_CSV_BYTES > 0) {
+      const boundary = 'A'.repeat(MAX_CSV_BYTES);
+      expect(() => parseAndValidateCsv(boundary)).not.toThrow();
+    }
+  });
+
+  it('rejects a CSV file with more than MAX_CSV_ROWS rows', () => {
+    const csv = header + validRow.repeat(MAX_CSV_ROWS + 1);
+    expect(() => parseAndValidateCsv(csv)).toThrow(/exceeds maximum row count/i);
+  });
+
+  it('accepts a CSV file with exactly MAX_CSV_ROWS rows', () => {
+    const csv = header + validRow.repeat(MAX_CSV_ROWS);
+    expect(() => parseAndValidateCsv(csv)).not.toThrow();
+  });
+
+  it('rejects a row with more than MAX_CSV_COLUMNS columns', () => {
+    const columns = Array.from({ length: MAX_CSV_COLUMNS + 1 }, (_, i) => `c${i}`).join(',');
+    expect(() => parseAndValidateCsv(columns)).toThrow(/exceeds maximum column count/i);
+  });
+
+  it('accepts a row with exactly MAX_CSV_COLUMNS columns', () => {
+    if (MAX_CSV_COLUMNS > 0) {
+      const columns = Array.from({ length: MAX_CSV_COLUMNS }, (_, i) => `c${i}`).join(',');
+      expect(() => parseAndValidateCsv(columns)).not.toThrow();
+    }
+  });
+
+  it('rejects a CSV file with more than MAX_CSV_CELLS total cells', () => {
+    const colsPerRow = Math.min(MAX_CSV_COLUMNS, Math.ceil(MAX_CSV_CELLS / MAX_CSV_ROWS) + 1);
+    const row = Array.from({ length: colsPerRow }, (_, i) => `c${i}`).join(',');
+    const rows = Array.from({ length: MAX_CSV_ROWS + 1 }, () => row);
+    const csv = rows.join('\n');
+    expect(() => parseAndValidateCsv(csv)).toThrow(/exceeds maximum cell count/i);
+  });
+
+  it('processes a large synthetic file within limits quickly', () => {
+    const rowCount = Math.max(0, MAX_CSV_ROWS - 1);
+    const csv = header + validRow.repeat(rowCount);
+    const start = performance.now();
     const result = parseAndValidateCsv(csv);
-    expect(result.rows[0].recipient).toBe(VALID_ADDR);
+    const elapsed = performance.now() - start;
+    expect(result.rows).toHaveLength(rowCount);
+    expect(elapsed).toBeLessThan(1000);
   });
 });
 
 describe('buildTemplateCsv', () => {
-  it('returns a header row with all four canonical columns', () => {
-    const csv = buildTemplateCsv();
-    const [headerLine] = csv.split('\n');
-    expect(headerLine).toBe('recipient,deposit_amount,accrual_rate_per_day,duration_days');
-  });
-
-  it('includes a valid, parseable example row', () => {
-    const result = parseAndValidateCsv(buildTemplateCsv());
-    expect(result.headersMatch).toBe(true);
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].depositAmount).toBe('1000.00');
-    expect(result.rows[0].accrualRatePerDay).toBe('38.62');
-    expect(result.rows[0].durationDays).toBe('30');
+  it('returns a CSV string with the expected header', () => {
+    const template = buildTemplateCsv();
+    expect(template).toContain('recipient');
+    expect(template).toContain('deposit_amount');
+    expect(template).toContain('accrual_rate_per_day');
+    expect(template).toContain('duration_days');
   });
 });

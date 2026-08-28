@@ -456,7 +456,7 @@ export default function RecentStreams({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-black">Recent streams</h2>
         </div>
-        <StreamsLoading />
+        <StreamsLoading variant="treasury" />
       </div>
     );
   }

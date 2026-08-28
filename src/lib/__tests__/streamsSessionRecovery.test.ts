@@ -417,22 +417,28 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, throwingStorage)).toBeNull();
     });
 
-    it("does not throw when setItem throws", () => {
+    it("keeps the safe session snapshot in memory when setItem throws", () => {
       const throwingStorage = {
-        getItem: vi.fn(),
+        getItem: vi.fn(() => {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }),
         setItem: vi.fn(() => {
-          throw new Error("boom");
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
         }),
         removeItem: vi.fn(),
       };
-      expect(() =>
-        writeStreamsSession(
-          { filters: DEFAULT_STREAMS_FILTERS, draft: null },
-          NOW,
-          ACCOUNT_ALICE,
-          throwingStorage,
-        ),
-      ).not.toThrow();
+
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
+        NOW,
+        throwingStorage,
+      );
+
+      expect(readStreamsSession(NOW, throwingStorage)).toEqual({
+        savedAt: NOW,
+        filters: DEFAULT_STREAMS_FILTERS,
+        draft: MEANINGFUL_DRAFT,
+      });
     });
 
     it("does not throw when removeItem throws", () => {

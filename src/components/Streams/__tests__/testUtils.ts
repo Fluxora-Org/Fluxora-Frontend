@@ -8,13 +8,13 @@ export const defaultStreamCreatedModalProps = {
   onClose: vi.fn(),
   streamId: "STR-123",
   streamUrl: "https://fluxora.io/stream/STR-123",
-  onCreateAnother: vi.fn(),
+  onCreateAnother: vinfn(),
 };
 
 /**
  * Helper to set up a mock navigator.clipboard for copy tests.
  */
-export function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
+export function setClipboard(writeText?: ReturnType<of vi.fn>) {
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: writeText ? { writeText } : undefined,
@@ -24,7 +24,7 @@ export function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
 /**
  * Helper to set up a mock navigator.share for Web Share API tests.
  */
-export function setShare(share?: ReturnType<typeof vi.fn>) {
+export function setShare(share?: ReturnType<of vinfn>) {
   Object.defineProperty(navigator, "share", {
     configurable: true,
     value: share,

@@ -854,6 +854,7 @@ export default function Streams() {
   // Keep the existing page authorization behavior; wallet identity is used
   // only to scope and gate session recovery below.
   const walletConnected = true;
+  const abortControllerRef = useRef<AbortController | null>(null);
   const hasInitializedExpanded = useRef(false);
 
   useEffect(() => {
@@ -862,6 +863,10 @@ export default function Streams() {
       setExpandedStreamId(streams[0]!.id);
     }
   }, [streams]);
+
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   // Verify the wallet identity before reading or restoring any persisted data.
   // The same boundary resets all recovery state on account changes so an old
@@ -991,7 +996,9 @@ export default function Streams() {
     )
       ? (filters.statusFilter as StatusFilter)
       : "All";
-    const restoredSortBy = SORT_OPTIONS.includes(filters.sortBy)
+    const restoredSortBy = SORT_OPTIONS.includes(
+      filters.sortBy as StreamSortMode,
+    )
       ? (filters.sortBy as StreamSortMode)
       : "recent";
 
@@ -1124,6 +1131,15 @@ export default function Streams() {
     setIsCreateModalOpen(true);
   }, [resolveSessionOnInteraction]);
 
+  const refetchStreams = useCallback(() => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    void (refetch as unknown as (signal?: AbortSignal) => Promise<void>)(
+      controller.signal,
+    );
+  }, [refetch]);
+
   const handleStreamCreated = useCallback((data?: StreamCreatedData) => {
     const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
     setCreatedStream({
@@ -1140,8 +1156,8 @@ export default function Streams() {
     // A transaction has completed — a draft must never be offered back.
     setLiveDraft(null);
     setRestoredDraft(null);
-    refetch();
-  }, [refetch, streams.length]);
+    refetchStreams();
+  }, [refetchStreams, streams.length]);
 
   const handleStreamError = useCallback(() => {
     refetch();
@@ -1207,6 +1223,9 @@ export default function Streams() {
     [announce],
   );
 
+  const isAbortError = error instanceof Error && error.name === "AbortError";
+  const visibleError = isAbortError ? null : error;
+
   /**
    * Filtered-empty recovery action: reset all active filters and return to the
    * first page of results. Stays on the same route (/app/streams) and keeps the
@@ -1220,21 +1239,21 @@ export default function Streams() {
     setCurrentPage(1);
   }, [resolveSessionOnInteraction]);
 
-  if (loading || (error && retryCount >= MAX_LOADING_RETRIES)) {
-    return <StreamsLoading retryCount={retryCount} onRetry={refetch} />;
+  if (loading || (visibleError && retryCount >= MAX_LOADING_RETRIES)) {
+    return <StreamsLoading retryCount={retryCount} onRetry={refetchStreams} />;
   }
 
-  if (error) {
+  if (visibleError) {
     return (
       <section className="streams-page">
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
-          {error}
+          {visibleError}
         </p>
         <button
           type="button"
           className="streams-primary-button"
-          onClick={refetch}
+          onClick={refetchStreams}
         >
           Try again
         </button>
@@ -1444,7 +1463,7 @@ export default function Streams() {
                     value={sortBy}
                     onChange={(e) => {
                       resolveSessionOnInteraction();
-                      setSortBy(e.target.value);
+                      setSortBy(e.target.value as StreamSortMode);
                     }}
                     options={[
                       { value: "recent", label: t("streams.list.sortRecent") },

@@ -32,131 +32,25 @@ import {
 import { useTheme } from "./ThemeProvider";
 import { useModalAccessibility } from "../components/useModalAccessibility";
 import {
-  contrastRatio,
   isValidHex,
   normaliseHex,
   LOCKED_TOKEN_KEYS,
-  CONTRAST_PAIRS,
   type AllowedTokenKey,
   type TokenValidationError,
 } from "./contrastUtils";
 import type { CustomThemeDefinition } from "./ThemeProvider";
-
-// ─── Field metadata ───────────────────────────────────────────────────────────
-
-interface TokenFieldMeta {
-  key: AllowedTokenKey;
-  label: string;
-  group: "brand" | "cta" | "navbar" | "surface" | "text";
-  hint: string;
-  /** Token to compare against for contrast (foreground fields only). */
-  contrastBg?: AllowedTokenKey;
-}
-
-const TOKEN_FIELDS: TokenFieldMeta[] = [
-  // Brand
-  {
-    key: "--color-accent-primary",
-    label: "Accent Primary",
-    group: "brand",
-    hint: "Main brand colour — links, active states, chart accents.",
-    contrastBg: "--surface-base",
-  },
-  {
-    key: "--color-accent-secondary",
-    label: "Accent Secondary",
-    group: "brand",
-    hint: "Secondary brand colour — hover highlights, sparkline fill.",
-    contrastBg: "--surface-base",
-  },
-  // CTA
-  {
-    key: "--color-cta-primary-bg",
-    label: "CTA Background",
-    group: "cta",
-    hint: "Background of primary call-to-action buttons.",
-  },
-  {
-    key: "--color-cta-primary-text",
-    label: "CTA Text",
-    group: "cta",
-    hint: "Text colour inside primary CTA buttons. Must contrast 4.5:1 against CTA Background.",
-    contrastBg: "--color-cta-primary-bg",
-  },
-  // Navbar
-  {
-    key: "--navbar-bg",
-    label: "Navbar Background",
-    group: "navbar",
-    hint: "Top navigation bar background.",
-  },
-  {
-    key: "--navbar-logo-color",
-    label: "Navbar Logo / Brand Text",
-    group: "navbar",
-    hint: "Colour of the Fluxora wordmark. Must contrast 4.5:1 against Navbar Background.",
-    contrastBg: "--navbar-bg",
-  },
-  {
-    key: "--navbar-link-color",
-    label: "Navbar Link Colour",
-    group: "navbar",
-    hint: "Navigation link text colour. Must contrast 4.5:1 against Navbar Background.",
-    contrastBg: "--navbar-bg",
-  },
-  // Surfaces
-  {
-    key: "--surface-base",
-    label: "Page Background",
-    group: "surface",
-    hint: "Root page/card background.",
-  },
-  {
-    key: "--surface-neutral",
-    label: "Card Surface",
-    group: "surface",
-    hint: "MetricCard and panel backgrounds.",
-  },
-  // Text
-  {
-    key: "--text-vivid",
-    label: "Primary Text",
-    group: "text",
-    hint: "Headings and high-emphasis values.",
-    contrastBg: "--surface-base",
-  },
-  {
-    key: "--text-secondary",
-    label: "Secondary Text",
-    group: "text",
-    hint: "Labels and supporting copy.",
-    contrastBg: "--surface-base",
-  },
-];
-
-const GROUP_LABELS: Record<TokenFieldMeta["group"], string> = {
-  brand: "Brand Accent",
-  cta: "Call to Action",
-  navbar: "Navigation Bar",
-  surface: "Surfaces",
-  text: "Typography",
-};
-
-// ─── Defaults (Fluxora light theme) ──────────────────────────────────────────
-
-const DEFAULTS: Partial<Record<AllowedTokenKey, string>> = {
-  "--color-accent-primary": "#0097a7",   // 3.51:1 on white — passes AA-large (3:1)
-  "--color-accent-secondary": "#00a884", // 3.03:1 on white — passes AA-large (3:1)
-  "--color-cta-primary-bg": "#0097a7",
-  "--color-cta-primary-text": "#04131a", // 12.8:1 on #0097a7 — passes AA (4.5:1)
-  "--navbar-bg": "#ffffff",
-  "--navbar-logo-color": "#1a1f36",      // 15.5:1 on white — passes AA (4.5:1)
-  "--navbar-link-color": "#4a5565",      // 7.5:1 on white — passes AA (4.5:1)
-  "--surface-base": "#ffffff",
-  "--surface-neutral": "#fafbfc",
-  "--text-vivid": "#1a1f36",             // 15.5:1 on white — passes AA (4.5:1)
-  "--text-secondary": "#4a5565",         // 7.5:1 on white — passes AA (4.5:1)
-};
+import {
+  TOKEN_FIELDS,
+  GROUP_LABELS,
+  DEFAULTS,
+  type TokenFieldMeta,
+  getContrastBadgeInfo,
+  resolveFieldValidationState,
+  resolvePreviewTokens,
+  createInitialDraft,
+  resetDraftToDefaults,
+  type ThemeEditorDraft,
+} from "./themeEditorModel";
 
 // ─── Sub-component: ContrastBadge ─────────────────────────────────────────────
 
@@ -166,12 +60,11 @@ interface ContrastBadgeProps {
 }
 
 function ContrastBadge({ ratio, required }: ContrastBadgeProps) {
-  const passes = ratio >= required;
-  const formatted = ratio.toFixed(2);
+  const { passes, formatted, ariaLabel } = getContrastBadgeInfo(ratio, required);
 
   return (
     <span
-      aria-label={`Contrast ratio ${formatted}:1 — ${passes ? "passes" : "fails"} WCAG AA`}
+      aria-label={ariaLabel}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -204,42 +97,28 @@ interface ColorFieldProps {
   allValues: Partial<Record<AllowedTokenKey, string>>;
   error?: TokenValidationError;
   onChange: (key: AllowedTokenKey, value: string) => void;
+  disabled?: boolean;
 }
 
-function ColorField({ meta, value, allValues, error, onChange }: ColorFieldProps) {
+function ColorField({
+  meta,
+  value,
+  allValues,
+  error,
+  onChange,
+  disabled = false,
+}: ColorFieldProps) {
   const inputId = useId();
   const textId = useId();
   const errorId = useId();
   const descId = useId();
 
-  // Compute live contrast when this is a foreground token.
-  let contrastResult: { ratio: number; required: number } | null = null;
-  if (meta.contrastBg) {
-    const bgKey = meta.contrastBg as AllowedTokenKey;
-    // Prefer the user's overridden bg value; fall back to the defaults map.
-    const bgHex =
-      allValues[bgKey] ??
-      DEFAULTS[bgKey] ??
-      "#ffffff";
-
-    if (isValidHex(value) && isValidHex(bgHex)) {
-      const required =
-        CONTRAST_PAIRS.find((p) => p.fg === meta.key)?.level === "AA-large"
-          ? 3.0
-          : 4.5;
-      contrastResult = {
-        ratio: contrastRatio(normaliseHex(value), normaliseHex(bgHex)),
-        required,
-      };
-    }
-  }
-
-  const isError = !!error || (contrastResult !== null && contrastResult.ratio < contrastResult.required);
-  const errorMessage =
-    error?.message ??
-    (contrastResult && contrastResult.ratio < contrastResult.required
-      ? `Contrast ${contrastResult.ratio.toFixed(2)}:1 — minimum ${contrastResult.required}:1 required (WCAG 2.1 AA). Choose a darker or lighter colour.`
-      : undefined);
+  const { contrastResult, isError, errorMessage } = resolveFieldValidationState({
+    meta,
+    value,
+    allValues,
+    registrationError: error,
+  });
 
   return (
     <div
@@ -271,6 +150,7 @@ function ColorField({ meta, value, allValues, error, onChange }: ColorFieldProps
           type="color"
           aria-hidden="true"
           tabIndex={-1}
+          disabled={disabled}
           value={isValidHex(value) ? normaliseHex(value) : "#000000"}
           onChange={(e: ChangeEvent<HTMLInputElement>) =>
             onChange(meta.key, e.target.value)
@@ -281,9 +161,10 @@ function ColorField({ meta, value, allValues, error, onChange }: ColorFieldProps
             padding: "2px",
             border: "1px solid var(--color-border-default, #e0e6ed)",
             borderRadius: "var(--radius-sm, 4px)",
-            cursor: "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
             background: "none",
             flexShrink: 0,
+            opacity: disabled ? 0.6 : 1,
           }}
         />
 
@@ -292,7 +173,8 @@ function ColorField({ meta, value, allValues, error, onChange }: ColorFieldProps
           id={textId}
           type="text"
           value={value}
-          maxLength={7}
+          maxLength={9}
+          disabled={disabled}
           autoComplete="off"
           spellCheck={false}
           aria-describedby={`${descId}${isError ? ` ${errorId}` : ""}`}
@@ -313,10 +195,14 @@ function ColorField({ meta, value, allValues, error, onChange }: ColorFieldProps
             color: "var(--color-text-primary, #1a1f36)",
             font: "var(--font-mono-sm, 400 12px/16px monospace)",
             outline: "none",
+            opacity: disabled ? 0.6 : 1,
+            cursor: disabled ? "not-allowed" : "text",
           }}
           onFocus={(e) => {
-            e.currentTarget.style.boxShadow =
-              "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+            if (!disabled) {
+              e.currentTarget.style.boxShadow =
+                "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+            }
           }}
           onBlur={(e) => {
             e.currentTarget.style.boxShadow = "";
@@ -370,20 +256,7 @@ interface PreviewStripProps {
  * Uses inline CSS vars so it always reflects the live draft, not the applied theme.
  */
 function PreviewStrip({ values }: PreviewStripProps) {
-  const get = (key: AllowedTokenKey, fallback: string) =>
-    values[key] && isValidHex(values[key]!) ? normaliseHex(values[key]!) : fallback;
-
-  const navBg = get("--navbar-bg", "#ffffff");
-  const navLogo = get("--navbar-logo-color", "#1a1f36");
-  const navLink = get("--navbar-link-color", "#4a5565");
-  const accentPrimary = get("--color-accent-primary", "#00b8d4");
-  const accentSecondary = get("--color-accent-secondary", "#00d4aa");
-  const ctaBg = get("--color-cta-primary-bg", "#00b8d4");
-  const ctaText = get("--color-cta-primary-text", "#04131a");
-  const surface = get("--surface-neutral", "#fafbfc");
-  const surfaceBase = get("--surface-base", "#ffffff");
-  const textPrimary = get("--text-vivid", "#1a1f36");
-  const textSecondary = get("--text-secondary", "#4a5565");
+  const tokens = resolvePreviewTokens(values);
 
   return (
     <div
@@ -395,7 +268,7 @@ function PreviewStrip({ values }: PreviewStripProps) {
         flexDirection: "column",
         gap: "16px",
         padding: "16px",
-        background: surfaceBase,
+        background: tokens.surfaceBase,
         borderRadius: "var(--radius-lg, 12px)",
         border: "1px solid var(--color-border-default, #e0e6ed)",
       }}
@@ -409,16 +282,16 @@ function PreviewStrip({ values }: PreviewStripProps) {
           justifyContent: "space-between",
           padding: "8px 16px",
           borderRadius: "var(--radius-md, 8px)",
-          background: navBg,
+          background: tokens.navBg,
           border: "1px solid rgba(0,0,0,0.06)",
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: "15px", color: navLogo }}>
+        <span style={{ fontWeight: 700, fontSize: "15px", color: tokens.navLogo }}>
           Fluxora
         </span>
         <nav aria-label="Preview navigation" style={{ display: "flex", gap: "16px" }}>
           {["Dashboard", "Streams", "Recipient"].map((label) => (
-            <span key={label} style={{ fontSize: "13px", fontWeight: 500, color: navLink }}>
+            <span key={label} style={{ fontSize: "13px", fontWeight: 500, color: tokens.navLink }}>
               {label}
             </span>
           ))}
@@ -427,8 +300,8 @@ function PreviewStrip({ values }: PreviewStripProps) {
           style={{
             padding: "6px 14px",
             borderRadius: "9999px",
-            background: ctaBg,
-            color: ctaText,
+            background: tokens.ctaBg,
+            color: tokens.ctaText,
             fontSize: "13px",
             fontWeight: 600,
           }}
@@ -456,7 +329,7 @@ function PreviewStrip({ values }: PreviewStripProps) {
             style={{
               padding: "16px",
               borderRadius: "var(--radius-xl, 16px)",
-              background: surface,
+              background: tokens.surface,
               border: "1px solid rgba(0,0,0,0.07)",
               display: "flex",
               flexDirection: "column",
@@ -464,10 +337,10 @@ function PreviewStrip({ values }: PreviewStripProps) {
             }}
           >
             <span style={{ fontSize: "20px" }} aria-hidden="true">{card.icon}</span>
-            <span style={{ fontSize: "11px", fontWeight: 500, color: textSecondary }}>
+            <span style={{ fontSize: "11px", fontWeight: 500, color: tokens.textSecondary }}>
               {card.label}
             </span>
-            <span style={{ fontSize: "18px", fontWeight: 700, color: textPrimary }}>
+            <span style={{ fontSize: "18px", fontWeight: 700, color: tokens.textPrimary }}>
               {card.value}
             </span>
           </div>
@@ -500,11 +373,11 @@ function PreviewStrip({ values }: PreviewStripProps) {
 
       {/* Accent swatch */}
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }} aria-label="Accent colour swatches">
-        <span style={{ fontSize: "11px", color: textSecondary }}>Brand accents:</span>
+        <span style={{ fontSize: "11px", color: tokens.textSecondary }}>Brand accents:</span>
         {[
-          { color: accentPrimary, label: "Accent primary" },
-          { color: accentSecondary, label: "Accent secondary" },
-          { color: ctaBg, label: "CTA background" },
+          { color: tokens.accentPrimary, label: "Accent primary" },
+          { color: tokens.accentSecondary, label: "Accent secondary" },
+          { color: tokens.ctaBg, label: "CTA background" },
         ].map((s) => (
           <span
             key={s.label}
@@ -533,6 +406,12 @@ export type { TokenFieldMeta };
 export interface ThemeEditorPanelProps {
   /** Called when the user dismisses the editor without applying. */
   onClose?: () => void;
+  /**
+   * Explicit authorization control:
+   * When false, editing controls and submission actions are disabled
+   * and an authorization alert is displayed. Defaults to true.
+   */
+  isAuthorized?: boolean;
 }
 
 /**
@@ -551,7 +430,10 @@ export interface ThemeEditorPanelProps {
  *   768–1279 px — two-column grid (form left, preview right)
  *   ≥ 1280 px   — same two-column, wider preview column
  */
-export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
+export default function ThemeEditorPanel({
+  onClose,
+  isAuthorized = true,
+}: ThemeEditorPanelProps) {
   const {
     customTheme,
     customThemeState,
@@ -565,11 +447,8 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Local draft values — seeded from the current applied theme or defaults.
-  const [draft, setDraft] = useState<Partial<Record<AllowedTokenKey, string>>>(
-    () => ({
-      ...DEFAULTS,
-      ...(customTheme?.validatedTokens ?? {}),
-    }),
+  const [draft, setDraft] = useState<ThemeEditorDraft>(() =>
+    createInitialDraft(customTheme),
   );
   const [label, setLabel] = useState<string>(customTheme?.label ?? "My Brand Theme");
   const [themeId, setThemeId] = useState<string>(customTheme?.id ?? "org-brand");
@@ -588,6 +467,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
   const handlePreview = useCallback(
     (e: FormEvent) => {
       e.preventDefault();
+      if (!isAuthorized) return;
       const definition: CustomThemeDefinition = {
         id: themeId,
         label,
@@ -595,15 +475,22 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
       };
       registerTheme(definition);
     },
-    [themeId, label, draft, registerTheme],
+    [themeId, label, draft, registerTheme, isAuthorized],
   );
 
   const handleApply = useCallback(() => {
+    if (!isAuthorized) return;
     applyCustomTheme();
-  }, [applyCustomTheme]);
+  }, [applyCustomTheme, isAuthorized]);
 
   const handleCancel = useCallback(() => {
     clearCustomTheme();
+    // Preserve undo/reset semantics: restore draft and state to default
+    const reset = resetDraftToDefaults();
+    setDraft(reset.draft);
+    setLabel(reset.label);
+    setThemeId(reset.themeId);
+    setTouched(reset.touched);
     onClose?.();
   }, [clearCustomTheme, onClose]);
 
@@ -629,6 +516,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
 
   const labelId = useId();
   const errSummaryId = useId();
+  const authNoticeId = useId();
 
   // Resolve locked token hint list for display.
   const lockedSample = LOCKED_TOKEN_KEYS.slice(0, 5);
@@ -638,7 +526,9 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelId}
-      aria-describedby={hasErrors ? errSummaryId : undefined}
+      aria-describedby={
+        hasErrors ? errSummaryId : !isAuthorized ? authNoticeId : undefined
+      }
       ref={panelRef}
       style={{
         display: "grid",
@@ -708,6 +598,26 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                 : "Default (Fluxora)"}
         </span>
       </div>
+
+      {/* ── Authorization Notice ────────────────────────────────────── */}
+      {!isAuthorized && (
+        <div
+          id={authNoticeId}
+          role="alert"
+          aria-live="assertive"
+          style={{
+            padding: "12px 16px",
+            borderRadius: "var(--radius-md, 8px)",
+            background: "var(--color-danger-bg, rgba(239,68,68,0.1))",
+            border: "1px solid rgba(239,68,68,0.25)",
+            color: "var(--color-danger, #ef4444)",
+            fontSize: "13px",
+            fontWeight: 500,
+          }}
+        >
+          You do not have administrative permission to modify theme settings. All fields are read-only.
+        </div>
+      )}
 
       {/* ── Error summary ────────────────────────────────────────────── */}
       {hasErrors && (
@@ -779,6 +689,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
               <input
                 id="theme-label"
                 type="text"
+                disabled={!isAuthorized}
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="e.g. Acme Corp Theme"
@@ -792,8 +703,14 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                   color: "var(--color-text-primary, #1a1f36)",
                   font: "var(--font-body-md, 400 14px/20px sans-serif)",
                   outline: "none",
+                  opacity: !isAuthorized ? 0.6 : 1,
+                  cursor: !isAuthorized ? "not-allowed" : "text",
                 }}
-                onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)"; }}
+                onFocus={(e) => {
+                  if (isAuthorized) {
+                    e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+                  }
+                }}
                 onBlur={(e) => { e.currentTarget.style.boxShadow = ""; }}
               />
             </div>
@@ -812,6 +729,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
               <input
                 id="theme-id"
                 type="text"
+                disabled={!isAuthorized}
                 value={themeId}
                 onChange={(e) => setThemeId(e.target.value)}
                 placeholder="e.g. acme-corp"
@@ -826,8 +744,14 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                   color: "var(--color-text-primary, #1a1f36)",
                   font: "var(--font-mono-sm, 400 12px/16px monospace)",
                   outline: "none",
+                  opacity: !isAuthorized ? 0.6 : 1,
+                  cursor: !isAuthorized ? "not-allowed" : "text",
                 }}
-                onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)"; }}
+                onFocus={(e) => {
+                  if (isAuthorized) {
+                    e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+                  }
+                }}
                 onBlur={(e) => { e.currentTarget.style.boxShadow = ""; }}
               />
             </div>
@@ -864,6 +788,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                       allValues={draft}
                       error={touched.has(field.key) ? fieldError : undefined}
                       onChange={handleTokenChange}
+                      disabled={!isAuthorized}
                     />
                   );
                 })}
@@ -910,6 +835,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
             {/* Preview / re-preview */}
             <button
               type="submit"
+              disabled={!isAuthorized}
               style={{
                 flex: "1 1 auto",
                 minHeight: "44px",
@@ -920,10 +846,15 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                 color: "var(--color-cta-primary-text, #04131a)",
                 font: "var(--font-label-lg, 500 14px/20px sans-serif)",
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: !isAuthorized ? "not-allowed" : "pointer",
                 outline: "none",
+                opacity: !isAuthorized ? 0.6 : 1,
               }}
-              onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)"; }}
+              onFocus={(e) => {
+                if (isAuthorized) {
+                  e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+                }
+              }}
               onBlur={(e) => { e.currentTarget.style.boxShadow = ""; }}
             >
               {isPreviewing ? "Update Preview" : "Preview Theme"}
@@ -933,6 +864,7 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
             {isPreviewing && (
               <button
                 type="button"
+                disabled={!isAuthorized}
                 onClick={handleApply}
                 style={{
                   flex: "1 1 auto",
@@ -944,10 +876,15 @@ export default function ThemeEditorPanel({ onClose }: ThemeEditorPanelProps) {
                   color: "#ffffff",
                   font: "var(--font-label-lg, 500 14px/20px sans-serif)",
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: !isAuthorized ? "not-allowed" : "pointer",
                   outline: "none",
+                  opacity: !isAuthorized ? 0.6 : 1,
                 }}
-                onFocus={(e) => { e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)"; }}
+                onFocus={(e) => {
+                  if (isAuthorized) {
+                    e.currentTarget.style.boxShadow = "0 0 0 2px var(--color-bg-primary,#fff), 0 0 0 4px var(--focus-ring-color,#0ea5e9)";
+                  }
+                }}
                 onBlur={(e) => { e.currentTarget.style.boxShadow = ""; }}
               >
                 Apply &amp; Save

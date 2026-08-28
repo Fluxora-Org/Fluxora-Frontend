@@ -52,21 +52,19 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
   const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const filtersKey = serializeFilters(filters);
-  const inFlightRef = useRef<number>(0);
 
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
   useEffect(() => {
-    const runId = ++inFlightRef.current;
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     setRetryCount((count) => count + 1);
 
     Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
       .then(([nextMetrics, nextStreams]) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
 
         const activeStreams = nextStreams.filter(s => s.status === "Active");
         
@@ -106,16 +104,14 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
         setMetrics([]);
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [reloadToken, filtersKey]);
 
   const refetch = useCallback(() => {
@@ -144,7 +140,6 @@ export function useRecipientStreams(address: string | null | undefined): {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
-  const inFlightRef = useRef<number>(0);
 
   useEffect(() => {
     if (!address) {
@@ -154,30 +149,27 @@ export function useRecipientStreams(address: string | null | undefined): {
       return;
     }
 
-    const runId = ++inFlightRef.current;
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     setRetryCount((count) => count + 1);
 
     getRecipientStreams(address)
       .then((next) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
         setStreams(next);
         setError(null);
         setRetryCount(0);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [address, reloadToken]);
 
   const refetch = useCallback(() => {

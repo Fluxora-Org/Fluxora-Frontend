@@ -26,6 +26,7 @@ const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
 const EmbedStreamWidget = lazy(() => import("./pages/EmbedStreamWidget"));
 import { IS_DEV } from "./utils/env";
+import { configError } from "./lib/config";
 
 const EmptyStateDemo = IS_DEV
   ? lazy(() => import("./pages/EmptyStateDemo"))
@@ -105,6 +106,17 @@ function lazyAppRoute(element: ReactElement) {
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  if (configError) {
+    return (
+      <ErrorPage
+        type="validation"
+        headline="Configuration needs attention"
+        errorMessage={`Fluxora cannot start safely. ${configError.message} Update your VITE_* variables and restart the development server or rebuild the application.`}
+        primaryCtaText="Reload"
+      />
+    );
+  }
 
   const handleSidebarToggle = () => {
     setIsSidebarOpen((prev) => !prev);

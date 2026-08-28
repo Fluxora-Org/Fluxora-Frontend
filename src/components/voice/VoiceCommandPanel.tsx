@@ -67,6 +67,12 @@ export const VoiceCommandPanel: React.FC = () => {
           color: "bg-amber-500/20 text-amber-400 border-amber-500/40",
           icon: AlertTriangle,
         };
+      case "command-ambiguous":
+        return {
+          label: "Needs clarification",
+          color: "bg-orange-500/20 text-orange-400 border-orange-500/40",
+          icon: AlertTriangle,
+        };
       case "confirming-destructive":
         return {
           label: "Confirmation Required",
@@ -176,6 +182,16 @@ export const VoiceCommandPanel: React.FC = () => {
                 Please enable microphone access in your browser site permissions to speak commands.
               </p>
             </div>
+          </div>
+        )}
+
+        {state === "command-ambiguous" && (
+          <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs flex gap-2.5 items-start">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+            <p>
+              I heard more than one possible command. Nothing was executed;
+              please repeat the complete command.
+            </p>
           </div>
         )}
 

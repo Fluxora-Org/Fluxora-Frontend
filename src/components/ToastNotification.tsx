@@ -219,6 +219,16 @@ export default function ToastNotification({
     return () => window.clearInterval(timer);
   }, [isPaused, onClose, onUndo]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const { label, icon } = TOAST_COPY[variant] ?? FALLBACK_COPY;
 
   return (

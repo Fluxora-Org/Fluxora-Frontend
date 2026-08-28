@@ -488,7 +488,7 @@ export default function AppNavbar({
               </div>
             ) : (
               <WalletStatus
-                address={address}
+                address={address ?? ""}
                 network={network ?? "TESTNET"}
                 expectedNetwork={expectedNetwork}
                 isNetworkMismatch={isNetworkMismatch}
@@ -592,7 +592,7 @@ export default function AppNavbar({
               </div>
             ) : (
               <WalletStatus
-                address={address}
+                address={address ?? ""}
                 network={network ?? "TESTNET"}
                 expectedNetwork={expectedNetwork}
                 isNetworkMismatch={isNetworkMismatch}

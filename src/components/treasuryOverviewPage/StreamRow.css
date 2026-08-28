@@ -79,6 +79,17 @@
   color: var(--color-text-primary);
 }
 
+.stream-row__address,
+.stream-row__amount {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.stream-row__address code {
+  max-width: 100%;
+}
+
 /* ─── Action button ─── */
 .stream-row__action-btn {
   background: none;

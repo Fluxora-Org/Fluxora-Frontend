@@ -11,6 +11,12 @@
 
 export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
 
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "./browserStorage";
+
 /** Snapshots older than this are treated as stale and never offered for restore. */
 export const STREAMS_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -201,26 +207,15 @@ export function readStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!storage || !normalizedAccountAddress) return null;
 
-  try {
-    const storageKey = getStorageKey(normalizedAccountAddress);
-    const raw = storage.getItem(storageKey);
-    if (!raw) return null;
+  const raw = readBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
+  if (!raw) return null;
 
-    const snapshot = parseSnapshot(raw);
-    if (!snapshot) return null;
+  const snapshot = parseSnapshot(raw);
+  if (!snapshot) return null;
+  if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
+  if (now < snapshot.savedAt) return null;
 
-    // Validate account match - prevents cross-account data leakage
-    if (snapshot.accountAddress !== normalizedAccountAddress) {
-      return null;
-    }
-
-    if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
-    if (now < snapshot.savedAt) return null;
-
-    return snapshot;
-  } catch {
-    return null;
-  }
+  return snapshot;
 }
 
 /**
@@ -241,17 +236,12 @@ export function writeStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!storage || !normalizedAccountAddress) return;
 
-  try {
-    const storageKey = getStorageKey(normalizedAccountAddress);
-    const full: StreamsSessionSnapshot = {
-      ...snapshot,
-      savedAt: now,
-      accountAddress: normalizedAccountAddress,
-    };
-    storage.setItem(storageKey, JSON.stringify(full));
-  } catch {
-    // Storage unavailable (quota, privacy mode); treat as best-effort.
-  }
+  const full: StreamsSessionSnapshot = { ...snapshot, savedAt: now };
+  writeBrowserStorage(
+    STREAMS_SESSION_STORAGE_KEY,
+    JSON.stringify(full),
+    storage,
+  );
 }
 
 /**
@@ -270,10 +260,5 @@ export function clearStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!storage || !normalizedAccountAddress) return;
 
-  try {
-    const storageKey = getStorageKey(normalizedAccountAddress);
-    storage.removeItem(storageKey);
-  } catch {
-    // Storage unavailable; treat as best-effort.
-  }
+  removeBrowserStorage(STREAMS_SESSION_STORAGE_KEY, storage);
 }

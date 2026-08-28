@@ -23,6 +23,20 @@ export const MAX_CSV_ROWS = 500;
 export const MAX_CSV_FILE_SIZE_BYTES = 1_048_576; // 1 MiB
 export const MAX_DEPOSIT_AMOUNT = 10_000_000;
 
+/**
+ * Maximum number of columns in a single data row. This bounds the width of
+ * the preview table and prevents parsing work from exploding on pathological
+ * CSV files.
+ */
+export const MAX_CSV_COLUMNS = 20;
+
+/**
+ * Maximum length (in characters) of a single CSV cell. This bounds the size of
+ * strings rendered in the preview and stops a single cell from dominating the
+ * main thread when parsing.
+ */
+export const MAX_CSV_CELL_LENGTH = 1000;
+
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 /**
@@ -377,6 +391,33 @@ export function parseAndValidateCsv(
       autoMapping: prep.autoMapping,
       rows: [],
     };
+  }
+
+  // Bound per-row complexity before rendering the preview. This runs only
+  // when rows are actually going to be parsed (i.e. after the header mapping
+  // early exit) so existing mapping behaviour is preserved.
+  for (let i = 0; i < dataLines.length; i++) {
+    const cells = splitCsvLine(dataLines[i]);
+    if (cells.length > MAX_CSV_COLUMNS) {
+      return {
+        detectedHeaders,
+        headersMatch,
+        autoMapping,
+        rows: [],
+        parseError: `Row ${i + 1} has ${cells.length} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
+      };
+    }
+    for (const cell of cells) {
+      if (cell.length > MAX_CSV_CELL_LENGTH) {
+        return {
+          detectedHeaders,
+          headersMatch,
+          autoMapping,
+          rows: [],
+          parseError: `Row ${i + 1} contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
+        };
+      }
+    }
   }
 
   // Parse rows using the effective mapping

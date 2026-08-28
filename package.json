@@ -18,13 +18,13 @@
     "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"
   },
   "dependencies": {
     "react-helmet-async": "^2.0.5",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",
-    "@tailwindcss/vite": "^4.2.0",
     "@testing-library/dom": "^10.4.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
