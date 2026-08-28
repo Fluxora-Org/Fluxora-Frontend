@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import StreamDetail from "../StreamDetail";
 import * as streamsService from "../../lib/api/streamsService";
+import type { StreamsRequestOptions } from "../../lib/api/streamsService";
 import type { StreamRecord } from "../../data/streamRecords";
 
 const renderWithHelmet = (ui: React.ReactElement) => {
@@ -123,8 +124,11 @@ describe("StreamDetail Page", () => {
   it("passes decoded streamId and AbortSignal to getStreamById", async () => {
     let capturedSignal: AbortSignal | undefined;
     vi.spyOn(streamsService, "getStreamById").mockImplementation(
-      (_id: string, signal?: AbortSignal) => {
-        capturedSignal = signal;
+      (_id: string, signalOrOptions?: AbortSignal | StreamsRequestOptions) => {
+        capturedSignal =
+          signalOrOptions instanceof AbortSignal
+            ? signalOrOptions
+            : undefined;
         return Promise.resolve(mockStream);
       },
     );
@@ -151,9 +155,12 @@ describe("StreamDetail Page", () => {
   it("aborts the in-flight request when component unmounts before resolution", () => {
     let capturedSignal: AbortSignal | undefined;
     vi.spyOn(streamsService, "getStreamById").mockImplementation(
-      (_id: string, signal?: AbortSignal) => {
-        capturedSignal = signal;
-        return new Promise(() => { }); // never resolves
+      (_id: string, signalOrOptions?: AbortSignal | StreamsRequestOptions) => {
+        capturedSignal =
+          signalOrOptions instanceof AbortSignal
+            ? signalOrOptions
+            : undefined;
+        return new Promise(() => {}); // never resolves
       },
     );
 

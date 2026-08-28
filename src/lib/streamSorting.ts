@@ -73,7 +73,7 @@ export function compareStreamDates(a?: string, b?: string): number {
   if (aMissing && bMissing) return 0;
   if (aMissing) return 1;
   if (bMissing) return -1;
-  return a.localeCompare(b);
+  return a!.localeCompare(b!);
 }
 
 /**

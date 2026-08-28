@@ -996,7 +996,9 @@ export default function Streams() {
     )
       ? (filters.statusFilter as StatusFilter)
       : "All";
-    const restoredSortBy = SORT_OPTIONS.includes(filters.sortBy)
+    const restoredSortBy = SORT_OPTIONS.includes(
+      filters.sortBy as StreamSortMode,
+    )
       ? (filters.sortBy as StreamSortMode)
       : "recent";
 
@@ -1461,7 +1463,7 @@ export default function Streams() {
                     value={sortBy}
                     onChange={(e) => {
                       resolveSessionOnInteraction();
-                      setSortBy(e.target.value);
+                      setSortBy(e.target.value as StreamSortMode);
                     }}
                     options={[
                       { value: "recent", label: t("streams.list.sortRecent") },
