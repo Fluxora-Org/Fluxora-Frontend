@@ -145,12 +145,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const watcherRef = useRef<InstanceType<typeof WatchWalletChanges> | null>(
     null,
   );
-  const disconnectVersionRef = useRef(0);
-
-  const clearWatcher = () => {
-    watcherRef.current?.stop();
-    watcherRef.current = null;
-  };
+  const watcherGenerationRef = useRef(0);
 
   const expectedNetwork = getExpectedStellarNetwork();
   const expectedNetworkLabel = getNetworkLabel(expectedNetwork);
@@ -159,31 +154,40 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const connect = (address: string, network: string) => {
     if (!isValidStellarAddress(address)) return;
-    setState({ address, network, connected: true, error: null, loading: false });
+    setState({
+      address,
+      network,
+      connected: true,
+      error: null,
+      loading: false,
+    });
   };
 
   const disconnect = () => {
-    disconnectVersionRef.current += 1;
-    clearWatcher();
+    // Invalidate any callback captured by the previous watcher before the
+    // disconnected state is exposed to consumers.
+    watcherGenerationRef.current += 1;
     setState(DISCONNECTED);
   };
 
   // Silently restore session if the user already approved this app.
   useEffect(() => {
     let cancelled = false;
-    const restoreDisconnectVersion = disconnectVersionRef.current;
+    const restoreGeneration = watcherGenerationRef.current;
 
     const finishRestore = () => {
-      if (cancelled || disconnectVersionRef.current !== restoreDisconnectVersion) {
+      if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
         return;
       }
+
       setState((prev) => (prev.loading ? { ...prev, loading: false } : prev));
     };
 
     const restoreError = (error: unknown) => {
-      if (cancelled || disconnectVersionRef.current !== restoreDisconnectVersion) {
+      if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
         return;
       }
+
       setState((prev) => ({
         ...prev,
         address: null,
@@ -217,7 +221,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
 
         if (!isValidStellarAddress(addr.address)) {
-          restoreError({ message: "Invalid Stellar address returned by Freighter" });
+          restoreError({
+            message: "Invalid Stellar address returned by Freighter",
+          });
           return;
         }
 
@@ -227,10 +233,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (
-          cancelled ||
-          disconnectVersionRef.current !== restoreDisconnectVersion
-        ) {
+        if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
           return;
         }
 
@@ -254,24 +257,53 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   // Watch for account / network switches inside Freighter.
   useEffect(() => {
-    clearWatcher();
-    if (!state.connected) return undefined;
+    if (!state.connected) {
+      return undefined;
+    }
 
+    const generation = ++watcherGenerationRef.current;
     const watcher = new WatchWalletChanges(WALLET_WATCH_INTERVAL_MS);
+
     watcherRef.current = watcher;
+
     watcher.watch(({ address, network }) => {
+      // A callback from an old watcher must never be allowed to mutate the
+      // current wallet state.
+      if (watcherGenerationRef.current !== generation) {
+        return;
+      }
+
       if (!isValidStellarAddress(address)) {
         setState((prev) => (prev.connected ? DISCONNECTED : prev));
         return;
       }
+
       setState((prev) =>
         address === prev.address && network === prev.network
           ? prev
-          : { address, network, connected: true, error: null, loading: false },
+          : {
+              address,
+              network,
+              connected: true,
+              error: null,
+              loading: false,
+            },
       );
     });
 
-    return clearWatcher;
+    return () => {
+      // Invalidate the callback before stopping the watcher so even a
+      // synchronous/delayed callback cannot update state after cleanup.
+      if (watcherGenerationRef.current === generation) {
+        watcherGenerationRef.current += 1;
+      }
+
+      if (watcherRef.current === watcher) {
+        watcherRef.current = null;
+      }
+
+      watcher.stop();
+    };
   }, [state.connected]);
 
   return (
