@@ -357,13 +357,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           className="p-4 mb-6 text-sm rounded-xl flex items-start justify-between gap-3 border"
           style={{
             color: "var(--color-error-text)",
-            backgroundColor: "var(--color-error-bg)",
             borderColor: "var(--color-error-border)",
-            /* Escalated persistent-failure ring: adds a subtle outer shadow on 3rd+ attempt */
-            boxShadow:
-              retryCount >= 2
-                ? "0 0 0 1px var(--color-error-border), var(--shadow-error-focus)"
-                : undefined,
+            backgroundColor: "var(--color-error-bg)",
           }}
         >
           <div className="flex items-start gap-2" style={{ minWidth: 0 }}>
@@ -417,9 +412,10 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           walletConnected={false}
           onPrimaryAction={onEmptyPrimaryAction}
         />
-      ) : !effectiveError && sortedStreams.length === 0 ? (
-        /* State 3.5: Filter returned no results */
-        <div className="py-12 text-center rounded-xl border border-dashed" style={{ borderColor: "var(--color-border-default)" }}>
+      )}
+
+      {!effectiveError && effectiveStreams.length > 0 && filteredStreams.length === 0 && (
+        <div className="text-center py-8">
           <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
             No {filter.toLowerCase()} streams found.
           </p>
@@ -431,26 +427,26 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             Clear Filters
           </button>
         </div>
-      ) : (
-        /* State 4: Populated State */
-        <VirtualList
-          items={sortedStreams}
-          getKey={(stream) => stream.id}
-          ariaLabel="Incoming streams"
-          className="space-y-3"
-          estimateSize={96}
-          threshold={50}
-          renderItem={(stream) => (
+      )}
+
+      {effectiveStreams.length > 0 && (
+        <div
+          role="list"
+          aria-label="Incoming streams"
+          data-virtualized={effectiveStreams.length > 50 ? "true" : undefined}
+          className="space-y-2"
+        >
+          {visibleStreams.map((stream) => (
             <div
               className="p-4 rounded-xl flex justify-between items-center"
               style={{ border: "1px solid var(--color-border-default)" }}
             >
               <div>
-                <p
-                  className="font-medium text-sm"
-                  style={{ color: "var(--color-text-secondary)" }}
-                >
-                  From: <span>{stream.senderName || stream.sender}</span>
+                <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
+                  From: <span>{stream.senderName ?? stream.sender}</span>
+                </p>
+                <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
+                  {stream.amount} XLM
                 </p>
                 <p className="text-lg font-bold">{stream.amount} XLM</p>
               </div>
@@ -488,6 +484,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                   style={{ color: "var(--color-text-tertiary)" }}
                   aria-label={stream.isPinned ? "Unpin stream" : "Pin stream"}
                   aria-pressed={stream.isPinned}
+                  className="hover:text-yellow-500 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md"
+                  style={{ color: "var(--color-text-tertiary)" }}
                 >
                   <span aria-hidden="true">{stream.isPinned ? "★" : "☆"}</span>
                   <span className="ml-1 text-xs font-medium">
@@ -503,4 +501,3 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   );
 };
 
-export default RecipientStreams;
