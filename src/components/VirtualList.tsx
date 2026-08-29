@@ -48,6 +48,19 @@ function clampRange(range: VirtualRange, itemCount: number): VirtualRange {
   return { start, end };
 }
 
+/** Finds the item index whose [offset, offset + height) span contains `target`. */
+function findOffsetIndex(offsets: number[], target: number): number {
+  let lo = 0;
+  let hi = offsets.length - 2; // offsets has itemCount + 1 entries
+  if (hi < 0) return 0;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (offsets[mid] <= target) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
 function getFocusableElements(element: HTMLElement): HTMLElement[] {
   return Array.from(
     element.querySelectorAll(
@@ -77,6 +90,96 @@ export default function VirtualList<T>({
   const safeEstimate = Math.max(estimateSize, 1);
   const effectiveOverscan = Math.max(prefersReducedMotion ? 1 : overscan, 0);
 
+  // Measured row heights, keyed by item key. Rows report their real rendered
+  // height via ResizeObserver so off-screen spacer sizing (and the mounted
+  // range) stay accurate once content pushes a row taller than the estimate.
+  const measuredHeightsRef = useRef<Map<string, number>>(new Map());
+  const rowElementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const [heightVersion, setHeightVersion] = useState(0);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return undefined;
+
+    const observer = new ResizeObserver((entries) => {
+      let changed = false;
+      for (const entry of entries) {
+        const target = entry.target as HTMLElement;
+        const key = target.getAttribute("data-virtual-key");
+        if (!key) continue;
+        const height = Math.round(
+          entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
+        );
+        if (height <= 0) continue;
+
+        const previousHeight = measuredHeightsRef.current.get(key);
+        if (previousHeight === height) continue;
+        measuredHeightsRef.current.set(key, height);
+        changed = true;
+
+        // Deterministic scroll correction: a row that resizes while positioned
+        // above the viewport (already scrolled past) shifts everything below
+        // it, including the visible content. Compensate the scroll position
+        // by the exact delta so the rows the user is looking at do not jump.
+        // A row growing/shrinking within the viewport is left alone — that
+        // change is visible and expected.
+        if (previousHeight !== undefined && typeof window !== "undefined") {
+          const top = target.getBoundingClientRect().top;
+          if (top < 0) {
+            window.scrollBy(0, height - previousHeight);
+          }
+        }
+      }
+      if (changed) setHeightVersion((v) => v + 1);
+    });
+    resizeObserverRef.current = observer;
+
+    return () => {
+      observer.disconnect();
+      resizeObserverRef.current = null;
+    };
+  }, []);
+
+  const rowRefCallbacksRef = useRef<Map<string, (node: HTMLDivElement | null) => void>>(
+    new Map(),
+  );
+  const getRowRefCallback = useCallback((key: string) => {
+    let callback = rowRefCallbacksRef.current.get(key);
+    if (!callback) {
+      callback = (node: HTMLDivElement | null) => {
+        const observer = resizeObserverRef.current;
+        const previous = rowElementsRef.current.get(key);
+        if (previous && previous !== node) {
+          observer?.unobserve(previous);
+          rowElementsRef.current.delete(key);
+        }
+        if (node) {
+          rowElementsRef.current.set(key, node);
+          observer?.observe(node);
+        } else {
+          rowRefCallbacksRef.current.delete(key);
+        }
+      };
+      rowRefCallbacksRef.current.set(key, callback);
+    }
+    return callback;
+  }, []);
+
+  // Cumulative offsets for every item, using measured heights where known and
+  // falling back to the estimate for rows that have never mounted. Rebuilt
+  // only when the item set or a measured height actually changes.
+  const offsets = useMemo(() => {
+    const result = new Array(items.length + 1);
+    result[0] = 0;
+    for (let i = 0; i < items.length; i++) {
+      const key = getKey(items[i], i);
+      const height = measuredHeightsRef.current.get(key) ?? safeEstimate;
+      result[i + 1] = result[i] + height;
+    }
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, getKey, safeEstimate, heightVersion]);
+
   const getRange = useCallback((): VirtualRange => {
     if (!shouldVirtualize || typeof window === "undefined") {
       return { start: 0, end: items.length };
@@ -98,11 +201,11 @@ export default function VirtualList<T>({
       viewportStart,
       scrollTop + viewportHeight - containerTop,
     );
-    const start = Math.floor(viewportStart / safeEstimate) - effectiveOverscan;
-    const end = Math.ceil(viewportEnd / safeEstimate) + effectiveOverscan + 1;
+    const start = findOffsetIndex(offsets, viewportStart) - effectiveOverscan;
+    const end = findOffsetIndex(offsets, viewportEnd) + effectiveOverscan + 1;
 
     return clampRange({ start, end }, items.length);
-  }, [effectiveOverscan, items.length, safeEstimate, shouldVirtualize]);
+  }, [effectiveOverscan, items.length, offsets, safeEstimate, shouldVirtualize]);
 
   const [range, setRange] = useState<VirtualRange>(() =>
     clampRange(
@@ -259,10 +362,11 @@ export default function VirtualList<T>({
     () => items.slice(mountedRange.start, mountedRange.end),
     [items, mountedRange.end, mountedRange.start],
   );
-  const beforeHeight = shouldVirtualize ? mountedRange.start * safeEstimate : 0;
+  const beforeHeight = shouldVirtualize ? offsets[mountedRange.start] : 0;
   const afterHeight = shouldVirtualize
-    ? Math.max(items.length - mountedRange.end, 0) * safeEstimate
+    ? Math.max(offsets[items.length] - offsets[mountedRange.end], 0)
     : 0;
+
   const containerClassName = [
     className,
     prefersReducedMotion ? "virtual-list--reduced-motion" : "",
@@ -295,16 +399,20 @@ export default function VirtualList<T>({
           )}
           {mountedItems.map((item, offset) => {
             const index = mountedRange.start + offset;
+            const key = getKey(item, index);
 
             return (
               <div
-                key={getKey(item, index)}
+                key={key}
+                ref={getRowRefCallback(key)}
                 className="virtual-list-item"
                 role="listitem"
                 data-virtual-index={index}
-                data-virtual-key={getKey(item, index)}
+                data-virtual-key={key}
                 style={
-                  shouldVirtualize ? { minHeight: safeEstimate } : undefined
+                  shouldVirtualize
+                    ? { minHeight: measuredHeightsRef.current.get(key) ?? safeEstimate }
+                    : undefined
                 }
               >
                 {renderItem(item, index)}
