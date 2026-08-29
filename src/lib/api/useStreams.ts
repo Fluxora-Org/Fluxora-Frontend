@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getStreamById,
   getStreams,
@@ -31,17 +31,14 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<StreamsServiceError | null>(null);
   const [tick, setTick] = useState(0);
-
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
+  const filtersKey = JSON.stringify(filters ?? {});
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    getStreams(filtersRef.current, controller.signal)
-    getStreams(filtersRef.current, { signal: controller.signal })
+    getStreams(filters, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setStreams(data);
@@ -63,7 +60,7 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
       });
 
     return () => controller.abort();
-  }, [tick]);
+  }, [filtersKey, tick]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 
@@ -89,12 +86,9 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
   const [data, setData] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<StreamsServiceError | null>(null);
-  const triggerRef = useRef(0);
+  const [tick, setTick] = useState(0);
 
-  const refetch = () => {
-    triggerRef.current += 1;
-    setLoading(true);
-  };
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
     if (!address) {
@@ -107,28 +101,29 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
     setLoading(true);
     setError(null);
 
-    getRecipientStreams(address, controller.signal)
-      .then((records) => {
-        if (!controller.signal.aborted) {
     getRecipientStreams(address, { signal: controller.signal })
       .then((records) => {
-        if (!cancelled && !controller.signal.aborted) {
+        if (!controller.signal.aborted) {
           setData(records);
-          setLoading(false);
         }
       })
       .catch((err) => {
-        if (controller.signal.aborted) return;
-        setError(
-          err instanceof StreamsServiceError
-            ? err
-            : new StreamsServiceError(String(err), "network"),
-        );
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof StreamsServiceError
+              ? err
+              : new StreamsServiceError(String(err), "network"),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
     return () => controller.abort();
-  }, [address, triggerRef.current]);
+  }, [address, tick]);
 
   return { data, loading, error, refetch };
 }

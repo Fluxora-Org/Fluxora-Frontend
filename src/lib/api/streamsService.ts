@@ -56,9 +56,16 @@ export interface StreamsRequestOptions {
    * Initial delay in milliseconds before the first retry.
    */
   initialDelayMs?: number;
+  /**
+   * Deterministic jitter ratio applied to retry delays. The same request path
+   * and attempt always produce the same delay, keeping tests stable.
+   */
+  jitterRatio?: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_RETRY_JITTER_RATIO = 0.2;
+const MAX_RETRY_DELAY_MS = 8_000;
 
 /**
  * Error thrown by the streams service when an upstream request fails, times out,
@@ -118,6 +125,44 @@ function readFiniteEnvInt(
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function readFiniteEnvNumber(
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampNonNegative(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function deterministicUnitHash(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0xffffffff;
+}
+
+export function getRetryDelayMs(
+  path: string,
+  attempt: number,
+  initialDelayMs: number,
+  jitterRatio: number,
+): number {
+  const baseDelay = Math.min(
+    clampNonNegative(initialDelayMs) * 2 ** attempt,
+    MAX_RETRY_DELAY_MS,
+  );
+  const boundedJitterRatio = Math.min(clampNonNegative(jitterRatio), 1);
+  const jitterMs =
+    baseDelay * boundedJitterRatio * deterministicUnitHash(`${path}:${attempt}`);
+  return Math.min(MAX_RETRY_DELAY_MS, Math.round(baseDelay + jitterMs));
+}
+
 /** Options controlling retry and timeout behaviour of {@link fetchJson}. */
 export interface FetchJsonOptions extends StreamsRequestOptions {}
 
@@ -168,7 +213,13 @@ async function fetchJson<T>(
   init?: RequestInit,
   options: FetchJsonOptions = {},
 ): Promise<T> {
-  const { baseUrl, fetchMaxRetries, fetchInitialDelayMs, defaultTimeoutMs } = {
+  const {
+    baseUrl,
+    fetchMaxRetries,
+    fetchInitialDelayMs,
+    fetchJitterRatio,
+    defaultTimeoutMs,
+  } = {
     ...readEnv(),
     fetchMaxRetries: readFiniteEnvInt(
       import.meta.env.VITE_FETCH_MAX_RETRIES,
@@ -178,6 +229,10 @@ async function fetchJson<T>(
       import.meta.env.VITE_FETCH_INITIAL_DELAY_MS,
       500,
     ),
+    fetchJitterRatio: readFiniteEnvNumber(
+      import.meta.env.VITE_FETCH_JITTER_RATIO,
+      DEFAULT_RETRY_JITTER_RATIO,
+    ),
     defaultTimeoutMs: readFiniteEnvInt(
       import.meta.env.VITE_API_TIMEOUT_MS,
       DEFAULT_TIMEOUT_MS,
@@ -186,11 +241,11 @@ async function fetchJson<T>(
 
   const maxRetries = options.maxRetries ?? fetchMaxRetries;
   const initialDelayMs = options.initialDelayMs ?? fetchInitialDelayMs;
+  const jitterRatio = options.jitterRatio ?? fetchJitterRatio;
   const callerSignal = options.signal;
   const timeoutMs = options.timeoutMs !== undefined ? options.timeoutMs : defaultTimeoutMs;
 
   const url = joinUrl(baseUrl, path);
-  const MAX_DELAY_MS = 8_000;
 
   // Set up timeout controller & combined abort signal
   const timeoutController = new AbortController();
@@ -266,7 +321,12 @@ async function fetchJson<T>(
           throw networkError;
         }
 
-        const delayMs = Math.min(initialDelayMs * 2 ** attempt, MAX_DELAY_MS);
+        const delayMs = getRetryDelayMs(
+          path,
+          attempt,
+          initialDelayMs,
+          jitterRatio,
+        );
         attempt++;
 
         if (import.meta.env.DEV) {

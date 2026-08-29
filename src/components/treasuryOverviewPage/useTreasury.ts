@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getRecipientStreams,
   getStreams,
@@ -53,16 +53,16 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
   const [reloadToken, setReloadToken] = useState(0);
   const filtersKey = serializeFilters(filters);
 
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
-
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
     setRetryCount((count) => count + 1);
 
-    Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
+    Promise.all([
+      getTreasuryMetrics({ signal: controller.signal }),
+      getStreams(filters, { signal: controller.signal }),
+    ])
       .then(([nextMetrics, nextStreams]) => {
         if (controller.signal.aborted) return;
 
@@ -154,7 +154,7 @@ export function useRecipientStreams(address: string | null | undefined): {
     setError(null);
     setRetryCount((count) => count + 1);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, { signal: controller.signal })
       .then((next) => {
         if (controller.signal.aborted) return;
         setStreams(next);

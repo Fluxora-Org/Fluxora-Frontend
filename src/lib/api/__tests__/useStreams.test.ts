@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as streamsService from "../streamsService";
 import { StreamsServiceError } from "../streamsService";
-import { useStreamById, useStreams } from "../useStreams";
+import { useRecipientStreams, useStreamById, useStreams } from "../useStreams";
 import type { StreamRecord } from "../../../data/streamRecords";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +69,55 @@ describe("useStreams", () => {
     act(() => result.current.refetch());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels pending retries when filters change", async () => {
+    let firstSignal: AbortSignal | undefined;
+    const stream = makeStream("filtered");
+    const spy = vi
+      .spyOn(streamsService, "getStreams")
+      .mockImplementation((_filters, options) => {
+        firstSignal ??= options?.signal;
+        return Promise.resolve([stream]);
+      });
+
+    const { rerender } = renderHook(
+      ({ recipient }: { recipient: string }) =>
+        useStreams({ recipient, status: "All" }),
+      { initialProps: { recipient: "GOLD" } },
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    rerender({ recipient: "GNEW" });
+
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useRecipientStreams", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cancels pending retries when address changes", async () => {
+    let firstSignal: AbortSignal | undefined;
+    const stream = makeStream("recipient");
+    const spy = vi
+      .spyOn(streamsService, "getRecipientStreams")
+      .mockImplementation((_address, options) => {
+        firstSignal ??= options?.signal;
+        return Promise.resolve([stream]);
+      });
+
+    const { rerender } = renderHook(
+      ({ address }: { address: string }) => useRecipientStreams(address),
+      { initialProps: { address: "GOLD" } },
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    rerender({ address: "GNEW" });
+
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
     expect(spy).toHaveBeenCalledTimes(2);
   });
 });
