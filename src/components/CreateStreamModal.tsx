@@ -6,17 +6,9 @@ import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 import { useWallet } from './wallet-connect/Walletcontext';
 import { useToast } from './toast/ToastProvider';
-import { useTransactionStatus } from '../hooks/useTransactionStatus';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import {
-  enqueueAction,
-  dequeueAction,
-  getQueuePosition,
-  getQueueLength,
-  subscribeToQueue,
-} from '../lib/offlineActionQueue';
-import { createStream, getTransactionStatus } from '../lib/stellar/tx';
-import { isValidStellarAddress } from '../lib/stellar';
+import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
+import { createStream } from '../lib/stellar/tx';
+import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 import {
   computeStreamEndDate,
   validateCliffBeforeEnd,
@@ -268,8 +260,6 @@ export default function CreateStreamModal({
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [streamError, setStreamError] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const [hasCompletedConfirmation, setHasCompletedConfirmation] =
     useState(false);
   const [queuedSubmission, setQueuedSubmission] = useState<
@@ -280,59 +270,6 @@ export default function CreateStreamModal({
   const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
-  const submitInFlightRef = useRef(false);
-  const pendingSubmissionRef = useRef<StreamSubmissionPayload | null>(null);
-  const flushedFromQueueRef = useRef(false);
-  const isOnline = useOnlineStatus();
-
-  // Dynamic Contrast Evaluation against selected background theme
-  const bgHex = targetTheme === 'dark' ? THEME_BACKGROUNDS.dark : THEME_BACKGROUNDS.light;
-  const contrastEval = labelColor
-    ? evaluateContrast(labelColor, bgHex)
-    : { ratio: 0, passesAA: false, formattedRatio: '' };
-
-  const contrastState: 'no-selection' | 'AA-pass' | 'AA-fail-blocked' | 'AA-fail-overridden' = !labelColor
-    ? 'no-selection'
-    : contrastEval.passesAA
-    ? 'AA-pass'
-    : overrideContrast
-    ? 'AA-fail-overridden'
-    : 'AA-fail-blocked';
-
-  const handleSwatchKeyDown = (e: React.KeyboardEvent, index: number) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const nextIndex = (index + 1) % LABEL_COLOR_SWATCHES.length;
-      setFocusedSwatchIndex(nextIndex);
-      const swatch = LABEL_COLOR_SWATCHES[nextIndex];
-      setLabelColor(swatch.hex);
-      setCustomHexInput(swatch.hex);
-      setOverrideContrast(false);
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prevIndex = (index - 1 + LABEL_COLOR_SWATCHES.length) % LABEL_COLOR_SWATCHES.length;
-      setFocusedSwatchIndex(prevIndex);
-      const swatch = LABEL_COLOR_SWATCHES[prevIndex];
-      setLabelColor(swatch.hex);
-      setCustomHexInput(swatch.hex);
-      setOverrideContrast(false);
-    } else if (e.key === 'Home') {
-      e.preventDefault();
-      setFocusedSwatchIndex(0);
-      const swatch = LABEL_COLOR_SWATCHES[0];
-      setLabelColor(swatch.hex);
-      setCustomHexInput(swatch.hex);
-      setOverrideContrast(false);
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      const lastIndex = LABEL_COLOR_SWATCHES.length - 1;
-      setFocusedSwatchIndex(lastIndex);
-      const swatch = LABEL_COLOR_SWATCHES[lastIndex];
-      setLabelColor(swatch.hex);
-      setCustomHexInput(swatch.hex);
-      setOverrideContrast(false);
-    }
-  };
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -342,37 +279,56 @@ export default function CreateStreamModal({
   const durationValue = parseFloat(duration || "0");
   const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
-  const transactionStatus = useTransactionStatus(submittedTxHash, {
-    enabled: currentStep === 3 && Boolean(submittedTxHash),
-    getStatus: getTransactionStatus,
+  const txSubmission = useTransactionSubmission({
+    submit: async (idempotencyKey) => {
+      const sender = wallet.address!;
+      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+      const start = startTimeOption === "now"
+        ? Math.floor(Date.now() / 1000)
+        : Math.floor(new Date(customStartDate).getTime() / 1000);
+      const durationDays = parseFloat(duration) || 0;
+      const durationSeconds = Math.floor(durationDays * 24 * 60 * 60);
+      const end = start + durationSeconds;
+      const cliffTime = cliffEnabled && cliffDate
+        ? Math.floor(new Date(cliffDate).getTime() / 1000)
+        : undefined;
+      const response = await createStream(
+        sender,
+        recipient.trim(),
+        amountStr,
+        start,
+        end,
+        cliffTime,
+      );
+      if (!response.txHash) {
+        throw new Error("Missing transaction hash from Stellar RPC.");
+      }
+      return { txHash: response.txHash };
+    },
+    params: {
+      recipient: recipient.trim(),
+      depositAmount,
+      accrualRate,
+      duration,
+      startTimeOption,
+      customStartDate,
+      cliffEnabled,
+      cliffDate,
+    },
   });
-  const isConfirmationPending = transactionStatus.status === "pending";
-  const isQueued = Boolean(queuedSubmission);
-  // Actively in-flight (network round trip or wallet signature); close/cancel
-  // stay blocked here, same as today. `isQueued` alone does NOT block them —
-  // a queued submission is just captured locally, nothing is in flight yet.
-  const isActivelySubmitting =
-    isSubmitting || isConfirmationPending || isFlushingQueue;
-  const isBusyCreating = isActivelySubmitting || isQueued;
+  const isConfirmationPending = txSubmission.status === "pending";
+  const isBusyCreating = txSubmission.isSubmitting;
   const submitButtonLabel =
-    currentStep === 3 && isQueued
-      ? t("createStream.button.queued")
-      : currentStep === 3 && isFlushingQueue
-        ? t("createStream.button.flushing")
-        : currentStep === 3 && isSubmitting
-          ? t("createStream.button.submitting")
-          : currentStep === 3 && isConfirmationPending
-            ? t("createStream.button.confirming")
-            : currentStep === 3 && transactionStatus.status === "failed"
-              ? t("createStream.button.retry")
-              : currentStep === 2
-                ? t("createStream.button.next")
-                : t("createStream.button.create");
-
-  const guardedClose = useCallback(() => {
-    if (isActivelySubmitting) return;
-    onClose();
-  }, [isActivelySubmitting, onClose]);
+    currentStep === 3 && txSubmission.status === "submitting"
+      ? t("createStream.button.submitting")
+      : currentStep === 3 && isConfirmationPending
+        ? t("createStream.button.confirming")
+        : currentStep === 3 && txSubmission.status === "timeout"
+          ? t("createStream.button.retry")
+          : currentStep === 2
+            ? t("createStream.button.next")
+            : t("createStream.button.create");
 
   useModalAccessibility({
     isOpen,
@@ -494,7 +450,7 @@ export default function CreateStreamModal({
 
   useEffect(() => {
     if (
-      transactionStatus.status !== "confirmed" ||
+      txSubmission.status !== "confirmed" ||
       hasCompletedConfirmation
     ) {
       return;
@@ -530,13 +486,8 @@ export default function CreateStreamModal({
     hasCompletedConfirmation,
     onClose,
     onStreamCreated,
-    transactionStatus.status,
     t,
-    submittedTxHash,
-    depositAmount,
-    accrualRate,
-    wallet.address,
-    recipient,
+    txSubmission.status,
   ]);
 
   useEffect(() => {
@@ -626,8 +577,7 @@ export default function CreateStreamModal({
   }, [queuedSubmission?.id]);
 
   const resetTransactionState = () => {
-    transactionStatus.reset();
-    setSubmittedTxHash(null);
+    txSubmission.reset();
     setHasCompletedConfirmation(false);
     setQueueFlushError(null);
     flushedFromQueueRef.current = false;
@@ -869,7 +819,9 @@ export default function CreateStreamModal({
       resetTransactionState();
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      if (submitInFlightRef.current) return;
+      if (txSubmission.status === "submitting" || txSubmission.status === "pending") {
+        return;
+      }
 
       if (!wallet.connected) {
         setError(t("createStream.validation.walletNotConnected"));
@@ -887,17 +839,13 @@ export default function CreateStreamModal({
       setStreamError(null);
       resetTransactionState();
 
-      const payload = buildSubmissionPayload();
-
-      if (!isOnline) {
-        // Capture locally instead of hanging on a request that can't reach
-        // the network. Flushed automatically by the effect above once the
-        // `online` event fires.
-        const entry = enqueueAction(payload);
-        pendingSubmissionRef.current = payload;
-        setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
-        setQueueLength(getQueueLength());
-        return;
+      try {
+        await txSubmission.submit();
+      } catch (err) {
+        const message = getStreamErrorMessage(err);
+        setStreamError(message);
+        addToast(t("createStream.error.failedWithMessage", { message }), "error");
+        onStreamError?.(err);
       }
 
       // Unchanged online path.
@@ -2547,134 +2495,68 @@ export default function CreateStreamModal({
                     </div>
                   </div>
 
-                  {streamError && (
-                    <div className="review-error-box" role="alert">
-                      <div>
-                        <strong>{t("createStream.step3.errorTitle")}</strong>
-                        <p>{streamError}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="review-error-retry"
-                        onClick={handleNext}
-                        disabled={isSubmitting}
-                      >
-                        {t("createStream.step3.tryAgainBtn")}
-                      </button>
-                    </div>
-                  )}
+                   {streamError && (
+                     <div className="review-error-box" role="alert">
+                       <div>
+                         <strong>{t("createStream.step3.errorTitle")}</strong>
+                         <p>{streamError}</p>
+                       </div>
+                       <button
+                         type="button"
+                         className="review-error-retry"
+                         onClick={handleNext}
+                         disabled={txSubmission.status === "submitting" || txSubmission.status === "pending"}
+                       >
+                         {t("createStream.step3.tryAgainBtn")}
+                       </button>
+                     </div>
+                   )}
 
-                  <div
-                    className="review-warning-box"
-                    role="region"
-                    aria-live="polite"
-                  >
-                    <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
-                    {t("createStream.step3.warningText", { reviewDeposit })}
-                  </div>
-                  {queuedSubmission && (
-                    <div
-                      className="offline-queue-banner"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <span className="offline-queue-banner__icon" aria-hidden="true">
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <circle cx="12" cy="12" r="9" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-                        </svg>
-                      </span>
-                      <div className="offline-queue-banner__body">
-                        <strong className="offline-queue-banner__title">
-                          {t("createStream.queue.bannerTitle")}
-                        </strong>
-                        <p>{t("createStream.queue.bannerBody")}</p>
-                        <span className="offline-queue-banner__position">
-                          {t("createStream.queue.bannerPosition", {
-                            position: queuedSubmission.position,
-                            total: Math.max(queueLength, queuedSubmission.position),
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {isFlushingQueue && (
-                    <div
-                      className="transaction-status-box"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {t("createStream.queue.flushingTitle")}
-                    </div>
-                  )}
-                  {queueFlushError && (
-                    <div className="offline-queue-banner offline-queue-banner--failed" role="alert">
-                      <span className="offline-queue-banner__icon" aria-hidden="true">
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.66 20h18.68a1 1 0 00.85-1.44l-8.48-14.7a1 1 0 00-1.72 0z" />
-                        </svg>
-                      </span>
-                      <div className="offline-queue-banner__body">
-                        <strong className="offline-queue-banner__title">
-                          {t("createStream.queue.flushFailedTitle")}
-                        </strong>
-                        <p>{queueFlushError}</p>
-                        <div className="offline-queue-banner__actions">
-                          <button
-                            type="button"
-                            className="offline-queue-banner__btn offline-queue-banner__btn--primary"
-                            onClick={handleRetryQueuedSubmission}
-                          >
-                            {t("createStream.queue.flushFailedRetryBtn")}
-                          </button>
-                          <button
-                            type="button"
-                            className="offline-queue-banner__btn"
-                            onClick={handleEditQueuedSubmission}
-                          >
-                            {t("createStream.queue.flushFailedEditBtn")}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {isSubmitting && (
-                    <div
-                      className="transaction-status-box"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {t("createStream.step3.statusSubmitting")}
-                    </div>
-                  )}
-                  {!isSubmitting && transactionStatus.status === "pending" && (
-                    <div
-                      className="transaction-status-box"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {t("createStream.step3.statusWaiting")}
-                      <span className="transaction-status-detail">
-                        {t("createStream.step3.statusDetail", {
-                          attempts: transactionStatus.attempts,
-                          txHash: submittedTxHash
-                            ? `${submittedTxHash.slice(0, 10)}...${submittedTxHash.slice(-8)}`
-                            : "",
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {transactionStatus.status === "failed" && (
-                    <div
-                      className="transaction-status-box transaction-status-box--error"
-                      role="alert"
-                    >
-                      {transactionStatus.error ??
-                        t("createStream.step3.statusFailed", {
-                          error: "Transaction confirmation failed. Please retry.",
-                        })}
-                    </div>
-                  )}
+                   <div
+                     className="review-warning-box"
+                     role="region"
+                     aria-live="polite"
+                   >
+                     <strong>{t("createStream.step3.warningTitle")}</strong>{" "}
+                     {t("createStream.step3.warningText", { reviewDeposit })}
+                   </div>
+                   {txSubmission.status === "submitting" && (
+                     <div
+                       className="transaction-status-box"
+                       role="status"
+                       aria-live="polite"
+                     >
+                       {t("createStream.step3.statusSubmitting")}
+                     </div>
+                   )}
+                   {txSubmission.status === "pending" && (
+                     <div
+                       className="transaction-status-box"
+                       role="status"
+                       aria-live="polite"
+                     >
+                       {t("createStream.step3.statusWaiting")}
+                       <span className="transaction-status-detail">
+                         {t("createStream.step3.statusDetail", {
+                           attempts: txSubmission.attempts,
+                           txHash: txSubmission.txHash
+                             ? `${txSubmission.txHash.slice(0, 10)}...${txSubmission.txHash.slice(-8)}`
+                             : "",
+                         })}
+                       </span>
+                     </div>
+                   )}
+                   {(txSubmission.status === "timeout" || txSubmission.status === "failed") && (
+                     <div
+                       className="transaction-status-box transaction-status-box--error"
+                       role="alert"
+                     >
+                       {txSubmission.error ??
+                         t("createStream.step3.statusFailed", {
+                           error: "Transaction confirmation failed. Please retry.",
+                         })}
+                     </div>
+                   )}
                 </>
               );
             })()}
