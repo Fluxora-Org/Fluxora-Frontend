@@ -1246,3 +1246,428 @@
 .theme-transitioning *:focus-visible {
   transition: none;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   15. FORCED-COLORS (Windows High Contrast / Forced-Colors Mode)
+   ───────────────────────────────────────────────────────────
+   When the OS activates a forced-colors palette, the browser
+   replaces author colors with system keywords.  CSS custom
+   properties lose their resolved values, so components that rely
+   on token-driven backgrounds or borders become invisible.
+
+   Strategy:
+   • Let the browser handle most surfaces (forced-color-adjust: auto).
+   • Use CSS system color keywords (Canvas, CanvasText, ButtonText,
+     Highlight, HighlightText, ButtonFace, ButtonBorder, Mark,
+     MarkText, GrayText, LinkText, VisitedText, ActiveText,
+     Field, FieldText) for explicit overrides where author control
+     is required.
+   • Give every semantically meaningful borderless element a visible
+     border so its boundary is preserved.
+   • Keep focus rings on `outline` (box-shadow is stripped by the
+     browser in forced-colors mode).
+   • Preserve status-pill icon shapes (forced-color-adjust: none on
+     the SVG fill only) so states remain distinguishable without
+     colour alone (WCAG 1.4.1).
+   • Suppress purely decorative gradients and shadows.
+   ═══════════════════════════════════════════════════════════ */
+
+@media (forced-colors: active) {
+  /* ── Token overrides: map semantic tokens to system colors ── */
+  :root {
+    /* Surfaces */
+    --color-bg-primary: Canvas;
+    --color-bg-secondary: Canvas;
+    --color-bg-tertiary: Canvas;
+    --color-surface-default: Canvas;
+    --color-surface-elevated: Canvas;
+    --color-surface-raised: Canvas;
+    --color-surface-highest: Canvas;
+
+    /* Text */
+    --color-text-primary: CanvasText;
+    --color-text-secondary: CanvasText;
+    --color-text-tertiary: GrayText;
+    --color-text-muted: GrayText;
+    --color-text-inverse: ButtonFace;
+
+    /* Borders */
+    --color-border-default: ButtonBorder;
+    --color-border-secondary: ButtonBorder;
+    --border-neutral: ButtonBorder;
+    --border-strong: ButtonBorder;
+
+    /* Interactive accent — use Highlight so it matches the OS accent */
+    --color-accent-primary: Highlight;
+    --color-accent-secondary: Highlight;
+    --color-accent-primary-dark: Highlight;
+    --color-accent-secondary-dark: Highlight;
+    --color-accent-primary-darkest: Highlight;
+
+    /* Status — keep readable with ButtonText/CanvasText */
+    --status-success: CanvasText;
+    --status-warning: CanvasText;
+    --status-error: CanvasText;
+    --status-info: CanvasText;
+    --color-success: CanvasText;
+    --color-warning: CanvasText;
+    --color-danger: CanvasText;
+    --color-info: CanvasText;
+
+    /* Status backgrounds — use Canvas so they do not disappear */
+    --status-success-bg: Canvas;
+    --status-warning-bg: Canvas;
+    --status-error-bg: Canvas;
+    --status-info-bg: Canvas;
+    --color-success-bg: Canvas;
+    --color-warning-bg: Canvas;
+    --color-danger-bg: Canvas;
+    --color-info-bg: Canvas;
+
+    /* Focus ring — outline only, box-shadow is stripped by the UA */
+    --focus-ring-color: Highlight;
+    --focus-ring-halo: transparent;
+    --focus-ring-shadow: none;
+    --focus-ring-shadow-inset: none;
+    --focus-ring-input-shadow: none;
+    --focus-ring: none;
+
+    /* Suppress decorative shadows and gradients */
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-accent-primary: none;
+    --shadow-accent-secondary: none;
+    --shadow-cta-primary: none;
+    --shadow-cta-primary-hover: none;
+    --shadow-error-focus: none;
+    --navbar-shadow: none;
+    --connect-card-shadow: none;
+    --connect-cta-shadow: none;
+    --tooltip-shadow: none;
+
+    /* Skeleton — use a visible GrayText tint */
+    --skeleton-base: GrayText;
+    --skeleton-shine: Canvas;
+
+    /* CTAs */
+    --color-cta-primary-bg: ButtonFace;
+    --color-cta-primary-bg-hover: Highlight;
+    --color-cta-primary-bg-active: Highlight;
+    --color-cta-primary-text: ButtonText;
+    --color-cta-secondary-bg: Canvas;
+    --color-cta-secondary-border: ButtonBorder;
+    --color-cta-secondary-text: ButtonText;
+  }
+
+  /* ── Focus rings: use outline, not box-shadow ── */
+  *:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Buttons ── */
+  button,
+  [role="button"] {
+    forced-color-adjust: auto;
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  button:hover,
+  [role="button"]:hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+    background: Canvas;
+  }
+
+  /* Primary CTA */
+  .ui-primary-cta,
+  .ui-primary-cta:hover {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+  }
+
+  .ui-primary-cta:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  /* ── Links ── */
+  a[href] {
+    color: LinkText;
+    forced-color-adjust: auto;
+  }
+
+  a[href]:visited {
+    color: VisitedText;
+  }
+
+  /* ── Form inputs and selects ── */
+  input,
+  textarea,
+  select {
+    forced-color-adjust: auto;
+    background: Field;
+    color: FieldText;
+    border: 1px solid ButtonBorder;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    border-color: Highlight;
+    box-shadow: none !important;
+  }
+
+  /* ── Status pills ──
+     The browser strips background-color, so we add a visible border
+     and keep the icon+text for shape/text differentiation (WCAG 1.4.1).
+     The SVG icon retains its authored color via forced-color-adjust: none
+     so the distinct shape (Play/Pause/Check/Heart/Alert/X) is preserved. */
+  [data-status-token] {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    outline: none;
+  }
+
+  [data-status-token]:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Restore icon visibility inside pills */
+  [data-status-token] svg {
+    forced-color-adjust: auto;
+    color: CanvasText;
+  }
+
+  /* ── Modal backdrop ── */
+  [role="dialog"] {
+    forced-color-adjust: auto;
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* Backdrop/overlay: just a translucent Canvas so content behind is
+     dimmed without a box-shadow or gradient that would be stripped */
+  .backdrop,
+  [class*="backdrop"],
+  [class*="overlay"] {
+    background: Canvas;
+    opacity: 0.85;
+  }
+
+  /* ── Skeleton loaders ──
+     Suppress shimmer animation and show a simple gray block */
+  [class*="skeleton"],
+  [class*="Skeleton"],
+  [aria-busy="true"] {
+    animation: none !important;
+    background: GrayText !important;
+    opacity: 0.3 !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Stream row / table ── */
+  .stream-row {
+    border-bottom: 1px solid ButtonBorder;
+  }
+
+  .stream-row--selected {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+    border-left: 3px solid HighlightText;
+  }
+
+  .stream-row:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: -2px !important;
+    box-shadow: none !important;
+  }
+
+  .stream-row__action-btn {
+    color: LinkText;
+    background: none;
+    border: none;
+  }
+
+  .stream-row__ellipsis-btn {
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .stream-row__ellipsis-btn:focus-visible {
+    outline: 2px solid Highlight !important;
+    box-shadow: none !important;
+  }
+
+  /* Context menu */
+  .context-menu {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .context-menu__item {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .context-menu__item:hover,
+  .context-menu__item:focus {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-menu__item--danger:hover,
+  .context-menu__item--danger:focus {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-menu__item:disabled {
+    color: GrayText;
+  }
+
+  /* ── Sidebar / navigation ── */
+  .app-nav-link {
+    border: 1px solid transparent;
+  }
+
+  .app-nav-link.active,
+  .app-nav-link[aria-current="page"] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .app-nav-link:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Tooltip ── */
+  [role="tooltip"] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Decorative glows / gradients — suppress ── */
+  .cyberpunk-skin,
+  .cyberpunk-scanlines::after,
+  .create-stream-fab__button,
+  [class*="glow"],
+  [class*="Glow"] {
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  /* ── FAB ── */
+  .create-stream-fab__button {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+  }
+
+  .create-stream-fab__menu-item {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+  }
+
+  .create-stream-fab__menu-item:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  /* ── Toast notifications ── */
+  [role="alert"],
+  [role="status"] {
+    forced-color-adjust: auto;
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Progress bars / timeline segments ── */
+  [class*="timeline"],
+  [class*="Timeline"] {
+    forced-color-adjust: auto;
+  }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb-link {
+    color: LinkText;
+  }
+
+  .breadcrumb-link:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* ── Network badge ── */
+  [class*="network"],
+  [class*="Network"] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Presence badges ── */
+  [class*="presence"],
+  [class*="Presence"] {
+    forced-color-adjust: auto;
+    background: Canvas;
+    border: 1px solid ButtonBorder;
+    color: CanvasText;
+  }
+
+  /* ── Skip-to-main link ── */
+  .skipToMain:focus-visible {
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;
+    box-shadow: none;
+  }
+
+  /* ── TruncatedReveal chip ── */
+  .truncateReveal__chip {
+    background: ButtonFace;
+    border: 1px solid ButtonBorder;
+    color: ButtonText;
+  }
+
+  /* ── Pagination ── */
+  [class*="pagination"],
+  [class*="Pagination"] {
+    forced-color-adjust: auto;
+  }
+}
