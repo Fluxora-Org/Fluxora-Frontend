@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -6,8 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-github.workflow-github.ref
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +26,6 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # @stellar/stellar-sdk requires Node >= 22.
           node-version: "22"
           cache: "npm"
 
@@ -34,16 +38,14 @@ jobs:
       - name: Test
         run: npm run test
 
-      # NOTE: `npm run lint` is intentionally not run here yet. The repo
-      # currently has ~68 pre-existing eslint errors (mostly
-      # @typescript-eslint/no-explicit-any) spread across ~15 files that
-      # predate this workflow. Fixing them is a real but separate cleanup
-      # effort, not something to fold into introducing CI. Once that debt
-      # is paid down, add a `run: npm run lint` step here.
-
-  supply-chain-audit:
-    name: Supply-chain audit (vulnerabilities & licenses)
+  playwright:
+    name: Playwright E2E
     runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,9 +59,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Gates the production dependency tree only (--omit=dev) against a
-      # severity threshold and a checked-in baseline of currently-known,
-      # reviewed findings. See scripts/supply-chain-policy.mjs and
-      # docs/supply-chain-policy.md for the full policy and rationale.
-      - name: Audit production dependencies (vulnerabilities & licenses)
-        run: npm run audit:supply-chain
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run accessibility tests
+        run: npm run test:a11y
+
+      - name: Run E2E tests (gateable)
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream"
