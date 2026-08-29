@@ -1437,7 +1437,11 @@ export default function Streams() {
                     }}
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="Filter streams by status"
+                >
                   {STATUS_FILTERS.map((filter) => (
                     <button
                       type="button"
