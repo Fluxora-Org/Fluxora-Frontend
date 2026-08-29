@@ -65,7 +65,11 @@ export const Pagination: React.FC<PaginationProps> = ({
   }
 
   return (
-    <nav data-testid="pagination-container" className="pagination-container fluxora-pagination">
+      <nav
+        data-testid="pagination-container"
+        className="pagination-container fluxora-pagination"
+        aria-label="Pagination"
+      >
       <div className="page-buttons">
         <button
           onClick={() => onPageChange(normalizedPage - 1)}
