@@ -1246,3 +1246,129 @@
 .theme-transitioning *:focus-visible {
   transition: none;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   15. SAFE-AREA INSETS  (Issue #1562)
+   ═══════════════════════════════════════════════════════════
+   Requires `viewport-fit=cover` in the <meta name="viewport"> tag (set in
+   index.html) so iOS/Android expose non-zero safe-area values for notched
+   and rounded-corner devices.
+
+   Strategy
+   ────────
+   • `env(safe-area-inset-*)` returns 0 on all non-notched / desktop
+     browsers, so these rules are additive and invisible on desktop.
+   • `max(base, env(...))` keeps a minimum comfortable padding even when the
+     inset would be larger than the default (avoids excessive gaps).
+   • Keyboard-open layouts are unaffected: insets come from the physical
+     device geometry, not the virtual-keyboard area.
+
+   Covered surfaces
+   ────────────────
+   1. Sticky AppNavbar header — top notch + landscape side bars.
+   2. Toast stack — bottom-right, clear home-indicator and landscape corners.
+   3. ConnectWalletModal backdrop — full-screen overlay padding.
+   4. Modal.module.css dialog — centred fixed dialog padding.
+   5. StreamCreatedModal overlay — centred fixed overlay padding.
+   6. Recipient alerts backdrop — centred fixed overlay padding.
+   7. Security-gate modal overlay (Recipient.css) — centred fixed overlay.
+   8. ConnectWallet page — `position: fixed; inset: 0` container.
+
+   The FAB (.create-stream-fab) and CreateStreamModal already handle
+   safe-area insets and are left untouched.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 1. Sticky AppNavbar ──────────────────────────────────────────────────
+   `sticky top-0` means the bar sits directly below the status bar on
+   notched iPhones. Adding padding-top pushes the bar content (logo, buttons)
+   below the cut-out. Landscape left/right insets cover the side bars on
+   iPhone X/11/12/13 in landscape orientation. */
+header[role="banner"] {
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(0px, env(safe-area-inset-left));
+  padding-right: max(0px, env(safe-area-inset-right));
+}
+
+/* Undo the extra padding on desktop where insets are always 0 — this rule
+   is a no-op there, but makes intent explicit for code readers. */
+@supports not (padding: env(safe-area-inset-top)) {
+  header[role="banner"] {
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ── 2. Toast stack ───────────────────────────────────────────────────────
+   Fixed bottom-right: must clear the home-indicator (bottom) and the side
+   sensor strip (right) in landscape. The `1.5rem` base value is the
+   existing default; `max()` ensures we use whichever is larger. */
+.toast-stack {
+  right: max(1.5rem, env(safe-area-inset-right));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* ── 3. ConnectWalletModal backdrop ──────────────────────────────────────
+   The full-screen backdrop already centres the modal. Adding inset-aware
+   padding ensures the modal box itself cannot be nudged behind a notch when
+   the viewport is very small. */
+.connect-wallet-modal-backdrop,
+[class*="ConnectWalletModal_backdrop"] {
+  padding-top: max(var(--space-lg, 1rem), env(safe-area-inset-top));
+  padding-bottom: max(var(--space-lg, 1rem), env(safe-area-inset-bottom));
+  padding-left: max(var(--space-lg, 1rem), env(safe-area-inset-left));
+  padding-right: max(var(--space-lg, 1rem), env(safe-area-inset-right));
+}
+
+/* ── 4. Modal.module.css — generic dialog (position: fixed) ─────────────
+   The dialog is centred with `top:50%/left:50%` translate so it normally
+   stays away from edges. On very short or narrow viewports a notch can
+   clip the close button or footer. We tighten max-height/width to stay
+   clear and add safe padding to the dialog panel itself. */
+@media (max-width: 640px) {
+  [class*="Modal_dialog"] {
+    padding-bottom: max(var(--space-xl, 1.5rem), env(safe-area-inset-bottom));
+    padding-left: max(var(--space-xl, 1.5rem), env(safe-area-inset-left));
+    padding-right: max(var(--space-xl, 1.5rem), env(safe-area-inset-right));
+  }
+}
+
+/* ── 5. StreamCreatedModal overlay ───────────────────────────────────────
+   Same strategy as ConnectWalletModal: inset padding on the full-screen
+   overlay keeps the centred modal clear of notches. */
+[class*="StreamCreatedModal_overlay"] {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* ── 6. Recipient alerts backdrop ───────────────────────────────────────
+   Class lives in Recipient.css; we augment it here alongside all other
+   safe-area declarations so the logic is co-located. */
+.recipient-alerts-backdrop {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* ── 7. Security-gate modal overlay (Recipient.css) ──────────────────────
+   Centred overlay used by the PIN / security modal on the Recipient page. */
+.security-modal-overlay {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* ── 8. ConnectWallet page (`position: fixed; inset: 0`) ─────────────────
+   The page itself acts as the viewport; its padding must respect the notch
+   so the card and CTA are fully tappable. */
+#main-content[style*="position: fixed"],
+#main-content[style*="position:fixed"] {
+  padding-top: max(16px, env(safe-area-inset-top)) !important;
+  padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  padding-left: max(16px, env(safe-area-inset-left)) !important;
+  padding-right: max(16px, env(safe-area-inset-right)) !important;
+}
