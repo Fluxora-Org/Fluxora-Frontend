@@ -21,6 +21,23 @@ import {
   isProviderConnected,
 } from "../../lib/shareWorkspaces";
 
+const RECEIPT_POLL_INTERVAL_MS = 5_000;
+const RECEIPT_POLL_MAX_ATTEMPTS = 6;
+const RECEIPT_POLL_TIMEOUT_MS = 30_000;
+
+type ReceiptStatus = "pending" | "confirmed" | "failed" | "unknown";
+
+async function fetchReceiptStatus(txHash: string): Promise<ReceiptStatus> {
+  const configWithUrls = config as { networkUrl?: string; horizonUrl?: string };
+  const networkUrl = configWithUrls.networkUrl ?? configWithUrls.horizonUrl ?? "";
+  const baseUrl = networkUrl.replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/transactions/${txHash}`);
+  if (response.status === 404) return "pending";
+  if (!response.ok) return "pending";
+  const data = (await response.json()) as { successful?: boolean };
+  return data.successful === false ? "failed" : "confirmed";
+}
+
 interface StreamCreatedModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -73,6 +90,8 @@ export default function StreamCreatedModal({
   const channelInputId = useId();
   const previewHeadingId = useId();
 
+  const [receiptStatus, setReceiptStatus] = useState<ReceiptStatus>("pending");
+
   useEffect(() => {
     if (isOpen) {
       setAnnouncement("Success! Your USDC stream is now live on Stellar.");
@@ -93,6 +112,69 @@ export default function StreamCreatedModal({
     modalRef,
     initialFocusRef: closeButtonRef,
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!txHash) {
+      setReceiptStatus("pending");
+      return;
+    }
+
+    setReceiptStatus("pending");
+
+    let cancelled = false;
+    let stopped = false;
+    let attempts = 0;
+    let pollInFlight = false;
+    let intervalId: number | undefined;
+    let timeoutId: number | undefined;
+
+    const clearTimers = () => {
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+
+    const finish = (status: ReceiptStatus) => {
+      if (cancelled || stopped) return;
+      stopped = true;
+      setReceiptStatus(status);
+      clearTimers();
+    };
+
+    const poll = async () => {
+      if (cancelled || stopped || pollInFlight) return;
+      pollInFlight = true;
+      try {
+        const status = await fetchReceiptStatus(txHash);
+        if (cancelled || stopped) return;
+        if (status === "confirmed" || status === "failed") {
+          finish(status);
+          return;
+        }
+        attempts += 1;
+        if (attempts >= RECEIPT_POLL_MAX_ATTEMPTS) {
+          finish("unknown");
+        }
+      } catch {
+        if (cancelled || stopped) return;
+        attempts += 1;
+        if (attempts >= RECEIPT_POLL_MAX_ATTEMPTS) {
+          finish("unknown");
+        }
+      } finally {
+        pollInFlight = false;
+      }
+    };
+
+    void poll();
+    intervalId = window.setInterval(() => void poll(), RECEIPT_POLL_INTERVAL_MS);
+    timeoutId = window.setTimeout(() => finish("unknown"), RECEIPT_POLL_TIMEOUT_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+    };
+  }, [isOpen, txHash, sender]);
 
   if (!isOpen) return null;
 
@@ -683,7 +765,7 @@ export default function StreamCreatedModal({
               rate,
               timestamp: new Date().toISOString(),
               txHash: txHash || null,
-              status: txHash ? "confirmed" : "pending",
+              status: receiptStatus,
               network: config.networkLabel,
             }}
           />
