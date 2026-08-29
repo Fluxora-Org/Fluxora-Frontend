@@ -372,11 +372,11 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             )}
           </div>
         </div>
-        
+
         {/* Filter Controls */}
         {effectiveStreams.length > 0 && (
-          <div 
-            role="group" 
+          <div
+            role="group"
             aria-label="Filter streams by status"
             className="flex flex-wrap gap-2"
           >
@@ -386,11 +386,10 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 onClick={() => setFilter(status)}
                 disabled={isRefreshing || isRetrying}
                 aria-pressed={filter === status}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  filter === status
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${filter === status
                     ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
                     : "bg-transparent text-gray-600 border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-800"
-                }`}
+                  }`}
               >
                 {status}
               </button>
@@ -496,6 +495,6 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
           )}
         />
       )}
-    </div>
-  );
+        </div>
+      );
 };
