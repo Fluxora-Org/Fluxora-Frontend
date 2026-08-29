@@ -7,6 +7,7 @@ import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
 import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
+import { useWalletStateMachine } from "./wallet-connect/useWalletStateMachine";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -32,7 +33,11 @@ export interface ConnectWalletModalProps {
   onConnectFreighter?: () => void;
   onConnectAlbedo?: () => void;
   onConnectWalletConnect?: () => void;
-  // Optional controlled error state to drive the modal view from a parent component
+  /**
+   * Optional controlled error state to drive the modal view from a parent
+   * component (e.g. Design QA preview tool). When provided this overrides
+   * the machine's derived view state.
+   */
   errorState?:
     | "not_installed"
     | "rejected"
@@ -46,11 +51,14 @@ export interface ConnectWalletModalProps {
     | "unplugged-error"
     | "mobile-unsupported"
     | null;
-  // Handler for retrying connection
+  /** Handler for retrying connection */
   onRetryConnection?: () => void;
-  // Handler for downloading extension
+  /** Handler for downloading extension */
   onDownloadFreighter?: () => void;
-  // Optional flag to explicitly show or hide the Design QA Preview switcher (default: true for reviewability)
+  /**
+   * Optional flag to explicitly show or hide the Design QA Preview switcher
+   * (default: true for reviewability).
+   */
   showStateSwitcher?: boolean;
   expectedNetworkLabel?: string;
   actualNetworkLabel?: string | null;
@@ -71,6 +79,24 @@ interface WalletOption {
 // side effects or are replaced between renders.
 const stableExpectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork());
 
+/**
+ * Maps the state machine's canonical state name to the legacy
+ * `errorState` string shape used by the prop API and the Design QA toolbar.
+ */
+type LegacyErrorState =
+  | "not_installed"
+  | "rejected"
+  | "network_mismatch"
+  | "network_timeout"
+  | "device-searching"
+  | "device-found-selecting"
+  | "awaiting-device-confirmation"
+  | "device-locked-error"
+  | "wrong-app-error"
+  | "unplugged-error"
+  | "mobile-unsupported"
+  | null;
+
 export default function ConnectWalletModal({
   isOpen,
   onClose,
@@ -88,43 +114,58 @@ export default function ConnectWalletModal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const customPathInputRef = useRef<HTMLInputElement>(null);
-  
+
+  // ── State machine ──────────────────────────────────────────────────────────
+  const { machineState, send, setRequestInFlight } = useWalletStateMachine();
+
   // Track hovered/focused options in default view
   const [hoveredOptionId, setHoveredOptionId] = useState<string | null>(null);
   const [focusedOptionId, setFocusedOptionId] = useState<string | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  // Keep a ref-based in-flight guard that the async handler can read
+  // synchronously (avoids stale closure issues with the ref inside the hook).
   const isRequestInFlight = useRef(false);
-  
+
   const { connect } = useWallet();
 
-  // Internal error state for uncontrolled usage/simulation
-  const [internalErrorState, setInternalErrorState] = useState<
-    | "not_installed"
-    | "rejected"
-    | "network_mismatch"
-    | "network_timeout"
-    | "device-searching"
-    | "device-found-selecting"
-    | "awaiting-device-confirmation"
-    | "device-locked-error"
-    | "wrong-app-error"
-    | "unplugged-error"
-    | "mobile-unsupported"
-    | null
-  >(null);
-
-  // Determine active state (controlled prop takes priority over internal state)
-  const currentErrorState = errorState !== undefined ? errorState : internalErrorState;
-
-  // Hardware wallet configuration states
+  // Hardware wallet configuration states (not part of the machine – purely UI)
   const [selectedDevice, setSelectedDevice] = useState<"ledger" | "trezor">("ledger");
   const [derivationPath, setDerivationPath] = useState<string>("m/44'/148'/0'");
   const [customPath, setCustomPath] = useState<string>("m/44'/148'/0'");
   const [pathError, setPathError] = useState<string | null>(null);
 
- const [isMobile, setIsMobile] = useState(() => isMobileViewport());
+  const [isMobile, setIsMobile] = useState(() => isMobileViewport());
   const [isSimulatingHardwareFlow, setIsSimulatingHardwareFlow] = useState(false);
 
+  // ── Derive the effective display state ────────────────────────────────────
+  // The `errorState` prop (Design-QA / controlled mode) takes priority over
+  // the machine state so that parent components can still drive the view for
+  // review purposes without interfering with production flows.
+  const effectiveDisplayState: LegacyErrorState = (() => {
+    if (errorState !== undefined) return errorState ?? null;
+    switch (machineState) {
+      case "not_installed":        return "not_installed";
+      case "rejected":             return "rejected";
+      case "network_mismatch":     return "network_mismatch";
+      case "network_timeout":      return "network_timeout";
+      case "device_searching":     return "device-searching";
+      case "device_found_selecting": return "device-found-selecting";
+      case "awaiting_device_confirmation": return "awaiting-device-confirmation";
+      case "device_locked_error":  return "device-locked-error";
+      case "wrong_app_error":      return "wrong-app-error";
+      case "unplugged_error":      return "unplugged-error";
+      case "mobile_unsupported":   return "mobile-unsupported";
+      default:                     return null; // idle, connecting, connected
+    }
+  })();
+
+  // Whether the modal is currently in the default wallet-list view.
+  const isDefaultView = effectiveDisplayState === null && machineState !== "connecting";
+  // Show connecting spinner on the Freighter option while machine is connecting.
+  const isConnecting = machineState === "connecting";
+
+  // ── Viewport resize tracking ───────────────────────────────────────────────
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
 
@@ -145,7 +186,7 @@ export default function ConnectWalletModal({
       window.removeEventListener("resize", handleResize);
     };
   }, []);
-  
+
   const handleCustomPathChange = (val: string) => {
     setCustomPath(val);
     const regex = /^m\/44'\/148'\/[0-9]+'?$/;
@@ -165,21 +206,22 @@ export default function ConnectWalletModal({
     }
   }, [derivationPath]);
 
-  // Simulate desktop scanning transition
+  // Simulate desktop scanning transition (only in Design QA simulation mode)
   useEffect(() => {
-    if (currentErrorState === "device-searching" && isSimulatingHardwareFlow) {
+    if (effectiveDisplayState === "device-searching" && isSimulatingHardwareFlow) {
       const timer = setTimeout(() => {
-        setInternalErrorState("device-found-selecting");
+        send({ type: "DEVICE_FOUND" });
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [currentErrorState, isSimulatingHardwareFlow]);
+  }, [effectiveDisplayState, isSimulatingHardwareFlow, send]);
 
-  // Simulate on-device approval confirmation transition
+  // Simulate on-device approval confirmation transition (Design QA only)
   useEffect(() => {
-    if (currentErrorState === "awaiting-device-confirmation" && isSimulatingHardwareFlow) {
+    if (effectiveDisplayState === "awaiting-device-confirmation" && isSimulatingHardwareFlow) {
       const timer = setTimeout(() => {
         connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+        send({ type: "CONNECTION_SUCCESS" });
         setIsSimulatingHardwareFlow(false);
         if (onConnectFreighter) {
           onConnectFreighter();
@@ -188,27 +230,39 @@ export default function ConnectWalletModal({
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [currentErrorState, isSimulatingHardwareFlow, connect, onClose, onConnectFreighter]);
+  }, [effectiveDisplayState, isSimulatingHardwareFlow, connect, onClose, onConnectFreighter, send]);
 
+  /** Handle hardware wallet selection (drives the machine). */
   const handleHardwareClick = () => {
     setIsSimulatingHardwareFlow(true);
     if (isMobile) {
-      setInternalErrorState("mobile-unsupported");
+      send({ type: "SELECT_HARDWARE_MOBILE" });
     } else {
-      setInternalErrorState("device-searching");
+      send({ type: "SELECT_HARDWARE" });
     }
   };
 
-  // Handle Freighter selection: perform actual connection and network verification
+  /**
+   * Handle Freighter selection: drives the machine to `connecting`, performs
+   * the actual Freighter API calls, then sends the appropriate result event.
+   */
   const handleFreighterClick = async () => {
+    // Machine-level guard: SELECT_FREIGHTER is ignored while in-flight.
     if (isRequestInFlight.current) return;
+
+    // Drive the machine into the connecting state BEFORE marking in-flight,
+    // so the machine's send() guard (which checks the hook's inFlightRef) does
+    // not swallow the SELECT_FREIGHTER event.
+    send({ type: "SELECT_FREIGHTER" });
+
     isRequestInFlight.current = true;
+    setRequestInFlight(true);
     setConnectingId("freighter");
-    setInternalErrorState(null);
+
     try {
       const ready = await isConnected();
       if (!ready.isConnected) {
-        setInternalErrorState("not_installed");
+        send({ type: "ERROR", error: "not_installed" });
         if (onDownloadFreighter) {
           onDownloadFreighter();
         }
@@ -217,13 +271,13 @@ export default function ConnectWalletModal({
 
       const access = await requestAccess();
       if (access.error || !access.address) {
-        setInternalErrorState("rejected");
+        send({ type: "ERROR", error: "rejected" });
         return;
       }
 
       const net = await withTimeout(getNetwork(), NETWORK_TIMEOUT_MS);
       if (net.error || !net.network) {
-        setInternalErrorState("rejected");
+        send({ type: "ERROR", error: "rejected" });
         return;
       }
 
@@ -231,37 +285,49 @@ export default function ConnectWalletModal({
       const actualUpper = net.network.toUpperCase();
       const expectedUpper = expectedNet.toUpperCase();
       if (actualUpper !== expectedUpper) {
-        setInternalErrorState("network_mismatch");
+        send({ type: "ERROR", error: "network_mismatch" });
         return;
       }
 
       // Successful connection!
       connect(access.address, net.network);
+      send({ type: "CONNECTION_SUCCESS" });
       if (onConnectFreighter) {
         onConnectFreighter();
       }
       onClose();
     } catch (err) {
       if (err instanceof Error && err.message === "NETWORK_CHECK_TIMEOUT") {
-        setInternalErrorState("network_timeout");
+        send({ type: "ERROR", error: "network_timeout" });
       } else {
-        setInternalErrorState("rejected");
+        send({ type: "ERROR", error: "rejected" });
       }
     } finally {
       isRequestInFlight.current = false;
+      setRequestInFlight(false);
       setConnectingId(null);
     }
   };
 
-  // Reset internal error state back to default wallet list
+  /** Retry Freighter connection from an error state. */
+  const handleRetryFreighter = () => {
+    send({ type: "RETRY" });
+    if (onRetryConnection) {
+      onRetryConnection();
+    }
+    // Re-attempt the connection after driving the machine to `connecting`.
+    void handleFreighterClick();
+  };
+
+  /** Return to the wallet selection list (idle). */
   const handleBackToWalletSelection = () => {
-    setInternalErrorState(null);
+    send({ type: "BACK" });
     if (onRetryConnection) {
       onRetryConnection();
     }
   };
 
-  // Keyboard navigation & Focus Trapping
+  // ── Keyboard navigation & Focus Trapping ───────────────────────────────────
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -305,7 +371,7 @@ export default function ConnectWalletModal({
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    
+
     // Auto-focus the close button or primary action when the modal opens
     closeButtonRef.current?.focus();
 
@@ -322,7 +388,7 @@ export default function ConnectWalletModal({
     if (!isOpen) return;
 
     const timer = setTimeout(() => {
-      if (currentErrorState) {
+      if (effectiveDisplayState) {
         const autofocusElement = modalRef.current?.querySelector<HTMLElement>(
           '[data-autofocus="true"]'
         );
@@ -337,7 +403,7 @@ export default function ConnectWalletModal({
     }, 50);
 
     return () => clearTimeout(timer);
-  }, [isOpen, currentErrorState]);
+  }, [isOpen, effectiveDisplayState]);
 
   if (!isOpen) {
     return null;
@@ -426,7 +492,7 @@ export default function ConnectWalletModal({
         </button>
 
         {/* DEFAULT STATE: Choose Wallet Provider */}
-        {!currentErrorState && (
+        {isDefaultView && (
           <>
             <div className={styles.header}>
               <span className={styles.badge} id="badge-default">Step 1 of 1</span>
@@ -444,8 +510,8 @@ export default function ConnectWalletModal({
                 const isActive =
                   !wallet.disabled &&
                   (hoveredOptionId === wallet.id || focusedOptionId === wallet.id);
-                const isConnectingThis = connectingId === wallet.id;
-                const isDisabled = wallet.disabled || connectingId !== null;
+                const isConnectingThis = isConnecting && connectingId === wallet.id;
+                const isDisabled = wallet.disabled || isConnecting;
 
                 return (
                   <button
@@ -552,18 +618,18 @@ export default function ConnectWalletModal({
         )}
 
         {/* ERROR STATE: Freighter Not Installed */}
-        {currentErrorState === "not_installed" && (
+        {effectiveDisplayState === "not_installed" && (
           <div className={styles.errorContainer} data-testid="error-state-not-installed">
             <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
               <Download size={28} />
             </div>
-            
+
             <span className={styles.badge} id="badge-not-installed">Extension Required</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
               Freighter Not Installed
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Freighter is the official browser extension for Stellar and Soroban. 
+              Freighter is the official browser extension for Stellar and Soroban.
               You will need to install the extension to securely connect your wallet to Fluxora.
             </p>
 
@@ -594,7 +660,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* ERROR STATE: Connection Request Rejected */}
-        {currentErrorState === "rejected" && (
+        {effectiveDisplayState === "rejected" && (
           <div className={styles.errorContainer} data-testid="error-state-rejected">
             <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
               <AlertCircle size={28} />
@@ -605,7 +671,7 @@ export default function ConnectWalletModal({
               Connection Rejected
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The connection was declined in your wallet extension. To interact with Fluxora, 
+              The connection was declined in your wallet extension. To interact with Fluxora,
               please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.
             </p>
 
@@ -614,7 +680,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleFreighterClick}
+                onClick={handleRetryFreighter}
                 aria-label="Retry connecting to Freighter wallet"
               >
                 <RefreshCw size={18} />
@@ -634,7 +700,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* ERROR STATE: Network Mismatch */}
-        {currentErrorState === "network_mismatch" && (
+        {effectiveDisplayState === "network_mismatch" && (
           <div className={styles.errorContainer} data-testid="error-state-network-mismatch">
             <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
               <AlertTriangle size={28} />
@@ -676,7 +742,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleFreighterClick}
+                onClick={handleRetryFreighter}
                 aria-label="Check network configuration again"
               >
                 <RefreshCw size={18} />
@@ -696,7 +762,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* ERROR STATE: Network Check Timed Out */}
-        {currentErrorState === "network_timeout" && (
+        {effectiveDisplayState === "network_timeout" && (
           <div className={styles.errorContainer} data-testid="error-state-network-timeout">
             <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
               <Timer size={28} />
@@ -716,7 +782,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleFreighterClick}
+                onClick={handleRetryFreighter}
                 aria-label="Retry network check"
               >
                 <RefreshCw size={18} />
@@ -736,7 +802,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Device Searching */}
-        {currentErrorState === "device-searching" && (
+        {effectiveDisplayState === "device-searching" && (
           <div className={styles.errorContainer} data-testid="error-state-device-searching">
             <div className={styles.radarContainer} aria-hidden="true">
               <div className={styles.radarRing}></div>
@@ -761,7 +827,7 @@ export default function ConnectWalletModal({
                 <button
                   type="button"
                   className={styles.primaryButton}
-                  onClick={() => setInternalErrorState("device-found-selecting")}
+                  onClick={() => send({ type: "DEVICE_FOUND" })}
                   aria-label="Simulate device detected"
                 >
                   Simulate Found
@@ -781,7 +847,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Device Found & Selection */}
-        {currentErrorState === "device-found-selecting" && (
+        {effectiveDisplayState === "device-found-selecting" && (
           <div className={styles.errorContainer} data-testid="error-state-device-found-selecting">
             <div className={`${styles.errorIcon} ${styles.iconNotInstalled}`} aria-hidden="true">
               <Cpu size={28} />
@@ -895,7 +961,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 disabled={derivationPath === "custom" && pathError !== null}
-                onClick={() => setInternalErrorState("awaiting-device-confirmation")}
+                onClick={() => send({ type: "DEVICE_CONFIRMED" })}
                 aria-label="Confirm selection and connect"
               >
                 <Check size={18} />
@@ -904,7 +970,7 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={styles.secondaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
+                onClick={() => send({ type: "BACK" })}
                 aria-label="Back to device scanning"
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
@@ -915,7 +981,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Awaiting Device Confirmation */}
-        {currentErrorState === "awaiting-device-confirmation" && (
+        {effectiveDisplayState === "awaiting-device-confirmation" && (
           <div className={styles.errorContainer} data-testid="error-state-awaiting-device-confirmation">
             <div className={styles.radarContainer} aria-hidden="true">
               <div className={styles.radarRing} style={{ animationDuration: "1.5s" }}></div>
@@ -941,6 +1007,7 @@ export default function ConnectWalletModal({
                   className={styles.primaryButton}
                   onClick={() => {
                     connect("GDU4D7EXAMPLEADDRESS0L50DR222222222222222222222222222222", "TESTNET");
+                    send({ type: "CONNECTION_SUCCESS" });
                     if (onConnectFreighter) onConnectFreighter();
                     onClose();
                   }}
@@ -952,7 +1019,7 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={styles.secondaryButton}
-                onClick={() => setInternalErrorState("device-found-selecting")}
+                onClick={() => send({ type: "BACK" })}
                 aria-label="Cancel confirmation and go back to configure"
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
@@ -963,7 +1030,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Device Locked Error */}
-        {currentErrorState === "device-locked-error" && (
+        {effectiveDisplayState === "device-locked-error" && (
           <div className={styles.errorContainer} data-testid="error-state-device-locked-error">
             <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
               <Lock size={28} />
@@ -981,7 +1048,7 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
+                onClick={() => send({ type: "RETRY" })}
                 aria-label="Retry connection scan"
               >
                 <RefreshCw size={18} />
@@ -1001,7 +1068,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Wrong App Error */}
-        {currentErrorState === "wrong-app-error" && (
+        {effectiveDisplayState === "wrong-app-error" && (
           <div className={styles.errorContainer} data-testid="error-state-wrong-app-error">
             <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
               <AlertTriangle size={28} />
@@ -1019,7 +1086,7 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
+                onClick={() => send({ type: "RETRY" })}
                 aria-label="Retry connection scan"
               >
                 <RefreshCw size={18} />
@@ -1039,7 +1106,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Unplugged Error */}
-        {currentErrorState === "unplugged-error" && (
+        {effectiveDisplayState === "unplugged-error" && (
           <div className={styles.errorContainer} data-testid="error-state-unplugged-error">
             <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
               <PowerOff size={28} />
@@ -1057,7 +1124,7 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={styles.primaryButton}
-                onClick={() => setInternalErrorState("device-searching")}
+                onClick={() => send({ type: "RETRY" })}
                 aria-label="Scan for hardware wallet again"
               >
                 <RefreshCw size={18} />
@@ -1077,7 +1144,7 @@ export default function ConnectWalletModal({
         )}
 
         {/* HARDWARE WALLET: Mobile Fallback */}
-        {currentErrorState === "mobile-unsupported" && (
+        {effectiveDisplayState === "mobile-unsupported" && (
           <div className={styles.errorContainer} data-testid="error-state-mobile-unsupported">
             <div className={`${styles.errorIcon} ${styles.iconMismatch}`} aria-hidden="true">
               <Smartphone size={28} />
@@ -1096,7 +1163,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 onClick={() => {
-                  setInternalErrorState(null);
+                  send({ type: "RESET" });
                   if (onConnectWalletConnect) onConnectWalletConnect();
                 }}
                 aria-label="Connect using WalletConnect mobile flow"
@@ -1124,156 +1191,173 @@ export default function ConnectWalletModal({
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === null ? styles.previewButtonActive : ""
+                  effectiveDisplayState === null ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState(null);
+                  send({ type: "RESET" });
                 }}
-                aria-pressed={currentErrorState === null}
+                aria-pressed={effectiveDisplayState === null}
               >
                 Default View
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "not_installed" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "not_installed" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("not_installed");
+                  send({ type: "SELECT_FREIGHTER" });
+                  send({ type: "ERROR", error: "not_installed" });
                 }}
-                aria-pressed={currentErrorState === "not_installed"}
+                aria-pressed={effectiveDisplayState === "not_installed"}
               >
                 Not Installed
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "rejected" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "rejected" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("rejected");
+                  send({ type: "SELECT_FREIGHTER" });
+                  send({ type: "ERROR", error: "rejected" });
                 }}
-                aria-pressed={currentErrorState === "rejected"}
+                aria-pressed={effectiveDisplayState === "rejected"}
               >
                 Rejected
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "network_mismatch" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "network_mismatch" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("network_mismatch");
+                  send({ type: "SELECT_FREIGHTER" });
+                  send({ type: "ERROR", error: "network_mismatch" });
                 }}
-                aria-pressed={currentErrorState === "network_mismatch"}
+                aria-pressed={effectiveDisplayState === "network_mismatch"}
               >
                 Wrong Network
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "network_timeout" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "network_timeout" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("network_timeout");
+                  send({ type: "SELECT_FREIGHTER" });
+                  send({ type: "ERROR", error: "network_timeout" });
                 }}
-                aria-pressed={currentErrorState === "network_timeout"}
+                aria-pressed={effectiveDisplayState === "network_timeout"}
               >
                 Timed Out
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "device-searching" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "device-searching" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-searching");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
                 }}
-                aria-pressed={currentErrorState === "device-searching"}
+                aria-pressed={effectiveDisplayState === "device-searching"}
               >
                 HW: Search
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "device-found-selecting" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "device-found-selecting" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-found-selecting");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
+                  send({ type: "DEVICE_FOUND" });
                 }}
-                aria-pressed={currentErrorState === "device-found-selecting"}
+                aria-pressed={effectiveDisplayState === "device-found-selecting"}
               >
                 HW: Select
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "awaiting-device-confirmation" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "awaiting-device-confirmation" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("awaiting-device-confirmation");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
+                  send({ type: "DEVICE_FOUND" });
+                  send({ type: "DEVICE_CONFIRMED" });
                 }}
-                aria-pressed={currentErrorState === "awaiting-device-confirmation"}
+                aria-pressed={effectiveDisplayState === "awaiting-device-confirmation"}
               >
                 HW: Confirm
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "device-locked-error" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "device-locked-error" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("device-locked-error");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
+                  send({ type: "ERROR", error: "device_locked_error" });
                 }}
-                aria-pressed={currentErrorState === "device-locked-error"}
+                aria-pressed={effectiveDisplayState === "device-locked-error"}
               >
                 HW: Locked
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "wrong-app-error" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "wrong-app-error" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("wrong-app-error");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
+                  send({ type: "ERROR", error: "wrong_app_error" });
                 }}
-                aria-pressed={currentErrorState === "wrong-app-error"}
+                aria-pressed={effectiveDisplayState === "wrong-app-error"}
               >
                 HW: Wrong App
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "unplugged-error" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "unplugged-error" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("unplugged-error");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE" });
+                  send({ type: "ERROR", error: "unplugged_error" });
                 }}
-                aria-pressed={currentErrorState === "unplugged-error"}
+                aria-pressed={effectiveDisplayState === "unplugged-error"}
               >
                 HW: Unplugged
               </button>
               <button
                 type="button"
                 className={`${styles.previewButton} ${
-                  currentErrorState === "mobile-unsupported" ? styles.previewButtonActive : ""
+                  effectiveDisplayState === "mobile-unsupported" ? styles.previewButtonActive : ""
                 }`}
                 onClick={() => {
                   setIsSimulatingHardwareFlow(false);
-                  setInternalErrorState("mobile-unsupported");
+                  send({ type: "RESET" });
+                  send({ type: "SELECT_HARDWARE_MOBILE" });
                 }}
-                aria-pressed={currentErrorState === "mobile-unsupported"}
+                aria-pressed={effectiveDisplayState === "mobile-unsupported"}
               >
                 HW: Mobile Unsupported
               </button>

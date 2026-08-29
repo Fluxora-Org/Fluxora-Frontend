@@ -41,6 +41,8 @@ export default defineConfig({
         "src/components/treasuryOverviewPage/StreamRow.tsx",
         "src/components/treasuryOverviewPage/useTreasury.ts",
         "src/components/wallet-connect/Walletbutton.tsx",
+        "src/components/wallet-connect/useWalletStateMachine.ts",
+        "src/components/ConnectWalletModal.tsx",
         "src/data/streamRecords.ts",
         "src/fixtures/malformedStreamRecords.ts",
         "src/lib/formatters.ts",
