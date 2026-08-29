@@ -35,6 +35,13 @@ import {
   type StreamStatus,
 } from "../data/streamRecords";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
+import { useOptimisticStreams } from "../hooks/useOptimisticStreams";
+import {
+  clearResolved as clearResolvedOptimistic,
+  getPendingOperations as getPendingOptimistic,
+  resolveByTxHash as resolveOptimisticByTxHash,
+} from "../lib/optimisticTransactions";
+import { getTransactionStatus } from "../lib/stellar/tx";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -805,7 +812,37 @@ export default function Streams() {
   const hasMountedFilterAnnouncer = useRef(false);
   const wallet = useWallet();
   const walletAddress = wallet.address?.trim() ?? "";
-  const { streams, loading, error, refetch, retryCount } = useTreasury();
+  const { streams: serverStreams, loading, error, refetch, retryCount } = useTreasury();
+  const { streams, pendingCount, rolledBackCount } = useOptimisticStreams({ streams: serverStreams });
+
+  // ── Reconcile stale optimistic rows on mount ───────────────────────────
+  // When the user reloads during receipt polling, pending optimistic rows may
+  // already be confirmed or failed on-chain.  We check each one and resolve
+  // it deterministically so the UI never shows a stale optimistic row.
+  const reconciledRef = useRef(false);
+  useEffect(() => {
+    if (reconciledRef.current) return;
+    reconciledRef.current = true;
+    const pending = getPendingOptimistic();
+    if (pending.length === 0) return;
+
+    for (const op of pending) {
+      if (!op.txHash) continue;
+      void getTransactionStatus(op.txHash)
+        .then((onChainStatus: string) => {
+          if (onChainStatus === "confirmed") {
+            resolveOptimisticByTxHash(op.txHash!, "confirmed");
+          } else if (onChainStatus === "failed") {
+            resolveOptimisticByTxHash(op.txHash!, "rolled-back", "Confirmed failed on-chain after reload");
+          }
+          // If still pending, leave it — the polling will eventually resolve it.
+        })
+        .catch(() => {
+          // Network error during reconciliation — leave the row as pending
+          // so the user sees it and can retry or refresh.
+        });
+    }
+  }, []);
 
   const filterLabels: Record<StatusFilter, string> = {
     All: t("streams.filter.all"),
@@ -1156,12 +1193,28 @@ export default function Streams() {
     // A transaction has completed — a draft must never be offered back.
     setLiveDraft(null);
     setRestoredDraft(null);
+    // Clean up resolved optimistic operations after a successful refetch.
+    clearResolvedOptimistic();
     refetchStreams();
   }, [refetchStreams, streams.length]);
 
   const handleStreamError = useCallback(() => {
     refetch();
   }, [refetch]);
+
+  // Toast the user when a rollback is detected (transaction failed or timed out
+  // while polling).  This fires once per page visit when rolledBackCount transitions
+  // from 0 to a positive value.
+  const rolledBackToastRef = useRef(0);
+  useEffect(() => {
+    if (rolledBackCount > 0 && rolledBackCount > rolledBackToastRef.current) {
+      addToast(
+        "A pending stream operation did not confirm on-chain and has been reverted.",
+        "error",
+      );
+    }
+    rolledBackToastRef.current = rolledBackCount;
+  }, [rolledBackCount, addToast]);
 
   const handleCopyRecipient = useCallback(
     async (stream: StreamRecord) => {

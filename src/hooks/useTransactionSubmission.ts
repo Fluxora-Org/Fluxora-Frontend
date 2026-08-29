@@ -18,6 +18,9 @@ export type TxStatus =
   | "timeout"
   | "failed";
 
+/** Outcome reported when the transaction reaches a terminal state. */
+export type TransactionResolvedOutcome = "confirmed" | "failed" | "timeout";
+
 export interface TransactionSubmissionOptions {
   submit: (idempotencyKey: string) => Promise<{ txHash: string }>;
   getStatus?: (hash: string) => Promise<"pending" | "confirmed" | "failed">;
@@ -25,6 +28,12 @@ export interface TransactionSubmissionOptions {
   maxAttempts?: number;
   backoffFactor?: number;
   params?: Record<string, unknown>;
+  /**
+   * Called exactly once when the transaction reaches a terminal state
+   * (confirmed, failed, or timeout).  The callback receives the outcome and
+   * the resolved `txHash` so the caller can reconcile optimistic rows.
+   */
+  onResolved?: (outcome: TransactionResolvedOutcome, txHash: string) => void;
 }
 
 export interface UseTransactionSubmissionResult {
@@ -47,7 +56,11 @@ export function useTransactionSubmission(
     maxAttempts = transactionPollingConfig.maxAttempts,
     backoffFactor = transactionPollingConfig.backoffFactor,
     params = {},
+    onResolved,
   } = options;
+
+  const onResolvedRef = useRef(onResolved);
+  onResolvedRef.current = onResolved;
 
   const [status, setStatus] = useState<TxStatus>("idle");
   const [attempts, setAttempts] = useState(0);
@@ -98,6 +111,7 @@ export function useTransactionSubmission(
             }
             clearPendingTx();
             stopTracking();
+            onResolvedRef.current?.("confirmed", hash);
             return;
           }
 
@@ -108,6 +122,7 @@ export function useTransactionSubmission(
             }
             clearPendingTx();
             stopTracking();
+            onResolvedRef.current?.("failed", hash);
             return;
           }
 
@@ -117,6 +132,7 @@ export function useTransactionSubmission(
               setError("Transaction confirmation timed out.");
             }
             stopTracking();
+            onResolvedRef.current?.("timeout", hash);
             return;
           }
 
@@ -137,6 +153,10 @@ export function useTransactionSubmission(
           }
           clearPendingTx();
           stopTracking();
+          onResolvedRef.current?.(
+            "failed",
+            hash,
+          );
         }
       };
 
@@ -167,6 +187,7 @@ export function useTransactionSubmission(
         }
         clearPendingTx();
         stopTracking();
+        onResolvedRef.current?.("confirmed", pending.txHash);
         return true;
       }
       if (onChainStatus === "pending") {
@@ -180,8 +201,10 @@ export function useTransactionSubmission(
         stopTracking();
         return true;
       }
+      // The tx was neither confirmed nor pending — treat as failed.
       clearPendingTx();
       stopTracking();
+      onResolvedRef.current?.("failed", pending.txHash);
       return false;
     } catch {
       clearPendingTx();
@@ -244,6 +267,8 @@ export function useTransactionSubmission(
         setStatus("failed");
         setError(message);
       }
+      // Submission errors (e.g. wallet rejection) do not have a txHash
+      // to resolve, so we skip onResolved here.
       throw new Error(message);
     }
   }, [clearPendingTx, params, poll, reconcileAndResume, submit]);

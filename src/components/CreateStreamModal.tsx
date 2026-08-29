@@ -8,6 +8,7 @@ import { useWallet } from './wallet-connect/Walletcontext';
 import { useToast } from './toast/ToastProvider';
 import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
 import { createStream } from '../lib/stellar/tx';
+import { addOptimistic, confirmOptimistic, rollbackOptimistic } from '../lib/optimisticTransactions';
 import { isValidStellarAddress, maskAddress } from '../lib/stellar';
 import {
   computeStreamEndDate,
@@ -279,6 +280,9 @@ export default function CreateStreamModal({
   const durationValue = parseFloat(duration || "0");
   const requiredDepositValue = accrualRateValue * durationValue;
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
+  // Ref to track the current optimistic operation so onResolved can resolve it.
+  const optimisticOpIdRef = useRef<string | null>(null);
+
   const txSubmission = useTransactionSubmission({
     submit: async (idempotencyKey) => {
       const sender = wallet.address!;
@@ -304,6 +308,42 @@ export default function CreateStreamModal({
       if (!response.txHash) {
         throw new Error("Missing transaction hash from Stellar RPC.");
       }
+      // Register an optimistic row so the stream list immediately shows
+      // the new stream.  The row is rolled back if the receipt polling
+      // reports rejection or timeout, or confirmed when it succeeds.
+      const now = new Date().toISOString().split("T")[0]!;
+      const optimisticRecord = {
+        id: `STR-NEW-${Date.now()}`,
+        name: `New stream → ${recipient.trim().slice(0, 8)}…`,
+        recipientName: "Pending…",
+        recipientAddress: recipient.trim(),
+        treasuryName: "Current treasury",
+        treasuryAddress: sender,
+        asset: "USDC",
+        status: "Active" as const,
+        monthlyRate: parseFloat(accrualRate || "0"),
+        depositAmount: parsedAmount,
+        streamedAmount: 0,
+        withdrawableAmount: 0,
+        remainingAmount: parsedAmount,
+        progress: 0,
+        startDate: now,
+        endDate: new Date(end * 1000).toISOString().split("T")[0]!,
+        summary: "Optimistic row — awaiting on-chain confirmation.",
+        health: "Healthy" as const,
+        healthNote: "Awaiting confirmation.",
+        auditNote: "Created via Fluxora UI.",
+        tags: ["Optimistic", "Pending confirmation"],
+        timeline: [
+          {
+            date: now,
+            title: "Stream created",
+            detail: "Transaction submitted, awaiting on-chain confirmation.",
+          },
+        ],
+      };
+      const op = addOptimistic("create", optimisticRecord as unknown as Record<string, unknown>, response.txHash);
+      optimisticOpIdRef.current = op.id;
       return { txHash: response.txHash };
     },
     params: {
@@ -315,6 +355,16 @@ export default function CreateStreamModal({
       customStartDate,
       cliffEnabled,
       cliffDate,
+    },
+    onResolved: (outcome, resolvedTxHash) => {
+      const opId = optimisticOpIdRef.current;
+      if (!opId) return;
+      if (outcome === "confirmed") {
+        confirmOptimistic(opId);
+      } else {
+        rollbackOptimistic(opId, `Transaction ${outcome}: ${resolvedTxHash}`);
+      }
+      optimisticOpIdRef.current = null;
     },
   });
   const isConfirmationPending = txSubmission.status === "pending";
