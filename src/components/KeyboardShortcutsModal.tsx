@@ -34,23 +34,32 @@ export function KeyboardShortcutsModal() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
-      const isEditable =
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        (e.target as HTMLElement).isContentEditable;
+        const isEditable =
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          (e.target as HTMLElement).isContentEditable;
+        // Ignore when IME composition is in progress
+        const isComposing = (e as KeyboardEvent).isComposing;
+        if (isComposing) return;
+        // Ignore when modifier keys are held without being part of a defined shortcut
+        if (e.ctrlKey || e.metaKey) return;
 
-      if (e.key === '?' && !isEditable) {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-      if (e.key === 'Escape') {
-        setOpen(false);
-      }
+        // Open modal on '?' only when not already open and not in an editable element
+        if (e.key === '?' && !isEditable && !open) {
+          e.preventDefault();
+          setOpen(true);
+        }
+        // Close modal on Escape when open
+        if (e.key === 'Escape' && open) {
+          e.preventDefault();
+          setOpen(false);
+        }
+
     }
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [open]);
 
   if (!open) return null;
 
