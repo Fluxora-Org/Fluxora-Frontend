@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "
 import { lazy, Suspense, useState, type ReactElement } from "react";
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
-import { Skeleton, SkeletonCard } from "./components/Skeleton";
+import WalletFallback from "./components/WalletFallback";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import { ToastProvider } from "./components/toast/ToastProvider";
@@ -53,51 +53,7 @@ function RecipientRoute() {
 }
 
 function AppRouteFallback() {
-  return (
-    <div role="status" aria-label="Loading app page" aria-busy="true">
-      <span className="sr-only">Loading app page...</span>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          marginBottom: "1.5rem",
-        }}
-      >
-        <Skeleton width={220} height={28} borderRadius={8} />
-        <Skeleton width={340} height={14} />
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "1rem",
-        }}
-        aria-hidden="true"
-      >
-        {[0, 1, 2].map((item) => (
-          <SkeletonCard
-            key={item}
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <Skeleton width={40} height={40} borderRadius={8} />
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              <Skeleton height={10} width="45%" />
-              <Skeleton height={18} width="70%" />
-            </div>
-          </SkeletonCard>
-        ))}
-      </div>
-    </div>
-  );
+  return <WalletFallback stage="loading-data" />;
 }
 
 function lazyAppRoute(element: ReactElement) {
