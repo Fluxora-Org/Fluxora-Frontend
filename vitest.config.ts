@@ -36,6 +36,7 @@ export default defineConfig({
         "src/components/WalletIcon.tsx",
         "src/components/treasuryOverviewPage/MetricCard.tsx",
         "src/components/treasuryOverviewPage/StatusPill.tsx",
+        "src/design-tokens.css",
         "src/components/treasuryOverviewPage/Metrics.tsx",
         "src/components/treasuryOverviewPage/RecentStreams.tsx",
         "src/components/treasuryOverviewPage/StreamRow.tsx",
