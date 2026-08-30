@@ -17,6 +17,7 @@ function truncateAddress(address?: string): string {
  */
 function getStatusPillStyle(status: string) {
   switch (status) {
+      
     case 'Active':
       return {
         bg: '#064E3B',
