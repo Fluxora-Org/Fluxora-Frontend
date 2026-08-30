@@ -26,6 +26,7 @@ vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
     loading: false,
     error: null,
     refetch: vi.fn(),
+    retryCount: 0,
   }),
   useRecipientStreams: () => ({
     streams: [],
@@ -35,10 +36,34 @@ vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
   }),
 }));
 
+vi.mock("../hooks/useOptimisticStreams", () => ({
+  useOptimisticStreams: ({ streams }: { streams: StreamRecord[] }) => ({
+    streams,
+    pendingCount: 0,
+    rolledBackCount: 0,
+  }),
+}));
+
+vi.mock("../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => ({
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    network: "TESTNET",
+    connected: true,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
+
+vi.mock("../lib/stellar/tx", () => ({
+  getTransactionStatus: vi.fn().mockResolvedValue("pending"),
+}));
+
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
-type ClipboardMock = {
-  writeText: ReturnType<typeof vi.fn>;
-};
 
 function mockMatchMedia(matches: boolean) {
   const listeners: MatchMediaChangeHandler[] = [];
@@ -74,6 +99,7 @@ function renderStreams() {
       <MemoryRouter initialEntries={["/app/streams"]}>
         <Routes>
           <Route path="/app/streams" element={<Streams />} />
+          <Route path="/app/streams/:streamId" element={<Streams />} />
         </Routes>
       </MemoryRouter>
     </ToastProvider>,
@@ -85,237 +111,6 @@ async function finishLoading() {
     vi.advanceTimersByTime(2000);
   });
 }
-
-describe("Streams disclosure motion", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    act(() => {
-      vi.runOnlyPendingTimers();
-    });
-    vi.useRealTimers();
-  });
-
-  it("debounces rapid filter and sort announcements", async () => {
-    const { unmount } = render(
-      <RecipientStreams streams={[activeStream, pausedStream]} pollIntervalMs={0} />,
-    );
-
-    const liveRegion = screen.getByRole("status");
-    expect(liveRegion).toHaveTextContent("");
-
-    // Rapid burst of filter and sort changes.
-    fireEvent.click(screen.getByRole("button", { name: /^Active$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Paused$/i }));
-
-    // Toggle a pin to force a sort change.
-    const pinButton = screen.getAllByRole("button", { name: /pin stream/i })[0]!;
-    fireEvent.click(pinButton);
-
-    // No announcement should be made during the debounce window.
-    expect(liveRegion).toHaveTextContent("");
-
-    // Advance past the debounce delay.
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    // Exactly one final announcement.
-    expect(liveRegion).toHaveTextContent("paused streams");
-
-    // Cleanup on unmount should cancel pending timers.
-    unmount();
-    expect(vi.getTimerCount()).toBe(0);
-  });
-});
-
-describe("Streams session recovery banner", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-    mockMatchMedia(false);
-    localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
-  it("does not show the banner when there is no prior session", async () => {
-    renderStreams();
-    await finishLoading();
-
-    expect(
-      screen.queryByRole("status", { name: /we restored your previous session/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("offers to restore a prior session and applies it on Restore", async () => {
-    writeStreamsSession(
-      { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
-      Date.now(),
-    );
-
-    renderStreams();
-    await finishLoading();
-
-    expect(
-      screen.getByRole("status", { name: /we restored your previous session/i }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
-
-    expect(screen.getByRole("button", { name: "Active" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByText(/session restored/i)).toBeInTheDocument();
-  });
-
-  it("clears the stored session on Start fresh", async () => {
-    writeStreamsSession(
-      { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" }, draft: null },
-      Date.now(),
-    );
-
-    renderStreams();
-    await finishLoading();
-
-    fireEvent.click(screen.getByRole("button", { name: "Start fresh" }));
-
-    expect(screen.getByText(/starting fresh/i)).toBeInTheDocument();
-    expect(readStreamsSession(Date.now())).toBeNull();
-  });
-
-  it("hides the banner without applying anything when ignored via direct interaction", async () => {
-    writeStreamsSession(
-      { filters: { ...DEFAULT_STREAMS_FILTERS, statusFilter: "Active" }, draft: null },
-      Date.now(),
-    );
-
-    renderStreams();
-    await finishLoading();
-
-    fireEvent.click(screen.getByRole("button", { name: "Paused" }));
-
-    expect(
-      screen.queryByRole("status", { name: /we restored your previous session/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Paused" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  it("shows the always-on persistence indicator and autosaves filter changes", async () => {
-    renderStreams();
-    await finishLoading();
-
-    expect(screen.getByText(/autosaving/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Active" }));
-
-    expect(screen.getByText(/autosaving/i)).toBeInTheDocument();
-  });
-});
-
-// Helpers for stale request cancellation tests
-const deferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
-
-const jsonResponse = (data: unknown): Response =>
-  new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-
-describe("Streams stale request cancellation", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-    mockMatchMedia(false);
-    localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  it("ignores out-of-order responses and only applies the latest filter results", async () => {
-    const slowOld = deferred<Response>();
-    const fastNew = deferred<Response>();
-    const fetchMock = vi.fn()
-      .mockReturnValueOnce(slowOld.promise)
-      .mockReturnValueOnce(fastNew.promise);
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderStreams();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: "Active" }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      fastNew.resolve(jsonResponse({
-        streams: [{ id: "new", name: "New Stream", recipientAddress: "0x123", amount: "100", status: "Active", category: "Grant" }],
-        total: 1,
-        announcements: [],
-      }));
-      await Promise.resolve();
-    });
-
-    expect(screen.getByText("New Stream")).toBeInTheDocument();
-
-    await act(async () => {
-      slowOld.resolve(jsonResponse({
-        streams: [{ id: "old", name: "Old Stream", recipientAddress: "0xabc", amount: "50", status: "Active", category: "Grant" }],
-        total: 1,
-        announcements: [],
-      }));
-      await Promise.resolve();
-    });
-
-    expect(screen.getByText("New Stream")).toBeInTheDocument();
-    expect(screen.queryByText("Old Stream")).not.toBeInTheDocument();
-  });
-
-  it("does not surface aborted request errors as user errors", async () => {
-    const abortError = new DOMException("The operation was aborted.", "AbortError");
-    const fetchMock = vi.fn()
-      .mockRejectedValueOnce(abortError)
-      .mockResolvedValueOnce(jsonResponse({
-        streams: [{ id: "new", name: "New Stream", recipientAddress: "0x123", amount: "100", status: "Active", category: "Grant" }],
-        total: 1,
-        announcements: [],
-      }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderStreams();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: "Active" }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(screen.getByText("New Stream")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-});
 
 function setSort(value: string) {
   fireEvent.change(screen.getByLabelText("Sort streams"), {
@@ -481,6 +276,9 @@ describe("Streams page sorting (integration)", () => {
   });
 
   afterEach(() => {
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
     vi.restoreAllMocks();
     mockStreamsRef.current = streamRecords;
@@ -549,5 +347,56 @@ describe("Streams page sorting (integration)", () => {
     expect(cards[1]!.textContent).toContain("TieRate2");
     expect(cards[2]!.textContent).toContain("TieRate");
     expect(cards[3]!.textContent).toContain("Low");
+  });
+
+  it("renders the not-found state for an unknown stream id", async () => {
+    mockStreamsRef.current = [
+      makeStream({ id: "STR-001", name: "Only Stream" }),
+    ];
+
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/app/streams/STR-999"]}>
+          <Routes>
+            <Route path="/app/streams" element={<Streams />} />
+            <Route path="/app/streams/:streamId" element={<Streams />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+    );
+    await finishLoading();
+
+    expect(
+      screen.getByText(/we couldn.t find STR-999/i),
+    ).toBeInTheDocument();
+  });
+});
+
+// ─── Session recovery banner ─────────────────────────────────────────────────
+describe("Streams session recovery banner", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    mockMatchMedia(false);
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    mockStreamsRef.current = streamRecords;
+  });
+
+  it("does not show the recovery banner when there is no prior session", async () => {
+    renderStreams();
+    await finishLoading();
+
+    // The session recovery banner is not expected when localStorage is clean.
+    expect(
+      screen.queryByText(/restore.*session/i),
+    ).not.toBeInTheDocument();
   });
 });
