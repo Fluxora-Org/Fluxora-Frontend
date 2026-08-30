@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
 import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
 import { useToast } from "../toast/ToastProvider";
@@ -20,6 +20,20 @@ vi.mock("../../lib/stellar/tx", () => ({
   createStream: vi.fn(),
   getTransactionStatus: vi.fn(),
 }));
+
+// Mock localStorage for testing
+const mockStorage: Record<string, string> = {};
+beforeEach(() => {
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: (key: string) => mockStorage[key] || null,
+      setItem: (key: string, value: string) => { mockStorage[key] = value; },
+      removeItem: (key: string) => { delete mockStorage[key]; },
+      clear: () => { Object.keys(mockStorage).forEach(key => delete mockStorage[key]); }
+    },
+    writable: true
+  });
+});
 
 const VALID_STELLAR =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
@@ -56,6 +70,7 @@ describe("CreateStreamModal offline action queue", () => {
   afterEach(() => {
     setOnline(true);
     __resetOfflineQueueForTests();
+    Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
     vi.clearAllMocks();
   });
 
