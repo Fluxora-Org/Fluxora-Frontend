@@ -812,7 +812,10 @@ export default function Streams() {
   const hasMountedFilterAnnouncer = useRef(false);
   const wallet = useWallet();
   const walletAddress = wallet.address?.trim() ?? "";
-  const { streams: serverStreams, loading, error, refetch, retryCount } = useTreasury();
+  const { streams: serverStreams, loading, error, refetch, retryCount } = useTreasury(
+    undefined,
+    wallet.accountContextVersion,
+  );
   const { streams, pendingCount, rolledBackCount } = useOptimisticStreams({ streams: serverStreams });
 
   // ── Reconcile stale optimistic rows on mount ───────────────────────────

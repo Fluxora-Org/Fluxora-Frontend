@@ -107,6 +107,34 @@ describe("useTreasury", () => {
     // If cancelled branch works, no React warning is thrown
   });
 
+  it("does not let a delayed previous-account request repopulate streams", async () => {
+    let resolveOldMetrics!: (value: unknown[]) => void;
+    let resolveOldStreams!: (value: typeof streamRecords) => void;
+    getTreasuryMetrics
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOldMetrics = resolve; }))
+      .mockResolvedValueOnce([]);
+    getStreams
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOldStreams = resolve; }))
+      .mockResolvedValueOnce([]);
+
+    const { result, rerender } = renderHook(
+      ({ accountContextVersion }) => useTreasury(undefined, accountContextVersion),
+      { initialProps: { accountContextVersion: 1 } },
+    );
+
+    rerender({ accountContextVersion: 2 });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      resolveOldMetrics([]);
+      resolveOldStreams(streamRecords);
+    });
+
+    expect(result.current.streams).toEqual([]);
+    expect(result.current.metrics).toEqual([]);
+    expect(getStreams).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the generic error fallback when rejection is not an Error instance", async () => {
     getTreasuryMetrics.mockResolvedValue([]);
     getStreams.mockRejectedValue("plain string rejection");
