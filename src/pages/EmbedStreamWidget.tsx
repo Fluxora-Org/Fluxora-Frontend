@@ -18,7 +18,7 @@ import {
 import { useEmbedAccessibility } from "../hooks/useEmbedAccessibility";
 import {
   getAllowedEmbedOrigins,
-  isAuthorizedEmbedMessage,
+  validateEmbedMessage,
   parseEmbedMessage
 } from "../lib/embedMessagePolicy";
 
@@ -86,7 +86,8 @@ export default function EmbedStreamWidget() {
   useEffect(() => {
     const allowedOrigins = getAllowedEmbedOrigins();
     const handleMessage = (event: MessageEvent) => {
-      if (!isAuthorizedEmbedMessage(event, allowedOrigins)) return;
+      const validation = validateEmbedMessage(event, allowedOrigins);
+      if (!validation.valid) return;
       const message = parseEmbedMessage(event.data);
       if (!message) return;
 
@@ -142,7 +143,6 @@ export default function EmbedStreamWidget() {
       controller.abort();
     };
     // retryCount intentionally included so clicking retry re-runs the fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamId, retryCount]);
   
   // Setup embed accessibility
