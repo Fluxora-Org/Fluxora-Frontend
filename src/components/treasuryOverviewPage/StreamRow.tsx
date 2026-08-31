@@ -330,11 +330,9 @@ export default function StreamRow({
 
       <td className="stream-row__cell py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
         <div className="stream-row__amount">{stream.rate}</div>
-        {typeof stream.accruedAmount === "number" && (
-          <div className="stream-row__amount text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {formatAccruedAmount(stream.accruedAmount)}
-          </div>
-        )}
+        <div className="stream-row__amount text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {formatAccruedAmount(stream.accruedAmount)}
+        </div>
       </td>
 
       <td className="stream-row__cell py-4 px-3" data-label="STATUS">
