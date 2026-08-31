@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import "./StreamTimeline.module.css";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { createDateTimeFormat, formatNumber } from "../lib/formatters";
@@ -39,6 +40,7 @@ type TransactionStatus = "idle" | "pending" | "confirmed" | "rejected" | "timeou
 const TransactionDemo: React.FC<{
   mockOutcome: Exclude<TransactionStatus, "idle" | "pending">;
 }> = ({ mockOutcome }) => {
+  const { t } = useTranslation();
   const [status, setStatus] = React.useState<TransactionStatus>("idle");
   const [message, setMessage] = React.useState(
     "Transaction state idle. Click submit to start.",
@@ -53,17 +55,21 @@ const TransactionDemo: React.FC<{
   React.useEffect(() => {
     if (status !== "pending") return;
     const timer = setTimeout(() => {
+      const successCount = mockOutcome === "confirmed" ? 1 : 0;
+      const failureCount =
+        mockOutcome === "rejected" || mockOutcome === "timeout" ? 1 : 0;
+      const skippedCount = 0;
       setStatus(mockOutcome);
-      if (mockOutcome === "confirmed") {
-        setMessage("Transaction confirmed successfully!");
-      } else if (mockOutcome === "rejected") {
-        setMessage("Transaction rejected. Please review the error and retry.");
-      } else {
-        setMessage("Transaction timed out. Please retry.");
-      }
+      setMessage(
+        [
+          t("transactionDemo.successes", { count: successCount }),
+          t("transactionDemo.failures", { count: failureCount }),
+          t("transactionDemo.skipped", { count: skippedCount }),
+        ].join(", "),
+      );
     }, 1200);
     return () => clearTimeout(timer);
-  }, [status, mockOutcome]);
+  }, [status, mockOutcome, t]);
 
   const isPending = status === "pending";
   const isFailed = status === "rejected" || status === "timeout";
@@ -134,6 +140,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   showTransactionDemo = false,
   transactionDemoOutcome = "confirmed",
 }) => {
+  const { t } = useTranslation();
   const [animateClass, setAnimateClass] = React.useState("");
   const prevStatusRef = React.useRef(status);
 
@@ -224,14 +231,16 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       <div className="stream-timeline__sr-summary" role="doc-subtitle">
         <h3 className="sr-only">Timeline Summary</h3>
         <ul className="sr-only">
-          <li>Start date: {formatDate(start)}</li>
-          {cliff && <li>Cliff end date: {formatDate(cliff)}</li>}
-          <li>Current date: {formatDate(current)}</li>
-          <li>End date: {formatDate(end)}</li>
-          <li>Stream status: {status}</li>
-          <li>Progress: {accrualPercent.toFixed(0)}% complete</li>
-          <li>Withdrawable: ${formatNumber(withdrawableAmount)}</li>
-          <li>Total amount: ${formatNumber(totalAmount)}</li>
+          <li>{t("streamTimeline.startDate", { date: formatDate(start) })}</li>
+          {cliff && (
+            <li>{t("streamTimeline.cliffEndDate", { date: formatDate(cliff) })}</li>
+          )}
+          <li>{t("streamTimeline.currentDate", { date: formatDate(current) })}</li>
+          <li>{t("streamTimeline.endDate", { date: formatDate(end) })}</li>
+          <li>{t("streamTimeline.streamStatus", { status })}</li>
+          <li>{t("streamTimeline.progress", { count: Math.round(accrualPercent), percent: accrualPercent.toFixed(0) })}</li>
+          <li>{t("streamTimeline.withdrawable", { count: withdrawableAmount, amount: formatNumber(withdrawableAmount) })}</li>
+          <li>{t("streamTimeline.totalAmount", { count: totalAmount, amount: formatNumber(totalAmount) })}</li>
         </ul>
       </div>
 

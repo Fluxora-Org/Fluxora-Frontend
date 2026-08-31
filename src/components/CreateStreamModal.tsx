@@ -129,7 +129,7 @@ function formatReviewDeposit(value: string): string {
 /** Formats the daily duration unit with singular/plural copy. */
 function formatDurationUnit(value: string, t: any): string {
   const count = parseStreamNumber(value);
-  return count === 1 ? t("createStream.duration.day_one") : t("createStream.duration.day_other", { count });
+  return t("createStream.duration.day", { count });
 }
 
 function validateAccrualRate(value: string, t: any): string | undefined {
