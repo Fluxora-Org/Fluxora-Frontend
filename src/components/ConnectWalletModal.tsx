@@ -8,6 +8,7 @@ import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
 import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 import { useWalletStateMachine } from "./wallet-connect/useWalletStateMachine";
+import { useI18n } from "../i18n";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -127,6 +128,7 @@ export default function ConnectWalletModal({
   // synchronously (avoids stale closure issues with the ref inside the hook).
   const isRequestInFlight = useRef(false);
 
+  const { t } = useI18n();
   const { connect } = useWallet();
 
   // Hardware wallet configuration states (not part of the machine – purely UI)
@@ -419,7 +421,7 @@ export default function ConnectWalletModal({
     {
       id: "freighter",
       name: "Freighter",
-      description: "Recommended browser extension for Stellar wallets.",
+      description: t("connectWallet.walletDescription.freighter"),
       icon: "🚀",
       iconSrc: "/src/assets/images/freighter.svg",
       action: handleFreighterClick,
@@ -427,7 +429,7 @@ export default function ConnectWalletModal({
     {
       id: "albedo",
       name: "Albedo",
-      description: "Open in-browser wallet for quick secure approvals.",
+      description: t("connectWallet.walletDescription.albedo"),
       icon: "⭐",
       iconSrc: "/src/assets/images/albedo.svg",
       action: onConnectAlbedo ?? (() => {}),
@@ -436,7 +438,7 @@ export default function ConnectWalletModal({
     {
       id: "walletconnect",
       name: "WalletConnect",
-      description: "Pair with compatible mobile wallets via QR.",
+      description: t("connectWallet.walletDescription.walletConnect"),
       icon: "🔗",
       iconSrc: "/src/assets/images/walletconnect.svg",
       action: onConnectWalletConnect ?? (() => {}),
@@ -445,7 +447,7 @@ export default function ConnectWalletModal({
     {
       id: "hardware",
       name: "Hardware Wallet",
-      description: "Connect via Ledger or Trezor device.",
+      description: t("connectWallet.walletDescription.hardware"),
       icon: "🛠️",
       iconSrc: "/src/assets/images/hardware.svg",
       action: handleHardwareClick,
@@ -473,7 +475,7 @@ export default function ConnectWalletModal({
           ref={closeButtonRef}
           className={styles.closeButton}
           onClick={onClose}
-          aria-label="Close wallet connection dialog"
+          aria-label={t("connectWallet.ariaCloseDialog")}
         >
           <svg
             width="14"
@@ -495,17 +497,16 @@ export default function ConnectWalletModal({
         {isDefaultView && (
           <>
             <div className={styles.header}>
-              <span className={styles.badge} id="badge-default">Step 1 of 1</span>
+              <span className={styles.badge} id="badge-default">{t("connectWallet.stepLabel")}</span>
               <h2 id="connect-wallet-modal-title" className={styles.title}>
-                Choose your wallet
+                {t("connectWallet.title")}
               </h2>
               <p id="connect-wallet-modal-description" className={styles.subtitle}>
-                Select a provider below to connect. You will review and approve the
-                request in your wallet.
+                {t("connectWallet.description")}
               </p>
             </div>
 
-            <div className={styles.walletList} role="list" aria-label="Wallet providers">
+            <div className={styles.walletList} role="list" aria-label={t("connectWallet.ariaWalletProviders")}>
               {walletOptions.map((wallet) => {
                 const isActive =
                   !wallet.disabled &&
@@ -544,8 +545,8 @@ export default function ConnectWalletModal({
                     onBlur={() => setFocusedOptionId(null)}
                     aria-label={
                       wallet.disabled
-                        ? `${wallet.name} — coming soon`
-                        : `Connect with ${wallet.name}`
+                        ? t("connectWallet.ariaComingSoon", { name: wallet.name })
+                        : t("connectWallet.ariaConnectWith", { name: wallet.name })
                     }
                     aria-disabled={isDisabled}
                     disabled={isDisabled}
@@ -576,12 +577,12 @@ export default function ConnectWalletModal({
                             }}
                             aria-hidden="true"
                           >
-                            coming soon
+                            {t("connectWallet.comingSoon")}
                           </span>
                         )}
                       </div>
                       <div className={styles.walletDescription}>
-                        {isConnectingThis ? "Connecting..." : wallet.description}
+                        {isConnectingThis ? t("connectWallet.connecting") : wallet.description}
                       </div>
                     </div>
                     {!wallet.disabled && !isConnectingThis && (
@@ -608,9 +609,9 @@ export default function ConnectWalletModal({
             </div>
 
             <p className={styles.footer}>
-              By continuing, you agree to Fluxora&apos;s{" "}
+              {t("connectWallet.termsPrefix")}{" "}
               <a href="/terms" className={styles.termsLink}>
-                Terms of Service
+                {t("connectWallet.termsLink")}
               </a>
               .
             </p>
@@ -624,13 +625,12 @@ export default function ConnectWalletModal({
               <Download size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-not-installed">Extension Required</span>
+            <span className={styles.badge} id="badge-not-installed">{t("connectWallet.notInstalled.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Freighter Not Installed
+              {t("connectWallet.notInstalled.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Freighter is the official browser extension for Stellar and Soroban.
-              You will need to install the extension to securely connect your wallet to Fluxora.
+              {t("connectWallet.notInstalled.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -641,19 +641,19 @@ export default function ConnectWalletModal({
                 className={styles.primaryButton}
                 data-autofocus="true"
                 onClick={onDownloadFreighter}
-                aria-label="Download Freighter browser extension"
+                aria-label={t("connectWallet.notInstalled.ariaDownload")}
               >
                 <Download size={18} />
-                Download Freighter
+                {t("connectWallet.notInstalled.downloadBtn")}
               </a>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.notInstalled.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.notInstalled.backBtn")}
               </button>
             </div>
           </div>
@@ -666,13 +666,12 @@ export default function ConnectWalletModal({
               <AlertCircle size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-rejected">Connection Failed</span>
+            <span className={styles.badge} id="badge-rejected">{t("connectWallet.rejected.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Connection Rejected
+              {t("connectWallet.rejected.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The connection was declined in your wallet extension. To interact with Fluxora,
-              please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.
+              {t("connectWallet.rejected.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -681,19 +680,19 @@ export default function ConnectWalletModal({
                 className={styles.primaryButton}
                 data-autofocus="true"
                 onClick={handleRetryFreighter}
-                aria-label="Retry connecting to Freighter wallet"
+                aria-label={t("connectWallet.rejected.ariaRetry")}
               >
                 <RefreshCw size={18} />
-                Retry Connection
+                {t("connectWallet.rejected.retryBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.rejected.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.rejected.backBtn")}
               </button>
             </div>
           </div>
@@ -706,33 +705,31 @@ export default function ConnectWalletModal({
               <AlertTriangle size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-network-mismatch">Network Mismatch</span>
+            <span className={styles.badge} id="badge-network-mismatch">{t("connectWallet.networkMismatch.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Wrong Stellar Network
+              {t("connectWallet.networkMismatch.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Your wallet is connected to the wrong network. Fluxora is configured for Stellar{" "}
-              <strong>{expectedNetworkLabel}</strong>, but your wallet is currently on{" "}
-              <strong>{actualNetworkLabel ?? "an unsupported network"}</strong>.
+              {t("connectWallet.networkMismatch.description", { expected: expectedNetworkLabel, actual: actualNetworkLabel ?? "an unsupported network" })}
             </p>
 
-            <ol className={styles.errorInstructions} aria-label="Instructions to switch network">
+            <ol className={styles.errorInstructions} aria-label={t("connectWallet.networkMismatch.ariaInstructions")}>
               <li className={styles.instructionItem}>
                 <span className={styles.instructionNumber}>1</span>
                 <span className={styles.instructionText}>
-                  Open your <strong>Freighter extension</strong> in your browser toolbar.
+                  {t("connectWallet.networkMismatch.instruction1")}
                 </span>
               </li>
               <li className={styles.instructionItem}>
                 <span className={styles.instructionNumber}>2</span>
                 <span className={styles.instructionText}>
-                  Click the <strong>network dropdown</strong> at the top of the extension popup.
+                  {t("connectWallet.networkMismatch.instruction2")}
                 </span>
               </li>
               <li className={styles.instructionItem}>
                 <span className={styles.instructionNumber}>3</span>
                 <span className={styles.instructionText}>
-                  Select <strong>{expectedNetworkLabel}</strong> and return here.
+                  {t("connectWallet.networkMismatch.instruction3", { expected: expectedNetworkLabel })}
                 </span>
               </li>
             </ol>
@@ -743,19 +740,19 @@ export default function ConnectWalletModal({
                 className={styles.primaryButton}
                 data-autofocus="true"
                 onClick={handleRetryFreighter}
-                aria-label="Check network configuration again"
+                aria-label={t("connectWallet.networkMismatch.ariaCheck")}
               >
                 <RefreshCw size={18} />
-                Check Network Again
+                {t("connectWallet.networkMismatch.checkBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.networkMismatch.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.networkMismatch.backBtn")}
               </button>
             </div>
           </div>
@@ -768,13 +765,12 @@ export default function ConnectWalletModal({
               <Timer size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-timeout">Timed Out</span>
+            <span className={styles.badge} id="badge-timeout">{t("connectWallet.timeout.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Network Check Timed Out
+              {t("connectWallet.timeout.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The network check did not respond in time. This can happen if the Freighter
-              extension is hung or unresponsive. Please try again.
+              {t("connectWallet.timeout.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -783,19 +779,19 @@ export default function ConnectWalletModal({
                 className={styles.primaryButton}
                 data-autofocus="true"
                 onClick={handleRetryFreighter}
-                aria-label="Retry network check"
+                aria-label={t("connectWallet.timeout.ariaRetry")}
               >
                 <RefreshCw size={18} />
-                Retry Connection
+                {t("connectWallet.timeout.retryBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.timeout.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.timeout.backBtn")}
               </button>
             </div>
           </div>
@@ -811,15 +807,15 @@ export default function ConnectWalletModal({
             </div>
 
             <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
-              Scanning for connected hardware wallets...
+              {t("connectWallet.deviceSearching.scanningAria")}
             </div>
 
-            <span className={styles.badge} id="badge-device-searching">Step 1 of 3</span>
+            <span className={styles.badge} id="badge-device-searching">{t("connectWallet.deviceSearching.stepLabel")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Connect via USB
+              {t("connectWallet.deviceSearching.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Searching for connected hardware wallets... Please plug in your Ledger or Trezor device via USB, unlock it with your PIN, and ensure the Stellar app is open.
+              {t("connectWallet.deviceSearching.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -828,19 +824,19 @@ export default function ConnectWalletModal({
                   type="button"
                   className={styles.primaryButton}
                   onClick={() => send({ type: "DEVICE_FOUND" })}
-                  aria-label="Simulate device detected"
+                  aria-label={t("connectWallet.deviceSearching.ariaSimulate")}
                 >
-                  Simulate Found
+                  {t("connectWallet.deviceSearching.simulateBtn")}
                 </button>
               )}
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.deviceSearching.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Cancel
+                {t("connectWallet.deviceSearching.cancelBtn")}
               </button>
             </div>
           </div>
@@ -853,18 +849,18 @@ export default function ConnectWalletModal({
               <Cpu size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-device-found-selecting">Step 2 of 3</span>
+            <span className={styles.badge} id="badge-device-found-selecting">{t("connectWallet.deviceFound.stepLabel")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Configure Device
+              {t("connectWallet.deviceFound.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Select your hardware wallet and choose a derivation path configuration.
+              {t("connectWallet.deviceFound.description")}
             </p>
 
             <div
               className={styles.deviceList}
               role="radiogroup"
-              aria-label="Select USB hardware wallet device"
+              aria-label={t("connectWallet.deviceFound.ariaSelectDevice")}
             >
               <button
                 type="button"
@@ -874,14 +870,14 @@ export default function ConnectWalletModal({
                   selectedDevice === "ledger" ? styles.deviceOptionActive : ""
                 }`}
                 onClick={() => setSelectedDevice("ledger")}
-                aria-label="Ledger Nano X or S"
+                aria-label={t("connectWallet.deviceFound.ledgerAria")}
               >
                 <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
                   L
                 </div>
                 <div className={styles.walletInfo}>
-                  <div className={styles.walletName}>Ledger Nano X / S</div>
-                  <div className={styles.walletDescription}>Connect via USB and confirm public key.</div>
+                  <div className={styles.walletName}>{t("connectWallet.deviceFound.ledgerName")}</div>
+                  <div className={styles.walletDescription}>{t("connectWallet.deviceFound.ledgerDesc")}</div>
                 </div>
               </button>
 
@@ -893,21 +889,21 @@ export default function ConnectWalletModal({
                   selectedDevice === "trezor" ? styles.deviceOptionActive : ""
                 }`}
                 onClick={() => setSelectedDevice("trezor")}
-                aria-label="Trezor Model T or One"
+                aria-label={t("connectWallet.deviceFound.trezorAria")}
               >
                 <div className={styles.walletIcon} aria-hidden="true" style={{ fontSize: "1.2rem" }}>
                   T
                 </div>
                 <div className={styles.walletInfo}>
-                  <div className={styles.walletName}>Trezor Model T / One</div>
-                  <div className={styles.walletDescription}>Connect via USB and unlock via screen.</div>
+                  <div className={styles.walletName}>{t("connectWallet.deviceFound.trezorName")}</div>
+                  <div className={styles.walletDescription}>{t("connectWallet.deviceFound.trezorDesc")}</div>
                 </div>
               </button>
             </div>
 
             <div className={styles.derivationPathContainer}>
               <label htmlFor="derivation-path-select" className={styles.derivationPathLabel}>
-                Derivation Path
+                {t("connectWallet.deviceFound.derivationLabel")}
               </label>
               <select
                 id="derivation-path-select"
@@ -920,9 +916,9 @@ export default function ConnectWalletModal({
                   }
                 }}
               >
-                <option value="m/44'/148'/0'">Stellar Standard (m/44'/148'/0')</option>
-                <option value="m/44'/148'/1'">Stellar Secondary (m/44'/148'/1')</option>
-                <option value="custom">Custom Derivation Path...</option>
+                <option value="m/44'/148'/0'">{t("connectWallet.deviceFound.stellarStandard")}</option>
+                <option value="m/44'/148'/1'">{t("connectWallet.deviceFound.stellarSecondary")}</option>
+                <option value="custom">{t("connectWallet.deviceFound.customOption")}</option>
               </select>
 
               {derivationPath === "custom" && (
@@ -935,7 +931,7 @@ export default function ConnectWalletModal({
                     value={customPath}
                     onChange={(e) => handleCustomPathChange(e.target.value)}
                     placeholder="m/44'/148'/0'"
-                    aria-label="Enter custom Stellar derivation path"
+                    aria-label={t("connectWallet.deviceFound.ariaCustomPath")}
                     aria-invalid={pathError !== null}
                     aria-describedby={pathError ? "custom-path-error" : undefined}
                   />
@@ -962,19 +958,19 @@ export default function ConnectWalletModal({
                 className={styles.primaryButton}
                 disabled={derivationPath === "custom" && pathError !== null}
                 onClick={() => send({ type: "DEVICE_CONFIRMED" })}
-                aria-label="Confirm selection and connect"
+                aria-label={t("connectWallet.deviceFound.ariaConfirm")}
               >
                 <Check size={18} />
-                Confirm & Connect
+                {t("connectWallet.deviceFound.confirmBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={() => send({ type: "BACK" })}
-                aria-label="Back to device scanning"
+                aria-label={t("connectWallet.deviceFound.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back
+                {t("connectWallet.deviceFound.backBtn")}
               </button>
             </div>
           </div>
@@ -989,15 +985,15 @@ export default function ConnectWalletModal({
             </div>
 
             <div className={styles.ariaLiveContainer} role="status" aria-live="polite">
-              Confirm Connection on Device... Please review public key on your hardware wallet.
+              {t("connectWallet.awaiting.scanningAria")}
             </div>
 
-            <span className={styles.badge} id="badge-awaiting-device-confirmation">Step 3 of 3</span>
+            <span className={styles.badge} id="badge-awaiting-device-confirmation">{t("connectWallet.awaiting.stepLabel")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Confirm on Device
+              {t("connectWallet.awaiting.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Please review and approve the public key connection request on your physical hardware wallet screen. Ensure the Stellar app is active.
+              {t("connectWallet.awaiting.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -1011,19 +1007,19 @@ export default function ConnectWalletModal({
                     if (onConnectFreighter) onConnectFreighter();
                     onClose();
                   }}
-                  aria-label="Simulate successful connection"
+                  aria-label={t("connectWallet.awaiting.ariaSimulate")}
                 >
-                  Simulate Success
+                  {t("connectWallet.awaiting.simulateBtn")}
                 </button>
               )}
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={() => send({ type: "BACK" })}
-                aria-label="Cancel confirmation and go back to configure"
+                aria-label={t("connectWallet.awaiting.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back
+                {t("connectWallet.awaiting.backBtn")}
               </button>
             </div>
           </div>
@@ -1036,12 +1032,12 @@ export default function ConnectWalletModal({
               <Lock size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-device-locked">Device Locked</span>
+            <span className={styles.badge} id="badge-device-locked">{t("connectWallet.deviceLocked.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Hardware Wallet Locked
+              {t("connectWallet.deviceLocked.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              Your hardware wallet is locked. Please enter your PIN on the physical device to unlock it and try again.
+              {t("connectWallet.deviceLocked.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -1049,19 +1045,19 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 onClick={() => send({ type: "RETRY" })}
-                aria-label="Retry connection scan"
+                aria-label={t("connectWallet.deviceLocked.ariaRetry")}
               >
                 <RefreshCw size={18} />
-                Retry Connection
+                {t("connectWallet.deviceLocked.retryBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.deviceLocked.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.deviceLocked.backBtn")}
               </button>
             </div>
           </div>
@@ -1074,12 +1070,12 @@ export default function ConnectWalletModal({
               <AlertTriangle size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-wrong-app">Stellar App Closed</span>
+            <span className={styles.badge} id="badge-wrong-app">{t("connectWallet.wrongApp.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Stellar App Not Open
+              {t("connectWallet.wrongApp.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The Stellar application is not open on your device. Please open the Stellar application on your Ledger or Trezor device before continuing.
+              {t("connectWallet.wrongApp.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -1087,19 +1083,19 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 onClick={() => send({ type: "RETRY" })}
-                aria-label="Retry connection scan"
+                aria-label={t("connectWallet.wrongApp.ariaRetry")}
               >
                 <RefreshCw size={18} />
-                Retry Connection
+                {t("connectWallet.wrongApp.retryBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.wrongApp.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.wrongApp.backBtn")}
               </button>
             </div>
           </div>
@@ -1112,12 +1108,12 @@ export default function ConnectWalletModal({
               <PowerOff size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-unplugged">Disconnected</span>
+            <span className={styles.badge} id="badge-unplugged">{t("connectWallet.unplugged.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Device Disconnected
+              {t("connectWallet.unplugged.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              The hardware wallet was unplugged or disconnected mid-flow. Please check your USB cable and reconnect the device.
+              {t("connectWallet.unplugged.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -1125,19 +1121,19 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 onClick={() => send({ type: "RETRY" })}
-                aria-label="Scan for hardware wallet again"
+                aria-label={t("connectWallet.unplugged.ariaScan")}
               >
                 <RefreshCw size={18} />
-                Scan for Device
+                {t("connectWallet.unplugged.scanBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.unplugged.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.unplugged.backBtn")}
               </button>
             </div>
           </div>
@@ -1150,12 +1146,12 @@ export default function ConnectWalletModal({
               <Smartphone size={28} />
             </div>
 
-            <span className={styles.badge} id="badge-mobile-unsupported">Mobile Fallback</span>
+            <span className={styles.badge} id="badge-mobile-unsupported">{t("connectWallet.mobileUnsupported.badge")}</span>
             <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
-              Device Unsupported on Mobile
+              {t("connectWallet.mobileUnsupported.title")}
             </h2>
             <p id="connect-wallet-modal-description" className={styles.errorDescription}>
-              USB hardware wallet connections are not supported on mobile web browsers. Please connect using a supported mobile-friendly wallet instead.
+              {t("connectWallet.mobileUnsupported.description")}
             </p>
 
             <div className={styles.actionGroup}>
@@ -1166,18 +1162,18 @@ export default function ConnectWalletModal({
                   send({ type: "RESET" });
                   if (onConnectWalletConnect) onConnectWalletConnect();
                 }}
-                aria-label="Connect using WalletConnect mobile flow"
+                aria-label={t("connectWallet.mobileUnsupported.ariaConnect")}
               >
-                Connect via WalletConnect
+                {t("connectWallet.mobileUnsupported.connectBtn")}
               </button>
               <button
                 type="button"
                 className={styles.secondaryButton}
                 onClick={handleBackToWalletSelection}
-                aria-label="Back to wallet selection list"
+                aria-label={t("connectWallet.mobileUnsupported.ariaBack")}
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
-                Back to wallet list
+                {t("connectWallet.mobileUnsupported.backBtn")}
               </button>
             </div>
           </div>

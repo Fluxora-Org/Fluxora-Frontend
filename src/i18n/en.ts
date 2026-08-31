@@ -149,6 +149,142 @@ export const en = {
   "createStream.error.failedWithMessage": "Failed to create stream: {message}",
   "createStream.success.message": "Stream created successfully on-chain!",
 
+  // ─── ConnectWalletModal ───────────────────────────────────────────────────────
+
+  // Default view
+  "connectWallet.stepLabel": "Step 1 of 1",
+  "connectWallet.title": "Choose your wallet",
+  "connectWallet.description": "Select a provider below to connect. You will review and approve the request in your wallet.",
+  "connectWallet.walletDescription.freighter": "Recommended browser extension for Stellar wallets.",
+  "connectWallet.walletDescription.albedo": "Open in-browser wallet for quick secure approvals.",
+  "connectWallet.walletDescription.walletConnect": "Pair with compatible mobile wallets via QR.",
+  "connectWallet.walletDescription.hardware": "Connect via Ledger or Trezor device.",
+  "connectWallet.comingSoon": "coming soon",
+  "connectWallet.connecting": "Connecting...",
+  "connectWallet.termsPrefix": "By continuing, you agree to Fluxora's",
+  "connectWallet.termsLink": "Terms of Service",
+  "connectWallet.ariaCloseDialog": "Close wallet connection dialog",
+  "connectWallet.ariaWalletProviders": "Wallet providers",
+  "connectWallet.ariaConnectWith": "Connect with {name}",
+  "connectWallet.ariaComingSoon": "{name} — coming soon",
+
+  // Error: Not installed
+  "connectWallet.notInstalled.badge": "Extension Required",
+  "connectWallet.notInstalled.title": "Freighter Not Installed",
+  "connectWallet.notInstalled.description": "Freighter is the official browser extension for Stellar and Soroban. You will need to install the extension to securely connect your wallet to Fluxora.",
+  "connectWallet.notInstalled.downloadBtn": "Download Freighter",
+  "connectWallet.notInstalled.backBtn": "Back to wallet list",
+  "connectWallet.notInstalled.ariaDownload": "Download Freighter browser extension",
+  "connectWallet.notInstalled.ariaBack": "Back to wallet selection list",
+
+  // Error: Rejected
+  "connectWallet.rejected.badge": "Connection Failed",
+  "connectWallet.rejected.title": "Connection Rejected",
+  "connectWallet.rejected.description": "The connection was declined in your wallet extension. To interact with Fluxora, please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.",
+  "connectWallet.rejected.retryBtn": "Retry Connection",
+  "connectWallet.rejected.backBtn": "Back to wallet list",
+  "connectWallet.rejected.ariaRetry": "Retry connecting to Freighter wallet",
+  "connectWallet.rejected.ariaBack": "Back to wallet selection list",
+
+  // Error: Network mismatch
+  "connectWallet.networkMismatch.badge": "Network Mismatch",
+  "connectWallet.networkMismatch.title": "Wrong Stellar Network",
+  "connectWallet.networkMismatch.description": "Your wallet is connected to the wrong network. Fluxora is configured for Stellar {expected}, but your wallet is currently on {actual}.",
+  "connectWallet.networkMismatch.instruction1": "Open your Freighter extension in your browser toolbar.",
+  "connectWallet.networkMismatch.instruction2": "Click the network dropdown at the top of the extension popup.",
+  "connectWallet.networkMismatch.instruction3": "Select {expected} and return here.",
+  "connectWallet.networkMismatch.checkBtn": "Check Network Again",
+  "connectWallet.networkMismatch.backBtn": "Back to wallet list",
+  "connectWallet.networkMismatch.ariaInstructions": "Instructions to switch network",
+  "connectWallet.networkMismatch.ariaCheck": "Check network configuration again",
+  "connectWallet.networkMismatch.ariaBack": "Back to wallet selection list",
+
+  // Error: Network timeout
+  "connectWallet.timeout.badge": "Timed Out",
+  "connectWallet.timeout.title": "Network Check Timed Out",
+  "connectWallet.timeout.description": "The network check did not respond in time. This can happen if the Freighter extension is hung or unresponsive. Please try again.",
+  "connectWallet.timeout.retryBtn": "Retry Connection",
+  "connectWallet.timeout.backBtn": "Back to wallet list",
+  "connectWallet.timeout.ariaRetry": "Retry network check",
+  "connectWallet.timeout.ariaBack": "Back to wallet selection list",
+
+  // Hardware: Device searching
+  "connectWallet.deviceSearching.stepLabel": "Step 1 of 3",
+  "connectWallet.deviceSearching.title": "Connect via USB",
+  "connectWallet.deviceSearching.description": "Searching for connected hardware wallets... Please plug in your Ledger or Trezor device via USB, unlock it with your PIN, and ensure the Stellar app is open.",
+  "connectWallet.deviceSearching.scanningAria": "Scanning for connected hardware wallets...",
+  "connectWallet.deviceSearching.simulateBtn": "Simulate Found",
+  "connectWallet.deviceSearching.cancelBtn": "Cancel",
+  "connectWallet.deviceSearching.ariaSimulate": "Simulate device detected",
+  "connectWallet.deviceSearching.ariaBack": "Back to wallet selection list",
+
+  // Hardware: Device found
+  "connectWallet.deviceFound.stepLabel": "Step 2 of 3",
+  "connectWallet.deviceFound.title": "Configure Device",
+  "connectWallet.deviceFound.description": "Select your hardware wallet and choose a derivation path configuration.",
+  "connectWallet.deviceFound.ariaSelectDevice": "Select USB hardware wallet device",
+  "connectWallet.deviceFound.ledgerName": "Ledger Nano X / S",
+  "connectWallet.deviceFound.ledgerDesc": "Connect via USB and confirm public key.",
+  "connectWallet.deviceFound.ledgerAria": "Ledger Nano X or S",
+  "connectWallet.deviceFound.trezorName": "Trezor Model T / One",
+  "connectWallet.deviceFound.trezorDesc": "Connect via USB and unlock via screen.",
+  "connectWallet.deviceFound.trezorAria": "Trezor Model T or One",
+  "connectWallet.deviceFound.derivationLabel": "Derivation Path",
+  "connectWallet.deviceFound.stellarStandard": "Stellar Standard (m/44'/148'/0')",
+  "connectWallet.deviceFound.stellarSecondary": "Stellar Secondary (m/44'/148'/1')",
+  "connectWallet.deviceFound.customOption": "Custom Derivation Path...",
+  "connectWallet.deviceFound.ariaCustomPath": "Enter custom Stellar derivation path",
+  "connectWallet.deviceFound.confirmBtn": "Confirm & Connect",
+  "connectWallet.deviceFound.backBtn": "Back",
+  "connectWallet.deviceFound.ariaConfirm": "Confirm selection and connect",
+  "connectWallet.deviceFound.ariaBack": "Back to device scanning",
+
+  // Hardware: Awaiting confirmation
+  "connectWallet.awaiting.stepLabel": "Step 3 of 3",
+  "connectWallet.awaiting.title": "Confirm on Device",
+  "connectWallet.awaiting.description": "Please review and approve the public key connection request on your physical hardware wallet screen. Ensure the Stellar app is active.",
+  "connectWallet.awaiting.scanningAria": "Confirm Connection on Device... Please review public key on your hardware wallet.",
+  "connectWallet.awaiting.simulateBtn": "Simulate Success",
+  "connectWallet.awaiting.backBtn": "Back",
+  "connectWallet.awaiting.ariaSimulate": "Simulate successful connection",
+  "connectWallet.awaiting.ariaBack": "Back to device scanning",
+
+  // Error: Device locked
+  "connectWallet.deviceLocked.badge": "Device Locked",
+  "connectWallet.deviceLocked.title": "Hardware Wallet Locked",
+  "connectWallet.deviceLocked.description": "Your hardware wallet is locked. Please enter your PIN on the physical device to unlock it and try again.",
+  "connectWallet.deviceLocked.retryBtn": "Retry Connection",
+  "connectWallet.deviceLocked.backBtn": "Back to wallet list",
+  "connectWallet.deviceLocked.ariaRetry": "Retry connection scan",
+  "connectWallet.deviceLocked.ariaBack": "Back to wallet selection list",
+
+  // Error: Wrong app
+  "connectWallet.wrongApp.badge": "Stellar App Closed",
+  "connectWallet.wrongApp.title": "Stellar App Not Open",
+  "connectWallet.wrongApp.description": "The Stellar application is not open on your device. Please open the Stellar application on your Ledger or Trezor device before continuing.",
+  "connectWallet.wrongApp.retryBtn": "Retry Connection",
+  "connectWallet.wrongApp.backBtn": "Back to wallet list",
+  "connectWallet.wrongApp.ariaRetry": "Retry connection scan",
+  "connectWallet.wrongApp.ariaBack": "Back to wallet selection list",
+
+  // Error: Unplugged
+  "connectWallet.unplugged.badge": "Disconnected",
+  "connectWallet.unplugged.title": "Device Disconnected",
+  "connectWallet.unplugged.description": "The hardware wallet was unplugged or disconnected mid-flow. Please check your USB cable and reconnect the device.",
+  "connectWallet.unplugged.scanBtn": "Scan for Device",
+  "connectWallet.unplugged.backBtn": "Back to wallet list",
+  "connectWallet.unplugged.ariaScan": "Scan for hardware wallet again",
+  "connectWallet.unplugged.ariaBack": "Back to wallet selection list",
+
+  // Error: Mobile unsupported
+  "connectWallet.mobileUnsupported.badge": "Mobile Fallback",
+  "connectWallet.mobileUnsupported.title": "Device Unsupported on Mobile",
+  "connectWallet.mobileUnsupported.description": "USB hardware wallet connections are not supported on mobile web browsers. Please connect using a supported mobile-friendly wallet instead.",
+  "connectWallet.mobileUnsupported.connectBtn": "Connect via WalletConnect",
+  "connectWallet.mobileUnsupported.backBtn": "Back to wallet list",
+  "connectWallet.mobileUnsupported.ariaConnect": "Connect using WalletConnect mobile flow",
+  "connectWallet.mobileUnsupported.ariaBack": "Back to wallet selection list",
+
   // Plurals
   "createStream.duration.day_one": "day",
   "createStream.duration.day_other": "days",
