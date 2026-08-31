@@ -311,10 +311,10 @@ describe("ConnectWalletModal — network_mismatch", () => {
     renderModal({ actualNetworkLabel: "Mainnet" });
     fireEvent.click(screen.getByLabelText("Connect with Freighter"));
     await screen.findByTestId("error-state-network-mismatch");
-    // "Testnet" appears in both the description paragraph and the instructions list.
-    // Confirm at least one instance is present, and check for the actual label too.
-    expect(screen.getAllByText("Testnet").length).toBeGreaterThan(0);
-    expect(screen.getByText("Mainnet")).toBeInTheDocument();
+    // "Testnet" appears in the description paragraph and the instructions list.
+    // Use exact: false because the description is now a single interpolated text node.
+    expect(screen.getAllByText("Testnet", { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Mainnet", { exact: false })).toBeInTheDocument();
   });
 
   it("RETRY re-checks network and succeeds when fixed", async () => {
