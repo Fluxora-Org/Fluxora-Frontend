@@ -78,6 +78,9 @@ export default defineConfig({
         "src/components/csv-upload/PreviewValidateStep.tsx",
         // Security headers (CSP + browser security header definitions, #1408)
         "src/lib/securityHeaders.ts",
+        // Issue #1410: split Streams page data loading from table rendering
+        "src/pages/useStreamsData.ts",
+        "src/components/Streams/StreamsListPanel.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
