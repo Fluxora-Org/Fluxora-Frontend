@@ -52,13 +52,15 @@ describe("StreamRow with records missing optional fields", () => {
     },
   );
 
-  it("omits the accrued line when the optional accruedAmount is absent", () => {
-    const stream = toLegacyStream(makeStreamRecord());
-    delete stream.accruedAmount;
+  it("renders the accrued line even when source data is missing (normalization provides fallback)", () => {
+    // With the new design, accruedAmount is always required and the normalization
+    // layer provides a fallback of 0 when source data is missing
+    const record = normalizeStreamRecord({ id: "STR-NO-AMOUNT" });
+    const stream = toLegacyStream(record);
     renderRow(stream);
 
     expect(screen.getByText(stream.name)).toBeInTheDocument();
-    expect(screen.queryByText(/accrued/)).not.toBeInTheDocument();
+    expect(screen.getByText(/accrued/)).toBeInTheDocument();
   });
 
   it("renders the accrued line when accruedAmount is present", () => {

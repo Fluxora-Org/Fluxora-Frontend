@@ -110,6 +110,7 @@ describe("useTreasuryOverviewData", () => {
         rate: "1,200 XLM/mo",
         accruedAmount: 500,
         status: "Active",
+        startDate: "",
       });
     });
 

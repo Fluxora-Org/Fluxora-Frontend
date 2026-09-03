@@ -54,8 +54,19 @@ describe('RecentStreams', () => {
     renderWithRouter(<RecentStreams streams={streams} />);
 
     const liveRegion = document.querySelector('[aria-live="polite"]') as HTMLElement;
-    expect(liveRegion).toBeTruthy();
-    expect(liveRegion.textContent).toBe('Found 1 matching streams.');
+    expect(liveRegion.textContent).toBe('Found 1 matching stream.');
+  });
+
+  it('uses the plural form for multiple matching streams', () => {
+    const streams = [
+      makeStream({ id: 'stream-2' }),
+      makeStream({ id: 'stream-3' }),
+      makeStream({ id: 'stream-4' }),
+    ];
+    renderWithRouter(<RecentStreams streams={streams} />);
+
+    const liveRegion = document.querySelector('[aria-live="polite"]') as HTMLElement;
+    expect(liveRegion.textContent).toBe('Found 3 matching streams.');
   });
 
   it('sets the announcement to "No matching streams found." for an empty list', () => {
