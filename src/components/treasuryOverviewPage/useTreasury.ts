@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getRecipientStreams,
   getStreams,
@@ -44,17 +44,30 @@ function readError(error: unknown): string {
  * Accepts an optional `filters` argument that is forwarded to
  * {@link getStreams}. Changes to `filters` trigger an automatic refetch.
  */
-export function useTreasury(filters?: StreamsFilters): TreasuryData {
+export function useTreasury(
+  filters?: StreamsFilters,
+  /** Changes when another tab changes the active wallet account. */
+  accountContextVersion = 0,
+): TreasuryData {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const accountContextVersionRef = useRef(accountContextVersion);
   const filtersKey = serializeFilters(filters);
 
   useEffect(() => {
     const controller = new AbortController();
+    const accountChanged = accountContextVersionRef.current !== accountContextVersion;
+    accountContextVersionRef.current = accountContextVersion;
+    if (accountChanged) {
+      // Do not render the prior account's cached rows while the replacement
+      // request is pending in this tab.
+      setMetrics([]);
+      setStreams([]);
+    }
     setLoading(true);
     setError(null);
     setRetryCount((count) => count + 1);
@@ -112,7 +125,9 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
       });
 
     return () => controller.abort();
-  }, [reloadToken, filtersKey]);
+  // Account context is intentionally included even where the backend query is
+  // not account-filtered: cleanup aborts old-account work before it can commit.
+  }, [accountContextVersion, reloadToken, filtersKey]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);

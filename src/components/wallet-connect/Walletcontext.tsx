@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
   type ReactNode,
 } from "react";
 import {
@@ -19,6 +20,10 @@ import {
 } from "../../lib/stellarNetwork";
 import { isValidStellarAddress } from "../../lib/stellar";
 import { getNetworkLabel } from "../../lib/config";
+import {
+  subscribeToAccountContext,
+  type AccountContextMessage,
+} from "../../lib/accountContextSync";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -40,6 +45,8 @@ interface WalletState {
 }
 
 interface WalletContextType extends WalletState {
+  /** Increments for both local and cross-tab account changes. */
+  accountContextVersion: number;
   expectedNetwork: StellarNetwork;
   expectedNetworkLabel: string;
   isNetworkMismatch: boolean;
@@ -142,19 +149,50 @@ function classifyWalletError(error: unknown): WalletError {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(INITIAL);
+  const stateRef = useRef(state);
+  const [accountContextVersion, setAccountContextVersion] = useState(0);
   const watcherRef = useRef<InstanceType<typeof WatchWalletChanges> | null>(
     null,
   );
   const watcherGenerationRef = useRef(0);
+  const accountChangeGenerationRef = useRef(0);
+  const latestRemoteChangeRef = useRef(0);
+  const latestChangeSourceRef = useRef("");
+  const channelRef = useRef<ReturnType<typeof subscribeToAccountContext> | null>(null);
+  const sourceRef = useRef(`wallet-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`);
 
   const expectedNetwork = getExpectedStellarNetwork();
   const expectedNetworkLabel = getNetworkLabel(expectedNetwork);
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
 
+  const applyAccountChange = useCallback((
+    next: WalletState,
+    options: { broadcast: boolean; changedAt?: number } = { broadcast: true },
+  ) => {
+    accountChangeGenerationRef.current += 1;
+    stateRef.current = next;
+    setAccountContextVersion((version) => version + 1);
+    setState(next);
+
+    if (options.broadcast) {
+      const changedAt = options.changedAt ?? Date.now();
+      latestRemoteChangeRef.current = Math.max(latestRemoteChangeRef.current, changedAt);
+      latestChangeSourceRef.current = sourceRef.current;
+      channelRef.current?.publish({
+        type: "account-context",
+        address: next.address,
+        network: next.network,
+        connected: next.connected,
+        changedAt,
+        source: sourceRef.current,
+      });
+    }
+  }, []);
+
   const connect = (address: string, network: string) => {
     if (!isValidStellarAddress(address)) return;
-    setState({
+    applyAccountChange({
       address,
       network,
       connected: true,
@@ -167,35 +205,71 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Invalidate any callback captured by the previous watcher before the
     // disconnected state is exposed to consumers.
     watcherGenerationRef.current += 1;
-    setState(DISCONNECTED);
+    applyAccountChange(DISCONNECTED);
   };
+
+  // A remote account change invalidates restore work started by this tab before
+  // the message arrived. This is what keeps a delayed Freighter/API result for
+  // the previous account from becoming visible again.
+  useEffect(() => {
+    const subscription = subscribeToAccountContext((message: AccountContextMessage) => {
+      if (
+        message.source === sourceRef.current ||
+        message.changedAt < latestRemoteChangeRef.current ||
+        (message.changedAt === latestRemoteChangeRef.current &&
+          message.source <= latestChangeSourceRef.current)
+      ) return;
+      if (message.connected && (!message.address || !isValidStellarAddress(message.address))) return;
+      latestRemoteChangeRef.current = message.changedAt;
+      latestChangeSourceRef.current = message.source;
+      applyAccountChange(
+        message.connected
+          ? { address: message.address, network: message.network, connected: true, error: null, loading: false }
+          : DISCONNECTED,
+        { broadcast: false, changedAt: message.changedAt },
+      );
+    });
+    channelRef.current = subscription;
+    return () => {
+      if (channelRef.current === subscription) channelRef.current = null;
+      subscription.close();
+    };
+  }, [applyAccountChange]);
 
   // Silently restore session if the user already approved this app.
   useEffect(() => {
     let cancelled = false;
-    const restoreGeneration = watcherGenerationRef.current;
+    const restoreGeneration = accountChangeGenerationRef.current;
 
     const finishRestore = () => {
-      if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
+      if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) {
         return;
       }
 
-      setState((prev) => (prev.loading ? { ...prev, loading: false } : prev));
+      setState((prev) => {
+        const next = prev.loading ? { ...prev, loading: false } : prev;
+        stateRef.current = next;
+        return next;
+      });
     };
 
     const restoreError = (error: unknown) => {
-      if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
+      if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) {
         return;
       }
 
-      setState((prev) => ({
-        ...prev,
-        address: null,
-        network: null,
-        connected: false,
-        error: classifyWalletError(error),
-        loading: false,
-      }));
+      setState((prev) => {
+        const next = {
+          ...prev,
+          address: null,
+          network: null,
+          connected: false,
+          error: classifyWalletError(error),
+          loading: false,
+        };
+        stateRef.current = next;
+        return next;
+      });
     };
 
     (async () => {
@@ -233,11 +307,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (cancelled || watcherGenerationRef.current !== restoreGeneration) {
-          return;
-        }
-
-        setState({
+        if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) return;
+        applyAccountChange({
           address: addr.address,
           network: net.network,
           connected: true,
@@ -274,21 +345,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
 
       if (!isValidStellarAddress(address)) {
-        setState((prev) => (prev.connected ? DISCONNECTED : prev));
+        if (stateRef.current.connected) applyAccountChange(DISCONNECTED);
         return;
       }
 
-      setState((prev) =>
-        address === prev.address && network === prev.network
-          ? prev
-          : {
-              address,
-              network,
-              connected: true,
-              error: null,
-              loading: false,
-            },
-      );
+      if (
+        address !== stateRef.current.address ||
+        network !== stateRef.current.network
+      ) {
+        applyAccountChange({ address, network, connected: true, error: null, loading: false });
+      }
     });
 
     return () => {
@@ -304,12 +370,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       watcher.stop();
     };
-  }, [state.connected]);
+  }, [applyAccountChange, state.connected]);
 
   return (
     <WalletContext.Provider
       value={{
         ...state,
+        accountContextVersion,
         expectedNetwork,
         expectedNetworkLabel,
         isNetworkMismatch,
