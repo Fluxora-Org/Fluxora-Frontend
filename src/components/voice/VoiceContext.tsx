@@ -180,93 +180,6 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     [navigate, announce]
   );
 
-  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
-const processSpokenPhrase = useCallback(
-  (phrase: string): boolean => {
-    setTranscript(phrase);
-    setState("processing");
-
-    // Handle active confirmation step
-    if (pendingDestructiveCommand) {
-      const clean = phrase.trim().toLowerCase();
-
-      if (clean === "confirm" || clean === "yes") {
-        confirmDestructiveAction();
-        return true;
-      }
-
-      if (clean === "cancel" || clean === "no" || clean === "abort") {
-        cancelDestructiveAction();
-        return true;
-      }
-
-      // Do not process other commands while confirmation is pending
-      setState("confirming-destructive");
-      return false;
-    }
-
-    const matched = matchCommand(phrase);
-
-    if (matched) {
-      executeCommand(matched, phrase);
-      return true;
-    }
-
-    setState("command-unrecognized");
-    announce(
-      `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
-    );
-
-    setTimeout(() => {
-      setState((prev) =>
-        prev === "command-unrecognized" ? "listening" : prev
-      );
-    }, 3000);
-
-    return false;
-  },
-  [
-    matchCommand,
-    executeCommand,
-    pendingDestructiveCommand,
-    confirmDestructiveAction,
-    cancelDestructiveAction,
-    announce,
-  ]
-);
-
-      const matched = matchCommand(phrase);
-      if (matched === "ambiguous") {
-        setState("command-ambiguous");
-        announce(
-          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-ambiguous" ? "listening" : prev,
-          );
-        }, 3000);
-        return false;
-      }
-      if (matched) {
-        executeCommand(matched, phrase);
-        return true;
-      } else {
-        setState("command-unrecognized");
-        announce(
-          `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-unrecognized" ? "listening" : prev
-          );
-        }, 3000);
-        return false;
-      }
-    },
-    [matchCommand, executeCommand, pendingDestructiveCommand, announce]
-  );
-
   // Destructive confirmations
   const confirmDestructiveAction = useCallback(() => {
     if (!pendingDestructiveCommand) return;
@@ -288,6 +201,74 @@ const processSpokenPhrase = useCallback(
     setState("listening");
     announce("Destructive action cancelled.");
   }, [announce]);
+
+  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
+  const processSpokenPhrase = useCallback(
+    (phrase: string): boolean => {
+      setTranscript(phrase);
+      setState("processing");
+
+      // Handle active confirmation step
+      if (pendingDestructiveCommand) {
+        const clean = phrase.trim().toLowerCase();
+
+        if (clean === "confirm" || clean === "yes") {
+          confirmDestructiveAction();
+          return true;
+        }
+
+        if (clean === "cancel" || clean === "no" || clean === "abort") {
+          cancelDestructiveAction();
+          return true;
+        }
+
+        // Do not process other commands while confirmation is pending
+        setState("confirming-destructive");
+        return false;
+      }
+
+      const matched = matchCommand(phrase);
+
+      if (matched === "ambiguous") {
+        setState("command-ambiguous");
+        announce(
+          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+        );
+        setTimeout(() => {
+          setState((prev) =>
+            prev === "command-ambiguous" ? "listening" : prev,
+          );
+        }, 3000);
+        return false;
+      }
+
+      if (matched) {
+        executeCommand(matched, phrase);
+        return true;
+      }
+
+      setState("command-unrecognized");
+      announce(
+        `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+      );
+
+      setTimeout(() => {
+        setState((prev) =>
+          prev === "command-unrecognized" ? "listening" : prev
+        );
+      }, 3000);
+
+      return false;
+    },
+    [
+      matchCommand,
+      executeCommand,
+      pendingDestructiveCommand,
+      confirmDestructiveAction,
+      cancelDestructiveAction,
+      announce,
+    ]
+  );
 
   // Start SpeechRecognition
   const startListening = useCallback(() => {
