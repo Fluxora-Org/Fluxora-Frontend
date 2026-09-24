@@ -170,7 +170,13 @@ non-negotiable; the CI e2e suite audits rendered pages with `axe-core`.
 ### Touch targets
 
 Interactive elements must have a minimum touch target of **44 × 44 CSS px**.
-See `.kiro/specs/touch-target-accessibility` for the full spec.
+The automated audit runs every primary route at the smallest supported viewport
+of **320 × 568 CSS px** in `e2e/touch-targets.spec.ts`.
+
+An exception is permitted only for a non-rendered or platform-controlled
+control that cannot be resized. Mark it with `data-touch-target-exception` and
+provide a non-empty `data-touch-target-reason`; the audit rejects unreasoned
+exceptions. See `.kiro/specs/touch-target-accessibility` for the full spec.
 
 ### Colour contrast
 

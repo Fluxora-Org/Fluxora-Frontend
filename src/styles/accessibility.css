@@ -16,6 +16,27 @@
  *   import './styles/accessibility.css'
  */
 
+/*
+ * Keep the 44px touch-target floor in the shared accessibility layer so
+ * component stylesheet changes cannot silently shrink interactive controls.
+ * Exceptions must provide both data attributes; the Playwright audit checks
+ * that every exception has a reason.
+ */
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [role='link'],
+  [role='menuitem'],
+  [role='tab']
+):not([data-touch-target-exception]) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    UNIVERSAL FOCUS-VISIBLE STYLING
    ─────────────────────────────────────────────────────────────────────────
