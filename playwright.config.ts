@@ -27,6 +27,13 @@ export default defineConfig({
     // backend. Existing values from the shell env take precedence.
     env: {
       VITE_USE_MOCKS: process.env.VITE_USE_MOCKS ?? "true",
+      // Demo/mock configuration so the app boots without live backend or RPC
+      // credentials, and an explicit network so config validation passes.
+      VITE_DEMO_MODE: process.env.VITE_DEMO_MODE ?? "true",
+      VITE_NETWORK: process.env.VITE_NETWORK ?? "TESTNET",
+      // Marks the run as end-to-end so wallet-gated routes are reachable
+      // without a browser wallet extension (see RequireWallet guards).
+      VITE_E2E: "true",
     },
   },
   projects: [
