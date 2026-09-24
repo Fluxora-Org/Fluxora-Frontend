@@ -6,7 +6,7 @@
  *
  * WCAG 2.1 AA Compliant:
  * - Receipt text contrast ratio >= 4.5:1 in exported files and preview.
- * - Handles hash-pending ("Pending confirmation") and hash-confirmed states.
+ * - Handles pending, confirmed, failed, and unknown confirmation states.
  */
 
 import {
@@ -26,7 +26,7 @@ export interface ReceiptData {
   rate?: string;
   timestamp: string;
   txHash?: string | null;
-  status: "confirmed" | "pending";
+  status: "confirmed" | "pending" | "failed" | "unknown";
   network?: string;
 }
 

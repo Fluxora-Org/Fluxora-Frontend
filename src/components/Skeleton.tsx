@@ -49,6 +49,9 @@ export function Skeleton({
     <div
       className={`skeleton ${className}`.trim()}
       style={{ width, height, borderRadius, flexShrink: 0, ...style }}
+      // A shimmer is decorative by default. Callers can explicitly opt back
+      // into exposure when a placeholder conveys meaningful content.
+      aria-hidden={rest["aria-hidden"] ?? true}
       {...rest}
     />
   );
