@@ -1,5 +1,5 @@
 /**
- * StreamTimeline.module.css
+ * StreamTimeline.css
  * 
  * Styles for stream timeline visualization component
  * Supports multiple states: active, paused, completed, upcoming
@@ -77,7 +77,9 @@
   justify-content: center;
   flex: 0 0 auto;
   height: 100%;
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
   overflow: hidden;
 }
 
@@ -140,7 +142,8 @@
 
 /* Accrual shimmer animation for active streams */
 @keyframes accrual-shimmer {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.95;
   }
   50% {
@@ -150,13 +153,25 @@
 
 /* Remaining segment (empty state) */
 .stream-timeline-bar__segment--remaining {
-  background: var(--color-surface-raised, #e8ecf1);
-  opacity: 0.6;
+  background-color: var(--color-surface-raised, #e8ecf1);
+  background-image: radial-gradient(
+    circle,
+    var(--color-text-secondary, #4a5565) 1.5px,
+    transparent 2px
+  );
+  background-size: 10px 10px;
   border-right: 1px solid var(--color-border-neutral, #e0e6ed);
 }
 
 .stream-timeline-bar__segment--remaining.is-completed {
-  opacity: 0.4;
+  opacity: 1;
+}
+
+.stream-timeline__text-summary {
+  margin: 0;
+  color: var(--color-text-primary, #1a1f36);
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 /* Segment labels */
@@ -199,9 +214,10 @@
   z-index: 10;
   animation: marker-pulse 2s ease-in-out infinite;
 
-  transition: left var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
-              background-color var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
-              filter var(--motion-duration-stream-disclosure, 200ms) ease-in-out;
+  transition:
+    left var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
+    background-color var(--motion-duration-stream-disclosure, 200ms) ease-in-out,
+    filter var(--motion-duration-stream-disclosure, 200ms) ease-in-out;
 }
 
 .stream-timeline-bar__marker.is-active {
@@ -220,7 +236,8 @@
 }
 
 @keyframes marker-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
   }
@@ -231,9 +248,15 @@
 }
 
 @keyframes highlight-ring-pulse-marker {
-  0% { box-shadow: 0 0 0 0 var(--interactive-focus-ring, #007acc); }
-  50% { box-shadow: 0 0 0 4px var(--interactive-focus-ring, #007acc); }
-  100% { box-shadow: 0 0 4px rgba(0, 0, 0, 0.3); }
+  0% {
+    box-shadow: 0 0 0 0 var(--interactive-focus-ring, #007acc);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--interactive-focus-ring, #007acc);
+  }
+  100% {
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -296,10 +319,6 @@
     font-size: 0.6rem;
     max-width: 40px;
   }
-
-  .stream-timeline-labels__label {
-    display: none;
-  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -346,7 +365,13 @@
 }
 
 .stream-timeline-legend__swatch--remaining {
-  background: var(--color-surface-raised, #e8ecf1);
+  background-color: var(--color-surface-raised, #e8ecf1);
+  background-image: radial-gradient(
+    circle,
+    var(--color-text-secondary, #4a5565) 1.5px,
+    transparent 2px
+  );
+  background-size: 10px 10px;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -447,7 +472,7 @@
 }
 
 [data-theme="dark"] .stream-timeline-bar__segment--remaining {
-  background: var(--color-surface-raised, #3a4556);
+  background-color: var(--color-surface-raised, #3a4556);
   border-color: var(--color-border-default, #6b7a94);
 }
 
@@ -604,6 +629,7 @@
 }
 
 /* Keep segment labels legible — hide them when segment is too narrow */
-.stream-timeline-container[data-compare="true"] .stream-timeline-bar__segment-label {
+.stream-timeline-container[data-compare="true"]
+  .stream-timeline-bar__segment-label {
   font-size: 0.65rem;
 }
