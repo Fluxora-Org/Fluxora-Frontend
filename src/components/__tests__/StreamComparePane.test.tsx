@@ -255,6 +255,79 @@ describe("usePaneStream", () => {
     expect(getStreamById.mock.calls[1]?.[1]).toBeInstanceOf(AbortSignal);
     expect(getStreamById.mock.calls[0]?.[1]?.aborted).toBe(true);
   });
+
+  it("settles on the last selection when ids change rapidly", async () => {
+    const resolvers: Array<(v: StreamRecord) => void> = [];
+    getStreamById.mockImplementation(
+      () =>
+        new Promise<StreamRecord>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const third = makeRecord({
+      id: "STR-THIRD",
+      name: "Third Stream",
+      monthlyRate: 7777,
+    });
+
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-FIRST",
+    });
+
+    rerender("STR-SECOND");
+    rerender("STR-THIRD");
+
+    expect(getStreamById).toHaveBeenCalledTimes(3);
+    // Prior in-flight requests must be cancelled on each change.
+    expect(getStreamById.mock.calls[0]?.[1]?.aborted).toBe(true);
+    expect(getStreamById.mock.calls[1]?.[1]?.aborted).toBe(true);
+    expect(getStreamById.mock.calls[2]?.[1]?.aborted).toBe(false);
+
+    act(() => {
+      resolvers[0]!(BASE_RECORD);
+      resolvers[1]!(ALT_RECORD);
+    });
+    // Superseded responses must not win.
+    expect(result.current.stream).toBeUndefined();
+    expect(result.current.streamId).toBe("STR-THIRD");
+
+    act(() => {
+      resolvers[2]!(third);
+    });
+
+    await waitFor(() => expect(result.current.stream).toBe(third));
+    expect(result.current.streamId).toBe("STR-THIRD");
+    expect(result.current.stream?.monthlyRate).toBe(7777);
+  });
+
+  it("discards a superseded response even when AbortSignal is ignored", async () => {
+    let resolveStale!: (v: StreamRecord) => void;
+    getStreamById.mockImplementationOnce(
+      (_id: string, _signal?: AbortSignal) =>
+        new Promise<StreamRecord>((resolve) => {
+          resolveStale = resolve;
+        }),
+    );
+    getStreamById.mockResolvedValueOnce(ALT_RECORD);
+
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-STALE",
+    });
+
+    rerender("STR-FRESH");
+
+    await waitFor(() => expect(result.current.stream).toBe(ALT_RECORD));
+
+    // Simulate a fetcher that ignores abort and still resolves.
+    act(() => {
+      resolveStale!(BASE_RECORD);
+    });
+
+    expect(result.current.stream).toBe(ALT_RECORD);
+    expect(result.current.streamId).toBe("STR-FRESH");
+    expect(result.current.stream?.name).toBe("Alt Stream");
+  });
 });
 
 // ─── 4. Rendering (swap / remove handlers) ───────────────────────────────────
@@ -262,6 +335,59 @@ describe("usePaneStream", () => {
 describe("StreamComparePane rendering", () => {
   beforeEach(() => {
     getStreamById.mockResolvedValue(BASE_RECORD);
+  });
+
+  it("keeps displayed figures aligned with the last rapid selection", async () => {
+    const leftFinal = makeRecord({
+      id: "STR-LEFT-FINAL",
+      name: "Left Final",
+      monthlyRate: 4242,
+    });
+    const rightFinal = makeRecord({
+      id: "STR-RIGHT-FINAL",
+      name: "Right Final",
+      monthlyRate: 8787,
+      status: "Paused",
+    });
+
+    getStreamById.mockImplementation((id: string) => {
+      if (id === "STR-LEFT-FINAL") return Promise.resolve(leftFinal);
+      if (id === "STR-RIGHT-FINAL") return Promise.resolve(rightFinal);
+      return new Promise(() => {});
+    });
+
+    const onExit = vi.fn();
+    const { rerender } = render(
+      <StreamComparePane
+        leftId="STR-LEFT-1"
+        rightId="STR-RIGHT-1"
+        onExit={onExit}
+      />,
+    );
+
+    rerender(
+      <StreamComparePane
+        leftId="STR-LEFT-2"
+        rightId="STR-RIGHT-2"
+        onExit={onExit}
+      />,
+    );
+    rerender(
+      <StreamComparePane
+        leftId="STR-LEFT-FINAL"
+        rightId="STR-RIGHT-FINAL"
+        onExit={onExit}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Left Final")).toBeInTheDocument();
+      expect(screen.getByText("Right Final")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("4,242 USDC/mo")).toBeInTheDocument();
+    expect(screen.getByText("8,787 USDC/mo")).toBeInTheDocument();
+    expect(screen.queryByText("Test Stream")).not.toBeInTheDocument();
   });
 
   it("does not show a removed pane's late response", async () => {

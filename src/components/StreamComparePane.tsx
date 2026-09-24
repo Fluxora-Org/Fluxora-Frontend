@@ -123,36 +123,48 @@ export function usePaneStream(streamId: string): PaneResult {
     error: null,
   });
   const [retryVersion, setRetryVersion] = useState(0);
+  // Bumped on every selection/retry so a superseded response is discarded even
+  // when AbortSignal is ignored by the fetcher.
+  const selectionRef = useState(() => ({ current: 0 }))[0];
 
   useEffect(() => {
     // If streamId is empty (pane was removed), skip fetching and mark as null.
     if (!streamId) {
+      selectionRef.current += 1;
       setState({ streamId: "", stream: null, error: null });
       return;
     }
 
+    const selectionId = ++selectionRef.current;
     const controller = new AbortController();
     setState({ streamId, stream: undefined, error: null });
 
+    const isCurrentSelection = () =>
+      selectionRef.current === selectionId && !controller.signal.aborted;
+
     getStreamById(decodeURIComponent(streamId), controller.signal)
       .then((result) => {
-        if (!controller.signal.aborted) {
-          setState({ streamId, stream: result, error: null });
-        }
+        if (!isCurrentSelection()) return;
+        setState({ streamId, stream: result, error: null });
       })
       .catch((err: unknown) => {
-        if (!controller.signal.aborted) {
-          setState({
-            streamId,
-            stream: undefined,
-            error:
-              err instanceof Error ? err.message : "Failed to load stream.",
-          });
-        }
+        if (!isCurrentSelection()) return;
+        setState({
+          streamId,
+          stream: undefined,
+          error:
+            err instanceof Error ? err.message : "Failed to load stream.",
+        });
       });
 
-    return () => controller.abort();
-  }, [streamId, retryVersion]);
+    return () => {
+      // Invalidate this selection and cancel the in-flight request.
+      if (selectionRef.current === selectionId) {
+        selectionRef.current += 1;
+      }
+      controller.abort();
+    };
+  }, [streamId, retryVersion, selectionRef]);
 
   const retry = useCallback(() => {
     setRetryVersion((version) => version + 1);
@@ -373,10 +385,17 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
   const [ids, setIds] = useState<[string, string]>([leftId, rightId]);
   const currentDate = useTickingNow();
 
-  // Re-sync if the parent swaps the IDs (e.g. deep-linking)
-  useEffect(() => {
+  // Re-sync during render when the parent selection changes (e.g. rapid
+  // deep-link / table selection updates). Avoids one frame where labels
+  // already reflect the new selection while figures still show the old one.
+  const [syncedProps, setSyncedProps] = useState<[string, string]>([
+    leftId,
+    rightId,
+  ]);
+  if (leftId !== syncedProps[0] || rightId !== syncedProps[1]) {
+    setSyncedProps([leftId, rightId]);
     setIds([leftId, rightId]);
-  }, [leftId, rightId]);
+  }
 
   const leftState = usePaneStream(ids[0]);
   const rightState = usePaneStream(ids[1]);
