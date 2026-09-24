@@ -1,14 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { lazy, useState, useEffect, type ComponentType, type ReactElement } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  useParams,
-} from "react-router-dom";
-import { lazy, useState, type ComponentType, type ReactElement } from "react";
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";

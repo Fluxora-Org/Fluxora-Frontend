@@ -243,17 +243,17 @@ export default function Dashboard() {
       )}
 
       {loading || hasError || hasStreams ? (
-        <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
-          <DashboardStreamsWidget
-            streams={streams}
-            loading={loading}
-            error={error}
-            walletConnected={walletConnected}
-            onRetry={refetch}
-            onCreateStream={() => setIsModalOpen(true)}
-          />
-        </WidgetErrorBoundary>
         <>
+          <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
+            <DashboardStreamsWidget
+              streams={streams}
+              loading={loading}
+              error={error}
+              walletConnected={walletConnected}
+              onRetry={refetch}
+              onCreateStream={() => setIsModalOpen(true)}
+            />
+          </WidgetErrorBoundary>
           <ErrorBoundary>
             <RecentStreams
               streams={streams}
