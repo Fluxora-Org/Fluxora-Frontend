@@ -176,6 +176,32 @@
   font-size: 1.25rem;
 }
 
+.streamIdValueGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.identifierCopyButton {
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #2a3d58;
+  border-radius: 6px;
+  background: #1e2d42;
+  color: #e8ecf4;
+  cursor: pointer;
+}
+
+.identifierCopyButton:hover {
+  background: #2a3d58;
+}
+
+.identifierCopyButton.copied {
+  background: #00d4aa;
+  color: #ffffff;
+}
+
 .urlContainer {
   display: flex;
   gap: 0.5rem;

@@ -11,6 +11,7 @@ import {
   getSafeExternalUrl,
   SAFE_EXTERNAL_LINK_ATTRIBUTES,
 } from "../../lib/safeExternalUrl";
+import { rememberCreatedStream } from "../../lib/recentCreatedStreams";
 import {
   type ShareFlowState,
   type ShareProvider,
@@ -83,6 +84,7 @@ export default function StreamCreatedModal({
   );
   const [listOpen, setListOpen] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
+  const [identifierCopied, setIdentifierCopied] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const channelInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +103,7 @@ export default function StreamCreatedModal({
       setChannelQuery("");
       setSelectedChannelId(null);
       setListOpen(false);
+      setIdentifierCopied(false);
       const timer = setTimeout(() => setAnnouncement(""), 1000);
       return () => clearTimeout(timer);
     }
@@ -198,6 +201,11 @@ export default function StreamCreatedModal({
     shareFlow === "send-failed";
   const safeStreamUrl = getSafeExternalUrl(streamUrl);
 
+  const handleClose = () => {
+    rememberCreatedStream({ streamId, streamUrl });
+    onClose();
+  };
+
   const announce = (message: string, clearMs = 2000) => {
     setAnnouncement(message);
     setTimeout(() => setAnnouncement(""), clearMs);
@@ -247,6 +255,17 @@ export default function StreamCreatedModal({
         "Could not copy stream URL. Please select and copy the URL manually.",
         3000,
       );
+    }
+  };
+
+  const handleCopyIdentifier = async () => {
+    const didCopy = await copy(streamId);
+    if (didCopy) {
+      setIdentifierCopied(true);
+      announce("Stream identifier copied");
+      window.setTimeout(() => setIdentifierCopied(false), 2000);
+    } else {
+      announce("Could not copy stream identifier. Please copy it manually.", 3000);
     }
   };
 
@@ -406,7 +425,7 @@ export default function StreamCreatedModal({
   return (
     <div
       className={`${styles.overlay}${theme === "cyberpunk" ? ` ${styles.cyberpunkSkin}` : ""}`}
-      onClick={onClose}
+      onClick={handleClose}
       data-skin={theme === "cyberpunk" ? "cyberpunk" : undefined}
     >
       <div
@@ -425,7 +444,7 @@ export default function StreamCreatedModal({
         <button
           ref={closeButtonRef}
           className={styles.closeButton}
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close stream created modal"
           type="button"
         >
@@ -464,7 +483,17 @@ export default function StreamCreatedModal({
         <div className={styles.streamInfoCard}>
           <div className={styles.streamIdRow}>
             <span className={styles.streamIdLabel}>Stream ID</span>
-            <span className={styles.streamIdValue}>#{streamId}</span>
+            <div className={styles.streamIdValueGroup}>
+              <code className={styles.streamIdValue}>{streamId}</code>
+              <button
+                className={`${styles.identifierCopyButton} ${identifierCopied ? styles.copied : ""}`}
+                onClick={() => void handleCopyIdentifier()}
+                type="button"
+                aria-label={identifierCopied ? "Copied stream identifier" : "Copy stream identifier"}
+              >
+                {identifierCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
           </div>
           <div className={styles.urlContainer}>
             <div className={styles.urlBar}>{streamUrl}</div>
@@ -787,7 +816,10 @@ export default function StreamCreatedModal({
         <div className={styles.actions}>
           <button
             className={`${styles.btn} ${styles.btnSecondary}`}
-            onClick={onCreateAnother}
+            onClick={() => {
+              rememberCreatedStream({ streamId, streamUrl });
+              onCreateAnother();
+            }}
             type="button"
           >
             <svg
@@ -805,6 +837,15 @@ export default function StreamCreatedModal({
             </svg>
             Create another
           </button>
+          {safeStreamUrl && (
+            <a
+              href={safeStreamUrl}
+              {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
+              className={`${styles.btn} ${styles.btnPrimary}`}
+            >
+              Open stream details
+            </a>
+          )}
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}
             onClick={handleViewStream}
