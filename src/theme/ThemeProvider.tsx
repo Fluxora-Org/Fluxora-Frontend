@@ -116,10 +116,15 @@ export interface ThemeRegistrationError {
 
 // ─── 3. Storage helpers ───────────────────────────────────────────────────────
 
-export type ThemePreference = "light" | "dark" | "auto";
+export type ThemePreference = "light" | "dark" | "cyberpunk" | "auto";
 
 export function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "auto";
+  return (
+    value === "light" ||
+    value === "dark" ||
+    value === "cyberpunk" ||
+    value === "auto"
+  );
 }
 
 function getStoredTheme(): ThemePreference | null {
@@ -520,13 +525,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     (next: Theme) => {
-      if (next === "light" || next === "dark") {
-        setThemePreference(next);
-      } else {
-        hasExplicitChoiceRef.current = true;
-        writeBrowserStorage(THEME_STORAGE_KEY, next, window.localStorage);
-        setThemeState(next);
-      }
+      // Every built-in `Theme` is now a valid explicit preference, so route the
+      // write through `setThemePreference`. This keeps the persisted preference
+      // (`themePreference`) and the applied theme (`theme`) in lock-step —
+      // including `"cyberpunk"`, which previously bypassed the preference state
+      // and was silently dropped on reload.
+      setThemePreference(next);
     },
     [setThemePreference],
   );
