@@ -189,6 +189,8 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
               alt="Fluxora dashboard showing active treasury streams and analytics"
               loading="eager"
               fetchPriority="high"
+              width={1024}
+              height={768}
               className="absolute -right-10 top-0 max-w-[600px] w-full rounded-2xl shadow-2xl hidden lg:block opacity-40 mix-blend-overlay"
             />
 
