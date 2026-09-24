@@ -208,6 +208,10 @@
   background: var(--timeline-status-active, var(--color-text-primary, #1a1f36));
 }
 
+.stream-timeline-bar__marker.timeline-marker-animate {
+  animation: highlight-ring-pulse-marker 500ms ease-out forwards;
+}
+
 .stream-timeline-bar__marker.is-completed {
   background: var(--timeline-status-completed, var(--color-success, #10b981));
   animation: none;
@@ -522,7 +526,7 @@
   }
 
   .stream-timeline-bar__marker.timeline-marker-animate {
-    animation: highlight-ring-pulse-marker 500ms ease-out forwards;
+    animation: none;
   }
 
   .stream-timeline__loading-spinner {

@@ -141,6 +141,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   transactionDemoOutcome = "confirmed",
 }) => {
   const { t } = useI18n();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [animateClass, setAnimateClass] = React.useState("");
   const prevStatusRef = React.useRef(status);
 
@@ -148,19 +149,18 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
     if (prevStatusRef.current !== status) {
       prevStatusRef.current = status;
       setAnimateClass("");
+      if (prefersReducedMotion) return undefined;
       const req = requestAnimationFrame(() => {
         setAnimateClass("timeline-marker-animate");
       });
       return () => cancelAnimationFrame(req);
     }
-  }, [status]);
+  }, [status, prefersReducedMotion]);
   // Parse dates
   const start = new Date(startDate);
   const cliff = cliffDate ? new Date(cliffDate) : null;
   const current = new Date(currentDate);
   const end = new Date(endDate);
-
-  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Validate dates
   const totalDuration = end.getTime() - start.getTime();
