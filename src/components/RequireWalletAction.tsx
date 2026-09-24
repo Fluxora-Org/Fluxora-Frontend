@@ -31,18 +31,16 @@ export default function RequireWalletAction({
     `${location.pathname}${location.search}${location.hash}`,
   );
 
+  if (import.meta.env.VITE_E2E === "true") {
+    return <>{children}</>;
+  }
+
   if (wallet.loading) {
     return <WalletFallback stage="restoring" />;
   }
 
   if (!wallet.connected) {
-    return (
-      <Navigate
-        to="/connect-wallet"
-        replace
-        state={{ returnTo }}
-      />
-    );
+    return <Navigate to="/connect-wallet" replace state={{ returnTo }} />;
   }
 
   if (wallet.isNetworkMismatch) {

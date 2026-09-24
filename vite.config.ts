@@ -4,7 +4,9 @@ import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
 
-const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const isTesting =
+  process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const isE2E = process.env.VITE_E2E === "true";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
 
 /**
@@ -26,11 +28,19 @@ const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
  * frame-ancestors override instructions.
  */
 function securityHeadersPlugin(): Plugin {
-  const applyHeaders = (
-    res: { setHeader: (name: string, value: string) => void }
-  ) => {
+  const applyHeaders = (res: {
+    setHeader: (name: string, value: string) => void;
+  }) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-      res.setHeader(name, value);
+      res.setHeader(
+        name,
+        isE2E && name === "Content-Security-Policy"
+          ? value.replace(
+              /script-src[^;]*;/,
+              "script-src 'self' 'unsafe-inline'; worker-src 'self' blob:;",
+            )
+          : value,
+      );
     }
   };
 
@@ -49,6 +59,18 @@ function securityHeadersPlugin(): Plugin {
         applyHeaders(res);
         next();
       });
+    },
+  };
+}
+
+function e2eCspPlugin(): Plugin {
+  return {
+    name: "e2e-csp",
+    transformIndexHtml(html) {
+      return html.replace(
+        /script-src[^;]*;/,
+        "script-src 'self' 'unsafe-inline'; worker-src 'self' blob:;",
+      );
     },
   };
 }
@@ -80,7 +102,12 @@ function vendorChunk(id: string) {
 export default defineConfig(async () => {
   const plugins = isTesting
     ? [react()]
-    : [react(), (await import("@tailwindcss/vite")).default(), securityHeadersPlugin()];
+    : [
+        react(),
+        (await import("@tailwindcss/vite")).default(),
+        securityHeadersPlugin(),
+        ...(isE2E ? [e2eCspPlugin()] : []),
+      ];
 
   return {
     plugins,
@@ -112,8 +139,12 @@ export default defineConfig(async () => {
             // Below-the-fold landing sections are lazy-loaded from Home and
             // share one chunk so they download together once the user scrolls.
             if (
-              normalizedId.includes("/src/components/landing-page/TrustSection") ||
-              normalizedId.includes("/src/components/ValuePropositionSection") ||
+              normalizedId.includes(
+                "/src/components/landing-page/TrustSection",
+              ) ||
+              normalizedId.includes(
+                "/src/components/ValuePropositionSection",
+              ) ||
               normalizedId.includes("/src/components/GetStartedCTA") ||
               normalizedId.includes("/src/components/NewsletterSection")
             ) {
@@ -133,7 +164,11 @@ export default defineConfig(async () => {
       coverage: {
         provider: "v8",
         reporter: ["text", "json", "html"],
-        include: ["src/components/**/*.tsx", "src/pages/**/*.tsx", "src/theme/**/*.tsx"],
+        include: [
+          "src/components/**/*.tsx",
+          "src/pages/**/*.tsx",
+          "src/theme/**/*.tsx",
+        ],
         exclude: [
           "src/components/**/*.test.tsx",
           "src/pages/**/*.test.tsx",

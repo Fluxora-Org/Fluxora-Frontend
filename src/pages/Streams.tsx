@@ -30,9 +30,7 @@ import {
   STATUS_FILTERS,
   MAX_LOADING_RETRIES,
 } from "./useStreamsData";
-import {
-  clearResolved as clearResolvedOptimistic,
-} from "../lib/optimisticTransactions";
+import { clearResolved as clearResolvedOptimistic } from "../lib/optimisticTransactions";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -610,10 +608,7 @@ function StreamDetail({
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -785,54 +780,6 @@ export default function Streams() {
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
-  const wallet = useWallet();
-  const walletAddress = wallet.address?.trim() ?? "";
-  const { streams: serverStreams, loading, error, refetch, retryCount } = useTreasury(
-    undefined,
-    wallet.accountContextVersion,
-  );
-  const { streams, pendingCount, rolledBackCount } = useOptimisticStreams({ streams: serverStreams });
-
-  // ── Reconcile stale optimistic rows on mount ───────────────────────────
-  // When the user reloads during receipt polling, pending optimistic rows may
-  // already be confirmed or failed on-chain.  We check each one and resolve
-  // it deterministically so the UI never shows a stale optimistic row.
-  const reconciledRef = useRef(false);
-  useEffect(() => {
-    if (reconciledRef.current) return;
-    reconciledRef.current = true;
-    const pending = getPendingOptimistic();
-    if (pending.length === 0) return;
-
-    for (const op of pending) {
-      if (!op.txHash) continue;
-      void getTransactionStatus(op.txHash)
-        .then((onChainStatus: string) => {
-          if (onChainStatus === "confirmed") {
-            resolveOptimisticByTxHash(op.txHash!, "confirmed");
-          } else if (onChainStatus === "failed") {
-            resolveOptimisticByTxHash(op.txHash!, "rolled-back", "Confirmed failed on-chain after reload");
-          }
-          // If still pending, leave it — the polling will eventually resolve it.
-        })
-        .catch(() => {
-          // Network error during reconciliation — leave the row as pending
-          // so the user sees it and can retry or refresh.
-        });
-    }
-  }, []);
-
-  const filterLabels: Record<StatusFilter, string> = {
-    All: t("streams.filter.all"),
-    Active: t("streams.filter.active"),
-    Paused: t("streams.filter.paused"),
-    Completed: t("streams.filter.completed"),
-  };
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<StreamSortMode>("recent");
-  const [expandedStreamId, setExpandedStreamId] = useState<string>("");
-  const [selectedStreamId, setSelectedStreamId] = useState<string>("");
 
   // ── All data + filter logic lives in the hook ──────────────────────────────
   const data = useStreamsData();
@@ -946,7 +893,13 @@ export default function Streams() {
       clearResolvedOptimisticOps();
       refetchStreams();
     },
-    [clearResolvedOptimisticOps, refetchStreams, setLiveDraft, setRestoredDraft, streams.length],
+    [
+      clearResolvedOptimisticOps,
+      refetchStreams,
+      setLiveDraft,
+      setRestoredDraft,
+      streams.length,
+    ],
   );
 
   const handleStreamError = useCallback(() => {
@@ -991,9 +944,12 @@ export default function Streams() {
     [addToast],
   );
 
-  const handleToggleStreamCard = useCallback((id: string) => {
-    setExpandedStreamId((current) => (current === id ? "" : id));
-  }, [setExpandedStreamId]);
+  const handleToggleStreamCard = useCallback(
+    (id: string) => {
+      setExpandedStreamId((current) => (current === id ? "" : id));
+    },
+    [setExpandedStreamId],
+  );
 
   const handleSelectStreamCard = useCallback(
     (id: string) => {

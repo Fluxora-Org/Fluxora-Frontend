@@ -492,8 +492,8 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
                 {stream.isPinned ? "📌" : "📌"}
               </button>
             </div>
-          )}
-        />
+          ))}
+        </div>
       )}
         </div>
       );
