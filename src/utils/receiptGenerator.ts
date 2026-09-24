@@ -213,7 +213,10 @@ export function drawReceiptToCanvas(
   ctx.stroke();
 
   // 2. STATUS BADGE & TIMESTAMP
-  const isPending = data.status === "pending" || !data.txHash;
+  // Only an explicit confirmed status may be rendered as a successful
+  // exported receipt. Failed and unknown results remain unverified even if a
+  // transaction hash is available.
+  const isPending = data.status !== "confirmed" || !data.txHash;
 
   ctx.fillStyle = isPending ? "#FEF3C7" : "#DCFCE7";
   ctx.strokeStyle = isPending ? "#F59E0B" : "#10B981";
