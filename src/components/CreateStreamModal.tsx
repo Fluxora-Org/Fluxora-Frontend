@@ -528,7 +528,7 @@ export default function CreateStreamModal({
     } catch (err) {
       const message = getStreamErrorMessage(err);
       setStreamError(message);
-      addToast(t("createStream.error.failedWithMessage", { message }), "error");
+      addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
       onStreamError?.(err);
     } finally {
       submitInFlightRef.current = false;
@@ -559,12 +559,12 @@ export default function CreateStreamModal({
 
     if (flushedFromQueueRef.current) {
       flushedFromQueueRef.current = false;
-      addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
+      addToast(t("createStream.queue.flushSuccessToast"), "success", 0, {
         label: t("createStream.queue.viewStreamAction"),
         onClick: () => onStreamCreated?.(createdData),
       });
     } else {
-      addToast(t("createStream.success.message"), "success");
+      addToast(t("createStream.success.message"), "success", 0);
     }
     onStreamCreated?.(createdData);
     onClose();
@@ -985,7 +985,7 @@ export default function CreateStreamModal({
       } catch (err) {
         const message = getStreamErrorMessage(err);
         setStreamError(message);
-        addToast(t("createStream.error.failedWithMessage", { message }), "error");
+        addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
         onStreamError?.(err);
       }
 
@@ -1448,9 +1448,10 @@ export default function CreateStreamModal({
       onClose();
     } else {
       addToast(
-        `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
-        'error',
-      );
+          `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
+          'error',
+          0
+        );
     }
   };
 
@@ -3572,3 +3573,5 @@ export default function CreateStreamModal({
     </div>
   );
 }
+
+

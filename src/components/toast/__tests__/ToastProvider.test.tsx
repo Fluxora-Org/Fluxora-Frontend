@@ -86,6 +86,14 @@ describe("ToastProvider / useToast", () => {
     expect(screen.queryByText("Hello")).not.toBeInTheDocument();
   });
 
+  it("does not auto-dismiss if timeout is 0", () => {
+    renderWithProvider(<AddButton timeout={0} />);
+    fireEvent.click(screen.getByRole("button", { name: /add success/i }));
+
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+  });
+
   it("respects a custom timeout", () => {
     renderWithProvider(<AddButton timeout={1000} />);
     fireEvent.click(screen.getByRole("button", { name: /add success/i }));
@@ -515,3 +523,4 @@ describe("ToastProvider / useToast", () => {
     expect(screen.getByText("Error 2")).toBeInTheDocument();
   });
 });
+

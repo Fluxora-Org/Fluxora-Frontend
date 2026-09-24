@@ -156,7 +156,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
     // Start timers for visible toasts that don't have an active timer
     for (const toast of visible) {
-      if (!timers.current.has(toast.id)) {
+      if (!timers.current.has(toast.id) && toast.timeout > 0) {
         const timer = setTimeout(() => dismiss(toast.id), toast.timeout);
         timers.current.set(toast.id, timer);
       }

@@ -910,6 +910,7 @@ export default function Streams() {
       addToast(
         "A pending stream operation did not confirm on-chain and has been reverted.",
         "error",
+        0
       );
     }
     rolledBackToastRef.current = rolledBackCount;
@@ -1325,3 +1326,4 @@ export default function Streams() {
     </div>
   );
 }
+
