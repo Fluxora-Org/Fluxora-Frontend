@@ -20,6 +20,9 @@ import {
   getAllowedEmbedOrigins,
   validateEmbedMessage,
 } from "../lib/embedMessagePolicy";
+import { getFramingContext } from "../lib/embedFramingPolicy";
+import { getNetworkLabel } from "../lib/config";
+import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 
 /**
  * EmbedStreamWidget - Dedicated embed page for stream status widget
@@ -37,6 +40,11 @@ import {
  * - Validates theme/accent query parameters
  * - Falls back to defaults on invalid input
  * - No arbitrary CSS injection
+ * - Only renders balances, progress, and timeline figures when the framing
+ *   page's origin is allowlisted via VITE_EMBED_ALLOWED_ORIGINS; otherwise the
+ *   widget degrades to identity + network + a notice (see
+ *   src/lib/embedFramingPolicy.ts)
+ * - Every render states which network and stream it shows
  */
 export default function EmbedStreamWidget() {
   const { streamId } = useParams<{ streamId: string }>();
@@ -51,6 +59,13 @@ export default function EmbedStreamWidget() {
   const [retryCount, setRetryCount] = useState(0);
 
   const tickingNow = useTickingNow();
+
+  // Framing trust is resolved once per mount: env and window topology do not
+  // change over the widget's lifetime.
+  const framing = useMemo(() => getFramingContext(), []);
+
+  // Stellar network the embedded stream lives on, disclosed on every render.
+  const networkLabel = getNetworkLabel(getExpectedStellarNetwork());
 
   /**
    * Derive a stable YYYY-MM-DD date string from the ticking timestamp.
@@ -172,7 +187,9 @@ export default function EmbedStreamWidget() {
     );
   }
   
-  // Success state — render appropriate widget layout
+  // Success state — render appropriate widget layout. The network + stream
+  // disclosure is always shown. When framing trust cannot be established, we
+  // degrade to identity + network + notice and hide all figures.
   const widgetProps = {
     stream,
     currentDate,
@@ -181,7 +198,10 @@ export default function EmbedStreamWidget() {
   
   return (
     <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
-      {widgetPreset === "banner" ? (
+      <EmbedWidgetDisclosure networkLabel={networkLabel} streamId={stream.id} />
+      {!framing.trusted ? (
+        <EmbedWidgetDegradedStream stream={stream} />
+      ) : widgetPreset === "banner" ? (
         <EmbedWidgetLayoutBanner {...widgetProps} />
       ) : widgetPreset === "compact" ? (
         <EmbedWidgetLayoutCompact {...widgetProps} />
@@ -235,6 +255,58 @@ function EmbedWidgetContainer({
       }}
     >
       {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Disclosure + degraded (trust-failed) state
+// ---------------------------------------------------------------------------
+
+interface EmbedWidgetDisclosureProps {
+  networkLabel: string;
+  streamId: string;
+}
+
+/**
+ * One-line disclosure stating which network and stream the widget renders.
+ * Shown in every success-state render, so a viewer can always verify what a
+ * framed widget is displaying.
+ */
+function EmbedWidgetDisclosure({ networkLabel, streamId }: EmbedWidgetDisclosureProps) {
+  return (
+    <div
+      className="embed-widget-disclosure"
+      role="note"
+      aria-label="Stream context"
+    >
+      {`${networkLabel} · Stream ${streamId}`}
+    </div>
+  );
+}
+
+interface EmbedWidgetDegradedProps {
+  stream: StreamRecord;
+}
+
+/**
+ * Safe fallback when the framing origin could not be verified against
+ * VITE_EMBED_ALLOWED_ORIGINS. Shows only stream identity plus the disclosure,
+ * no balances, progress, rates, or timeline.
+ */
+function EmbedWidgetDegradedStream({ stream }: EmbedWidgetDegradedProps) {
+  return (
+    <div
+      role="article"
+      data-testid="embed-degraded-state"
+      className="embed-widget-degraded"
+      aria-label={`Stream widget: ${stream.name} (unverified host)`}
+    >
+      <h1 className="embed-widget-degraded__title">{stream.name}</h1>
+      <p className="embed-widget-degraded__notice">
+        This widget could not verify the page displaying it. Stream balances and
+        progress are hidden.
+      </p>
     </div>
   );
 }
