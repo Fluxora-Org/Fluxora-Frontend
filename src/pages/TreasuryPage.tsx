@@ -2,10 +2,12 @@ import { useState } from "react";
 import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
 import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
-import ActivityHeatmap from "../components/treasuryOverviewPage/ActivityHeatmap";
-import TreasuryFlowSankey from "../components/treasuryOverviewPage/TreasuryFlowSankey";
-import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
-import ReportBuilderPanel from "../components/treasuryOverviewPage/ReportBuilderPanel";
+import { lazy, Suspense } from "react";
+import ErrorBoundary from "../components/ErrorBoundary";
+const ActivityHeatmap = lazy(() => import("../components/treasuryOverviewPage/ActivityHeatmap"));
+const TreasuryFlowSankey = lazy(() => import("../components/treasuryOverviewPage/TreasuryFlowSankey"));
+const RecentStreams = lazy(() => import("../components/treasuryOverviewPage/RecentStreams"));
+const ReportBuilderPanel = lazy(() => import("../components/treasuryOverviewPage/ReportBuilderPanel"));
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import {
   ColorBlindSimulationProvider,
@@ -95,21 +97,37 @@ export default function TreasuryPage() {
           onRefresh={refetch}
         />
         {showReportBuilder && (
-          <ReportBuilderPanel
-            streams={streams || []}
-            onClose={() => setShowReportBuilder(false)}
-          />
+          <ErrorBoundary>
+            <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
+              <ReportBuilderPanel
+                streams={streams || []}
+                onClose={() => setShowReportBuilder(false)}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
         <Metrics metrics={metrics || []} loading={loading} error={error} />
-        <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
-        <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} />
-        <RecentStreams
-          streams={streams || []}
-          loading={loading}
-          error={error}
-          onRetry={refetch}
-          walletConnected={walletConnected}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
+            <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
+            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
+            <RecentStreams
+              streams={streams || []}
+              loading={loading}
+              error={error}
+              onRetry={refetch}
+              walletConnected={walletConnected}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </ColorBlindSimulationProvider>
   );

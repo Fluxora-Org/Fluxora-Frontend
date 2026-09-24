@@ -258,6 +258,7 @@ describe("streamsSessionRecovery", () => {
       // Reading with Alice's key should fail because accountAddress doesn't match
       const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
       expect(snapshot).toBeNull();
+      expect(storage.getItem(aliceKey)).toBeNull();
     });
 
     it("returns null when accountAddress is empty string", () => {
@@ -431,11 +432,13 @@ describe("streamsSessionRecovery", () => {
       writeStreamsSession(
         { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
         NOW,
+        ACCOUNT_ALICE,
         throwingStorage,
       );
 
-      expect(readStreamsSession(NOW, throwingStorage)).toEqual({
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, throwingStorage)).toEqual({
         savedAt: NOW,
+        accountAddress: ACCOUNT_ALICE,
         filters: DEFAULT_STREAMS_FILTERS,
         draft: MEANINGFUL_DRAFT,
       });

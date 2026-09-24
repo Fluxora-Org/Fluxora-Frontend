@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
-import { lazy, Suspense, useState, type ReactElement } from "react";
+import { lazy, useState, type ComponentType, type ReactElement } from "react";
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
-import { Skeleton, SkeletonCard } from "./components/Skeleton";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import { ToastProvider } from "./components/toast/ToastProvider";
@@ -52,56 +52,11 @@ function RecipientRoute() {
   return <Recipient key={getRecipientRouteKey(location.pathname, location.search)} />;
 }
 
-function AppRouteFallback() {
-  return (
-    <div role="status" aria-label="Loading app page" aria-busy="true">
-      <span className="sr-only">Loading app page...</span>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          marginBottom: "1.5rem",
-        }}
-      >
-        <Skeleton width={220} height={28} borderRadius={8} />
-        <Skeleton width={340} height={14} />
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "1rem",
-        }}
-        aria-hidden="true"
-      >
-        {[0, 1, 2].map((item) => (
-          <SkeletonCard
-            key={item}
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <Skeleton width={40} height={40} borderRadius={8} />
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              <Skeleton height={10} width="45%" />
-              <Skeleton height={18} width="70%" />
-            </div>
-          </SkeletonCard>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function lazyAppRoute(element: ReactElement) {
-  return <Suspense fallback={<AppRouteFallback />}>{element}</Suspense>;
+function lazyAppRoute(
+  element: ReactElement,
+  load?: () => Promise<{ default: ComponentType }>,
+) {
+  return <RouteErrorBoundary load={load}>{element}</RouteErrorBoundary>;
 }
 
 export default function App() {
@@ -152,22 +107,22 @@ export default function App() {
                         </RequireWallet>
                       }
                     >
-                      <Route index element={lazyAppRoute(<Dashboard />)} />
-                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<Streams />)}</RequireWalletAction>} />
-                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />)}</RequireWalletAction>} />
+                      <Route index element={lazyAppRoute(<Dashboard />, () => import("./pages/Dashboard"))} />
+                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<Streams />, () => import("./pages/Streams"))}</RequireWalletAction>} />
+                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />, () => import("./pages/StreamDetail"))}</RequireWalletAction>} />
                       <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />)}</RequireWalletAction>} />
-                      <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />)} />
+                      <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />, () => import("./pages/TreasuryPage"))} />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (
                         <Route
                           path="empty-state-demo"
-                          element={lazyAppRoute(<EmptyStateDemo />)}
+                          element={lazyAppRoute(<EmptyStateDemo />, () => import("./pages/EmptyStateDemo"))}
                         />
                       )}
                       {IS_DEV && (
                         <Route
                           path="component-gallery"
-                          element={lazyAppRoute(<ComponentGallery />)}
+                          element={lazyAppRoute(<ComponentGallery />, () => import("./pages/dev/ComponentGallery"))}
                         />
                       )}
                     </Route>

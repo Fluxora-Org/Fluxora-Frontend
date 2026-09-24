@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { config } from "../lib/config";
+import WalletFallback from "./WalletFallback";
 
 const SAFE_DEFAULT = "/app";
 
@@ -52,18 +53,7 @@ export default function RequireWallet({ children }: RequireWalletProps) {
   }
 
   if (wallet.loading) {
-    return (
-      <main
-        id="main-content"
-        aria-busy="true"
-        aria-live="polite"
-        className="min-h-[60vh] flex items-center justify-center"
-      >
-        <div role="status" className="text-body-md text-[var(--muted)]">
-          Restoring wallet session...
-        </div>
-      </main>
-    );
+    return <WalletFallback stage="restoring" />;
   }
 
   if (!wallet.connected) {

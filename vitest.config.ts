@@ -36,11 +36,14 @@ export default defineConfig({
         "src/components/WalletIcon.tsx",
         "src/components/treasuryOverviewPage/MetricCard.tsx",
         "src/components/treasuryOverviewPage/StatusPill.tsx",
+        "src/design-tokens.css",
         "src/components/treasuryOverviewPage/Metrics.tsx",
         "src/components/treasuryOverviewPage/RecentStreams.tsx",
         "src/components/treasuryOverviewPage/StreamRow.tsx",
         "src/components/treasuryOverviewPage/useTreasury.ts",
         "src/components/wallet-connect/Walletbutton.tsx",
+        "src/components/wallet-connect/useWalletStateMachine.ts",
+        "src/components/ConnectWalletModal.tsx",
         "src/data/streamRecords.ts",
         "src/fixtures/malformedStreamRecords.ts",
         "src/lib/formatters.ts",
@@ -73,6 +76,11 @@ export default defineConfig({
         "src/components/csv-upload/CsvDropZone.tsx",
         "src/components/csv-upload/ColumnMappingStep.tsx",
         "src/components/csv-upload/PreviewValidateStep.tsx",
+        // Security headers (CSP + browser security header definitions, #1408)
+        "src/lib/securityHeaders.ts",
+        // Issue #1410: split Streams page data loading from table rendering
+        "src/pages/useStreamsData.ts",
+        "src/components/Streams/StreamsListPanel.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

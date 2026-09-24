@@ -19,6 +19,12 @@ describe("getSafeExternalUrl", () => {
     );
   });
 
+  it("returns the URL parser's canonical HTTPS serialization", () => {
+    expect(getSafeExternalUrl("HTTPS://EXAMPLE.COM/stream/../receipt")).toBe(
+      "https://example.com/receipt",
+    );
+  });
+
   it("rejects HTTP because external navigation is HTTPS-only", () => {
     expect(getSafeExternalUrl("http://example.com/stream/123")).toBeNull();
   });

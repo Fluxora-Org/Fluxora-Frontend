@@ -27,6 +27,14 @@ vi.mock("../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../WalletFallback", () => ({
+  default: ({ stage }: { stage?: string }) => (
+    <div data-testid="wallet-fallback" data-stage={stage}>
+      Wallet fallback: {stage}
+    </div>
+  ),
+}));
+
 function LocationProbe() {
   const location = useLocation();
   const state = location.state as { returnTo?: string } | null;
@@ -181,9 +189,9 @@ describe("RequireWallet", () => {
 
     renderGuard("/app");
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Restoring wallet session...",
-    );
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toBeInTheDocument();
+    expect(fallback).toHaveAttribute("data-stage", "restoring");
     expect(screen.queryByText("/connect-wallet")).not.toBeInTheDocument();
   });
 

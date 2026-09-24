@@ -31,7 +31,7 @@ export default function Dashboard() {
   const wallet = useWallet();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
-  const treasury = useTreasury();
+  const treasury = useTreasury(undefined, wallet.accountContextVersion);
   const { loading, error, refetch } = treasury;
   const streams = useMemo<Stream[]>(
     () => treasury.streams.map(toRecentStream),

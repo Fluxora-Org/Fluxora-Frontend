@@ -121,17 +121,17 @@ export const GROUP_LABELS: Record<TokenFieldMeta["group"], string> = {
 };
 
 export const DEFAULTS: Partial<Record<AllowedTokenKey, string>> = {
-  "--color-accent-primary": "#0097a7",   // 3.51:1 on white — passes AA-large (3:1)
+  "--color-accent-primary": "#0097a7", // 3.51:1 on white — passes AA-large (3:1)
   "--color-accent-secondary": "#00a884", // 3.03:1 on white — passes AA-large (3:1)
   "--color-cta-primary-bg": "#0097a7",
   "--color-cta-primary-text": "#04131a", // 12.8:1 on #0097a7 — passes AA (4.5:1)
   "--navbar-bg": "#ffffff",
-  "--navbar-logo-color": "#1a1f36",      // 15.5:1 on white — passes AA (4.5:1)
-  "--navbar-link-color": "#4a5565",      // 7.5:1 on white — passes AA (4.5:1)
+  "--navbar-logo-color": "#1a1f36", // 15.5:1 on white — passes AA (4.5:1)
+  "--navbar-link-color": "#4a5565", // 7.5:1 on white — passes AA (4.5:1)
   "--surface-base": "#ffffff",
   "--surface-neutral": "#fafbfc",
-  "--text-vivid": "#1a1f36",             // 15.5:1 on white — passes AA (4.5:1)
-  "--text-secondary": "#4a5565",         // 7.5:1 on white — passes AA (4.5:1)
+  "--text-vivid": "#1a1f36", // 15.5:1 on white — passes AA (4.5:1)
+  "--text-secondary": "#4a5565", // 7.5:1 on white — passes AA (4.5:1)
 };
 
 // ─── Color & Format Validation ────────────────────────────────────────────────
@@ -170,7 +170,9 @@ export interface ColorFormatValidationResult {
  * Validates a color value for a theme field.
  * Returns isValid: true if valid, or a descriptive reason and message if invalid.
  */
-export function validateColorFormat(value: string): ColorFormatValidationResult {
+export function validateColorFormat(
+  value: string,
+): ColorFormatValidationResult {
   const trimmed = value.trim();
   if (!trimmed) {
     return {
@@ -238,7 +240,8 @@ export function computeFieldContrast(
 
   if (isValidHex(value) && isValidHex(bgHex)) {
     const pair = CONTRAST_PAIRS.find((p) => p.fg === meta.key);
-    const required = pair?.level === "AA-large" ? WCAG_AA_LARGE : WCAG_AA_NORMAL;
+    const required =
+      pair?.level === "AA-large" ? WCAG_AA_LARGE : WCAG_AA_NORMAL;
     const ratio = contrastRatio(normaliseHex(value), normaliseHex(bgHex));
     return {
       ratio,
@@ -253,7 +256,10 @@ export function computeFieldContrast(
 /**
  * Formats the contrast failure error message per WCAG 2.1 AA requirements.
  */
-export function formatContrastErrorMessage(ratio: number, required: number): string {
+export function formatContrastErrorMessage(
+  ratio: number,
+  required: number,
+): string {
   return `Contrast ${ratio.toFixed(2)}:1 — minimum ${required}:1 required (WCAG 2.1 AA). Choose a darker or lighter colour.`;
 }
 
@@ -295,7 +301,10 @@ export function resolveFieldValidationState(params: {
   const errorMessage =
     registrationError?.message ??
     (contrastFails && contrastResult
-      ? formatContrastErrorMessage(contrastResult.ratio, contrastResult.required)
+      ? formatContrastErrorMessage(
+          contrastResult.ratio,
+          contrastResult.required,
+        )
       : undefined);
 
   return {
@@ -330,7 +339,12 @@ export function resolvePreviewTokens(
 ): ResolvedPreviewTokens {
   const get = (key: AllowedTokenKey, fallback: string) => {
     const val = values[key];
-    return val && isValidHex(val) ? normaliseHex(val) : fallback;
+    // Reject translucent colors (4-digit #RGBA / 8-digit #RRGGBBAA) even though
+    // isValidHex() accepts them — WCAG contrast cannot be computed deterministically
+    // for semi-transparent values.
+    return val && isValidHex(val) && !isTranslucentColor(val)
+      ? normaliseHex(val)
+      : fallback;
   };
 
   return {
@@ -401,10 +415,14 @@ export function isDraftDirty(
 /**
  * Initializes model state with pristine baseline and draft.
  */
-export function initThemeEditorState(options: ThemeEditorModelOptions = {}): ThemeEditorState {
+export function initThemeEditorState(
+  options: ThemeEditorModelOptions = {},
+): ThemeEditorState {
   const initialDraft = createInitialDraft(options.customTheme);
-  const initialLabel = options.customTheme?.label ?? options.defaultLabel ?? "My Brand Theme";
-  const initialThemeId = options.customTheme?.id ?? options.defaultId ?? "org-brand";
+  const initialLabel =
+    options.customTheme?.label ?? options.defaultLabel ?? "My Brand Theme";
+  const initialThemeId =
+    options.customTheme?.id ?? options.defaultId ?? "org-brand";
 
   return {
     draft: { ...initialDraft },
@@ -503,7 +521,9 @@ export interface DraftValidationFailure {
   errors: TokenValidationError[];
 }
 
-export type DraftValidationResult = DraftValidationSuccess | DraftValidationFailure;
+export type DraftValidationResult =
+  | DraftValidationSuccess
+  | DraftValidationFailure;
 
 /**
  * Validates a theme draft submission before registration/preview.
@@ -530,7 +550,8 @@ export function validateThemeDraft(params: {
     return {
       ok: false,
       reason: "unauthorized",
-      message: "User is not authorized to register or update organization themes.",
+      message:
+        "User is not authorized to register or update organization themes.",
       errors: [
         {
           status: "error",
@@ -566,14 +587,16 @@ export function validateThemeDraft(params: {
     return {
       ok: false,
       reason: "invalid-identity",
-      message: 'Theme ID must be a lowercase slug containing only alphanumeric characters, "-" or "_".',
+      message:
+        'Theme ID must be a lowercase slug containing only alphanumeric characters, "-" or "_".',
       errors: [
         {
           status: "error",
           token: "theme-id",
           value: themeId,
           reason: "disallowed",
-          message: "Theme ID must be a lowercase slug matching pattern [a-z0-9_-]+.",
+          message:
+            "Theme ID must be a lowercase slug matching pattern [a-z0-9_-]+.",
         },
       ],
     };

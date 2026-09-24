@@ -53,126 +53,33 @@ export function CommandPaletteModal() {
   // Global Keyboard Shortcut Listeners (Cmd+K, Ctrl+K, ?, CustomEvent)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as HTMLElement;
-      const isEditable =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+      const tag = (e.target as HTMLElement).tagName;
+        const isEditable =
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          (e.target as HTMLElement).isContentEditable;
+        // Ignore when IME composition is in progress
+        const isComposing = (e as KeyboardEvent).isComposing;
+        if (isComposing) return;
+        // Ignore when modifier keys are held without being part of a defined shortcut
+        if (e.ctrlKey || e.metaKey) return;
 
-      // Cmd+K or Ctrl+K
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-      // ? key (only when not typing in text field)
-      else if (e.key === "?" && !isEditable) {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      }
-      // Escape closes modal
-      else if (e.key === "Escape" && open) {
-        setOpen(false);
-      }
+        // Open modal on '?' only when not already open and not in an editable element
+        if (e.key === '?' && !isEditable && !open) {
+          e.preventDefault();
+          setOpen(true);
+        }
+        // Close modal on Escape when open
+        if (e.key === 'Escape' && open) {
+          e.preventDefault();
+          setOpen(false);
+        }
+
     }
 
-    function handleCustomOpen() {
-      setOpen(true);
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("open-command-palette", handleCustomOpen);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("open-command-palette", handleCustomOpen);
-    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open]);
-
-  // Reset search & focus index whenever modal opens
-  useEffect(() => {
-    if (open) {
-      setQuery("");
-      setFocusedIndex(0);
-    }
-  }, [open]);
-
-  // Filter items based on query
-  const filteredItems = useMemo(() => {
-    const clean = query.trim().toLowerCase();
-    if (!clean) return PALETTE_ITEMS;
-
-    return PALETTE_ITEMS.filter((item) => {
-      if (item.title.toLowerCase().includes(clean)) return true;
-      if (item.description.toLowerCase().includes(clean)) return true;
-      if (item.keywords.some((kw) => kw.toLowerCase().includes(clean))) return true;
-      if (item.category.toLowerCase().includes(clean)) return true;
-      return false;
-    });
-  }, [query]);
-
-  // Group filtered items by category
-  const groupedResults = useMemo(() => {
-    const map: Record<PaletteCategory, PaletteItem[]> = {
-      Actions: [],
-      Shortcuts: [],
-      Help: [],
-    };
-    filteredItems.forEach((item) => {
-      map[item.category].push(item);
-    });
-    return map;
-  }, [filteredItems]);
-
-  // Flattened array of visible results for keyboard indexing
-  const flatResults = useMemo(() => {
-    return [
-      ...groupedResults.Actions,
-      ...groupedResults.Shortcuts,
-      ...groupedResults.Help,
-    ];
-  }, [groupedResults]);
-
-  // Clamp focusedIndex within bounds
-  useEffect(() => {
-    if (flatResults.length === 0) {
-      setFocusedIndex(0);
-    } else if (focusedIndex >= flatResults.length) {
-      setFocusedIndex(flatResults.length - 1);
-    }
-  }, [flatResults.length, focusedIndex]);
-
-  // Execute selected item
-  const handleSelectItem = useCallback(
-    (item: PaletteItem) => {
-      setOpen(false);
-
-      if (item.targetPath) {
-        navigate(item.targetPath);
-      } else if (item.actionId === "toggle-theme") {
-        toggleTheme();
-      }
-    },
-    [navigate, toggleTheme]
-  );
-
-  // Keyboard navigation within listbox (ArrowUp, ArrowDown, Enter)
-  const handleInputKeyDown = (e: React.KeyboardEvent) => {
-    if (flatResults.length === 0) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setFocusedIndex((prev) => (prev + 1) % flatResults.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setFocusedIndex((prev) => (prev - 1 + flatResults.length) % flatResults.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const current = flatResults[focusedIndex];
-      if (current) {
-        handleSelectItem(current);
-      }
-    }
-  };
 
   if (!open) return null;
 

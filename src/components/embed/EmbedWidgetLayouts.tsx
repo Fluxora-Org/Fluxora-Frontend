@@ -4,6 +4,109 @@ import { ThemeConfig } from "../../lib/embedThemeParser";
 import { formatNumber } from "../../lib/formatters";
 import "./EmbedWidgetLayouts.css";
 
+const EMBED_MESSAGE_MAX_STRING_LENGTH = 500;
+const EMBED_MESSAGE_MAX_URL_LENGTH = 2048;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isDateString(value: unknown): value is string {
+  return isBoundedString(value, 32) && !Number.isNaN(Date.parse(value));
+}
+
+function isThemeConfig(value: unknown): value is ThemeConfig {
+  if (!isRecord(value) || Object.keys(value).length === 0) return false;
+  return Object.values(value).every((entry) =>
+    isBoundedString(entry, EMBED_MESSAGE_MAX_STRING_LENGTH)
+  );
+}
+
+function isStream(value: unknown): value is StreamRecord {
+  if (!isRecord(value)) return false;
+  return (
+    isBoundedString(value.name, 200) &&
+    isBoundedString(value.asset, 20) &&
+    (value.status === "Active" || value.status === "Paused" || value.status === "Completed") &&
+    isDateString(value.startDate) &&
+    (value.cliffDate === null || value.cliffDate === undefined || isDateString(value.cliffDate)) &&
+    isDateString(value.endDate) &&
+    isFiniteNumber(value.depositAmount) && value.depositAmount >= 0 &&
+    isFiniteNumber(value.monthlyRate) && value.monthlyRate >= 0 &&
+    isFiniteNumber(value.streamedAmount) && value.streamedAmount >= 0 &&
+    isFiniteNumber(value.remainingAmount) && value.remainingAmount >= 0 &&
+    isFiniteNumber(value.withdrawableAmount) && value.withdrawableAmount >= 0 &&
+    isFiniteNumber(value.progress) && value.progress >= 0 && value.progress <= 100
+  );
+}
+
+function isSafeUrl(value: string): boolean {
+  if (value.length === 0 || value.length > EMBED_MESSAGE_MAX_URL_LENGTH) return false;
+  try {
+    const parsed = new URL(value, "https://floxora.local");
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export interface EmbedThemeMessage {
+  type: "theme";
+  theme: ThemeConfig;
+}
+
+export interface EmbedStreamMessage {
+  type: "stream";
+  stream: StreamRecord;
+  currentDate?: string;
+}
+
+export interface EmbedNavigateMessage {
+  type: "navigate";
+  url: string;
+  target?: "_blank" | "_self" | "_top" | "_parent";
+}
+
+export type EmbedMessage =
+  | EmbedThemeMessage
+  | EmbedStreamMessage
+  | EmbedNavigateMessage;
+
+export function validateEmbedMessage(message: unknown): message is EmbedMessage {
+  if (!isRecord(message) || !isBoundedString(message.type, 20)) return false;
+  switch (message.type) {
+    case "theme":
+      return "theme" in message && isThemeConfig(message.theme);
+    case "stream":
+      return (
+        "stream" in message &&
+        isStream(message.stream) &&
+        (message.currentDate === undefined || isDateString(message.currentDate))
+      );
+    case "navigate":
+      return (
+        "url" in message &&
+        typeof message.url === "string" &&
+        isSafeUrl(message.url) &&
+        (message.target === undefined ||
+          message.target === "_blank" ||
+          message.target === "_self" ||
+          message.target === "_top" ||
+          message.target === "_parent")
+      );
+    default:
+      return false;
+  }
+}
+
 interface EmbedWidgetLayoutProps {
   stream: StreamRecord;
   currentDate: string;

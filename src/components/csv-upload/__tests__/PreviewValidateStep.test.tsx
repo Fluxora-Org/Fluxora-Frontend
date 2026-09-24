@@ -320,6 +320,50 @@ describe("PreviewValidateStep — duplicate handling, validation, and actions", 
     );
 
     const skipAllBtn = screen.getByRole("button", {
+      name: "Skip invalid row",
+    });
+    fireEvent.click(skipAllBtn);
+
+    expect(onRowsChange).toHaveBeenCalledTimes(1);
+    const updatedRows: CsvRow[] = onRowsChange.mock.calls[0][0];
+    expect(updatedRows[0].status).toBe("valid");
+    expect(updatedRows[1].status).toBe("skipped");
+  });
+
+  it("skips multiple invalid rows via the bulk skip button", () => {
+    const onRowsChange = vi.fn();
+    const rows: CsvRow[] = [
+      createRow({
+        id: "r1",
+        rowNumber: 1,
+        status: "valid",
+      }),
+      createRow({
+        id: "r2",
+        rowNumber: 2,
+        recipient: "invalid-address-2",
+        status: "needs-fix",
+        fieldErrors: { recipient: "Invalid Stellar address" },
+      }),
+      createRow({
+        id: "r3",
+        rowNumber: 3,
+        recipient: "invalid-address-3",
+        status: "needs-fix",
+        fieldErrors: { recipient: "Invalid Stellar address" },
+      }),
+    ];
+
+    render(
+      <PreviewValidateStep
+        rows={rows}
+        onRowsChange={onRowsChange}
+        onReview={vi.fn()}
+        onReplaceFile={vi.fn()}
+      />,
+    );
+
+    const skipAllBtn = screen.getByRole("button", {
       name: "Skip invalid rows",
     });
     fireEvent.click(skipAllBtn);
@@ -328,6 +372,7 @@ describe("PreviewValidateStep — duplicate handling, validation, and actions", 
     const updatedRows: CsvRow[] = onRowsChange.mock.calls[0][0];
     expect(updatedRows[0].status).toBe("valid");
     expect(updatedRows[1].status).toBe("skipped");
+    expect(updatedRows[2].status).toBe("skipped");
   });
 
   it("renders loading state when isLoading is true", () => {
@@ -420,5 +465,40 @@ describe("PreviewValidateStep — duplicate handling, validation, and actions", 
     expect(
       screen.getByText("No valid rows found in this file."),
     ).toBeInTheDocument();
+  });
+
+  it("renders singular stream count for a single row", () => {
+    const rows: CsvRow[] = [
+      createRow({ id: "r1", rowNumber: 1, status: "valid" }),
+    ];
+
+    render(
+      <PreviewValidateStep
+        rows={rows}
+        onRowsChange={vi.fn()}
+        onReview={vi.fn()}
+        onReplaceFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Reviewing 1 stream")).toBeInTheDocument();
+  });
+
+  it("renders plural stream count for multiple rows", () => {
+    const rows: CsvRow[] = [
+      createRow({ id: "r1", rowNumber: 1, status: "valid" }),
+      createRow({ id: "r2", rowNumber: 2, status: "valid" }),
+    ];
+
+    render(
+      <PreviewValidateStep
+        rows={rows}
+        onRowsChange={vi.fn()}
+        onReview={vi.fn()}
+        onReplaceFile={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Reviewing 2 streams")).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export type StreamStatus = 'Active' | 'Paused' | 'Completed';
 
@@ -15,6 +16,10 @@ export interface Stream {
 import StreamsLoading from './StreamsLoading';
 import EmptyState from './EmptyState';
 import { isSafeUrl } from '../utils/security';
+import {
+  getSafeExternalUrl,
+  SAFE_EXTERNAL_LINK_ATTRIBUTES,
+} from '../lib/safeExternalUrl';
 
 interface RecentStreamsProps {
   streams: Stream[];
@@ -39,18 +44,19 @@ export default function RecentStreams({
   onRetry,
   walletConnected = false
 }: RecentStreamsProps) {
+  const { t } = useTranslation();
   const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
     if (streams.length > 0) {
-      setAnnouncement(`Found ${streams.length} matching streams.`);
+      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: streams.length }));
     } else {
-      setAnnouncement('No matching streams found.');
+      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: 0 }));
     }
     
     const timer = setTimeout(() => setAnnouncement(''), 1000);
     return () => clearTimeout(timer);
-  }, [streams.length]);
+  }, [streams.length, t]);
 
   if (loading) {
     return (
@@ -126,7 +132,15 @@ export default function RecentStreams({
             </tr>
           </thead>
           <tbody>
-            {streams.map((stream, index) => (
+            {streams.map((stream, index) => {
+              const safeExternalDetailUrl = getSafeExternalUrl(stream.detailUrl);
+              const detailUrl =
+                safeExternalDetailUrl ??
+                (stream.detailUrl && isSafeUrl(stream.detailUrl)
+                  ? stream.detailUrl
+                  : `/app/streams/${stream.id}`);
+
+              return (
               <tr key={stream.id} style={index % 2 === 0 ? rowEven : rowOdd}>
                 <td style={td}>
                   <div style={streamName}>{stream.name}</div>
@@ -142,8 +156,11 @@ export default function RecentStreams({
                   <StatusPill status={stream.status} />
                 </td>
                 <td style={td}>
-                  <Link 
-                    to={stream.detailUrl && isSafeUrl(stream.detailUrl) ? stream.detailUrl : `/app/streams/${stream.id}`} 
+                  <Link
+                    to={detailUrl}
+                    {...(safeExternalDetailUrl
+                      ? SAFE_EXTERNAL_LINK_ATTRIBUTES
+                      : {})}
                     style={viewLink}
                     aria-label={`View details for ${stream.name}`}
                   >
@@ -167,7 +184,8 @@ export default function RecentStreams({
                   </Link>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
