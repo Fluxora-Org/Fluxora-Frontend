@@ -1001,4 +1001,64 @@ describe('EmbedStreamWidget', () => {
       });
     });
   });
+
+  describe('PostMessage Integration Contract', () => {
+    it('responds to valid theme messages by updating the container theme', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "theme",
+          theme: "dark",
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container?.getAttribute('data-theme')).toBe('dark');
+      });
+    });
+
+    it('responds to valid resize messages by updating container styles', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "resize",
+          width: 500,
+          height: 800,
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container') as HTMLElement;
+        expect(container.style.maxWidth).toBe('500px');
+        expect(container.style.minHeight).toBe('800px');
+      });
+    });
+  });
 });
