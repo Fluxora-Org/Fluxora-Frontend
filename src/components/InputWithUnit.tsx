@@ -52,16 +52,27 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
   hasError,
   keyboardHint,
   className,
+  type = 'text',
+  inputMode,
   ...inputProps
 }) => {
   const unitId = `${id}-unit`;
   const hintId = keyboardHint ? `${id}-keyboard-hint` : undefined;
+
+  // Amount fields must keep the exact decimal string the user entered. A native
+  // `type="number"` input coerces its value through a floating-point `number`,
+  // which loses precision, so it is downgraded to a text field with a decimal
+  // keypad on touch devices. Callers can still override `inputMode`.
+  const resolvedType = type === 'number' ? 'text' : type;
+  const resolvedInputMode = inputMode ?? (type === 'number' ? 'decimal' : undefined);
 
   return (
     <div className={`input-with-unit ${hasError ? 'input-with-unit--error' : ''}`}>
       <input
         {...inputProps}
         id={id}
+        type={resolvedType}
+        inputMode={resolvedInputMode}
         className={`input-with-unit__field ${className || ''}`.trim()}
         aria-describedby={keyboardHint ? `${unitId} ${hintId}` : unitId}
         aria-invalid={hasError || undefined}
