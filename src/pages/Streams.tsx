@@ -885,6 +885,7 @@ export default function Streams() {
     handleResumeDraft,
     resolveSessionOnInteraction,
     announcement,
+    alertAnnouncement,
     clearResolvedOptimisticOps,
   } = data;
 
@@ -1121,6 +1122,9 @@ export default function Streams() {
     <div className="streams-page">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
       </div>
 
       {selectedStream ? (

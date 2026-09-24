@@ -71,7 +71,10 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
 vi.mock("../hooks/useLiveAnnouncer", () => ({
   useLiveAnnouncer: () => ({
     announcement: "",
+    alertAnnouncement: "",
     announce: vi.fn(),
+    announceStatus: vi.fn(),
+    announceAlert: vi.fn(),
   }),
 }));
 

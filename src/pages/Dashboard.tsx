@@ -27,7 +27,8 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
-  const { announcement, announce } = useLiveAnnouncer();
+  const { announcement, alertAnnouncement, announce, announceAlert } =
+    useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
@@ -82,6 +83,16 @@ export default function Dashboard() {
     }
   }, [withdrawable, announce]);
 
+  useEffect(() => {
+    if (error) {
+      const message =
+        error === "Unable to load treasury data."
+          ? "Failed to load dashboard data."
+          : `Failed to load dashboard data: ${error}`;
+      announceAlert(message);
+    }
+  }, [error, announceAlert]);
+
   const handleDismissOnboarding = () => {
     setShowOnboarding(false);
   };
@@ -115,6 +126,9 @@ export default function Dashboard() {
     <main id="main-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
       </div>
 
       <h1 className="text-heading-1" style={{ marginTop: 0 }}>
