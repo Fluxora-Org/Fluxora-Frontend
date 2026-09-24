@@ -111,6 +111,16 @@
   outline-offset: 2px;
 }
 
+/* Keyboard operability: widget root container and interactive controls keep
+   a visible focus ring for keyboard-only users. */
+.embed-widget-card:focus-visible,
+.embed-widget-banner:focus-visible,
+.embed-widget-compact:focus-visible,
+[class*="embed-widget"] button:focus-visible {
+  outline: 2px solid var(--interactive-focus-ring, #007acc);
+  outline-offset: 2px;
+}
+
 /* ============================================================================
    Card Layout (300px-420px)
    ============================================================================ */
