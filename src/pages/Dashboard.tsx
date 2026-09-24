@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import RecentStreams, { Stream } from "../components/RecentStreams";
+import type { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
@@ -14,8 +14,11 @@ import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatAssetAmount } from "../lib/formatters";
-import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
+import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
+import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
+import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
+import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";
 
 export default function Dashboard() {
@@ -166,39 +169,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={cardGrid}>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Active Streams
-          </div>
-          <div className="text-heading-2">{streams.length || "--"}</div>
-        </div>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Total Streaming
-          </div>
-          <div className="text-heading-2">
-            {totalStreaming > 0 ? formatUsdc(totalStreaming) : "-- USDC"}
-          </div>
-        </div>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Withdrawable
-          </div>
-          <div className="text-heading-2">
-            {withdrawable !== null ? formatUsdc(withdrawable) : "-- USDC"}
-          </div>
-        </div>
-      </div>
+      <WidgetErrorBoundary name="Treasury summary" onRetry={refetch}>
+        <DashboardSummaryWidget
+          streamCount={streams.length}
+          totalStreaming={totalStreaming}
+          withdrawable={withdrawable}
+          loading={loading}
+        />
+      </WidgetErrorBoundary>
 
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
@@ -214,25 +192,16 @@ export default function Dashboard() {
       )}
 
       {loading || hasError || hasStreams ? (
-        <>
-          <RecentStreams
+        <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
+          <DashboardStreamsWidget
             streams={streams}
             loading={loading}
             error={error}
-            onRetry={refetch}
             walletConnected={walletConnected}
+            onRetry={refetch}
+            onCreateStream={() => setIsModalOpen(true)}
           />
-          {!loading && !error && (
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setIsModalOpen(true)}
-              aria-label="Create stream"
-            >
-              Create stream
-            </Button>
-          )}
-        </>
+        </WidgetErrorBoundary>
       ) : showOnboarding ? (
         <TreasuryOnboarding
           walletConnected={walletConnected}
@@ -293,16 +262,3 @@ const walletBannerStyle: React.CSSProperties = {
   marginBottom: "0.25rem",
 };
 
-const cardGrid: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-  gap: "1rem",
-  marginTop: "1.5rem",
-};
-
-const card: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "1.25rem",
-};
