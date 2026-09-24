@@ -29,27 +29,31 @@ test.describe("embedded widget display flow", () => {
       page.getByRole("heading", { level: 1, name: KNOWN_STREAM_NAME }),
     ).toBeVisible();
 
-    await expect(widget.getByText("Active", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("status", { name: "Stream status: Active" }),
+    ).toBeVisible();
     await expect(widget.getByText(/Payment Rate/i)).toBeVisible();
     await expect(widget.getByText(/5,?000\s*USDC\/month/i)).toBeVisible();
     await expect(page.getByText(/Powered by Fluxora/i)).toBeVisible();
   });
 
   test("success path honors compact preset query param", async ({ page }) => {
-    await page.goto(
-      `/embed/streams/${KNOWN_STREAM_ID}?preset=compact`,
-      { waitUntil: "domcontentloaded" },
-    );
+    await page.goto(`/embed/streams/${KNOWN_STREAM_ID}?preset=compact`, {
+      waitUntil: "domcontentloaded",
+    });
 
+    // Compact layout has no title heading; identify via article aria-label.
     const widget = page.getByRole("article", {
       name: new RegExp(`Stream widget:\s*${KNOWN_STREAM_NAME}`, "i"),
     });
     await expect(widget).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: KNOWN_STREAM_NAME }),
+      page.getByRole("status", { name: "Stream status: Active" }),
     ).toBeVisible();
-    // Compact layout still surfaces status; footer branding is card-only.
-    await expect(widget.getByText("Active", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("progressbar", { name: /Stream progress:\s*40%/i }),
+    ).toBeVisible();
+    await expect(widget.getByText("Fluxora", { exact: true })).toBeVisible();
   });
 
   test("primary failure shows unavailable state for unknown stream", async ({
