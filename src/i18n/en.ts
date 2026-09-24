@@ -144,6 +144,7 @@ export const en = {
   "createStream.validation.cliffDatePast": "Cliff date must not be in the past.",
   "createStream.validation.cliffDateAfterStart": "Cliff date must be on or after the start date.",
   "createStream.validation.walletNotConnected": "Please connect your wallet first.",
+  "createStream.validation.walletConnectionLost": "Wallet connection lost. Reconnect your wallet to continue — your entries are kept.",
   "createStream.validation.networkMismatch": "Wrong Stellar network. Expected {expected}, but wallet is connected to {actual}. Please switch network in Freighter.",
   "createStream.error.generic": "Stream creation failed. Please try again.",
   "createStream.error.failedWithMessage": "Failed to create stream: {message}",
