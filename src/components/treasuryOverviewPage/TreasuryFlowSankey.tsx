@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Stream } from "./Stream";
 import { formatNumber } from "../../lib/formatters";
+import { DemoDataBadge } from "./DemoBanner";
 import "./TreasuryFlowSankey.css";
 
 export interface TreasuryFlowSankeyProps {
   streams: Stream[];
   loading?: boolean;
   error?: string | null;
+  isDemoMode?: boolean;
 }
 
 interface FlowNode {
@@ -176,6 +178,7 @@ export default function TreasuryFlowSankey({
   streams,
   loading,
   error,
+  isDemoMode,
 }: TreasuryFlowSankeyProps) {
   const isBelowMd = useIsBelowMdBreakpoint();
   const [viewMode, setViewMode] = useState<"diagram" | "table">("diagram");
@@ -281,7 +284,10 @@ export default function TreasuryFlowSankey({
   return (
     <div className="treasury-flow-sankey-container">
       <div className="sankey-header">
-        <h3 className="sankey-title">Treasury Stream Flow</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="sankey-title">Treasury Stream Flow</h3>
+          {isDemoMode && <DemoDataBadge />}
+        </div>
         {!isBelowMd && !isEmpty && (
           <button
             type="button"
