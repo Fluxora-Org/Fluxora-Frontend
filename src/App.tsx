@@ -18,6 +18,7 @@ import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 import { getRecipientRouteKey } from "./pages/recipientRouteKey";
 import RequireWalletAction from "./components/RequireWalletAction";
+import ApiVersionGuard from "./components/ApiVersionGuard";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -79,6 +80,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <ApiVersionGuard />
       <I18nProvider>
         <BrowserRouter>
           <VoiceProvider>
