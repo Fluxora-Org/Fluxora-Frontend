@@ -46,17 +46,46 @@ export default function RecentStreams({
 }: RecentStreamsProps) {
   const { t } = useTranslation();
   const [announcement, setAnnouncement] = useState('');
+  const safeStreams = streams.filter((stream): stream is Stream => {
+    if (!stream || typeof stream !== 'object') {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    const candidate = stream as Partial<Stream>;
+    const isValidStatus =
+      candidate.status === 'Active' ||
+      candidate.status === 'Paused' ||
+      candidate.status === 'Completed';
+
+    if (
+      typeof candidate.id !== 'string' ||
+      candidate.id.trim() === '' ||
+      typeof candidate.name !== 'string' ||
+      candidate.name.trim() === '' ||
+      typeof candidate.recipient !== 'string' ||
+      candidate.recipient.trim() === '' ||
+      typeof candidate.rate !== 'string' ||
+      candidate.rate.trim() === '' ||
+      !isValidStatus
+    ) {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
-    if (streams.length > 0) {
-      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: streams.length }));
+    if (safeStreams.length > 0) {
+      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: safeStreams.length }));
     } else {
       setAnnouncement(t('recentStreams.foundMatchingStreams', { count: 0 }));
     }
     
     const timer = setTimeout(() => setAnnouncement(''), 1000);
     return () => clearTimeout(timer);
-  }, [streams.length, t]);
+  }, [safeStreams.length, t]);
 
   if (loading) {
     return (
@@ -91,7 +120,7 @@ export default function RecentStreams({
     );
   }
 
-  if (streams.length === 0) {
+  if (safeStreams.length === 0) {
     return (
       <section style={sectionContainer}>
         <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -132,7 +161,7 @@ export default function RecentStreams({
             </tr>
           </thead>
           <tbody>
-            {streams.map((stream, index) => {
+            {safeStreams.map((stream, index) => {
               const safeExternalDetailUrl = getSafeExternalUrl(stream.detailUrl);
               const detailUrl =
                 safeExternalDetailUrl ??
