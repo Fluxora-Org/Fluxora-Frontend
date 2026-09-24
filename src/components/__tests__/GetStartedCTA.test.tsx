@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GetStartedCTA from "../GetStartedCTA";
+import { useWallet } from "../wallet-connect/Walletcontext";
 
 const mockNavigate = vi.fn();
 
@@ -19,9 +20,14 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("../wallet-connect/Walletcontext", () => ({
+  useWallet: vi.fn(),
+}));
+
 describe("GetStartedCTA", () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    vi.mocked(useWallet).mockReturnValue({ connected: true } as any);
   });
 
   it("renders tokenized styles without hardcoded colors", () => {
@@ -106,5 +112,16 @@ describe("GetStartedCTA", () => {
 
     expect(mockNavigate).toHaveBeenCalledOnce();
     expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("prompts a first-time visitor to connect their wallet and states consequence", () => {
+    vi.mocked(useWallet).mockReturnValue({ connected: false } as any);
+    render(<GetStartedCTA />);
+
+    const connectButton = screen.getByRole("button", {
+      name: /connect wallet to launch dashboard/i,
+    });
+    
+    expect(connectButton).toHaveTextContent("Connect wallet");
   });
 });
