@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /**
  * Persistence + validation for the Streams page session-recovery feature.
  * See docs/STREAMS_SESSION_RECOVERY_SPEC.md for the full design rationale —
@@ -264,7 +266,7 @@ export function readStreamsSession(
 
   const snapshot = parseVersionedSnapshot(raw);
   if (!snapshot) {
-    console.warn(
+    logger.warn(
       "Discarding unsupported or malformed streams session payload for recovery.",
       {
         storageKey,

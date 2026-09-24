@@ -260,15 +260,15 @@ export default function StreamCreatedModal({
       try {
         const parsedUrl = new URL(streamUrl);
         if (parsedUrl.protocol !== "https:") {
-          console.error("Invalid URL scheme. Only https is allowed.");
+          announce("Invalid stream URL. Only secure links are allowed.", 3000);
           return;
         }
       } catch {
-        console.error("Invalid URL provided.");
+        announce("Invalid stream URL. Please try again.", 3000);
         return;
       }
 
-      console.error("Invalid URL provided.");
+      announce("Invalid stream URL. Please try again.", 3000);
       return;
     }
 

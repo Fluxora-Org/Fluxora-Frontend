@@ -140,6 +140,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [soundPreference],
   );
 
+  useEffect(() => {
+    const handleLog = (event: Event) => {
+      const entry = (event as CustomEvent<{ level?: string }>).detail;
+      if (entry?.level === "error") {
+        addToast("Something went wrong. Please try again.", "error", 6000);
+      }
+    };
+    window.addEventListener("fluxora:log", handleLog);
+    return () => window.removeEventListener("fluxora:log", handleLog);
+  }, [addToast]);
+
   const visible = toasts.slice(-MAX_VISIBLE);
   const overflow = toasts.length - MAX_VISIBLE;
 

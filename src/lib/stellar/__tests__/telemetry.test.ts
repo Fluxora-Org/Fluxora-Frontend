@@ -215,17 +215,20 @@ describe('createTelemetryErrorReporter', () => {
     expect(() => reporter(new Error('boom'))).not.toThrow();
   });
 
-  it('defaults to console.error with the redacted payload', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('defaults to the logging boundary with the redacted payload', () => {
+    const handler = vi.fn();
+    window.addEventListener('fluxora:log', handler);
     const reporter = createTelemetryErrorReporter();
 
     reporter(new Error(`hash ${SAMPLE_HASH}`));
 
-    expect(spy).toHaveBeenCalledTimes(1);
-    const logged = JSON.stringify(spy.mock.calls[0]);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const logged = JSON.stringify(
+      (handler.mock.calls[0][0] as CustomEvent).detail,
+    );
     expect(logged).not.toContain(SAMPLE_HASH);
     expect(logged).toContain('[tx:');
-    spy.mockRestore();
+    window.removeEventListener('fluxora:log', handler);
   });
 });
 
