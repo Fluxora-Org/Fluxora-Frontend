@@ -157,7 +157,7 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
 function NavbarTimeIndicator() {
   const [manualTime, setManualTime] = useState<Date | null>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  const tickingNow = useTickingNow();
+  const tickingNow = useTickingNow({ precision: "minute" });
 
   useEffect(() => {
     setManualTime(null);

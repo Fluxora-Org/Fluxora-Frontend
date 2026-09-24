@@ -51,7 +51,7 @@ export default function EmbedStreamWidget() {
   // so a re-fetch is triggered without remounting the component.
   const [retryCount, setRetryCount] = useState(0);
 
-  const tickingNow = useTickingNow();
+  const tickingNow = useTickingNow({ precision: "minute" });
 
   /**
    * Derive a stable YYYY-MM-DD date string from the ticking timestamp.

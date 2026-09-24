@@ -60,7 +60,7 @@ export default function StreamDetail() {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a

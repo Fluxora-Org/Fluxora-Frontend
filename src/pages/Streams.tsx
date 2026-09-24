@@ -514,7 +514,7 @@ function StreamDetail({
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
 }) {
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
   return (
     <>
       <button

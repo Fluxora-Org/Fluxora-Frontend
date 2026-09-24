@@ -371,7 +371,7 @@ function CompareStreamPane({
 
 export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
   const [ids, setIds] = useState<[string, string]>([leftId, rightId]);
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
 
   // Re-sync if the parent swaps the IDs (e.g. deep-linking)
   useEffect(() => {
