@@ -2,14 +2,19 @@ import { useState } from "react";
 import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
 import Header from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
-import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
-import ReportBuilderPanel from "../components/treasuryOverviewPage/ReportBuilderPanel";
+import { lazy, Suspense } from "react";
+import ErrorBoundary from "../components/ErrorBoundary";
+const ActivityHeatmap = lazy(() => import("../components/treasuryOverviewPage/ActivityHeatmap"));
+const TreasuryFlowSankey = lazy(() => import("../components/treasuryOverviewPage/TreasuryFlowSankey"));
+const RecentStreams = lazy(() => import("../components/treasuryOverviewPage/RecentStreams"));
+const ReportBuilderPanel = lazy(() => import("../components/treasuryOverviewPage/ReportBuilderPanel"));
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import {
   ColorBlindSimulationProvider,
   ColorBlindToggle,
 } from "../components/colorBlindSimulation";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { IS_DEV } from "../utils/env";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -50,7 +55,7 @@ export default function TreasuryPage() {
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
-          <ColorBlindToggle />
+          {IS_DEV && <ColorBlindToggle />}
           <Header />
           <div role="status" className="text-sm text-gray-500">
             Loading treasury overview...
@@ -66,7 +71,7 @@ export default function TreasuryPage() {
         <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
-          <ColorBlindToggle />
+          {IS_DEV && <ColorBlindToggle />}
           <Header />
           <div role="alert" className="text-sm text-red-600">
             {error}
@@ -85,23 +90,44 @@ export default function TreasuryPage() {
             so the entire Metrics and RecentStreams area is filtered.
             This component is not rendered in production end-user UI; it is
             intended for design review and QA sessions only. */}
-        <ColorBlindToggle />
+        {IS_DEV && <ColorBlindToggle />}
 
-        <Header onExportClick={() => setShowReportBuilder(true)} />
+        <Header
+          onExportClick={() => setShowReportBuilder(true)}
+          onRefresh={refetch}
+        />
         {showReportBuilder && (
-          <ReportBuilderPanel
-            streams={streams || []}
-            onClose={() => setShowReportBuilder(false)}
-          />
+          <ErrorBoundary>
+            <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
+              <ReportBuilderPanel
+                streams={streams || []}
+                onClose={() => setShowReportBuilder(false)}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
         <Metrics metrics={metrics || []} loading={loading} error={error} />
-        <RecentStreams
-          streams={streams || []}
-          loading={loading}
-          error={error}
-          onRetry={refetch}
-          walletConnected={walletConnected}
-        />
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
+            <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
+            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
+            <RecentStreams
+              streams={streams || []}
+              loading={loading}
+              error={error}
+              onRetry={refetch}
+              walletConnected={walletConnected}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </ColorBlindSimulationProvider>
   );

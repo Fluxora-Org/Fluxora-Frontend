@@ -5,6 +5,7 @@ import CreateStreamModal, {
   MAX_DURATION_DAYS,
   MAX_REQUIRED_DEPOSIT,
 } from '../CreateStreamModal';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 // Checksum-valid Stellar public key (required by the centralized
 // isValidStellarAddress validator introduced in #331).
@@ -12,7 +13,9 @@ const VALID_STELLAR =
   'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
 function renderModal() {
-  return render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  const result = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  selectSingleStreamInContainer(result.container);
+  return result;
 }
 
 function advanceToStep2(container: HTMLElement) {

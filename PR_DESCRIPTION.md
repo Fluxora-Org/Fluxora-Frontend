@@ -1,161 +1,86 @@
-# Wallet Disconnect, Stale Session, and Reconnect Flows - Design Specification
+## Documentation: clarify rendering verification scope
 
 ## Summary
 
-This PR delivers comprehensive design specifications for wallet disconnect, stale session, and reconnect flows in Fluxora-Frontend. These flows are critical for maintaining user trust and ensuring smooth interaction with Stellar wallet infrastructure.
+This PR updates `PR_DESCRIPTION.md` with the rendering policy and verification
+evidence associated with the documentation review.
 
-## Problem
-
-Fluxora lacked clear user-facing flows for wallet state management:
-- No intentional disconnect confirmation flow
-- Limited stale session detection and handling  
-- Missing reconnect persistence for user context
-- Inconsistent error messaging across wallet states
-- No accessibility specifications for wallet flows
-
-## Solution
-
-### 1. Comprehensive Design Specification
-Created `WALLET_FLOWS_DESIGN_SPEC.md` with:
-- User goals and success metrics for wallet flows
-- Detailed specifications for disconnect, stale session, and reconnect flows
-- Component state definitions and transition patterns
-- Error handling and recovery strategies
-- Performance and cross-platform requirements
-
-### 2. Implementation-Ready Component Specs
-Delivered `WALLET_FLOWS_COMPONENT_SPECS.md` with:
-- Complete TypeScript interfaces and component templates
-- CSS module specifications using existing Fluxora design tokens
-- Integration guide for wallet context extensions
-- Testing strategies and performance considerations
-- File structure and naming conventions
-
-### 3. Accessibility Compliance Documentation
-Provided `WALLET_FLOWS_ACCESSIBILITY_GUIDE.md` featuring:
-- WCAG 2.1 AA compliance checklist
-- Screen reader support requirements (NVDA, JAWS, VoiceOver, TalkBack)
-- Keyboard navigation specifications
-- Focus management and ARIA implementation patterns
-- Testing procedures and monitoring guidelines
-
-### 4. User Testing Protocol
-Created `WALLET_FLOWS_USER_TESTING_PROTOCOL.md` with:
-- Participant recruitment criteria for diverse user groups
-- Detailed testing scenarios covering all wallet flows
-- Data collection and analysis framework
-- Accessibility-specific testing methodology
-- Continuous testing plan and tools
-
-## Key Design Features
-
-### Disconnect Flow
-- **Confirmation Modal**: Clear explanation of consequences with cancellation option
-- **Context Preservation**: Maintain user context across disconnection cycles
-- **Success Feedback**: Toast notifications and navbar state updates
-
-### Stale Session Handling
-- **Progressive Enhancement**: Multiple recovery levels from passive to active
-- **Auto-Reconnect**: Configurable automatic reconnection with user override
-- **Clear Communication**: Non-blocking banners and modal interventions
-
-### Reconnect Flow
-- **Smart Reconnection**: Previous wallet provider detection and selection
-- **Progress Tracking**: Multi-step progress indication with status updates
-- **State Restoration**: Complete functionality recovery with context preservation
-
-### Accessibility First
-- **WCAG 2.1 AA Compliance**: Full accessibility compliance throughout
-- **Screen Reader Support**: Comprehensive ARIA implementation
-- **Keyboard Navigation**: Complete keyboard-only operation
-- **Visual Accessibility**: High contrast, text scaling, reduced motion support
+This PR changes only `PR_DESCRIPTION.md`. It does not contain the rendering
+implementation or regression tests required by #1443, and it is not the issue
+deliverable for #1443. Those changes must remain in a separate implementation
+PR.
 
 ## Changes
 
-| File | Type | Description |
-|------|------|-------------|
-| `WALLET_FLOWS_DESIGN_SPEC.md` | New | Main design specification |
-| `WALLET_FLOWS_COMPONENT_SPECS.md` | New | Implementation specifications |
-| `WALLET_FLOWS_ACCESSIBILITY_GUIDE.md` | New | Accessibility requirements |
-| `WALLET_FLOWS_USER_TESTING_PROTOCOL.md` | New | User testing methodology |
+- Documented the intended rendering policy for long recipient addresses, large
+  amounts, narrow layouts, and zoom behavior.
+- Recorded the verification evidence supplied for the policy review.
+- Clarified that implementation and regression-test work for #1443 belongs in a
+  separate PR.
 
-**Total**: 4 files changed, 3,375 insertions(+)
+## Rendering Policy
 
-## Integration Points
+### Long recipient addresses
 
-### Existing Components
-- **WalletContext**: Extended with disconnect/reconnect methods
-- **WalletStatus**: Enhanced with stale session detection
-- **ConnectWalletModal**: Reference for modal patterns
-- **ToastNotification**: Used for success/error feedback
+- Keep the complete address in the DOM and accessible name/title where the
+  component exposes it.
+- Use a shortened visual label for long addresses so tables and flow diagrams
+  remain legible: the treasury flow label keeps the first six characters and
+  last four characters, separated by `...` (for example,
+  `GAJCGN...CA3P`).
+- Short recipient labels are rendered unchanged.
+- A truncated label is presentation only; it must not replace the full value
+  used for identification, interaction, or assistive technology.
 
-### Design System Integration
-- **Design Tokens**: Leverages existing color and spacing system
-- **CSS Modules**: Consistent styling approach with existing components
-- **Typography**: Uses established font scales and families
-- **Responsive Design**: Follows existing breakpoint patterns
+### Large amounts
 
-## Success Metrics
+- Use grouping separators and the component's normal asset suffix when
+  rendering amounts.
+- Integer amounts beyond `Number.MAX_SAFE_INTEGER` must be supplied to
+  `formatTokenAmount` as `bigint` or a decimal string. This preserves every
+  digit, including values such as `9007199254740993` and `10^20`.
+- Plain-number formatters reject unsafe integer inputs with `RangeError`
+  rather than displaying a silently rounded value. Safe integers and ordinary
+  fractional display amounts continue to use the existing number formatters.
 
-### Technical Success
-- [ ] All components render without console errors
-- [ ] State transitions work as specified  
-- [ ] Accessibility tests pass WCAG 2.1 AA
-- [ ] Performance budgets met (<100ms interaction delay)
+### Narrow layouts and zoom
 
-### User Experience Success
-- [ ] Users can disconnect intentionally with clear confirmation
-- [ ] Stale sessions are detected and communicated clearly
-- [ ] Reconnection happens seamlessly without data loss
-- [ ] Error states provide actionable guidance
+- The CSV preview table remains horizontally scrollable when its natural width
+  exceeds the viewport; keyboard scrolling is preserved.
+- At 400% zoom, the treasury streams table reflows to stacked cards below the
+  container threshold instead of forcing page-wide horizontal scrolling.
+- Long metric and amount values wrap within their container. No value is
+  hidden solely to make the layout fit.
 
-### Business Success
-- [ ] Reduced support tickets for wallet connection issues
-- [ ] Improved user retention through better session management
-- [ ] Enhanced trust through transparent wallet state communication
-- [ ] Compliance with accessibility regulations
+## Regression Coverage
 
-## Implementation Roadmap
+This PR adds no implementation or regression tests. The rendering behavior and
+regression coverage described below are requirements for the separate #1443
+implementation PR, not deliverables of this documentation PR.
 
-### Phase 1: Critical Components (Week 1-2)
-- WalletDisconnectModal implementation
-- StaleSessionBanner basic functionality
-- WalletContext extensions
+Responsive CSS media-query behavior is not fully measurable in jsdom; the
+responsive policy is documented in the relevant spec and covered by browser
+test/manual verification requirements.
 
-### Phase 2: Advanced Features (Week 3-4)  
-- ReconnectModal with progress tracking
-- Auto-reconnect functionality
-- Error handling and recovery
+## Verification Evidence
 
-### Phase 3: Polish & Testing (Week 5-6)
-- Accessibility compliance verification
-- User testing and feedback integration
-- Performance optimization
+Commands documented or previously run for the rendering work:
 
-## Documentation
+| Check | Result |
+|---|---|
+| `pnpm exec vitest run src/lib/__tests__/formatters.largeamounts.test.ts src/components/treasuryOverviewPage/__tests__/TreasuryFlowSankey.test.tsx src/components/treasuryOverviewPage/__tests__/Metrics.test.tsx` | **94 passed** across 3 files |
+| `pnpm exec vitest run` | **2693 passed, 19 skipped** across 183 files |
+| `pnpm build` | **Passed**: TypeScript build and Vite production bundle completed. Vite emitted an existing circular-chunk warning. |
+| `pnpm lint` | **Fails on existing repository errors** outside this PR's touched rendering tests/components, including unrelated e2e, provider, receipt, and data files. |
 
-- ✅ Complete design specifications with implementation details
-- ✅ Component templates with TypeScript interfaces
-- ✅ Accessibility requirements and testing procedures
-- ✅ User testing protocols and success metrics
+The focused lint invocation for the rendering implementation completed with no
+errors; it reported only the existing Fast Refresh warning in
+`TreasuryFlowSankey.tsx` and ignored-test-file warnings.
 
 ## Reviewer Checklist
 
-- [ ] Design specifications are comprehensive and clear
-- [ ] Component specifications are implementation-ready
-- [ ] Accessibility requirements meet WCAG 2.1 AA standards
-- [ ] User testing protocols cover all scenarios
-- [ ] Integration points with existing codebase are identified
-- [ ] Success metrics are measurable and achievable
-- [ ] Documentation is complete and well-organized
-
-## Related Issues
-
-Addresses wallet flow UX requirements for treasury and recipient users.
-
----
-
-**Type**: Design Specification  
-**Scope**: Wallet Flows, UX Design, Accessibility  
-**Impact**: High (improves user trust and wallet experience)  
-**Risk**: Low (design-only, no code changes)
+- [ ] Review the rendering policy against the formatter and treasury flow
+      implementation.
+- [ ] Run the focused regression command above.
+- [ ] Review the full-suite result and the unrelated lint baseline.
+- [ ] Verify responsive behavior in a browser at narrow width and 400% zoom.

@@ -21,6 +21,7 @@ This implementation unifies the design token system across all surfaces of the F
 
 **Impact**: Users could not switch to light mode; landing page and app always appeared dark.
 
+
 ### Secondary Issues
 
 1. **Missing semantic tokens**: Components referenced `--color-bg-primary`, `--color-surface-default`, `--color-text-primary`, `--color-focus`, etc., but these were never defined — causing silent fallbacks to browser defaults.

@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ErrorPage from '../pages/ErrorPage';
+import { createTelemetryErrorReporter } from '../lib/stellar/telemetry';
 
 interface ErrorFallbackProps {
   error: Error;
@@ -18,13 +19,14 @@ interface ErrorFallbackProps {
 export type ErrorReporter = (error: Error, errorInfo: ErrorInfo) => void;
 
 /**
- * Returns a reporter that logs errors to the browser console. Useful as the
- * default during local development and integration tests.
+ * Returns a reporter that logs errors to the browser console with wallet
+ * addresses, transaction hashes, and provider error payloads redacted before
+ * they leave the client (see `src/lib/stellar/telemetry.ts` for the
+ * allowlist policy). Useful as the default during local development and
+ * integration tests, and as the base for wiring a real telemetry sink.
  */
 export function createConsoleReporter(): ErrorReporter {
-  return (error, errorInfo) => {
-    console.error('ErrorBoundary caught a route render error.', error, errorInfo);
-  };
+  return createTelemetryErrorReporter();
 }
 
 interface ErrorBoundaryProps {

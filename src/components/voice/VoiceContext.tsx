@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveAnnouncer } from "../../hooks/useLiveAnnouncer";
+import { useI18n } from "../../i18n";
 import {
   VoiceState,
   VoiceCommandDef,
@@ -68,6 +69,10 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const navigate = useNavigate();
   const { announce } = useLiveAnnouncer();
+  const { locale } = useI18n();
+
+  // Map i18n locale to a BCP-47 speech-recognition tag.
+  const speechLang = locale === "es" ? "es-ES" : "en-US";
 
   const [state, setState] = useState<VoiceState>("idle");
   const [isSupported, setIsSupported] = useState<boolean>(true);
@@ -92,17 +97,38 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  // Match phrase to command dictionary
-  const matchCommand = useCallback((spokenText: string): VoiceCommandDef | null => {
+  // Match phrase to command dictionary.
+  // Partial-match (substring) fallback is only applied to non-destructive
+  // commands so that longer utterances that happen to contain the phrase
+  // "Cancel stream" do not accidentally trigger the destructive confirmation
+  // flow (Issue #938).
+  const matchCommand = useCallback((spokenText: string): VoiceCommandDef | "ambiguous" | null => {
     const clean = spokenText.trim().toLowerCase();
     if (!clean) return null;
 
+    // "stream" is a shared stem for navigation, creation, and cancellation.
+    // It is never specific enough to select a safe target.
+    if (clean === "stream") return "ambiguous";
+
+    // Exact-match pass — check every command's phrase and aliases first.
     for (const cmd of DEFAULT_COMMANDS) {
       if (cmd.phrase.toLowerCase() === clean) return cmd;
       if (cmd.aliases.some((alias) => alias.toLowerCase() === clean)) return cmd;
-      // Partial match support
-      if (clean.includes(cmd.phrase.toLowerCase())) return cmd;
     }
+
+    // Partial matches must be unique. Returning the first match made phrases
+    // such as "stream" silently choose whichever command appeared first.
+    const partialMatches = DEFAULT_COMMANDS.filter((cmd) => {
+      if (cmd.requiresConfirmation) return false;
+      return (
+        clean.includes(cmd.phrase.toLowerCase()) ||
+        cmd.aliases.some((alias) => clean.includes(alias.toLowerCase()))
+      );
+    });
+
+    if (partialMatches.length > 1) return "ambiguous";
+    if (partialMatches.length === 1) return partialMatches[0];
+
     return null;
   }, []);
 
@@ -155,25 +181,73 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
-  const processSpokenPhrase = useCallback(
-    (phrase: string): boolean => {
-      setTranscript(phrase);
-      setState("processing");
+const processSpokenPhrase = useCallback(
+  (phrase: string): boolean => {
+    setTranscript(phrase);
+    setState("processing");
 
-      // Handle active confirmation step
-      if (pendingDestructiveCommand) {
-        const clean = phrase.trim().toLowerCase();
-        if (clean.includes("confirm") || clean.includes("yes")) {
-          confirmDestructiveAction();
-          return true;
-        }
-        if (clean.includes("cancel") || clean.includes("no") || clean.includes("abort")) {
-          cancelDestructiveAction();
-          return true;
-        }
+    // Handle active confirmation step
+    if (pendingDestructiveCommand) {
+      const clean = phrase.trim().toLowerCase();
+
+      if (clean === "confirm" || clean === "yes") {
+        confirmDestructiveAction();
+        return true;
       }
 
+      if (clean === "cancel" || clean === "no" || clean === "abort") {
+        cancelDestructiveAction();
+        return true;
+      }
+
+      // Do not process other commands while confirmation is pending
+      setState("confirming-destructive");
+      return false;
+    }
+
+    const matched = matchCommand(phrase);
+
+    if (matched) {
+      executeCommand(matched, phrase);
+      return true;
+    }
+
+    setState("command-unrecognized");
+    announce(
+      `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+    );
+
+    setTimeout(() => {
+      setState((prev) =>
+        prev === "command-unrecognized" ? "listening" : prev
+      );
+    }, 3000);
+
+    return false;
+  },
+  [
+    matchCommand,
+    executeCommand,
+    pendingDestructiveCommand,
+    confirmDestructiveAction,
+    cancelDestructiveAction,
+    announce,
+  ]
+);
+
       const matched = matchCommand(phrase);
+      if (matched === "ambiguous") {
+        setState("command-ambiguous");
+        announce(
+          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+        );
+        setTimeout(() => {
+          setState((prev) =>
+            prev === "command-ambiguous" ? "listening" : prev,
+          );
+        }, 3000);
+        return false;
+      }
       if (matched) {
         executeCommand(matched, phrase);
         return true;
@@ -245,7 +319,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
       const recognition = new SpeechRecognitionClass();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = "en-US";
+      recognition.lang = speechLang;
 
       recognition.onstart = () => {
         setState("listening");

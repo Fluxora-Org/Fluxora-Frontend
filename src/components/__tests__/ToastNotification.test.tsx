@@ -45,3 +45,36 @@ describe("ToastNotification aria-live semantics", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ToastNotification undo action", () => {
+  it("renders an accessible countdown and invokes undo plus close", () => {
+    const onUndo = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <ToastNotification
+        message="Stream paused"
+        variant="info"
+        onClose={onClose}
+        onUndo={onUndo}
+      />,
+    );
+
+    expect(screen.getByRole("progressbar", { name: "Undo time remaining" })).toBeInTheDocument();
+    expect(screen.getByText("5s")).toBeInTheDocument();
+    screen.getByRole("button", { name: "Undo" }).click();
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ToastNotification keyboard interactions", () => {
+  it("dismisses the toast when Escape key is pressed", () => {
+    const onClose = vi.fn();
+    render(
+      <ToastNotification message="Escape me" variant="info" onClose={onClose} />,
+    );
+    
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});

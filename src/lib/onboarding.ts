@@ -1,3 +1,9 @@
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "./browserStorage";
+
 export const ONBOARDING_DISMISSED_STORAGE_KEY = "fluxora_onboarding_dismissed";
 
 const ONBOARDING_DISMISSED_VALUE = "true";
@@ -26,14 +32,8 @@ export function readOnboardingDismissed(
     return false;
   }
 
-  try {
-    return (
-      storage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) ===
-      ONBOARDING_DISMISSED_VALUE
-    );
-  } catch {
-    return false;
-  }
+  return readBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage) ===
+    ONBOARDING_DISMISSED_VALUE;
 }
 
 /**
@@ -50,17 +50,13 @@ export function writeOnboardingDismissed(
     return;
   }
 
-  try {
-    if (dismissed) {
-      storage.setItem(
-        ONBOARDING_DISMISSED_STORAGE_KEY,
-        ONBOARDING_DISMISSED_VALUE,
-      );
-      return;
-    }
-
-    storage.removeItem(ONBOARDING_DISMISSED_STORAGE_KEY);
-  } catch {
-    // Storage unavailable; treat dismissal persistence as best effort.
+  if (dismissed) {
+    writeBrowserStorage(
+      ONBOARDING_DISMISSED_STORAGE_KEY,
+      ONBOARDING_DISMISSED_VALUE,
+      storage,
+    );
+  } else {
+    removeBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage);
   }
 }

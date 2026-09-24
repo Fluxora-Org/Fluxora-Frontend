@@ -11,6 +11,7 @@ export type VoiceState =
   | "processing"
   | "command-recognized"
   | "command-unrecognized"
+  | "command-ambiguous"
   | "unsupported-browser"
   | "permission-denied"
   | "confirming-destructive";

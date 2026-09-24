@@ -131,3 +131,40 @@
     transition: none;
   }
 }
+
+/* Keyboard Hint Chip */
+.keyboard-hint-chip {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 80px;
+  padding: 2px 6px;
+  background: var(--surface-neutral, #f0f2f5);
+  color: var(--text-muted, #718096);
+  font: var(--font-body-sm);
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 4px;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.input-with-unit:focus-within .keyboard-hint-chip {
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .keyboard-hint-chip {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keyboard-hint-chip {
+    transition: none;
+  }
+}

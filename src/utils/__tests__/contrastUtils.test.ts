@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   hexToRgb,
-  relativeLuminance,
+  luminance,
   contrastRatio,
   wcagLevel,
   applyColorMatrix,
@@ -50,19 +50,19 @@ describe("hexToRgb", () => {
   });
 });
 
-// ─── relativeLuminance ───────────────────────────────────────────────────────
+// ─── luminance ───────────────────────────────────────────────────────────────
 
-describe("relativeLuminance", () => {
+describe("luminance", () => {
   it("returns 0 for black", () => {
-    expect(relativeLuminance({ r: 0, g: 0, b: 0 })).toBe(0);
+    expect(luminance(0, 0, 0)).toBe(0);
   });
 
   it("returns 1 for white", () => {
-    expect(relativeLuminance({ r: 255, g: 255, b: 255 })).toBeCloseTo(1, 5);
+    expect(luminance(255, 255, 255)).toBeCloseTo(1, 5);
   });
 
   it("returns a value between 0 and 1 for a mid-tone colour", () => {
-    const lum = relativeLuminance({ r: 30, g: 201, b: 142 }); // #1ec98e success
+    const lum = luminance(30, 201, 142); // #1ec98e success
     expect(lum).toBeGreaterThan(0);
     expect(lum).toBeLessThan(1);
   });
@@ -235,3 +235,17 @@ describe("simulatedContrastRatio", () => {
     expect(ratio as number).toBeGreaterThanOrEqual(1);
   });
 });
+
+import { contrastRatio as themeContrastRatio } from "../../theme/contrastUtils";
+
+describe("Integration: contrastRatio canonical source", () => {
+  it("utils and theme contrastRatio agree exactly on a boundary value", () => {
+    // A pair that might cause rounding differences
+    const fg = "#757575"; // grey
+    const bg = "#ffffff"; // white
+    const utilsRatio = contrastRatio(fg, bg);
+    const themeRatio = themeContrastRatio(fg, bg);
+    expect(utilsRatio).toBe(themeRatio);
+  });
+});
+

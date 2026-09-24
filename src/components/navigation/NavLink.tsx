@@ -1,3 +1,4 @@
+import type { MouseEventHandler } from "react";
 import { Link, useLocation } from "react-router-dom";
 import styles from "./NavLink.module.css";
 
@@ -5,7 +6,7 @@ interface NavLinkProps {
   to: string;
   label: string;
   icon?: React.ReactNode;
-  onClick?: () => void;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
   disabled?: boolean;
   variant?: "primary" | "secondary";
   /**
@@ -74,12 +75,23 @@ export default function NavLink({
   const { pathname } = useLocation();
   const isActive = segmentMatch(pathname, to, end);
 
+  const handleClick: MouseEventHandler<HTMLAnchorElement> = (event) => {
+    if (disabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    onClick?.(event);
+  };
+
   return (
     <Link
       to={to}
-      onClick={onClick}
+      onClick={handleClick}
       aria-current={isActive ? "page" : undefined}
       aria-disabled={disabled ? "true" : undefined}
+      tabIndex={disabled ? -1 : undefined}
       className={[
         styles.navItem,
         disabled ? styles.disabled : "",

@@ -12,7 +12,6 @@ export interface VoiceMicButtonProps {
 
 export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
   variant = "navbar",
-  showLabel = false,
   className,
 }) => {
   const { state, isSupported, toggleListening, togglePanel, panelOpen } =
@@ -68,43 +67,45 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
   if (variant === "sidebar") {
     return (
       <div className="flex flex-col gap-1 w-full">
-        <button
-          type="button"
-          onClick={toggleListening}
-          disabled={isUnsupported}
-          aria-pressed={isListening}
-          aria-label={getAriaLabel()}
-          className={clsx(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-left w-full",
-            isListening
-              ? "bg-[var(--color-accent-primary)] text-white shadow-md"
-              : isDenied
-              ? "bg-red-500/10 text-[var(--color-danger)] border border-red-500/30"
-              : "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)]",
-            isUnsupported && "opacity-50 cursor-not-allowed",
-            className
-          )}
-        >
-          <div className="relative flex items-center justify-center">
-            {renderIcon()}
-            {isListening && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+        <div className="flex items-center gap-2 w-full">
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={isUnsupported}
+            aria-pressed={isListening}
+            aria-label={getAriaLabel()}
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-left w-full",
+              isListening
+                ? "bg-[var(--color-accent-primary)] text-white shadow-md"
+                : isDenied
+                ? "bg-red-500/10 text-[var(--color-danger)] border border-red-500/30"
+                : "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)]",
+              isUnsupported && "opacity-50 cursor-not-allowed",
+              className
             )}
-          </div>
-          <span className="truncate flex-1">
-            {isListening ? "Voice Active" : "Voice Commands"}
-          </span>
-          <span
-            onClick={(e) => {
-              e.stopPropagation();
-              togglePanel();
-            }}
+          >
+            <div className="relative flex items-center justify-center">
+              {renderIcon()}
+              {isListening && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+              )}
+            </div>
+            <span className="truncate flex-1">
+              {isListening ? "Voice Active" : "Voice Commands"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-pressed={panelOpen}
+            aria-label="Toggle Voice Command Reference"
             title="Toggle Voice Command Reference"
-            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--surface-raised)] hover:bg-[var(--surface-highest)] text-[var(--text-muted)] font-mono"
+            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--surface-raised)] hover:bg-[var(--surface-highest)] text-[var(--text-muted)] font-mono outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             {panelOpen ? "Hide" : "Help"}
-          </span>
-        </button>
+          </button>
+        </div>
       </div>
     );
   }

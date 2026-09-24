@@ -1,0 +1,17 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer circle background matching Fluxora brand -->
+  <circle cx="96" cy="96" r="96" fill="#0F1419" />
+  
+  <!-- Bell body -->
+  <path d="M96 32C82.745 32 72 42.745 72 56V80C72 80 68 96 64 100C62 102 60 106 64 108H128C132 106 130 102 128 100C124 96 120 80 120 80V56C120 42.745 109.255 32 96 32Z" 
+        fill="#00B8D4" stroke="#0F1419" stroke-width="2"/>
+  
+  <!-- Bell clapper -->
+  <circle cx="96" cy="120" r="6" fill="#0F1419"/>
+  
+  <!-- Bell rim highlight -->
+  <path d="M78 108H114" stroke="#0F1419" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Notification dot (indicates active) -->
+  <circle cx="126" cy="54" r="14" fill="#FF6B6B" stroke="#0F1419" stroke-width="2"/>
+</svg>

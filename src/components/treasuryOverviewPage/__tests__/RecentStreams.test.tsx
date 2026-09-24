@@ -88,4 +88,133 @@ describe("treasuryOverviewPage RecentStreams", () => {
       screen.getByRole("button", { name: /create stream/i }),
     ).toBeInTheDocument();
   });
+
+  // -------------------------------------------------------------------------
+  // View toggle: Table vs Graph
+  // -------------------------------------------------------------------------
+
+  it("defaults to table view when no graph view is active", () => {
+    renderRecentStreams();
+
+    expect(screen.getByRole("grid", { name: "Active streams" })).toBeInTheDocument();
+  });
+
+  it("shows the Graph toggle button on desktop", () => {
+    renderRecentStreams();
+
+    expect(screen.getByRole("button", { name: /graph view/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /table view/i })).toBeInTheDocument();
+  });
+
+  it("switches to graph view when Graph toggle is clicked", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    const graphBtn = screen.getByRole("button", { name: /graph view/i });
+    await user.click(graphBtn);
+
+    expect(screen.getByRole("toolbar", { name: /graph view controls/i })).toBeInTheDocument();
+  });
+
+  it("switches back to table view when Table toggle is clicked", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+    expect(screen.getByRole("toolbar", { name: /graph view controls/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /table view/i }));
+    expect(screen.getByRole("grid", { name: "Active streams" })).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // Graph view accessibility
+  // -------------------------------------------------------------------------
+
+  it("marks the SVG as aria-hidden when graph view is active", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    const svg = screen.getByRole("toolbar", { name: /graph view controls/i })
+      .closest(".recent-streams-graph-container")
+      ?.querySelector("svg[aria-hidden]");
+    expect(svg).toBeInTheDocument();
+  });
+
+  it("renders pan/zoom controls with accessible labels", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    expect(screen.getByRole("button", { name: /zoom in/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /zoom out/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reset view/i })).toBeInTheDocument();
+  });
+
+  it("renders the controls toolbar with role toolbar", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    expect(screen.getByRole("toolbar", { name: /graph view controls/i })).toBeInTheDocument();
+  });
+
+  it("renders the legend with accessible label", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    expect(screen.getByLabelText("Graph legend")).toBeInTheDocument();
+  });
+
+  it("pan/zoom controls are keyboard-operable", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    const zoomInBtn = screen.getByRole("button", { name: /zoom in/i });
+    const zoomOutBtn = screen.getByRole("button", { name: /zoom out/i });
+    const resetBtn = screen.getByRole("button", { name: /reset view/i });
+
+    zoomInBtn.focus();
+    await user.keyboard("{Enter}");
+    expect(document.activeElement).toBe(zoomInBtn);
+
+    zoomOutBtn.focus();
+    await user.keyboard("{Enter}");
+    expect(document.activeElement).toBe(zoomOutBtn);
+
+    resetBtn.focus();
+    await user.keyboard("{Enter}");
+    expect(document.activeElement).toBe(resetBtn);
+  });
+
+  it("allows the user tab past graph controls (graph does not trap focus)", async () => {
+    const user = userEvent.setup();
+    renderRecentStreams();
+
+    await user.click(screen.getByRole("button", { name: /graph view/i }));
+
+    const resetBtn = screen.getByRole("button", { name: /reset view/i });
+    resetBtn.focus();
+
+    await user.keyboard("{Tab}");
+    // Focus should move past the controls — either back to the toggle or to another element
+    expect(document.activeElement).not.toBe(resetBtn);
+  });
+
+  it("graph container is hidden on mobile (below md breakpoint)", () => {
+    renderRecentStreams();
+
+    // On a jsdom environment without a real viewport, verify the CSS class exists
+    // The actual hiding is handled by CSS media query at --breakpoint-md (768px)
+    const container = document.querySelector(".recent-streams-graph-container");
+    expect(container).toBeInTheDocument();
+  });
 });

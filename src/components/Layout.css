@@ -299,13 +299,40 @@
     justify-content: flex-start;
   }
 
+  /* ── Mobile topbar ────────────────────────────────────────────────────────
+     Shown at the top of the viewport on small screens. Needs safe-area
+     padding so the menu button and title are not obscured by the status bar
+     notch on iPhone and Android cutout devices. Horizontal insets cover
+     landscape orientation corners. */
+  .app-mobile-topbar {
+    display: flex;
+    align-items: center;
+    padding-top: env(safe-area-inset-top);
+    padding-left: max(var(--space-4), env(safe-area-inset-left));
+    padding-right: max(var(--space-4), env(safe-area-inset-right));
+  }
+
+  /* ── Mobile sidebar ──────────────────────────────────────────────────────
+     Slides in from the left edge. When open it must keep its content away
+     from notches/corners on all four sides. `height: 100dvh` keeps it flush
+     with the visual viewport when the browser chrome shrinks. */
   .app-sidebar {
     position: fixed;
     left: 0;
     top: 0;
     height: 100vh;
+    /* Respect status-bar / notch on all edges */
+    padding-top: max(var(--space-5), env(safe-area-inset-top));
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    padding-left: max(var(--space-4), env(safe-area-inset-left));
 
     transform: translateX(-110%);
+  }
+
+  @supports (height: 100dvh) {
+    .app-sidebar {
+      height: 100dvh;
+    }
   }
 
   .app-layout.is-mobile-open .app-sidebar {
@@ -327,6 +354,13 @@
   .app-layout.is-mobile-open .app-sidebar-backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  /* ── Sidebar connect button ───────────────────────────────────────────────
+     Pinned to the bottom of the sidebar drawer — needs bottom inset so it
+     clears the home-indicator bar on iOS. */
+  .app-connect-button {
+    margin-bottom: env(safe-area-inset-bottom);
   }
 }
 

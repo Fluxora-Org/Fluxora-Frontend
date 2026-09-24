@@ -266,3 +266,86 @@
     width: 100%;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   FORCED-COLORS FALLBACKS
+   ─────────────────────────────────────────────────────────
+   box-shadow focus rings are stripped by the UA in forced-colors
+   mode. Replace with an outline and use system color keywords so
+   the button boundary and state remain visible.
+   ═══════════════════════════════════════════════════════════ */
+
+@media (forced-colors: active) {
+  .button {
+    forced-color-adjust: auto;
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+  }
+
+  .button:not(:disabled):hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+    box-shadow: none;
+  }
+
+  .button:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .button:disabled {
+    color: GrayText;
+    border-color: GrayText;
+    background: Canvas;
+  }
+
+  .buttonGhost {
+    background: Canvas;
+    border: 1px solid ButtonBorder;
+    color: ButtonText;
+  }
+
+  .buttonGhost:not(:disabled):hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .buttonDanger {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+  }
+
+  .buttonDanger:not(:disabled):hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .buttonSuccess {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+  }
+
+  .buttonSuccess:not(:disabled):hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .buttonSecondary {
+    background: Canvas;
+    border: 1px solid ButtonBorder;
+    color: ButtonText;
+  }
+
+  .loadingSpinner {
+    forced-color-adjust: auto;
+    color: ButtonText;
+    animation: none;
+  }
+}

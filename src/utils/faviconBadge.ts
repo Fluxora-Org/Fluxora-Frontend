@@ -71,7 +71,8 @@ export function drawBaseIcon(
     ctx.arcTo((x + w) * scale, y * scale, (x + w) * scale, (y + r) * scale, r * scale);
     ctx.lineTo((x + w) * scale, (y + h - r) * scale);
     ctx.arcTo((x + w) * scale, (y + h) * scale, (x + w - r) * scale, (y + h) * scale, r * scale);
-    ctx.lineTo((x + r) * scale, (y + h) * scale, x * scale, (y + h) * scale, r * scale);
+    ctx.lineTo((x + r) * scale, (y + h) * scale);
+    ctx.arcTo(x * scale, (y + h) * scale, x * scale, (y + h - r) * scale, r * scale);
     ctx.lineTo(x * scale, (y + r) * scale);
     ctx.arcTo(x * scale, y * scale, (x + r) * scale, y * scale, r * scale);
     ctx.closePath();

@@ -56,4 +56,35 @@ describe("RecipientEmptyState", () => {
     retryBtn.click();
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
+
+  it("disables error Retry button when ctaDisabled is true", () => {
+    const onRetry = vi.fn();
+    render(
+      <RecipientEmptyState
+        error="still fetching"
+        onRetry={onRetry}
+        ctaDisabled={true}
+      />,
+    );
+    const retryBtn = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtn).toBeDisabled();
+    expect(retryBtn).toHaveAttribute("aria-disabled", "true");
+    retryBtn.click();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("forwards retryButtonRef to the error Retry button element", () => {
+    const retryButtonRef = { current: null as HTMLButtonElement | null };
+    render(
+      <RecipientEmptyState
+        error="Service down"
+        onRetry={vi.fn()}
+        retryButtonRef={retryButtonRef}
+      />,
+    );
+    expect(retryButtonRef.current).toBeInstanceOf(HTMLButtonElement);
+    expect(retryButtonRef.current).toBe(
+      screen.getByRole("button", { name: "Retry loading data" }),
+    );
+  });
 });

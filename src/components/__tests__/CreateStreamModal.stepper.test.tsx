@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
 import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
+import { selectSingleStream } from './CreateStreamModal.testUtils';
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
@@ -22,7 +23,9 @@ const VALID_STELLAR =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderModal() {
-  return render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  const result = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  selectSingleStream();
+  return result;
 }
 
 function fillStep1(container: HTMLElement) {

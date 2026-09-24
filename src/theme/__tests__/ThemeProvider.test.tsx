@@ -93,7 +93,7 @@ const LOCKED_TOKEN_BRAND: CustomThemeDefinition = {
   label: "Locked Attempt",
   tokenOverrides: {
     "--focus-ring-color": "#ff0000",
-  },
+  } as Partial<Record<string, string>>,
 };
 
 /** Small consumer that surfaces all theme, font, and custom-theme context values. */
@@ -105,6 +105,8 @@ function ThemeProbe() {
     easyReadFont,
     setEasyReadFont,
     toggleEasyReadFont,
+    themePreference,
+    setThemePreference,
     customTheme,
     customThemeState,
     registrationErrors,
@@ -117,12 +119,16 @@ function ThemeProbe() {
   return (
     <div>
       <span data-testid="theme">{theme}</span>
+      <span data-testid="theme-pref">{themePreference}</span>
       <span data-testid="custom-state">{customThemeState}</span>
       <span data-testid="custom-id">{customTheme?.id ?? "none"}</span>
       <span data-testid="error-count">{registrationErrors.length}</span>
       <button onClick={toggleTheme}>toggle</button>
       <button onClick={() => setTheme("dark")}>set-dark</button>
       <button onClick={() => setTheme("light")}>set-light</button>
+      <button onClick={() => setThemePreference("auto")}>set-pref-auto</button>
+      <button onClick={() => setThemePreference("light")}>set-pref-light</button>
+      <button onClick={() => setThemePreference("dark")}>set-pref-dark</button>
       <span data-testid="easy-read">{String(easyReadFont)}</span>
       <button onClick={toggleEasyReadFont}>toggle-font</button>
       <button onClick={() => setEasyReadFont(true)}>set-font-true</button>
@@ -664,5 +670,99 @@ describe("ThemeProvider font behaviour", () => {
     });
     expect(document.documentElement.getAttribute("data-font-transitioning")).toBeNull();
     vi.useRealTimers();
+  });
+});
+
+describe("ThemeProvider — themePreference and setThemePreference", () => {
+  it("initializes themePreference as auto when no value is stored", () => {
+    render(<ThemeProbe />, { wrapper: Wrapper });
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("auto");
+  });
+
+  it("initializes themePreference as light/dark when stored", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    render(<ThemeProbe />, { wrapper: Wrapper });
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("dark");
+  });
+
+  it("setThemePreference('auto') clears localStorage and resumes OS following", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    const mq = mockMatchMedia(true); // OS prefers dark
+
+    render(<ThemeProbe />, { wrapper: Wrapper });
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("dark");
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+
+    mq.matches = false; // OS is now light
+
+    await user.click(screen.getByText("set-pref-auto"));
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("auto");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+
+    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+
+    act(() => {
+      mq.dispatchChange(true);
+    });
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+  });
+
+  it("setThemePreference('light') writes localStorage and stops OS following", async () => {
+    const user = userEvent.setup();
+    const mq = mockMatchMedia(true); // OS prefers dark
+
+    render(<ThemeProbe />, { wrapper: Wrapper });
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("auto");
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+
+    await user.click(screen.getByText("set-pref-light"));
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("light");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
+    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+
+    act(() => {
+      mq.dispatchChange(true);
+    });
+    expect(screen.getByTestId("theme")).toHaveTextContent("light");
+  });
+
+  it("keeps the selected theme when localStorage rejects the write", async () => {
+    const user = userEvent.setup();
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = vi.fn(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    try {
+      render(<ThemeProbe />, { wrapper: Wrapper });
+      await user.click(screen.getByText("set-pref-light"));
+
+      expect(screen.getByTestId("theme-pref")).toHaveTextContent("light");
+      expect(screen.getByTestId("theme")).toHaveTextContent("light");
+    } finally {
+      localStorage.setItem = originalSetItem;
+    }
+  });
+
+  it("Cross-tab: storage event with newValue === null sets preference to 'auto' and applies OS theme", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    mockMatchMedia(false); // OS prefers light
+
+    render(<ThemeProbe />, { wrapper: Wrapper });
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("dark");
+    expect(screen.getByTestId("theme")).toHaveTextContent("dark");
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: THEME_STORAGE_KEY,
+          newValue: null,
+        })
+      );
+    });
+
+    expect(screen.getByTestId("theme-pref")).toHaveTextContent("auto");
+    expect(screen.getByTestId("theme")).toHaveTextContent("light");
   });
 });

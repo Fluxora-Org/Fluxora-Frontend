@@ -63,4 +63,29 @@ describe("CreateStreamFab", () => {
     expect(onImport).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("closes the expanded action menu when clicking outside the FAB (Issue #942)", () => {
+    const onCreate = vi.fn();
+    const onImport = vi.fn();
+    render(
+      <div>
+        <div data-testid="outside">Outside element</div>
+        <CreateStreamFab
+          onCreateStream={onCreate}
+          actions={[
+            createAction("Create stream", onCreate),
+            createAction("Import CSV", onImport),
+          ]}
+        />
+      </div>,
+    );
+
+    const fab = screen.getByRole("button", { name: "Create stream" });
+    fireEvent.click(fab);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    // Click outside the FAB — menu should close.
+    fireEvent.mouseDown(screen.getByTestId("outside"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
 });

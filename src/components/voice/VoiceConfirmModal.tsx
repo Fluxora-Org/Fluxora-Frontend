@@ -11,37 +11,96 @@ export const VoiceConfirmModal: React.FC = () => {
   } = useVoiceContext();
 
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const isOpen =
     state === "confirming-destructive" && pendingDestructiveCommand !== null;
 
-  // Auto focus confirm button when opened
+  // Auto focus Cancel button when opened (safe default — prevents accidental
+  // destructive action via reflexive Enter/Space press)
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
-        confirmBtnRef.current?.focus();
+        cancelBtnRef.current?.focus();
       }, 50);
     }
   }, [isOpen]);
 
-  // Escape key handler
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         cancelDestructiveAction();
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, cancelDestructiveAction]);
 
   if (!isOpen || !pendingDestructiveCommand) return null;
 
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelDestructiveAction();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      ) ?? [],
+    ).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return !element.hasAttribute("disabled") && element.tabIndex !== -1 && style.display !== "none" && style.visibility !== "hidden";
+    });
+
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    const activeElement = document.activeElement as HTMLElement | null;
+    const currentIndex = focusableElements.indexOf(activeElement as HTMLElement);
+
+    if (activeElement && !dialogRef.current?.contains(activeElement)) {
+      event.preventDefault();
+      event.stopPropagation();
+      focusableElements[0].focus();
+      return;
+    }
+
+    const nextIndex = event.shiftKey
+      ? (currentIndex - 1 + focusableElements.length) % focusableElements.length
+      : (currentIndex + 1) % focusableElements.length;
+
+    if (currentIndex === -1) {
+      event.preventDefault();
+      event.stopPropagation();
+      focusableElements[0].focus();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    focusableElements[nextIndex].focus();
+  };
+
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
+      onKeyDownCapture={handleDialogKeyDown}
       aria-labelledby="voice-confirm-heading"
       aria-describedby="voice-confirm-desc"
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -102,6 +161,7 @@ export const VoiceConfirmModal: React.FC = () => {
             Confirm Action
           </button>
           <button
+            ref={cancelBtnRef}
             type="button"
             onClick={cancelDestructiveAction}
             className="py-3 px-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--border-neutral)] text-[var(--text-vivid)] hover:bg-[var(--surface-elevated)] font-semibold text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"

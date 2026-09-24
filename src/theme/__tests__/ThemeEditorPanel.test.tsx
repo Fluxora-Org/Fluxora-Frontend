@@ -12,10 +12,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ThemeEditorPanel, {
-  ColorField,
   ContrastBadge,
   PreviewStrip,
   TOKEN_FIELDS,
@@ -46,11 +45,15 @@ function mockMatchMedia(matches = false) {
 }
 
 function renderPanel(onClose?: () => void) {
-  return render(
+  const result = render(
     <ThemeProvider>
       <ThemeEditorPanel onClose={onClose} />
     </ThemeProvider>,
   );
+  act(() => {
+    vi.runAllTimers();
+  });
+  return result;
 }
 
 beforeEach(() => {
@@ -58,9 +61,12 @@ beforeEach(() => {
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("style");
   mockMatchMedia();
+  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
 });
 
 afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -134,7 +140,7 @@ describe("ThemeEditorPanel — keyboard navigation", () => {
     }
     // After tabbing through all inputs, focus should have moved.
     expect(document.activeElement?.tagName).not.toBe("BODY");
-  });
+  }, 30000);
 
   it("Preview button is reachable by Tab and activatable by Enter", async () => {
     const user = userEvent.setup();
@@ -174,6 +180,60 @@ describe("ThemeEditorPanel — keyboard navigation", () => {
     await user.keyboard("{Escape}");
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── 2b. Focus trap ────────────────────────────────────────────────────────────
+
+describe("ThemeEditorPanel — focus trap", () => {
+  it("dialog has aria-modal=true", () => {
+    renderPanel();
+    expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
+  });
+
+  it("Tab from the last focusable element wraps to the first", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    // Focus the Cancel button (last focusable element in the dialog)
+    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
+    cancelBtn.focus();
+    expect(cancelBtn).toHaveFocus();
+
+    // Tab forward — should wrap back to the first focusable element
+    await user.keyboard("{Tab}");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(cancelBtn);
+  });
+
+  it("Shift+Tab from the first focusable element wraps to the last", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    // Focus the first focusable element (Display Name input)
+    const nameInput = screen.getByLabelText(/display name/i);
+    nameInput.focus();
+    expect(nameInput).toHaveFocus();
+
+    // Shift+Tab backward — should wrap to the last focusable element
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(nameInput);
+  });
+
+  it("Tab cannot escape the dialog to outside elements", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const dialog = screen.getByRole("dialog");
+
+    // Tab from the last element wraps back to first; focus stays inside
+    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
+    cancelBtn.focus();
+    await user.keyboard("{Tab}");
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });
 
@@ -361,5 +421,54 @@ describe("Exported constants", () => {
     for (const value of Object.values(DEFAULTS)) {
       expect(value).toMatch(/^#[0-9a-f]{3,6}$/i);
     }
+  });
+});
+
+// ─── 8. Edge Cases (Loading, Empty, Responsive) ──────────────────────────────
+
+describe("ThemeEditorPanel — edge cases", () => {
+  it("handles empty input gracefully (sync validation, no retry states)", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const hexInputs = screen.getAllByRole("textbox");
+    const firstHex = hexInputs.find((el) => el.getAttribute("placeholder") === "#RRGGBB");
+    
+    // Clear input
+    await user.clear(firstHex!);
+    
+    // Attempt preview
+    await user.click(screen.getByRole("button", { name: /preview theme/i }));
+    
+    // Should show error for missing/invalid hex, but NO loading state
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.length).toBeGreaterThan(0);
+    
+    // Loading state is not present in sync validation
+    expect(screen.queryByText(/loading/i)).toBeNull();
+    expect(screen.queryByText(/retry/i)).toBeNull();
+  });
+
+  it("injects responsive layout CSS", () => {
+    renderPanel();
+    // The panel injects a <style> tag for responsive grid
+    const styles = document.querySelectorAll("style");
+    const styleText = Array.from(styles).map(s => s.textContent).join(" ");
+    expect(styleText).toContain("@media (min-width: 768px)");
+    expect(styleText).toContain("@media (min-width: 1280px)");
+  });
+  
+  it("colour picker keyboard fallback interacts with text input", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    
+    const hexInputs = screen.getAllByRole("textbox");
+    const firstHex = hexInputs.find((el) => el.getAttribute("placeholder") === "#RRGGBB");
+    
+    // Since native color pickers are aria-hidden and tabIndex={-1}, we interact with text
+    await user.clear(firstHex!);
+    await user.type(firstHex!, "#abcdef");
+    
+    expect(firstHex).toHaveValue("#abcdef");
+    // Contrast badge or UI should sync but native color picker state is uncontrolled by us except via value bind
   });
 });

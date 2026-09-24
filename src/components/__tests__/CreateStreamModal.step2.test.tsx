@@ -9,13 +9,16 @@ import * as fc from 'fast-check';
 import CreateStreamModal, {
   sanitizeDepositAmountInput,
 } from '../CreateStreamModal';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 const VALID_STELLAR = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
 function renderModal() {
-  return render(
+  const result = render(
     <CreateStreamModal isOpen={true} onClose={() => {}} />
   );
+  selectSingleStreamInContainer(result.container);
+  return result;
 }
 
 /** Advance from step 1 to step 2 with valid data, using container-scoped queries */

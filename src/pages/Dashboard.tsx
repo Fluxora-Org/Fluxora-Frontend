@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import RecentStreams, { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
@@ -12,6 +13,7 @@ import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
+import { formatAssetAmount } from "../lib/formatters";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
 import "../design-tokens.css";
@@ -25,12 +27,11 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
-  const [totalStreaming, setTotalStreaming] = useState<number | null>(null);
   const { announcement, announce } = useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
-  const treasury = useTreasury();
+  const treasury = useTreasury(undefined, wallet.accountContextVersion);
   const { loading, error, refetch } = treasury;
   const streams = useMemo<Stream[]>(
     () => treasury.streams.map(toRecentStream),
@@ -46,7 +47,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     setWithdrawable(walletConnected ? 22600 : null);
-    setTotalStreaming(walletConnected ? 48500 : null);
   }, [walletConnected]);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (withdrawable !== null) {
       announce(
-        `Available balance updated to ${withdrawable.toLocaleString()} USDC.`,
+        `Available balance updated to ${formatAssetAmount(withdrawable, "USDC")}.`,
       );
     }
   }, [withdrawable, announce]);
@@ -91,7 +91,7 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleStreamCreated = () => {
+  const handleStreamCreated = (_data?: StreamCreatedData) => {
     setIsModalOpen(false);
     setToast({
       message:
@@ -249,6 +249,7 @@ export default function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+        onStreamError={refetch}
       />
 
       <CreateStreamFab

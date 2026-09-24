@@ -76,7 +76,8 @@
   --interactive-bg-active: #dfe5ed;
   --interactive-bg-disabled: #fafbfc;
 
-  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ─── */
+  /* ─── Focus Ring System (WCAG 2.4.7, 2.4.11) ───
+     Applied globally, including VirtualList and InfoTooltip interactive elements */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --focus-ring-color: #0284c7; /* Sky Blue - >= 3:1 contrast vs all light surfaces (including surface-highest at #dfe5ed) */
@@ -193,6 +194,69 @@
   --tooltip-title-color: var(--text-vivid);
   --tooltip-text-color: var(--text-secondary);
   --tooltip-z-index: 1100;
+
+  /* ─── Connect Wallet Onboarding (theme-aware) ───
+     Issue #737: replaces previously hardcoded rgba/hex literals in
+     src/pages/ConnectWallet.tsx with theme-aware tokens so the page
+     adapts to the active `data-theme` automatically. */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    var(--surface-elevated) 0%,
+    var(--surface-sunken) 35%,
+    var(--surface-base) 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-raised) 92%, transparent) 0%,
+    color-mix(in srgb, var(--surface-sunken) 96%, transparent) 100%
+  );
+  --connect-card-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 22%, transparent);
+  --connect-card-shadow: 0 20px 55px
+    color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+
+  --connect-eyebrow-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 32%, transparent);
+  --connect-eyebrow-bg: color-mix(
+    in srgb,
+    var(--border-interactive) 10%,
+    transparent
+  );
+  --connect-eyebrow-text: var(--status-info);
+
+  --connect-description-text: color-mix(
+    in srgb,
+    var(--text-secondary) 82%,
+    transparent
+  );
+
+  --connect-step-border: 1px solid
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-step-bg: color-mix(
+    in srgb,
+    var(--surface-raised) 82%,
+    transparent
+  );
+  --connect-step-text: color-mix(
+    in srgb,
+    var(--text-vivid) 92%,
+    transparent
+  );
+
+  --connect-helper-text: color-mix(
+    in srgb,
+    var(--text-muted) 74%,
+    transparent
+  );
+
+  --connect-cta-text: var(--color-text-inverse);
+  --connect-cta-shadow: 0 10px 25px
+    color-mix(in srgb, var(--border-interactive) 26%, transparent);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px
+      color-mix(in srgb, var(--border-interactive) 26%, transparent);
 
   /* ─── Inline Unit Badge (for input suffixes) ─── */
   --input-badge-bg: var(--surface-neutral);
@@ -329,6 +393,40 @@
   --color-danger-bg: rgba(255, 107, 107, 0.15);
   --color-info-bg: rgba(0, 184, 212, 0.30);
 
+  /* ─── Connect Wallet Onboarding (dark) ─── */
+  --connect-page-bg: radial-gradient(
+    circle at 20% 10%,
+    #12375b 0%,
+    #071426 35%,
+    #06111f 100%
+  );
+  --connect-card-bg: linear-gradient(
+    180deg,
+    rgba(20, 30, 48, 0.88) 0%,
+    rgba(10, 16, 28, 0.94) 100%
+  );
+  --connect-card-border: 1px solid rgba(34, 211, 238, 0.22);
+  --connect-card-shadow: 0 20px 55px rgba(0, 0, 0, 0.4);
+
+  --connect-eyebrow-border: 1px solid rgba(34, 211, 238, 0.32);
+  --connect-eyebrow-bg: rgba(34, 211, 238, 0.12);
+  --connect-eyebrow-text: #22d3ee;
+
+  --connect-description-text: rgba(231, 242, 255, 0.78);
+
+  --connect-step-border: 1px solid rgba(148, 195, 255, 0.2);
+  --connect-step-bg: rgba(16, 27, 44, 0.82);
+  --connect-step-text: rgba(231, 242, 255, 0.9);
+
+  --connect-helper-text: rgba(199, 220, 244, 0.68);
+
+  --connect-cta-text: #04131a;
+  --connect-cta-shadow: 0 10px 25px rgba(0, 184, 212, 0.26);
+  --connect-cta-focus-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--focus-ring-color),
+    0 10px 25px rgba(0, 184, 212, 0.26);
+
   /* ─── Skeleton Loading ─── */
   --skeleton-base: #1f2a3e;
   --skeleton-shine: #38516f;
@@ -366,6 +464,51 @@
   --recipient-body-text: var(--text-secondary);
 }
 
+/* Strictly opt-in Cyberpunk layer; target components opt in with data-skin. */
+[data-skin="cyberpunk"] {
+  --color-surface-default: #101827;
+  --color-border-default: #31506b;
+  --color-text-primary: #f4f7ff;
+  --color-text-vivid: #f4f7ff;
+  --color-text-secondary: #b4bfd1;
+  --color-focus: #ffe66d;
+  --cyber-accent-cyan: #65f6ff;
+  --cyber-accent-green: #62ffc9;
+  --cyber-accent-magenta: #ff75d8;
+  --cyber-accent-yellow: #ffe66d;
+  --cyber-surface: #070b12;
+  --cyber-panel: #101827;
+  --cyber-panel-raised: #152238;
+  --cyber-border: #31506b;
+}
+
+.cyberpunk-skin {
+  box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 24px rgba(101, 246, 255, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyberpunk-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(101, 246, 255, 0.06) 4px);
+}
+
+@keyframes cyberpunkGlow {
+  from { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.18), 0 0 22px rgba(101, 246, 255, 0.16); }
+  to { box-shadow: 0 0 0 1px rgba(101, 246, 255, 0.28), 0 0 34px rgba(255, 117, 216, 0.22); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cyberpunk-skin { animation: cyberpunkGlow 4s ease-in-out infinite alternate; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. TYPOGRAPHY TOKENS
+   ═══════════════════════════════════════════════════════════ */
+
 /* ═══════════════════════════════════════════════════════════
    3. TYPOGRAPHY TOKENS
    ═══════════════════════════════════════════════════════════ */
@@ -373,16 +516,19 @@
 :root {
   --font-family-default: "Plus Jakarta Sans", system-ui, -apple-system,
     "Segoe UI", sans-serif;
-  --font-family-dyslexic: "Lexend", "OpenDyslexic", "Comic Neue", "Comic Sans MS", "Arial", sans-serif;
-
-  --font-family-base: var(--font-family-default);
+  --font-family-dyslexic: "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", Arial, sans-serif;
   --font-family-mono: "Monaco", "Menlo", "Courier New", monospace;
+  --font-family-base: var(--font-family-default);
 
-  /* Line Heights (Dynamic to allow easy-read scaling) */
+  /* ─── Line Height Tokens ─── */
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 1.75;
+
   --line-height-heading-1: 44px;
   --line-height-heading-2: 32px;
-  --line-height-heading-3: 28px;
-  --line-height-heading-4: 24px;
+  --line-height-heading-3: 24px;
+  --line-height-heading-4: 20px;
 
   --line-height-body-lg: 24px;
   --line-height-body-md: 20px;
@@ -497,12 +643,25 @@
   --shadow-cta-primary: var(--shadow-accent-primary);
   --shadow-cta-primary-hover: 0 8px 16px rgba(0, 184, 212, 0.3);
 
-  /* Persistent create-stream FAB */
+  /* Persistent create-stream FAB.
+     Offsets and inner paddings reference already-defined spacing tokens
+     (--space-xl == 24px, --space-md == 12px, --space-lg == 16px,
+     --space-sm == 8px).
+     An earlier revision aliased var(--space-2) / var(--space-3) /
+     var(--space-4) / var(--space-5) / var(--space-6) — none of which
+     are defined on :root and silently fell through to invalid token
+     values, leaving the FAB flush to the viewport edge and the menu
+     paddings collapsed. See docs/CREATE_STREAM_FAB_SPEC.md. */
   --fab-size: 56px;
-  --fab-bottom-offset: var(--space-6);
-  --fab-bottom-offset-mobile: 5.5rem;
-  --fab-side-offset: var(--space-6);
+  --fab-bottom-offset: var(--space-xl);
+  --fab-bottom-offset-mobile: 5.5rem; /* 88px — clears the mobile bottom-nav safe area */
+  --fab-side-offset: var(--space-xl);
   --fab-z-index: 900;
+  --fab-menu-gap: var(--space-sm);     /* 8px — vertical spacing between speed-dial items */
+  --fab-trigger-padding-x: var(--space-md); /* 12px — horizontal padding inside the pill */
+  --fab-menu-item-gap: var(--space-sm);   /* 8px — spacing between icon and label */
+  --fab-menu-item-padding-y: var(--space-sm);
+  --fab-menu-item-padding-x: var(--space-md);
 }
 
 /* Dark theme shadow adjustments */
@@ -899,13 +1058,13 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--fab-menu-gap);
 }
 
 .create-stream-fab__button {
   min-width: var(--fab-size);
   min-height: var(--fab-size);
-  padding: 0 var(--space-5);
+  padding: 0 var(--fab-trigger-padding-x);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
 }
@@ -933,15 +1092,15 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-2);
+  gap: var(--fab-menu-gap);
 }
 
 .create-stream-fab__menu-item {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--fab-menu-item-gap);
   min-height: 44px;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--fab-menu-item-padding-y) var(--fab-menu-item-padding-x);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-full);
   background: var(--color-bg-primary);
@@ -964,7 +1123,7 @@
 
 @media (max-width: 860px) {
   .create-stream-fab {
-    right: max(var(--space-4), env(safe-area-inset-right));
+    right: max(var(--space-lg), env(safe-area-inset-right));
     bottom: max(var(--fab-bottom-offset-mobile), env(safe-area-inset-bottom));
   }
 }
@@ -1060,3 +1219,455 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   14. CROSS-TAB THEME TRANSITION (.theme-transitioning)
+   ═══════════════════════════════════════════════════════════
+   See docs/THEME_CROSSFADE_TRANSITION_SPEC.md for the full design.
+
+   `ThemeProvider.applyTheme()` toggles `.theme-transitioning` on <html>
+   around every theme change (immediately before the `data-theme` update,
+   removed after the transition duration — deferred via `visibilitychange`
+   while the tab is hidden, so a background-tab flip cross-fades on refocus
+   instead of reading as an instant, jarring flash). The class was already
+   wired up on the JS side; this section supplies the CSS that was
+   previously missing, per the spec's documented property list:
+   background-color, border-color, color, fill, stroke transition; focus
+   rings (box-shadow/outline) are intentionally excluded so they never look
+   ambiguous mid-fade. `prefers-reduced-motion` is handled globally above,
+   which also zeroes this duration. */
+
+.theme-transitioning,
+.theme-transitioning * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: var(--transition-base);
+  transition-timing-function: var(--ease-in-out);
+}
+
+.theme-transitioning *:focus-visible {
+  transition: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   15. FORCED-COLORS (Windows High Contrast / Forced-Colors Mode)
+   ───────────────────────────────────────────────────────────
+   When the OS activates a forced-colors palette, the browser
+   replaces author colors with system keywords.  CSS custom
+   properties lose their resolved values, so components that rely
+   on token-driven backgrounds or borders become invisible.
+
+   Strategy:
+   • Let the browser handle most surfaces (forced-color-adjust: auto).
+   • Use CSS system color keywords (Canvas, CanvasText, ButtonText,
+     Highlight, HighlightText, ButtonFace, ButtonBorder, Mark,
+     MarkText, GrayText, LinkText, VisitedText, ActiveText,
+     Field, FieldText) for explicit overrides where author control
+     is required.
+   • Give every semantically meaningful borderless element a visible
+     border so its boundary is preserved.
+   • Keep focus rings on `outline` (box-shadow is stripped by the
+     browser in forced-colors mode).
+   • Preserve status-pill icon shapes (forced-color-adjust: none on
+     the SVG fill only) so states remain distinguishable without
+     colour alone (WCAG 1.4.1).
+   • Suppress purely decorative gradients and shadows.
+   ═══════════════════════════════════════════════════════════ */
+
+@media (forced-colors: active) {
+  /* ── Token overrides: map semantic tokens to system colors ── */
+  :root {
+    /* Surfaces */
+    --color-bg-primary: Canvas;
+    --color-bg-secondary: Canvas;
+    --color-bg-tertiary: Canvas;
+    --color-surface-default: Canvas;
+    --color-surface-elevated: Canvas;
+    --color-surface-raised: Canvas;
+    --color-surface-highest: Canvas;
+
+    /* Text */
+    --color-text-primary: CanvasText;
+    --color-text-secondary: CanvasText;
+    --color-text-tertiary: GrayText;
+    --color-text-muted: GrayText;
+    --color-text-inverse: ButtonFace;
+
+    /* Borders */
+    --color-border-default: ButtonBorder;
+    --color-border-secondary: ButtonBorder;
+    --border-neutral: ButtonBorder;
+    --border-strong: ButtonBorder;
+
+    /* Interactive accent — use Highlight so it matches the OS accent */
+    --color-accent-primary: Highlight;
+    --color-accent-secondary: Highlight;
+    --color-accent-primary-dark: Highlight;
+    --color-accent-secondary-dark: Highlight;
+    --color-accent-primary-darkest: Highlight;
+
+    /* Status — keep readable with ButtonText/CanvasText */
+    --status-success: CanvasText;
+    --status-warning: CanvasText;
+    --status-error: CanvasText;
+    --status-info: CanvasText;
+    --color-success: CanvasText;
+    --color-warning: CanvasText;
+    --color-danger: CanvasText;
+    --color-info: CanvasText;
+
+    /* Status backgrounds — use Canvas so they do not disappear */
+    --status-success-bg: Canvas;
+    --status-warning-bg: Canvas;
+    --status-error-bg: Canvas;
+    --status-info-bg: Canvas;
+    --color-success-bg: Canvas;
+    --color-warning-bg: Canvas;
+    --color-danger-bg: Canvas;
+    --color-info-bg: Canvas;
+
+    /* Focus ring — outline only, box-shadow is stripped by the UA */
+    --focus-ring-color: Highlight;
+    --focus-ring-halo: transparent;
+    --focus-ring-shadow: none;
+    --focus-ring-shadow-inset: none;
+    --focus-ring-input-shadow: none;
+    --focus-ring: none;
+
+    /* Suppress decorative shadows and gradients */
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+    --shadow-xl: none;
+    --shadow-accent-primary: none;
+    --shadow-accent-secondary: none;
+    --shadow-cta-primary: none;
+    --shadow-cta-primary-hover: none;
+    --shadow-error-focus: none;
+    --navbar-shadow: none;
+    --connect-card-shadow: none;
+    --connect-cta-shadow: none;
+    --tooltip-shadow: none;
+
+    /* Skeleton — use a visible GrayText tint */
+    --skeleton-base: GrayText;
+    --skeleton-shine: Canvas;
+
+    /* CTAs */
+    --color-cta-primary-bg: ButtonFace;
+    --color-cta-primary-bg-hover: Highlight;
+    --color-cta-primary-bg-active: Highlight;
+    --color-cta-primary-text: ButtonText;
+    --color-cta-secondary-bg: Canvas;
+    --color-cta-secondary-border: ButtonBorder;
+    --color-cta-secondary-text: ButtonText;
+  }
+
+  /* ── Focus rings: use outline, not box-shadow ── */
+  *:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Buttons ── */
+  button,
+  [role="button"] {
+    forced-color-adjust: auto;
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  button:hover,
+  [role="button"]:hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+    background: Canvas;
+  }
+
+  /* Primary CTA */
+  .ui-primary-cta,
+  .ui-primary-cta:hover {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+  }
+
+  .ui-primary-cta:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  /* ── Links ── */
+  a[href] {
+    color: LinkText;
+    forced-color-adjust: auto;
+  }
+
+  a[href]:visited {
+    color: VisitedText;
+  }
+
+  /* ── Form inputs and selects ── */
+  input,
+  textarea,
+  select {
+    forced-color-adjust: auto;
+    background: Field;
+    color: FieldText;
+    border: 1px solid ButtonBorder;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    border-color: Highlight;
+    box-shadow: none !important;
+  }
+
+  /* ── Status pills ──
+     The browser strips background-color, so we add a visible border
+     and keep the icon+text for shape/text differentiation (WCAG 1.4.1).
+     The SVG icon retains its authored color via forced-color-adjust: none
+     so the distinct shape (Play/Pause/Check/Heart/Alert/X) is preserved. */
+  [data-status-token] {
+    forced-color-adjust: none;
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    outline: none;
+  }
+
+  [data-status-token]:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Restore icon visibility inside pills */
+  [data-status-token] svg {
+    forced-color-adjust: auto;
+    color: CanvasText;
+  }
+
+  /* ── Modal backdrop ── */
+  [role="dialog"] {
+    forced-color-adjust: auto;
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* Backdrop/overlay: just a translucent Canvas so content behind is
+     dimmed without a box-shadow or gradient that would be stripped */
+  .backdrop,
+  [class*="backdrop"],
+  [class*="overlay"] {
+    background: Canvas;
+    opacity: 0.85;
+  }
+
+  /* ── Skeleton loaders ──
+     Suppress shimmer animation and show a simple gray block */
+  [class*="skeleton"],
+  [class*="Skeleton"],
+  [aria-busy="true"] {
+    animation: none !important;
+    background: GrayText !important;
+    opacity: 0.3 !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Stream row / table ── */
+  .stream-row {
+    border-bottom: 1px solid ButtonBorder;
+  }
+
+  .stream-row--selected {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+    border-left: 3px solid HighlightText;
+  }
+
+  .stream-row:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: -2px !important;
+    box-shadow: none !important;
+  }
+
+  .stream-row__action-btn {
+    color: LinkText;
+    background: none;
+    border: none;
+  }
+
+  .stream-row__ellipsis-btn {
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  .stream-row__ellipsis-btn:focus-visible {
+    outline: 2px solid Highlight !important;
+    box-shadow: none !important;
+  }
+
+  /* Context menu */
+  .context-menu {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .context-menu__item {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .context-menu__item:hover,
+  .context-menu__item:focus {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-menu__item--danger:hover,
+  .context-menu__item--danger:focus {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-menu__item:disabled {
+    color: GrayText;
+  }
+
+  /* ── Sidebar / navigation ── */
+  .app-nav-link {
+    border: 1px solid transparent;
+  }
+
+  .app-nav-link.active,
+  .app-nav-link[aria-current="page"] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .app-nav-link:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Tooltip ── */
+  [role="tooltip"] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Decorative glows / gradients — suppress ── */
+  .cyberpunk-skin,
+  .cyberpunk-scanlines::after,
+  .create-stream-fab__button,
+  [class*="glow"],
+  [class*="Glow"] {
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  /* ── FAB ── */
+  .create-stream-fab__button {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+  }
+
+  .create-stream-fab__menu-item {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+  }
+
+  .create-stream-fab__menu-item:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  /* ── Toast notifications ── */
+  [role="alert"],
+  [role="status"] {
+    forced-color-adjust: auto;
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Progress bars / timeline segments ── */
+  [class*="timeline"],
+  [class*="Timeline"] {
+    forced-color-adjust: auto;
+  }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb-link {
+    color: LinkText;
+  }
+
+  .breadcrumb-link:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+
+  /* ── Network badge ── */
+  [class*="network"],
+  [class*="Network"] {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  /* ── Presence badges ── */
+  [class*="presence"],
+  [class*="Presence"] {
+    forced-color-adjust: auto;
+    background: Canvas;
+    border: 1px solid ButtonBorder;
+    color: CanvasText;
+  }
+
+  /* ── Skip-to-main link ── */
+  .skipToMain:focus-visible {
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;
+    box-shadow: none;
+  }
+
+  /* ── TruncatedReveal chip ── */
+  .truncateReveal__chip {
+    background: ButtonFace;
+    border: 1px solid ButtonBorder;
+    color: ButtonText;
+  }
+
+  /* ── Pagination ── */
+  [class*="pagination"],
+  [class*="Pagination"] {
+    forced-color-adjust: auto;
+  }
+}

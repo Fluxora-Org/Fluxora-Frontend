@@ -48,13 +48,14 @@ describe("WalletStatus keyboard navigation", () => {
     await waitFor(() => expect(firstItem).toHaveFocus());
 
     const secondItem = screen.getByRole("menuitem", { name: /view in explorer/i });
-    const thirdItem = screen.getByRole("menuitem", { name: /disconnect/i });
+    const lastItem = screen.getByRole("menuitem", { name: /^disconnect$/i });
 
     await user.keyboard("{ArrowDown}");
     expect(secondItem).toHaveFocus();
 
-    await user.keyboard("{ArrowDown}");
-    expect(thirdItem).toHaveFocus();
+    // Skip share-workspace items to the final wallet disconnect action
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
+    expect(lastItem).toHaveFocus();
 
     await user.keyboard("{ArrowDown}");
     expect(firstItem).toHaveFocus(); // wraps around
@@ -77,14 +78,16 @@ describe("WalletStatus keyboard navigation", () => {
     const firstItem = await screen.findByRole("menuitem", { name: /copy address/i });
     await waitFor(() => expect(firstItem).toHaveFocus());
 
-    const secondItem = screen.getByRole("menuitem", { name: /view in explorer/i });
-    const thirdItem = screen.getByRole("menuitem", { name: /disconnect/i });
+    const teamsItem = screen.getByRole("menuitem", {
+      name: /connect microsoft teams/i,
+    });
+    const lastItem = screen.getByRole("menuitem", { name: /^disconnect$/i });
 
     await user.keyboard("{ArrowUp}");
-    expect(thirdItem).toHaveFocus(); // wraps around to last
+    expect(lastItem).toHaveFocus(); // wraps around to last
 
     await user.keyboard("{ArrowUp}");
-    expect(secondItem).toHaveFocus();
+    expect(teamsItem).toHaveFocus();
   });
 
   it("traps focus within the menu using Tab and Shift+Tab", async () => {
@@ -104,10 +107,10 @@ describe("WalletStatus keyboard navigation", () => {
     const firstItem = await screen.findByRole("menuitem", { name: /copy address/i });
     await waitFor(() => expect(firstItem).toHaveFocus());
 
-    const thirdItem = screen.getByRole("menuitem", { name: /disconnect/i });
+    const lastItem = screen.getByRole("menuitem", { name: /^disconnect$/i });
 
     await user.keyboard("{Shift>}{Tab}{/Shift}");
-    expect(thirdItem).toHaveFocus();
+    expect(lastItem).toHaveFocus();
 
     await user.keyboard("{Tab}");
     expect(firstItem).toHaveFocus();
@@ -154,7 +157,9 @@ describe("WalletStatus keyboard navigation", () => {
     await user.keyboard("{ArrowDown}");
     
     // Go to disconnect confirm view
-    const disconnectItem = await screen.findByRole("menuitem", { name: /disconnect/i });
+    const disconnectItem = await screen.findByRole("menuitem", {
+      name: /^disconnect$/i,
+    });
     await waitFor(() => expect(disconnectItem).toBeInTheDocument());
     
     // We use keyboard to click it to simulate pure keyboard flow

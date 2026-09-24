@@ -7,6 +7,22 @@ export const en = {
   "createStream.description": "Set the recipient, funding, and schedule details for a new Stellar stream.",
   "createStream.accessibility.closeLabel": "Close create stream modal",
 
+  // CreateStreamModal Mode Toggle
+  "createStream.modeToggle.wizardLabel": "Wizard",
+  "createStream.modeToggle.advancedLabel": "Advanced",
+  "createStream.modeToggle.ariaLabel": "Create stream mode: {mode}",
+  "createStream.modeToggle.wizardAria": "Guided 3-step wizard (default)",
+  "createStream.modeToggle.advancedAria": "Single-page advanced form with all fields",
+
+  // CreateStreamModal Advanced mode (single-page)
+  "createStream.advanced.section1Header": "Recipient & amount",
+  "createStream.advanced.section1Desc": "Set who receives the stream and how much USDC to lock.",
+  "createStream.advanced.section2Header": "Rate & schedule",
+  "createStream.advanced.section2Desc": "Configure how fast USDC streams, when it starts, and optional cliff.",
+  "createStream.advanced.section3Header": "Summary & create",
+  "createStream.advanced.section3Desc": "Review your stream details and submit to the network.",
+  "createStream.advanced.createBtn": "Create stream",
+
   // CreateStreamModal Steps
   "createStream.steps.recipientAmount": "Recipient & amount",
   "createStream.steps.rateSchedule": "Rate & schedule",
@@ -133,6 +149,142 @@ export const en = {
   "createStream.error.failedWithMessage": "Failed to create stream: {message}",
   "createStream.success.message": "Stream created successfully on-chain!",
 
+  // ─── ConnectWalletModal ───────────────────────────────────────────────────────
+
+  // Default view
+  "connectWallet.stepLabel": "Step 1 of 1",
+  "connectWallet.title": "Choose your wallet",
+  "connectWallet.description": "Select a provider below to connect. You will review and approve the request in your wallet.",
+  "connectWallet.walletDescription.freighter": "Recommended browser extension for Stellar wallets.",
+  "connectWallet.walletDescription.albedo": "Open in-browser wallet for quick secure approvals.",
+  "connectWallet.walletDescription.walletConnect": "Pair with compatible mobile wallets via QR.",
+  "connectWallet.walletDescription.hardware": "Connect via Ledger or Trezor device.",
+  "connectWallet.comingSoon": "coming soon",
+  "connectWallet.connecting": "Connecting...",
+  "connectWallet.termsPrefix": "By continuing, you agree to Fluxora's",
+  "connectWallet.termsLink": "Terms of Service",
+  "connectWallet.ariaCloseDialog": "Close wallet connection dialog",
+  "connectWallet.ariaWalletProviders": "Wallet providers",
+  "connectWallet.ariaConnectWith": "Connect with {name}",
+  "connectWallet.ariaComingSoon": "{name} — coming soon",
+
+  // Error: Not installed
+  "connectWallet.notInstalled.badge": "Extension Required",
+  "connectWallet.notInstalled.title": "Freighter Not Installed",
+  "connectWallet.notInstalled.description": "Freighter is the official browser extension for Stellar and Soroban. You will need to install the extension to securely connect your wallet to Fluxora.",
+  "connectWallet.notInstalled.downloadBtn": "Download Freighter",
+  "connectWallet.notInstalled.backBtn": "Back to wallet list",
+  "connectWallet.notInstalled.ariaDownload": "Download Freighter browser extension",
+  "connectWallet.notInstalled.ariaBack": "Back to wallet selection list",
+
+  // Error: Rejected
+  "connectWallet.rejected.badge": "Connection Failed",
+  "connectWallet.rejected.title": "Connection Rejected",
+  "connectWallet.rejected.description": "The connection was declined in your wallet extension. To interact with Fluxora, please grant permission to view your Stellar public key. No funds can be accessed without your explicit signature.",
+  "connectWallet.rejected.retryBtn": "Retry Connection",
+  "connectWallet.rejected.backBtn": "Back to wallet list",
+  "connectWallet.rejected.ariaRetry": "Retry connecting to Freighter wallet",
+  "connectWallet.rejected.ariaBack": "Back to wallet selection list",
+
+  // Error: Network mismatch
+  "connectWallet.networkMismatch.badge": "Network Mismatch",
+  "connectWallet.networkMismatch.title": "Wrong Stellar Network",
+  "connectWallet.networkMismatch.description": "Your wallet is connected to the wrong network. Fluxora is configured for Stellar {expected}, but your wallet is currently on {actual}.",
+  "connectWallet.networkMismatch.instruction1": "Open your Freighter extension in your browser toolbar.",
+  "connectWallet.networkMismatch.instruction2": "Click the network dropdown at the top of the extension popup.",
+  "connectWallet.networkMismatch.instruction3": "Select {expected} and return here.",
+  "connectWallet.networkMismatch.checkBtn": "Check Network Again",
+  "connectWallet.networkMismatch.backBtn": "Back to wallet list",
+  "connectWallet.networkMismatch.ariaInstructions": "Instructions to switch network",
+  "connectWallet.networkMismatch.ariaCheck": "Check network configuration again",
+  "connectWallet.networkMismatch.ariaBack": "Back to wallet selection list",
+
+  // Error: Network timeout
+  "connectWallet.timeout.badge": "Timed Out",
+  "connectWallet.timeout.title": "Network Check Timed Out",
+  "connectWallet.timeout.description": "The network check did not respond in time. This can happen if the Freighter extension is hung or unresponsive. Please try again.",
+  "connectWallet.timeout.retryBtn": "Retry Connection",
+  "connectWallet.timeout.backBtn": "Back to wallet list",
+  "connectWallet.timeout.ariaRetry": "Retry network check",
+  "connectWallet.timeout.ariaBack": "Back to wallet selection list",
+
+  // Hardware: Device searching
+  "connectWallet.deviceSearching.stepLabel": "Step 1 of 3",
+  "connectWallet.deviceSearching.title": "Connect via USB",
+  "connectWallet.deviceSearching.description": "Searching for connected hardware wallets... Please plug in your Ledger or Trezor device via USB, unlock it with your PIN, and ensure the Stellar app is open.",
+  "connectWallet.deviceSearching.scanningAria": "Scanning for connected hardware wallets...",
+  "connectWallet.deviceSearching.simulateBtn": "Simulate Found",
+  "connectWallet.deviceSearching.cancelBtn": "Cancel",
+  "connectWallet.deviceSearching.ariaSimulate": "Simulate device detected",
+  "connectWallet.deviceSearching.ariaBack": "Back to wallet selection list",
+
+  // Hardware: Device found
+  "connectWallet.deviceFound.stepLabel": "Step 2 of 3",
+  "connectWallet.deviceFound.title": "Configure Device",
+  "connectWallet.deviceFound.description": "Select your hardware wallet and choose a derivation path configuration.",
+  "connectWallet.deviceFound.ariaSelectDevice": "Select USB hardware wallet device",
+  "connectWallet.deviceFound.ledgerName": "Ledger Nano X / S",
+  "connectWallet.deviceFound.ledgerDesc": "Connect via USB and confirm public key.",
+  "connectWallet.deviceFound.ledgerAria": "Ledger Nano X or S",
+  "connectWallet.deviceFound.trezorName": "Trezor Model T / One",
+  "connectWallet.deviceFound.trezorDesc": "Connect via USB and unlock via screen.",
+  "connectWallet.deviceFound.trezorAria": "Trezor Model T or One",
+  "connectWallet.deviceFound.derivationLabel": "Derivation Path",
+  "connectWallet.deviceFound.stellarStandard": "Stellar Standard (m/44'/148'/0')",
+  "connectWallet.deviceFound.stellarSecondary": "Stellar Secondary (m/44'/148'/1')",
+  "connectWallet.deviceFound.customOption": "Custom Derivation Path...",
+  "connectWallet.deviceFound.ariaCustomPath": "Enter custom Stellar derivation path",
+  "connectWallet.deviceFound.confirmBtn": "Confirm & Connect",
+  "connectWallet.deviceFound.backBtn": "Back",
+  "connectWallet.deviceFound.ariaConfirm": "Confirm selection and connect",
+  "connectWallet.deviceFound.ariaBack": "Back to device scanning",
+
+  // Hardware: Awaiting confirmation
+  "connectWallet.awaiting.stepLabel": "Step 3 of 3",
+  "connectWallet.awaiting.title": "Confirm on Device",
+  "connectWallet.awaiting.description": "Please review and approve the public key connection request on your physical hardware wallet screen. Ensure the Stellar app is active.",
+  "connectWallet.awaiting.scanningAria": "Confirm Connection on Device... Please review public key on your hardware wallet.",
+  "connectWallet.awaiting.simulateBtn": "Simulate Success",
+  "connectWallet.awaiting.backBtn": "Back",
+  "connectWallet.awaiting.ariaSimulate": "Simulate successful connection",
+  "connectWallet.awaiting.ariaBack": "Back to device scanning",
+
+  // Error: Device locked
+  "connectWallet.deviceLocked.badge": "Device Locked",
+  "connectWallet.deviceLocked.title": "Hardware Wallet Locked",
+  "connectWallet.deviceLocked.description": "Your hardware wallet is locked. Please enter your PIN on the physical device to unlock it and try again.",
+  "connectWallet.deviceLocked.retryBtn": "Retry Connection",
+  "connectWallet.deviceLocked.backBtn": "Back to wallet list",
+  "connectWallet.deviceLocked.ariaRetry": "Retry connection scan",
+  "connectWallet.deviceLocked.ariaBack": "Back to wallet selection list",
+
+  // Error: Wrong app
+  "connectWallet.wrongApp.badge": "Stellar App Closed",
+  "connectWallet.wrongApp.title": "Stellar App Not Open",
+  "connectWallet.wrongApp.description": "The Stellar application is not open on your device. Please open the Stellar application on your Ledger or Trezor device before continuing.",
+  "connectWallet.wrongApp.retryBtn": "Retry Connection",
+  "connectWallet.wrongApp.backBtn": "Back to wallet list",
+  "connectWallet.wrongApp.ariaRetry": "Retry connection scan",
+  "connectWallet.wrongApp.ariaBack": "Back to wallet selection list",
+
+  // Error: Unplugged
+  "connectWallet.unplugged.badge": "Disconnected",
+  "connectWallet.unplugged.title": "Device Disconnected",
+  "connectWallet.unplugged.description": "The hardware wallet was unplugged or disconnected mid-flow. Please check your USB cable and reconnect the device.",
+  "connectWallet.unplugged.scanBtn": "Scan for Device",
+  "connectWallet.unplugged.backBtn": "Back to wallet list",
+  "connectWallet.unplugged.ariaScan": "Scan for hardware wallet again",
+  "connectWallet.unplugged.ariaBack": "Back to wallet selection list",
+
+  // Error: Mobile unsupported
+  "connectWallet.mobileUnsupported.badge": "Mobile Fallback",
+  "connectWallet.mobileUnsupported.title": "Device Unsupported on Mobile",
+  "connectWallet.mobileUnsupported.description": "USB hardware wallet connections are not supported on mobile web browsers. Please connect using a supported mobile-friendly wallet instead.",
+  "connectWallet.mobileUnsupported.connectBtn": "Connect via WalletConnect",
+  "connectWallet.mobileUnsupported.backBtn": "Back to wallet list",
+  "connectWallet.mobileUnsupported.ariaConnect": "Connect using WalletConnect mobile flow",
+  "connectWallet.mobileUnsupported.ariaBack": "Back to wallet selection list",
+
   // Plurals
   "createStream.duration.day_one": "day",
   "createStream.duration.day_other": "days",
@@ -196,4 +348,92 @@ export const en = {
   "zeroAccrual.rateZero.title": "Stream rate is zero",
   "zeroAccrual.rateZero.description": "The stream is active but the accrual rate is set to zero. No USDC is accumulating. Contact your treasury manager to update the rate.",
   "zeroAccrual.rateZero.nextEvent": "Pending rate update",
+
+  // ─── CSV Bulk-Upload Flow ─────────────────────────────────────────────────
+
+  // Mode selection (step 0)
+  "csvUpload.mode.title": "How would you like to create streams?",
+  "csvUpload.mode.single": "Create a single stream",
+  "csvUpload.mode.singleDesc": "Step through recipient, rate, and schedule for one stream.",
+  "csvUpload.mode.bulk": "Bulk create from CSV",
+  "csvUpload.mode.bulkDesc": "Upload a CSV file to create multiple streams at once.",
+
+  // Upload step (step B1)
+  "csvUpload.upload.title": "Upload recipient CSV",
+  "csvUpload.upload.subtitle": "Upload a CSV file with recipient addresses and stream details.",
+  "csvUpload.upload.dropzone": "Drag & drop your CSV here",
+  "csvUpload.upload.browse": "or click to browse files",
+  "csvUpload.upload.accepts": "Accepts .csv · max 500 rows",
+  "csvUpload.upload.templateLink": "Download CSV template",
+  "csvUpload.upload.parsing": "Parsing file…",
+  "csvUpload.upload.success": "{fileName} — {rowCount} rows detected",
+  "csvUpload.upload.errorType": "Only .csv files are accepted.",
+  "csvUpload.upload.errorEmpty": "The CSV file has no data rows.",
+  "csvUpload.upload.errorTooLarge": "This CSV has {rowCount} rows. Maximum is 500.",
+  "csvUpload.upload.inputAriaLabel": "Upload CSV file. Accepts .csv format, maximum 500 rows.",
+
+  // Column mapping step (step B2)
+  "csvUpload.mapping.title": "Map your columns",
+  "csvUpload.mapping.subtitle": "We couldn't auto-detect all required columns. Map each required field to a column in your file.",
+  "csvUpload.mapping.fieldRecipient": "Recipient address",
+  "csvUpload.mapping.fieldDeposit": "Deposit amount (USDC)",
+  "csvUpload.mapping.fieldRate": "Rate (USDC/day)",
+  "csvUpload.mapping.fieldDuration": "Duration (days)",
+  "csvUpload.mapping.selectPlaceholder": "-- Select column --",
+  "csvUpload.mapping.errorDuplicate": "Each column can only be used once.",
+  "csvUpload.mapping.applyBtn": "Apply mapping",
+
+  // Preview/validate step (step B3)
+  "csvUpload.preview.title": "Review {total} streams",
+  "csvUpload.preview.attention": "{count} rows need attention before you can submit.",
+  "csvUpload.preview.colRow": "#",
+  "csvUpload.preview.colRecipient": "Recipient",
+  "csvUpload.preview.colDeposit": "Deposit (USDC)",
+  "csvUpload.preview.colRate": "Rate/day",
+  "csvUpload.preview.colDuration": "Duration",
+  "csvUpload.preview.colStatus": "Status",
+  "csvUpload.preview.statusValid": "Valid",
+  "csvUpload.preview.statusNeedsFix": "Needs fix",
+  "csvUpload.preview.statusDuplicate": "Duplicate",
+  "csvUpload.preview.statusSkipped": "Skipped",
+  "csvUpload.preview.fixBtn": "Fix",
+  "csvUpload.preview.skipBtn": "Skip row",
+  "csvUpload.preview.replaceLink": "Replace CSV",
+  "csvUpload.preview.skipInvalidBtn": "Skip invalid rows",
+  "csvUpload.preview.submitBtn": "Submit {count} valid streams",
+  "csvUpload.preview.editSave": "Save",
+  "csvUpload.preview.editCancel": "Cancel",
+  "csvUpload.preview.rowAria": "Row {n}: {status}",
+  "csvUpload.preview.editRowAria": "Editing row {n}",
+  "csvUpload.preview.scrollRegionAria": "CSV preview table. Scroll horizontally to see all columns.",
+  "csvUpload.preview.captionSr": "{valid} valid, {errors} need attention, {dups} duplicate recipients",
+  "csvUpload.preview.liveUpdate": "Row {n} updated: {status}.",
+  "csvUpload.preview.replaceConfirm": "Replacing the file will clear your current preview. Continue?",
+
+  // Submission
+  "csvUpload.submit.progress": "Submitting stream {current} of {total}…",
+  "csvUpload.submit.success": "{success} of {total} streams created successfully.",
+  "csvUpload.submit.partial": "{success} of {total} streams created. {failed} failed.",
+
+  // Dry-run confirmation screen (step B4)
+  "csvUpload.dryRun.title": "Review batch summary",
+  "csvUpload.dryRun.subtitle": "Preview the cumulative impact before submitting. Review each row's outcome and confirm to proceed.",
+  "csvUpload.dryRun.calculating": "Calculating dry-run totals…",
+  "csvUpload.dryRun.totalStreams": "Total streams",
+  "csvUpload.dryRun.totalDeposit": "Total deposit",
+  "csvUpload.dryRun.totalEstimatedFees": "Estimated fees",
+  "csvUpload.dryRun.validRows": "Valid rows",
+  "csvUpload.dryRun.skippedRows": "Skipped rows",
+  "csvUpload.dryRun.errorRows": "Rows needing attention",
+  "csvUpload.dryRun.duplicateRows": "Duplicate recipients",
+  "csvUpload.dryRun.partialFailureWarning": "Warning: {failed} of {total} streams may fail mid-batch. A partial failure is previewed below so you can review the risk before committing.",
+  "csvUpload.dryRun.confirmationLabel": "I understand this will create {count} streams",
+  "csvUpload.dryRun.submitBtn": "Create {count} stream{count, plural, one {} other {s}}",
+  "csvUpload.dryRun.submitDisabled": "Confirm the batch to submit",
+  "csvUpload.dryRun.submitting": "Submitting batch…",
+  "csvUpload.dryRun.back": "Back to preview",
+  "csvUpload.dryRun.outcome": "Outcome preview",
+  "csvUpload.dryRun.statusSuccess": "Will succeed",
+  "csvUpload.dryRun.statusWarning": "Duplicate — will skip",
+  "csvUpload.dryRun.statusError": "Will fail",
 };

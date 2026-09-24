@@ -67,6 +67,12 @@ export const VoiceCommandPanel: React.FC = () => {
           color: "bg-amber-500/20 text-amber-400 border-amber-500/40",
           icon: AlertTriangle,
         };
+      case "command-ambiguous":
+        return {
+          label: "Needs clarification",
+          color: "bg-orange-500/20 text-orange-400 border-orange-500/40",
+          icon: AlertTriangle,
+        };
       case "confirming-destructive":
         return {
           label: "Confirmation Required",
@@ -179,6 +185,16 @@ export const VoiceCommandPanel: React.FC = () => {
           </div>
         )}
 
+        {state === "command-ambiguous" && (
+          <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs flex gap-2.5 items-start">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+            <p>
+              I heard more than one possible command. Nothing was executed;
+              please repeat the complete command.
+            </p>
+          </div>
+        )}
+
         {/* Destructive Action Confirmation Step Banner */}
         {state === "confirming-destructive" && pendingDestructiveCommand && (
           <div className="p-4 rounded-xl bg-red-500/15 border-2 border-red-500/50 text-red-200 space-y-3">
@@ -246,10 +262,11 @@ export const VoiceCommandPanel: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   {catCmds.map((cmd) => (
-                    <div
+                    <button
                       key={cmd.id}
+                      type="button"
                       className={clsx(
-                        "p-2 rounded-lg border text-xs flex flex-col gap-0.5 transition-all cursor-pointer hover:border-[var(--color-accent-primary)]/50",
+                        "p-2 rounded-lg border text-xs flex flex-col gap-0.5 transition-all text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] hover:border-[var(--color-accent-primary)]/50",
                         recognizedCommand?.command.id === cmd.id
                           ? "bg-[var(--color-accent-primary)]/10 border-[var(--color-accent-primary)] text-[var(--text-vivid)]"
                           : "bg-[var(--surface-sunken)] border-[var(--border-subtle)] text-[var(--text-secondary)]"
@@ -271,7 +288,7 @@ export const VoiceCommandPanel: React.FC = () => {
                       <div className="text-[10px] text-[var(--text-disabled)] font-mono mt-0.5">
                         Aliases: {cmd.aliases.map((a) => `"${a}"`).join(", ")}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

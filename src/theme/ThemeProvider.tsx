@@ -13,6 +13,11 @@ import {
   type AllowedTokenKey,
   type TokenValidationError,
 } from "./contrastUtils";
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "../lib/browserStorage";
 
 // ─── 1. Core "light | dark" union (unchanged) ────────────────────────────────
 
@@ -21,7 +26,7 @@ import {
  * tampered or corrupted `localStorage` entries — is rejected before it can
  * reach the DOM, preventing `data-theme` attribute injection.
  */
-export type Theme = "light" | "dark";
+export type Theme = "light" | "dark" | "cyberpunk";
 
 /** `localStorage` key under which the user's explicit built-in theme is persisted. */
 export const THEME_STORAGE_KEY = "theme";
@@ -42,7 +47,7 @@ const DARK_MEDIA_QUERY = "(prefers-color-scheme: dark)";
  * @returns `true` only when `value` is exactly `"light"` or `"dark"`.
  */
 export function isTheme(value: unknown): value is Theme {
-  return value === "light" || value === "dark";
+  return value === "light" || value === "dark" || value === "cyberpunk";
 }
 
 // ─── 2. Custom theme types ────────────────────────────────────────────────────
@@ -54,7 +59,9 @@ export function isTheme(value: unknown): value is Theme {
  * @returns `true` when value is boolean or boolean-string.
  */
 export function isEasyReadFont(value: unknown): value is boolean {
-  return value === true || value === false || value === "true" || value === "false";
+  return (
+    value === true || value === false || value === "true" || value === "false"
+  );
 }
 
 /**
@@ -109,14 +116,27 @@ export interface ThemeRegistrationError {
 
 // ─── 3. Storage helpers ───────────────────────────────────────────────────────
 
-function getStoredTheme(): Theme | null {
+export type ThemePreference = "light" | "dark" | "auto";
+
+export function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "auto";
+}
+
+function getStoredTheme(): ThemePreference | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(stored) ? stored : null;
+    const stored = readBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
+    return isThemePreference(stored) ? stored : null;
   } catch {
     return null;
   }
+}
+
+export function resolveThemeFromPreference(pref: ThemePreference): Theme {
+  if (pref === "auto") {
+    return getSystemTheme();
+  }
+  return pref;
 }
 
 /**
@@ -127,8 +147,10 @@ function getStoredTheme(): Theme | null {
 export function getStoredFontPreference(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    const stored = window.localStorage.getItem(FONT_STORAGE_KEY);
-    return isEasyReadFont(stored) ? stored === "true" || stored === true : false;
+    const stored = readBrowserStorage(FONT_STORAGE_KEY, window.localStorage);
+    return isEasyReadFont(stored)
+      ? stored === "true" || stored === true
+      : false;
   } catch {
     return false;
   }
@@ -141,7 +163,10 @@ export function getStoredFontPreference(): boolean {
  * Falls back to `"light"` in non-browser / SSR environments.
  */
 function getSystemTheme(): Theme {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return "light";
   }
   return window.matchMedia(DARK_MEDIA_QUERY).matches ? "dark" : "light";
@@ -154,7 +179,10 @@ function getSystemTheme(): Theme {
 function getStoredCustomTheme(): RegisteredTheme | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
+    const raw = readBrowserStorage(
+      CUSTOM_THEME_STORAGE_KEY,
+      window.localStorage,
+    );
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (
@@ -176,7 +204,10 @@ function getStoredCustomTheme(): RegisteredTheme | null {
  * Returns an empty string if no alphanumeric characters remain after sanitisation.
  */
 function sanitiseId(id: string): string {
-  const cleaned = id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  const cleaned = id
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-");
   // Require at least one alphanumeric character (not just hyphens/underscores).
   return /[a-z0-9]/.test(cleaned) ? cleaned : "";
 }
@@ -191,8 +222,12 @@ const CUSTOM_PROP_PREFIX = "--custom-";
  * no FOUC.
  */
 export function resolveInitialTheme(): Theme {
-  return getStoredTheme() ?? getSystemTheme();
+  const stored = getStoredTheme();
+  return resolveThemeFromPreference(stored ?? "auto");
 }
+
+let transitionTimeout: number | undefined;
+let pendingVisibilityListener: (() => void) | null = null;
 
 /**
  * Applies a built-in theme or the special `"custom"` marker to `<html>`.
@@ -202,7 +237,48 @@ export function resolveInitialTheme(): Theme {
  */
 export function applyTheme(theme: Theme | "custom"): void {
   if (typeof document === "undefined") return;
-  document.documentElement.setAttribute("data-theme", theme);
+
+  const root = document.documentElement;
+  if (root.getAttribute("data-theme") === theme) return;
+
+  const isInitial = !root.hasAttribute("data-theme");
+
+  if (!isInitial) {
+    root.classList.add("theme-transitioning");
+  }
+
+  root.setAttribute("data-theme", theme);
+
+  if (isInitial) return;
+
+  const cleanup = () => {
+    root.classList.remove("theme-transitioning");
+  };
+
+  window.clearTimeout(transitionTimeout);
+
+  if (pendingVisibilityListener) {
+    document.removeEventListener("visibilitychange", pendingVisibilityListener);
+    pendingVisibilityListener = null;
+  }
+
+  if (document.hidden) {
+    pendingVisibilityListener = () => {
+      if (!document.hidden) {
+        if (pendingVisibilityListener) {
+          document.removeEventListener(
+            "visibilitychange",
+            pendingVisibilityListener,
+          );
+          pendingVisibilityListener = null;
+        }
+        transitionTimeout = window.setTimeout(cleanup, 200);
+      }
+    };
+    document.addEventListener("visibilitychange", pendingVisibilityListener);
+  } else {
+    transitionTimeout = window.setTimeout(cleanup, 200);
+  }
 }
 
 /**
@@ -213,7 +289,42 @@ export function applyTheme(theme: Theme | "custom"): void {
  */
 export function applyFontPreference(easyRead: boolean): void {
   if (typeof document === "undefined") return;
-  document.documentElement.setAttribute("data-font", easyRead ? "easy-read" : "default");
+  document.documentElement.setAttribute(
+    "data-font",
+    easyRead ? "easy-read" : "default",
+  );
+}
+
+/**
+ * Returns `true` only when `value` is a safe, normalised 3-/6-digit hex
+ * colour (`#rgb` or `#rrggbb`).
+ *
+ * This is the canonical CSS-value guard used throughout the theme subsystem.
+ * It intentionally rejects:
+ *  - Named colours and CSS functions (`rgb()`, `hsl()`, `var()`)
+ *  - Semicolons, braces, and backslashes (declaration-smuggling characters)
+ *  - `javascript:` / `data:` pseudo-schemes and Unicode escapes
+ *  - Any whitespace or non-ASCII characters
+ *
+ * @param value - Candidate CSS value.
+ */
+export function isSafeHexColor(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  // Reject any suspicious characters before the regex check (defence-in-depth).
+  if (
+    value.includes(";") ||
+    value.includes("{") ||
+    value.includes("}") ||
+    value.includes("(") ||
+    value.includes(")") ||
+    value.includes("\\") ||
+    value.includes("\n") ||
+    value.includes("\r") ||
+    value.includes("\t")
+  ) {
+    return false;
+  }
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value);
 }
 
 /**
@@ -232,7 +343,7 @@ export function applyCustomTokens(
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   for (const [token, value] of Object.entries(tokens)) {
-    if (typeof value === "string" && /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value)) {
+    if (isSafeHexColor(value)) {
       // Write to --custom-<base-name> slot, e.g. --custom-color-accent-primary
       const slotName = token.replace(/^--/, CUSTOM_PROP_PREFIX);
       root.style.setProperty(slotName, value);
@@ -293,6 +404,10 @@ export interface ThemeContextValue {
   setEasyReadFont: (easyReadFont: boolean) => void;
   /** Flips the easy-read font preference. */
   toggleEasyReadFont: () => void;
+  /** The theme preference chosen by the user (light, dark, auto). */
+  themePreference: ThemePreference;
+  /** Sets and persists the theme preference. */
+  setThemePreference: (pref: ThemePreference) => void;
 
   /** The currently registered custom theme, or `null`. */
   customTheme: RegisteredTheme | null;
@@ -358,19 +473,30 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // ── built-in theme ──────────────────────────────────────────────────────────
-  const [theme, setThemeState] = useState<Theme>(resolveInitialTheme);
-  const [easyReadFont, setEasyReadState] = useState<boolean>(getStoredFontPreference);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
+    () => {
+      return getStoredTheme() ?? "auto";
+    },
+  );
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const initialPref = getStoredTheme() ?? "auto";
+    return resolveThemeFromPreference(initialPref);
+  });
+  const [easyReadFont, setEasyReadState] = useState<boolean>(
+    getStoredFontPreference,
+  );
 
   // Whether the user (in this tab or another) has explicitly picked a theme.
   // While `false`, we keep following the OS preference. A ref keeps the latest
   // value available to long-lived event listeners without re-subscribing.
-  const hasExplicitChoiceRef = useRef<boolean>(getStoredTheme() !== null);
+  const hasExplicitChoiceRef = useRef<boolean>(themePreference !== "auto");
+
+  // Keep hasExplicitChoiceRef in sync with themePreference state
+  hasExplicitChoiceRef.current = themePreference !== "auto";
 
   // Mirror built-in theme to DOM (only when not in custom mode).
   useEffect(() => {
-    if (
-      document.documentElement.getAttribute("data-theme") !== "custom"
-    ) {
+    if (document.documentElement.getAttribute("data-theme") !== "custom") {
       applyTheme(theme);
     }
   }, [theme]);
@@ -379,27 +505,42 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyFontPreference(easyReadFont);
   }, [easyReadFont]);
 
-  const setTheme = useCallback((next: Theme) => {
-    hasExplicitChoiceRef.current = true;
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch { /* ignore quota errors */ }
-    setThemeState(next);
+  const setThemePreference = useCallback((pref: ThemePreference) => {
+    setThemePreferenceState(pref);
+    hasExplicitChoiceRef.current = pref !== "auto";
+    if (pref === "auto") {
+      removeBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
+      const systemTheme = getSystemTheme();
+      setThemeState(systemTheme);
+    } else {
+      writeBrowserStorage(THEME_STORAGE_KEY, pref, window.localStorage);
+      setThemeState(pref);
+    }
   }, []);
 
+  const setTheme = useCallback(
+    (next: Theme) => {
+      if (next === "light" || next === "dark") {
+        setThemePreference(next);
+      } else {
+        hasExplicitChoiceRef.current = true;
+        writeBrowserStorage(THEME_STORAGE_KEY, next, window.localStorage);
+        setThemeState(next);
+      }
+    },
+    [setThemePreference],
+  );
+
   const toggleTheme = useCallback(() => {
-    setTheme(theme === "light" ? "dark" : "light");
-  }, [theme, setTheme]);
+    const nextPref = theme === "light" ? "dark" : "light";
+    setThemePreference(nextPref);
+  }, [theme, setThemePreference]);
 
   const setEasyReadFont = useCallback((next: boolean) => {
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-font-transitioning", "true");
     }
-    try {
-      window.localStorage.setItem(FONT_STORAGE_KEY, String(next));
-    } catch {
-      // Ignore persistence failures.
-    }
+    writeBrowserStorage(FONT_STORAGE_KEY, String(next), window.localStorage);
     setEasyReadState(next);
     setTimeout(() => {
       if (typeof document !== "undefined") {
@@ -412,9 +553,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setEasyReadFont(!easyReadFont);
   }, [easyReadFont, setEasyReadFont]);
 
-  // Follow the OS colour-scheme preference, but only while the user has not
-  // made an explicit choice. Effects only run in the browser, so we only need
-  // to guard against environments where matchMedia itself is missing.
+  // Follow the OS colour-scheme preference
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return undefined;
     const mq = window.matchMedia(DARK_MEDIA_QUERY);
@@ -437,23 +576,33 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (event.newValue === null) {
           // Another tab cleared the choice → resume following the OS.
           hasExplicitChoiceRef.current = false;
+          setThemePreferenceState("auto");
           setThemeState(getSystemTheme());
           return;
         }
 
-        if (isTheme(event.newValue)) {
+        if (isThemePreference(event.newValue)) {
+          hasExplicitChoiceRef.current = event.newValue !== "auto";
+          setThemePreferenceState(event.newValue);
+          setThemeState(resolveThemeFromPreference(event.newValue));
+        } else if (isTheme(event.newValue)) {
           hasExplicitChoiceRef.current = true;
           setThemeState(event.newValue);
         }
       } else if (event.key === FONT_STORAGE_KEY) {
         if (event.newValue === null) {
           if (typeof document !== "undefined") {
-            document.documentElement.setAttribute("data-font-transitioning", "true");
+            document.documentElement.setAttribute(
+              "data-font-transitioning",
+              "true",
+            );
           }
           setEasyReadState(false);
           setTimeout(() => {
             if (typeof document !== "undefined") {
-              document.documentElement.removeAttribute("data-font-transitioning");
+              document.documentElement.removeAttribute(
+                "data-font-transitioning",
+              );
             }
           }, 150);
           return;
@@ -462,12 +611,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (event.newValue === "true" || event.newValue === "false") {
           const nextVal = event.newValue === "true";
           if (typeof document !== "undefined") {
-            document.documentElement.setAttribute("data-font-transitioning", "true");
+            document.documentElement.setAttribute(
+              "data-font-transitioning",
+              "true",
+            );
           }
           setEasyReadState(nextVal);
           setTimeout(() => {
             if (typeof document !== "undefined") {
-              document.documentElement.removeAttribute("data-font-transitioning");
+              document.documentElement.removeAttribute(
+                "data-font-transitioning",
+              );
             }
           }, 150);
         }
@@ -500,10 +654,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Rehydrate persisted custom theme on mount.
     return getStoredCustomTheme();
   });
-  const [customThemeState, setCustomThemeState] = useState<CustomThemeState>(() =>
-    getStoredCustomTheme() ? "custom-applied" : "default",
+  const [customThemeState, setCustomThemeState] = useState<CustomThemeState>(
+    () => (getStoredCustomTheme() ? "custom-applied" : "default"),
   );
-  const [registrationErrors, setRegistrationErrors] = useState<TokenValidationError[]>([]);
+  const [registrationErrors, setRegistrationErrors] = useState<
+    TokenValidationError[]
+  >([]);
 
   // Apply persisted custom theme on initial mount.
   useEffect(() => {
@@ -521,7 +677,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
    * Returns [RegisteredTheme, []] on success, or [null, errors[]] on failure.
    */
   const validateAndBuild = useCallback(
-    (definition: CustomThemeDefinition): [RegisteredTheme | null, TokenValidationError[]] => {
+    (
+      definition: CustomThemeDefinition,
+    ): [RegisteredTheme | null, TokenValidationError[]] => {
       const safeId = sanitiseId(definition.id);
       if (!safeId) {
         return [
@@ -532,7 +690,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
               token: "id",
               value: definition.id,
               reason: "disallowed",
-              message: "Theme id must contain at least one alphanumeric character.",
+              message:
+                "Theme id must contain at least one alphanumeric character.",
             },
           ],
         ];
@@ -551,8 +710,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         resolvedBg,
       );
 
-      if (errors.length > 0) {
-        return [null, errors];
+      let validationErrors = [...errors];
+      const validatedTokens = { ...valid };
+
+      for (const [token, value] of Object.entries(definition.tokenOverrides)) {
+        if (value !== undefined && value !== null && value.trim() !== "") {
+          if (!isSafeHexColor(value)) {
+            delete validatedTokens[token as AllowedTokenKey];
+            validationErrors = validationErrors.filter(
+              (e) => e.token !== token,
+            );
+            validationErrors.push({
+              status: "error",
+              token,
+              value,
+              reason: "invalid-hex",
+              message: `Value "${value}" is not a valid hex colour. Use #RRGGBB or #RGB.`,
+            });
+          }
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        return [null, validationErrors];
       }
 
       return [
@@ -560,7 +740,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           id: safeId,
           label: definition.label,
           tokenOverrides: definition.tokenOverrides,
-          validatedTokens: valid,
+          validatedTokens,
         },
         [],
       ];
@@ -597,20 +777,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const applyCustomTheme = useCallback(() => {
     if (customTheme && customThemeState === "custom-pending-preview") {
-      try {
-        window.localStorage.setItem(
-          CUSTOM_THEME_STORAGE_KEY,
-          JSON.stringify(customTheme),
-        );
-      } catch { /* ignore */ }
+      writeBrowserStorage(
+        CUSTOM_THEME_STORAGE_KEY,
+        JSON.stringify(customTheme),
+        window.localStorage,
+      );
       setCustomThemeState("custom-applied");
     }
   }, [customTheme, customThemeState]);
 
   const clearCustomTheme = useCallback(() => {
-    try {
-      window.localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY);
-    } catch { /* ignore */ }
+    removeBrowserStorage(CUSTOM_THEME_STORAGE_KEY, window.localStorage);
     clearCustomTokens();
     setCustomTheme(null);
     setCustomThemeState("default");
@@ -627,6 +804,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       easyReadFont,
       setEasyReadFont,
       toggleEasyReadFont,
+      themePreference,
+      setThemePreference,
       customTheme,
       customThemeState,
       registrationErrors,
@@ -642,6 +821,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       easyReadFont,
       setEasyReadFont,
       toggleEasyReadFont,
+      themePreference,
+      setThemePreference,
       customTheme,
       customThemeState,
       registrationErrors,
@@ -652,13 +833,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 // ─── 7. Hook ─────────────────────────────────────────────────────────────────
 
 /**
- * Accesses the current theme and its mutators.
+ * Accesses the current theme, font mode, and their mutators.
  *
  * @throws If called outside of a {@link ThemeProvider}.
  *
@@ -673,4 +856,28 @@ export function useTheme(): ThemeContextValue {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
   return ctx;
+}
+
+/** Reads theme state for leaf components that are also supported standalone. */
+export function useOptionalTheme(): ThemeContextValue {
+  const context = useContext(ThemeContext);
+  if (context !== null) return context;
+
+  return {
+    theme: "light",
+    setTheme: () => undefined,
+    toggleTheme: () => undefined,
+    easyReadFont: false,
+    setEasyReadFont: () => undefined,
+    toggleEasyReadFont: () => undefined,
+    themePreference: "light",
+    setThemePreference: () => undefined,
+    customTheme: null,
+    customThemeState: "default",
+    registrationErrors: [],
+    registerTheme: () => false,
+    applyCustomTheme: () => undefined,
+    clearCustomTheme: () => undefined,
+    previewCustomTheme: () => false,
+  };
 }

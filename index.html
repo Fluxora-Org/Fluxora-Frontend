@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Fluxora — Continuous Capital</title>
     <meta
       name="description"
@@ -25,14 +25,60 @@
         object-src  'none'          — block plugins (Flash, etc.)
         frame-ancestors 'none'      — prevent clickjacking (equivalent to X-Frame-Options: DENY)
         base-uri    'self'          — prevent base-tag hijacking
+
+      EMBED ROUTE EXCEPTION (/embed/streams/:streamId):
+        The /embed/streams/* route is designed to be loaded inside a host-site
+        iframe. This meta tag's frame-ancestors 'none' applies to ALL routes
+        served by this HTML shell and cannot be scoped per-route via a <meta>
+        tag — browsers only honour frame-ancestors from HTTP response headers.
+
+        For production deployment, the reverse-proxy / CDN must emit a
+        SEPARATE, ROUTE-SCOPED Content-Security-Policy response header that
+        overrides this value only for /embed/streams/* requests, e.g.:
+
+          # Nginx example
+          location /embed/streams/ {
+            add_header Content-Security-Policy
+              "frame-ancestors https://trusted-host.example https://another.example";
+          }
+          location / {
+            add_header Content-Security-Policy "frame-ancestors 'none'";
+          }
+
+        The allow-list MUST:
+          • Name specific HTTPS origins — never use frame-ancestors *
+          • Cover only /embed/* paths, leaving all other routes at 'none'
+          • Be updated in the server config whenever a new embedding host is approved
+
+        See docs/EMBEDDABLE_STREAM_WIDGET_SPEC.md §Content Security Policy for
+        full rationale, Nginx/Caddy/Vercel config snippets, and the audit log
+        requirements for adding new trusted origins.
+
+        Note: Server-side CSP overrides are mandatory because client-side meta tags
+        do not support frame-ancestors restrictions.
+    -->
+    <!--
+      The 'sha256-...' hash in script-src covers only the inline theme-bootstrap
+      script immediately below. Recompute the hash whenever the script body
+      changes:
+        node -e "const c=require('crypto'),s=require('fs').readFileSync('index.html','utf8').match(/<script id=\"theme-bootstrap\">([\s\S]*?)<\/script>/)[1];console.log('sha256-'+c.createHash('sha256').update(s).digest('base64'))"
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
+      content="default-src 'self'; script-src 'self' 'sha256-rYHtv2kv2J9mGq+H5er2MOudnal5QmHotnNLc03Df6s='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
     />
 
-    <!-- Open Graph link previews -->
+    <!--
+      Site-Wide Default Open Graph & Twitter link previews
+      PER-ROUTE OVERRIDE PATTERN:
+      For single stream detail routes (/app/streams/:streamId), src/components/MetaTags.tsx
+      dynamically overrides og:title, og:description, og:url, og:image, and og:image:alt via
+      react-helmet-async to reference per-stream auto-generated 1200x630 cards
+      (e.g., https://fluxora.app/og-image/:streamId.png?v=:updatedAtTimestamp).
+      See docs/STREAM_OG_IMAGE_TEMPLATE_SPEC.md for full specifications.
+    -->
     <meta property="og:type" content="website" />
+    
     <meta property="og:site_name" content="Fluxora" />
     <meta property="og:title" content="Fluxora - Continuous Capital" />
     <meta
@@ -57,9 +103,60 @@
       name="twitter:image"
       content="https://fluxora.app/freighter-wallet.jpeg"
     />
+    <meta name="twitter:image:alt" content="Fluxora Stellar wallet preview" />
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Theme Bootstrap Script
+      ──────────────────────
+      Runs synchronously before any ES module is parsed so the correct
+      data-theme / data-font attributes land on <html> on the very first paint,
+      preventing a flash of the wrong theme (FOUC).
+
+      Resolution order:
+        1. Persisted custom theme  → data-theme="custom" + --custom-* tokens
+        2. Persisted built-in pref → data-theme="light|dark|cyberpunk"
+        3. OS prefers-color-scheme → data-theme="light|dark"
+
+      CSS injection prevention:
+        • Only 3-/6-digit lowercase hex colours (#rgb / #rrggbb) are accepted
+          for custom token values. Any other value is silently dropped before
+          it can reach the DOM.
+        • The built-in theme is validated against a strict allowlist
+          (light, dark, cyberpunk). Any other localStorage value is ignored.
+
+      CSP compliance:
+        The script hash in script-src covers this exact script body.
+        Recompute when the script changes (see comment above the CSP meta tag).
+    -->
+    <script id="theme-bootstrap">(function(){
+  var VALID=['light','dark','cyberpunk'];
+  var THEME_KEY='theme';
+  var CUSTOM_KEY='theme:custom';
+  var FONT_KEY='easy-read-font';
+  function safeHex(v){return typeof v==='string'&&/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(v);}
+  var root=document.documentElement;
+  try{
+    var raw=localStorage.getItem(CUSTOM_KEY);
+    if(raw){
+      var p=JSON.parse(raw);
+      if(p&&typeof p==='object'&&p.validatedTokens&&typeof p.validatedTokens==='object'){
+        var tokens=p.validatedTokens;
+        for(var k in tokens){if(Object.prototype.hasOwnProperty.call(tokens,k)&&safeHex(tokens[k])){root.style.setProperty(k.replace(/^--/,'--custom-'),tokens[k]);}}
+        root.setAttribute('data-theme','custom');
+        root.setAttribute('data-font',localStorage.getItem(FONT_KEY)==='true'?'easy-read':'default');
+        return;
+      }
+    }
+  }catch(e){}
+  try{
+    var stored=localStorage.getItem(THEME_KEY);
+    var theme=(stored&&VALID.indexOf(stored)!==-1)?stored:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    root.setAttribute('data-theme',theme);
+    root.setAttribute('data-font',localStorage.getItem(FONT_KEY)==='true'?'easy-read':'default');
+  }catch(e){root.setAttribute('data-theme','light');root.setAttribute('data-font','default');}
+})();</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

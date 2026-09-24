@@ -48,10 +48,10 @@ describe("WalletIcon", () => {
       expect(img.tagName).toBe("IMG");
     });
 
-    it("sets alt text to the wallet name", () => {
+    it("sets alt text to the wallet name with logo suffix", () => {
       render(<WalletIcon name="Freighter" iconSrc="/assets/freighter.svg" />);
       const img = screen.getByRole("img");
-      expect(img).toHaveAttribute("alt", "Freighter");
+      expect(img).toHaveAttribute("alt", "Freighter wallet logo");
       expect(img.tagName).toBe("IMG");
     });
 

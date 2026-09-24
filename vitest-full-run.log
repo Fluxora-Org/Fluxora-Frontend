@@ -1,0 +1,3536 @@
+﻿
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90mC:/Users/ABUBAKAR/Fluxora-Frontend[39m
+
+ [32mÔ£ô[39m src/pages/__tests__/EmbedStreamWidget.test.tsx [2m([22m[2m66 tests[22m[2m)[22m[33m 5032[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m shows skeleton loading state [33m 356[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m retries the fetch when the retry button is clicked [33m 1195[2mms[22m[39m
+node.exe : Error: Uncaught [Error: 
+useVoiceContext must be used within a 
+VoiceProvider]
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpeci 
+   fied: (Error: Uncaught... VoicePro  
+  vider]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCo 
+   mmandError
+ 
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useVoiceContext 
+must be used within a VoiceProvider
+    at useVoiceContext (C:/Users/ABUBAK
+AR/Fluxora-Frontend/src/components/voic
+e/VoiceContext.tsx:360:11)
+    at Bare (C:/Users/ABUBAKAR/Fluxora-
+Frontend/src/components/voice/__tests__
+/VoiceContext.test.tsx:796:7)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+Error: Uncaught [Error: 
+useVoiceContext must be used within a 
+VoiceProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useVoiceContext 
+must be used within a VoiceProvider
+    at useVoiceContext (C:/Users/ABUBAK
+AR/Fluxora-Frontend/src/components/voic
+e/VoiceContext.tsx:360:11)
+    at Bare (C:/Users/ABUBAKAR/Fluxora-
+Frontend/src/components/voice/__tests__
+/VoiceContext.test.tsx:796:7)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+ [32mÔ£ô[39m src/components/voice/__tests__/VoiceContext.test.tsx [2m([22m[2m63 tests[22m[2m)[22m[33m 1556[2mms[22m[39m
+ [32mÔ£ô[39m src/components/csv-upload/__tests__/csvParser.test.ts [2m([22m[2m82 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32mÔ£ô[39m src/components/voice/__tests__/VoiceCommandPanel.test.tsx [2m([22m[2m51 tests[22m[2m)[22m[33m 2833[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the panel aside when panelOpen is true [33m 335[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/ActivityHeatmap.test.tsx [2m([22m[2m36 tests[22m[2m)[22m[33m 6136[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders 84 cells for a 12-week trailing window [33m 344[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m cell aria-label contains the correct date and count [33m 351[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m "View as table" toggle hides the grid and shows the table [33m 575[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m table contains only rows for days with activity [33m 548[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders correct empty message in table view when there is no activity [33m 338[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m applies safety shift Y when tooltip overflows bottom edge [33m 312[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m table mode does NOT render the role=img wrapper or the sr-only mirror [33m 327[2mms[22m[39m
+Error: Uncaught [Error: useTheme must 
+be used within a ThemeProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useTheme must 
+be used within a ThemeProvider
+    at useTheme (C:/Users/ABUBAKAR/Flux
+ora-Frontend/src/theme/ThemeProvider.ts
+x:770:11)
+    at C:/Users/ABUBAKAR/Fluxora-Fronte
+nd/src/theme/__tests__/ThemeProvider.te
+st.tsx:495:35
+    at TestComponent (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\@t
+esting-library+react@16.3_8105afb30b3ae
+d617b9ca863f1e5e96d\node_modules\@testi
+ng-library\react\dist\pure.js:330:27)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+Error: Uncaught [Error: useTheme must 
+be used within a ThemeProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useTheme must 
+be used within a ThemeProvider
+    at useTheme (C:/Users/ABUBAKAR/Flux
+ora-Frontend/src/theme/ThemeProvider.ts
+x:770:11)
+    at C:/Users/ABUBAKAR/Fluxora-Fronte
+nd/src/theme/__tests__/ThemeProvider.te
+st.tsx:495:35
+    at TestComponent (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\@t
+esting-library+react@16.3_8105afb30b3ae
+d617b9ca863f1e5e96d\node_modules\@testi
+ng-library\react\dist\pure.js:330:27)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+ [32mÔ£ô[39m src/theme/__tests__/ThemeProvider.test.tsx [2m([22m[2m52 tests[22m[2m)[22m[33m 3934[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m toggleTheme still works after custom-theme code is added [33m 673[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m transitions to custom-pending-preview after registerTheme (valid) [33m 308[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m removes custom theme from localStorage after clearCustomTheme [33m 578[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/formatters.test.ts [2m([22m[2m68 tests[22m[2m)[22m[32m 271[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/stellar/__tests__/tx.test.ts [2m([22m[2m34 tests[22m[2m)[22m[33m 342[2mms[22m[39m
+ [31mÔØ»[39m src/components/__tests__/ConnectWalletModal.test.tsx [2m([22m[2m32 tests[22m[2m | [22m[31m3 failed[39m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 22369[2mms[22m[39m
+     [32mÔ£ô[39m should not render when isOpen is false[32m 130[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders default view when isOpen is true and no error state is active [33m 362[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onClose when close button is clicked [33m 510[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m restores focus to the trigger after the modal closes [33m 393[2mms[22m[39m
+     [32mÔ£ô[39m calls onClose when backdrop is clicked[32m 194[2mms[22m[39m
+     [32mÔ£ô[39m renders 'not_installed' error state with correct copy, links, and actions[32m 205[2mms[22m[39m
+     [32mÔ£ô[39m renders 'rejected' error state with correct copy and calls retry[32m 274[2mms[22m[39m
+     [32mÔ£ô[39m renders 'network_mismatch' error state with instructions[32m 66[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m allows switching states via the Design QA toolbar [33m 1373[2mms[22m[39m
+       [32mÔ£ô[39m shows timeout error when getNetwork never resolves[32m 111[2mms[22m[39m
+       [32mÔ£ô[39m shows timeout error state with retry button[32m 153[2mms[22m[39m
+       [32mÔ£ô[39m recovers with retry after timeout when getNetwork succeeds on next attempt[32m 209[2mms[22m[39m
+       [32mÔ£ô[39m matches network case-insensitively[32m 140[2mms[22m[39m
+       [32mÔ£ô[39m detects network mismatch correctly[32m 218[2mms[22m[39m
+       [32mÔ£ô[39m renders network_timeout from controlled errorState prop[32m 35[2mms[22m[39m
+         [33m[2mÔ£ô[22m[39m traps focus within the modal and wraps correctly [33m 563[2mms[22m[39m
+         [32mÔ£ô[39m has correct ARIA attributes[32m 50[2mms[22m[39m
+     [2m[90mÔåô[39m[22m renders Albedo and WalletConnect as disabled when no handlers provided
+     [32mÔ£ô[39m shows 'coming soon' label text for disabled options[32m 23[2mms[22m[39m
+     [2m[90mÔåô[39m[22m enables Albedo when a handler is provided
+       [32mÔ£ô[39m renders Hardware Wallet list entry[32m 40[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m redirects to mobile-unsupported error state on mobile viewport / user agent [33m 312[2mms[22m[39m
+       [32mÔ£ô[39m starts device-searching on desktop viewport[32m 136[2mms[22m[39m
+       [32mÔ£ô[39m allows transitioning to device-found-selecting and choosing a device[32m 177[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m validates custom derivation path input and updates UI validity [33m 1161[2mms[22m[39m
+[31m       [31m├ù[31m focuses custom derivation path input programmatically when selected[39m[33m 5049[2mms[22m[39m
+       [32mÔ£ô[39m renders hardware wallet-specific error states from props[32m 78[2mms[22m[39m
+[31m       [31m├ù[31m allows QA preview toolbar to select hardware states[39m[33m 5031[2mms[22m[39m
+[31m     [31m├ù[31m treats widths at or above BREAKPOINT_MD as desktop and below it as mobile, on mount[39m[33m 5036[2mms[22m[39m
+     [32mÔ£ô[39m updates mobile state only after the debounce delay elapses on resize[32m 150[2mms[22m[39m
+     [32mÔ£ô[39m collapses rapid resize events into a single debounced update[32m 90[2mms[22m[39m
+     [32mÔ£ô[39m clears the pending debounce timer on unmount[32m 87[2mms[22m[39m
+ [32mÔ£ô[39m src/components/embed/__tests__/EmbedWidgetLayouts.test.tsx [2m([22m[2m37 tests[22m[2m)[22m[33m 1966[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m renders card layout with all elements [33m 637[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.edgeCases.test.tsx [2m([22m[2m28 tests[22m[2m)[22m[33m 8944[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blocks advancing to step 2 when recipient is empty [33m 783[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blocks advancing to step 2 when deposit is empty [33m 363[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blocks advancing to step 2 when deposit text cannot be parsed as positive [33m 307[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m disables the create-stream button and shows spinner while submitting [33m 492[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m disables the close button during active submission [33m 432[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows the retry button label after transaction status fails [33m 650[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows a transaction status indicator during active submission [33m 360[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows confirming status text after txHash received [33m 519[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows error message and retry button on API failure [33m 552[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m retries submission on "Try again" click and clears previous error [33m 506[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m does not allow retry while the retry request is still in flight [33m 474[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps the modal open after a submission failure [33m 304[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows generic error for non-Error rejection [33m 338[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Enter on the submit button triggers handleNext via userEvent click [33m 670[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Enter key on a focused Next button is handled by the accessibility hook [33m 332[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Escape does not close the modal when close button is disabled (submitting) [33m 404[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/useEmbedAccessibility.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 307[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/Streams.test.tsx [2m([22m[2m28 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 9155[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps focus on the toggle button while collapse animation runs [33m 1487[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m removes the disclosure immediately when reduced motion is preferred [33m 588[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps the current small stream list non-virtualized and accessible [32m 300[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps the stream list in sync after filtering and sorting [33m 686[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m announces filtered stream counts after search changes without announcing on mount [33m 526[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m copies the card recipient address and shows success feedback without selecting the card [33m 429[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows accessible failure feedback when card recipient copy is unavailable [33m 504[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m does not show the banner when there is no prior session [33m 318[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m offers to restore a prior session and applies it on Restore [33m 560[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clears the stored session on Start fresh [33m 468[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m hides the banner without applying anything when ignored via direct interaction [33m 592[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows the always-on persistence indicator and autosaves filter changes [33m 677[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a different set of stream cards on page 2 than page 1 [33m 640[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m resets to page 1 when filtering reduces results below the current page [33m 596[2mms[22m[39m
+ [31mÔØ»[39m src/components/__tests__/StreamCompare.test.tsx [2m([22m[2m25 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 8226[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a checkbox for every data row [33m 692[2mms[22m[39m
+     [32mÔ£ô[39m does not show the compare action bar initially[32m 74[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows bar and disabled Compare button after one stream is checked [33m 440[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m enables Compare button when two streams are checked [33m 509[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onCompare with the two selected IDs when Compare is clicked [33m 539[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m unchecking a stream updates the count and re-disables Compare [33m 915[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m drops the oldest selection when a third stream is checked [33m 554[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clears all selections when Clear is clicked [33m 656[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m preserves sort direction after checking compare rows [33m 448[2mms[22m[39m
+     [32mÔ£ô[39m checkbox can be toggled with the Space key when focused[32m 118[2mms[22m[39m
+     [32mÔ£ô[39m grid has aria-multiselectable[32m 63[2mms[22m[39m
+     [32mÔ£ô[39m renders a compare region with Pane A and Pane B labels[32m 93[2mms[22m[39m
+     [32mÔ£ô[39m loads and displays stream names in both panes[32m 185[2mms[22m[39m
+     [32mÔ£ô[39m shows health badges once data resolves[32m 124[2mms[22m[39m
+     [32mÔ£ô[39m shows a diff count badge when fields differ between panes[32m 143[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m swap button reverses pane stream assignments [33m 388[2mms[22m[39m
+     [32mÔ£ô[39m exit button calls onExit[32m 152[2mms[22m[39m
+     [32mÔ£ô[39m remove button on Pane A calls onExit[32m 247[2mms[22m[39m
+     [32mÔ£ô[39m shows loading skeletons while fetch is pending[32m 23[2mms[22m[39m
+     [32mÔ£ô[39m Pane A section is aria-labelled by its heading[32m 161[2mms[22m[39m
+     [32mÔ£ô[39m Pane B section is aria-labelled by its heading[32m 130[2mms[22m[39m
+     [32mÔ£ô[39m both panes render a Timeline section heading after loading[32m 159[2mms[22m[39m
+     [32mÔ£ô[39m both panes render a StreamTimeline progressbar after loading[32m 175[2mms[22m[39m
+     [32mÔ£ô[39m shows not-found empty state for an unknown stream ID[32m 112[2mms[22m[39m
+[31m     [31m├ù[31m formats large safe integer amounts via formatAssetAmount instead of toLocaleString[39m[33m 1114[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/formatters.largeamounts.test.ts [2m([22m[2m56 tests[22m[2m)[22m[32m 257[2mms[22m[39m
+ [31mÔØ»[39m src/pages/Recipient.test.tsx [2m([22m[2m19 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3955[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses disconnected state from useWallet for the empty state [33m 501[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m enables the withdraw surface when useWallet reports a connected wallet [33m 355[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m withdraws using the selected live recipient stream id [33m 349[2mms[22m[39m
+[31m     [31m├ù[31m updates the document title when the tab is blurred and clears it on focus[39m[32m 179[2mms[22m[39m
+     [32mÔ£ô[39m selects only active withdrawable streams with valid contract ids[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m validates withdraw amounts before contract calls[32m 2[2mms[22m[39m
+       [32mÔ£ô[39m renders the security gate settings card when connected[32m 190[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m runs biometric and PIN enrollment successfully [33m 1362[2mms[22m[39m
+       [32mÔ£ô[39m falls back to PIN setup when biometrics are unsupported[32m 128[2mms[22m[39m
+       [32mÔ£ô[39m requires confirmation when withdrawing if local gate is active[32m 184[2mms[22m[39m
+       [32mÔ£ô[39m allows bypassing the local gate via Skip to Wallet button[32m 199[2mms[22m[39m
+     [32mÔ£ô[39m renders the monthly summary section when streams exist[32m 110[2mms[22m[39m
+     [32mÔ£ô[39m does not render the monthly summary when there are no live streams[32m 49[2mms[22m[39m
+     [32mÔ£ô[39m disables the print button when there is no activity for the month[32m 110[2mms[22m[39m
+     [32mÔ£ô[39m renders the current month label by default[32m 92[2mms[22m[39m
+     [32mÔ£ô[39m renders previous and next month navigation buttons[32m 127[2mms[22m[39m
+     [32mÔ£ô[39m correctly aggregates totals for a month with activity[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns no activity for a month with no streams[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m reads withdrawals from timeline events[32m 1[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/timePresentation.test.ts [2m([22m[2m60 tests[22m[2m)[22m[33m 379[2mms[22m[39m
+ [31mÔØ»[39m src/components/csv-upload/__tests__/PreviewValidateStep.test.tsx [2m([22m[2m30 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 9796[2mms[22m[39m
+       [32mÔ£ô[39m shows the total row count, pluralised[32m 273[2mms[22m[39m
+       [32mÔ£ô[39m shows singular "stream" for exactly one row[32m 39[2mms[22m[39m
+       [32mÔ£ô[39m shows an error badge when there are needs-fix rows, hidden otherwise[32m 35[2mms[22m[39m
+       [32mÔ£ô[39m omits the error badge when there are no needs-fix rows[32m 49[2mms[22m[39m
+       [32mÔ£ô[39m shows a duplicate badge with correct pluralisation[32m 51[2mms[22m[39m
+       [32mÔ£ô[39m shows a skipped badge when rows are skipped[32m 44[2mms[22m[39m
+       [32mÔ£ô[39m renders a Valid badge for a valid row[32m 21[2mms[22m[39m
+       [32mÔ£ô[39m renders a Needs fix badge for an invalid row[32m 53[2mms[22m[39m
+       [32mÔ£ô[39m renders a Duplicate badge and hint text for duplicate-recipient rows[32m 68[2mms[22m[39m
+       [32mÔ£ô[39m renders a Skipped badge for a skipped row[32m 18[2mms[22m[39m
+       [32mÔ£ô[39m shows field-level error text inline for a needs-fix row[32m 59[2mms[22m[39m
+       [32mÔ£ô[39m displays the recipient address via its title attribute[32m 16[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m shows an Edit button (not Skip) for a valid row [33m 332[2mms[22m[39m
+       [32mÔ£ô[39m shows Fix and Skip buttons for a needs-fix row[32m 137[2mms[22m[39m
+       [32mÔ£ô[39m shows an Edit button (not Skip) for a duplicate-recipient row[32m 71[2mms[22m[39m
+       [32mÔ£ô[39m shows no Fix/Edit/Skip buttons for a skipped row[32m 52[2mms[22m[39m
+       [32mÔ£ô[39m opens the edit panel with prefilled values and focuses the recipient input[32m 272[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m saves a valid edit, updates the row, closes the panel, announces success, and returns focus [33m 3408[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m shows inline validation errors and does not call onRowsChange when the edited values are invalid [33m 573[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m re-runs duplicate detection after a save, marking both matching rows as duplicate-recipient [33m 3152[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m closes the edit panel without saving and returns focus to the trigger button [33m 407[2mms[22m[39m
+       [32mÔ£ô[39m skips an individual needs-fix row without touching other rows[32m 121[2mms[22m[39m
+       [32mÔ£ô[39m shows the "Skip invalid rows" button only when there are needs-fix rows[32m 54[2mms[22m[39m
+       [32mÔ£ô[39m skips all needs-fix rows and announces the count when "Skip invalid rows" is clicked[32m 93[2mms[22m[39m
+       [32mÔ£ô[39m disables the review button when there are no valid or duplicate-recipient rows[32m 34[2mms[22m[39m
+       [32mÔ£ô[39m enables review when there are valid or duplicate-recipient rows[32m 54[2mms[22m[39m
+       [32mÔ£ô[39m uses "Review batch" wording for the action button[32m 32[2mms[22m[39m
+       [32mÔ£ô[39m calls onReview when clicked[32m 75[2mms[22m[39m
+[31m       [31m├ù[31m calls onReplaceFile when the user confirms the replace dialog[39m[32m 116[2mms[22m[39m
+       [32mÔ£ô[39m does not call onReplaceFile when the user cancels the dialog[32m 71[2mms[22m[39m
+ [32mÔ£ô[39m src/theme/__tests__/ThemeEditorPanel.test.tsx [2m([22m[2m33 tests[22m[2m)[22m[33m 12336[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a dialog landmark [33m 884[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m dialog is labelled by its heading [33m 401[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m has a form with an accessible label [33m 442[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m all colour inputs have associated labels [33m 499[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m first focusable element receives focus on Tab from body [33m 537[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Tab cycles through all text inputs [33m 2498[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Preview button is reachable by Tab and activatable by Enter [33m 520[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Cancel button is reachable and calls onClose [33m 653[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Escape key triggers cancel / onClose [33m 505[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Tab from the last focusable element wraps to the first [33m 386[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Shift+Tab from the first focusable element wraps to the last [33m 517[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Tab cannot escape the dialog to outside elements [33m 398[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Apply button appears only after Preview is clicked [33m 531[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clicking Apply & Save sets DOM data-theme to custom [33m 595[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Reset to Default removes custom theme [33m 454[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows a role=alert error summary when registration fails [33m 988[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m error message mentions WCAG requirement [33m 556[2mms[22m[39m
+Error: Uncaught [Error: useToast must 
+be used inside <ToastProvider>]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useToast must 
+be used inside <ToastProvider>
+    at Module.useToast (C:/Users/ABUBAK
+AR/Fluxora-Frontend/src/components/toas
+t/ToastProvider.tsx:217:11)
+    at Bad (C:/Users/ABUBAKAR/Fluxora-F
+rontend/src/components/toast/__tests__/
+ToastProvider.test.tsx:280:7)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+Error: Uncaught [Error: useToast must 
+be used inside <ToastProvider>]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useToast must 
+be used inside <ToastProvider>
+    at Module.useToast (C:/Users/ABUBAK
+AR/Fluxora-Frontend/src/components/toas
+t/ToastProvider.tsx:217:11)
+    at Bad (C:/Users/ABUBAKAR/Fluxora-F
+rontend/src/components/toast/__tests__/
+ToastProvider.test.tsx:280:7)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+ [32mÔ£ô[39m src/components/toast/__tests__/ToastProvider.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 1957[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a sound-alert toggle in the muted-by-default state [33m 422[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/TreasuryFlowSankey.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 2268[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a skeleton with 4 placeholder rows while loading [33m 465[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m sorts the table by recipient and amount on header click, toggling direction [33m 451[2mms[22m[39m
+Error: Not implemented: navigation 
+(except hash changes)
+    at module.exports (C:\Users\ABUBAKA
+R\Fluxora-Frontend\node_modules\.pnpm\j
+sdom@26.1.0\node_modules\jsdom\lib\jsdo
+m\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\js
+dom@26.1.0\node_modules\jsdom\lib\jsdom
+\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Users\ABUBA
+KAR\Fluxora-Frontend\node_modules\.pnpm
+\jsdom@26.1.0\node_modules\jsdom\lib\js
+dom\living\window\navigation.js:55:3)
+    at Timeout._onTimeout (C:\Users\ABU
+BAKAR\Fluxora-Frontend\node_modules\.pn
+pm\jsdom@26.1.0\node_modules\jsdom\lib\
+jsdom\living\nodes\HTMLHyperlinkElement
+Utils-impl.js:80:7)
+    at listOnTimeout 
+(node:internal/timers:605:17)
+    at processTimers 
+(node:internal/timers:541:7) undefined
+ [32mÔ£ô[39m src/components/__tests__/Sidebar.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 1478[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m triggers onMobileClose when logo, close button, backdrop, or nav links are clicked [33m 487[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/api/__tests__/streamsService.test.ts [2m([22m[2m31 tests[22m[2m)[22m[33m 333[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/AppNavbar.keyboard.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 8520[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m follows DOM order: logo ÔåÆ links ÔåÆ time ÔåÆ palette ÔåÆ font ÔåÆ theme ÔåÆ wallet [33m 2939[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m starts at the sidebar toggle and ends at the wallet triggers [33m 1989[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m Arrow, Home and End keys do not move focus between nav links [33m 636[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens the tooltip on focus, closes on Escape, and keeps focus [33m 376[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/TreasuryOnboarding.test.tsx [2m([22m[2m21 tests[22m[2m)[22m[33m 9803[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the Welcome step content on step 1 [33m 729[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the How-it-works step content on step 2 [33m 649[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the disconnected Get-started step content on step 3 [33m 648[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows testnet reassurance only when the expected network is TESTNET [33m 423[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m warns that real funds are used when the expected network is PUBLIC [33m 307[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the connected Get-started step content with truncated address [33m 304[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates forward through all steps with Next [33m 461[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates backward with Back [33m 1088[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m persists dismissal and calls onDismiss [33m 502[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m is available on every step [33m 776[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onCreateStream (not onConnectWallet) when wallet is connected [33m 516[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onConnectWallet (not onCreateStream) when wallet is disconnected [33m 568[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m does not persist dismissal before reaching the final step [33m 420[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m only enables completed steps on step 2 [33m 498[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m marks the current step with aria-current='step' [33m 323[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates back to a completed step when its dot is clicked [33m 542[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m moves focus to the new heading when navigating forward [33m 340[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m moves focus to the new heading when navigating backward [33m 416[2mms[22m[39m
+ [32mÔ£ô[39m src/theme/__tests__/contrastUtils.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 153[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.dates.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 5475[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows error when cliff date is after stream end and blocks Next [33m 2148[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m accepts cliff date equal to stream end date (cliff == end) [33m 390[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m accepts cliff date within stream duration [33m 343[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m re-validates when duration changes to make existing cliff invalid [33m 624[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows inline error tied to the cliff input field (not a global banner) [33m 351[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses datetime-local for custom start and cliff inputs [33m 383[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects a custom start datetime in the past [33m 513[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects a cliff datetime before the custom start datetime [33m 414[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/RecentStreams.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 1839[2mms[22m[39m
+ [32mÔ£ô[39m src/data/__tests__/streamRecords.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/watcher.test.tsx [2m([22m[2m14 tests[22m[2m | [22m[33m5 skipped[39m[2m)[22m[33m 338[2mms[22m[39m
+ [31mÔØ»[39m src/components/__tests__/StreamComparePane.test.tsx [2m([22m[2m26 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 40012010[2mms[22m[39m
+     [32mÔ£ô[39m formats monthlyRate with asset suffix[32m 80[2mms[22m[39m
+     [32mÔ£ô[39m formats depositAmount with asset suffix[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m formats streamedAmount with asset suffix[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m formats withdrawableAmount with asset suffix[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m formats remainingAmount with asset suffix[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m formats progress as percentage with one decimal[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m returns raw string for status[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns raw string for startDate[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns raw string for endDate[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns raw string for health[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m returns formatted cliffDate when present[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns em-dash for cliffDate when undefined[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns 0 for identical records[32m 10[2mms[22m[39m
+     [32mÔ£ô[39m returns 1 when a single field differs[32m 4[2mms[22m[39m
+     [32mÔ£ô[39m returns correct count when multiple fields differ[32m 4[2mms[22m[39m
+     [32mÔ£ô[39m returns COMPARE_FIELDS.length when every field differs[32m 4[2mms[22m[39m
+     [32mÔ£ô[39m starts in loading state (stream undefined, no error)[32m 79[2mms[22m[39m
+     [32mÔ£ô[39m transitions to loaded state on successful fetch[32m 77[2mms[22m[39m
+     [32mÔ£ô[39m transitions to error state on API failure[32m 74[2mms[22m[39m
+     [32mÔ£ô[39m renders null stream when getStreamById returns null[32m 91[2mms[22m[39m
+     [32mÔ£ô[39m updates streamId on rerender and refetches[32m 161[2mms[22m[39m
+     [32mÔ£ô[39m ignores stale response after mid-fetch streamId swap (cancellation)[32m 79[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders both panes and the toolbar with diff badge [33m 384[2mms[22m[39m
+[31m     [31m├ù[31m calls onExit when Remove (Ô£ò) button is clicked on left pane[39m[33m 40007347[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onExit when Remove (Ô£ò) button is clicked on right pane [33m 1592[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m swaps pane IDs when the Swap button is clicked [33m 1829[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/EmptyState.test.tsx [2m([22m[2m38 tests[22m[2m)[22m[33m 2049[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m all SVGs in the treasury variant are aria-hidden [33m 354[2mms[22m[39m
+ [31mÔØ»[39m src/components/voice/__tests__/VoiceMicButton.test.tsx [2m([22m[2m36 tests[22m[2m | [22m[31m8 failed[39m[2m)[22m[33m 1800[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m state="idle" renders correct aria-label [33m 567[2mms[22m[39m
+     [32mÔ£ô[39m state="listening" renders correct aria-label[32m 24[2mms[22m[39m
+     [32mÔ£ô[39m state="processing" renders correct aria-label[32m 86[2mms[22m[39m
+     [32mÔ£ô[39m state="command-recognized" renders correct aria-label[32m 19[2mms[22m[39m
+     [32mÔ£ô[39m state="command-unrecognized" renders correct aria-label[32m 93[2mms[22m[39m
+     [32mÔ£ô[39m state="confirming-destructive" renders correct aria-label[32m 10[2mms[22m[39m
+     [32mÔ£ô[39m state="permission-denied" renders correct aria-label[32m 16[2mms[22m[39m
+     [32mÔ£ô[39m state="unsupported-browser" renders correct aria-label[32m 11[2mms[22m[39m
+     [32mÔ£ô[39m toggles listening on click[32m 34[2mms[22m[39m
+     [32mÔ£ô[39m is keyboard triggerable via Enter key[32m 29[2mms[22m[39m
+     [32mÔ£ô[39m is keyboard triggerable via Space key (native button behavior)[32m 19[2mms[22m[39m
+     [32mÔ£ô[39m sets aria-pressed=true when listening[32m 15[2mms[22m[39m
+     [32mÔ£ô[39m sets aria-pressed=false when idle[32m 20[2mms[22m[39m
+     [32mÔ£ô[39m is disabled when unsupported[32m 10[2mms[22m[39m
+     [32mÔ£ô[39m renders cyan background when listening (non-text contrast indicator)[32m 17[2mms[22m[39m
+     [32mÔ£ô[39m renders danger border when permission denied[32m 18[2mms[22m[39m
+     [32mÔ£ô[39m renders reduced opacity when unsupported[32m 21[2mms[22m[39m
+[31m     [31m├ù[31m state="idle" renders correct aria-label[39m[32m 128[2mms[22m[39m
+[31m     [31m├ù[31m state="listening" renders correct aria-label[39m[32m 28[2mms[22m[39m
+[31m     [31m├ù[31m state="processing" renders correct aria-label[39m[32m 96[2mms[22m[39m
+[31m     [31m├ù[31m state="command-recognized" renders correct aria-label[39m[32m 37[2mms[22m[39m
+[31m     [31m├ù[31m state="command-unrecognized" renders correct aria-label[39m[32m 24[2mms[22m[39m
+[31m     [31m├ù[31m state="confirming-destructive" renders correct aria-label[39m[32m 15[2mms[22m[39m
+[31m     [31m├ù[31m state="permission-denied" renders correct aria-label[39m[32m 22[2mms[22m[39m
+[31m     [31m├ù[31m state="unsupported-browser" renders correct aria-label[39m[32m 17[2mms[22m[39m
+     [32mÔ£ô[39m toggles listening on click[32m 29[2mms[22m[39m
+     [32mÔ£ô[39m shows 'Voice Active' label when listening[32m 21[2mms[22m[39m
+     [32mÔ£ô[39m shows 'Voice Commands' label when idle[32m 6[2mms[22m[39m
+     [32mÔ£ô[39m renders panel toggle button with correct label[32m 76[2mms[22m[39m
+     [32mÔ£ô[39m panel toggle button calls togglePanel on click[32m 30[2mms[22m[39m
+     [32mÔ£ô[39m panel toggle button is keyboard focusable and activates togglePanel with Enter[32m 132[2mms[22m[39m
+     [32mÔ£ô[39m panel toggle button shows 'Hide' when panel is open[32m 5[2mms[22m[39m
+     [32mÔ£ô[39m is disabled when unsupported[32m 56[2mms[22m[39m
+     [32mÔ£ô[39m renders danger background when permission denied[32m 19[2mms[22m[39m
+     [32mÔ£ô[39m renders accent background when listening[32m 32[2mms[22m[39m
+     [32mÔ£ô[39m panel toggle button click does not trigger toggleListening[32m 9[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/Walletbutton.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 2518[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens the canonical ConnectWalletModal and restores focus on close [33m 577[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders TESTNET network badge with warning design tokens and handles actions [33m 327[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m handles copy address, backdrop click, and Escape key navigation [33m 510[2mms[22m[39m
+ [32mÔ£ô[39m src/components/presence/__tests__/PresenceBadge.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[33m 794[2mms[22m[39m
+ [32mÔ£ô[39m src/components/csv-upload/__tests__/CsvDropZone.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 1028[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the empty-state instructions initially [33m 373[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/ReportBuilderPanel.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 1457[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the panel with title and close button [33m 381[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/embedThemeParser.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.contrast.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 4313[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m 1. Default initial state is "no-selection" [33m 474[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m 4. Step 1 validation blocks proceeding when in AA-fail-blocked state [33m 1914[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m 10. Advanced Mode: validation blocks low contrast color unless override checked [33m 866[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/InputField.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 4395[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m input container has neither error nor success modifier class when no error/success props [33m 688[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders a hint ValidationMessage with the helperText content when no error [33m 494[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m input container has input-container--error class for any non-empty error string [33m 533[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m child input has aria-invalid="true" for any non-empty error string [33m 422[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m input aria-describedby equals the error message element id when error is set [33m 476[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m input aria-describedby equals the hint message element id when helperText is set and no error [33m 368[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m only error ValidationMessage is rendered when both error and helperText are set [33m 399[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m label htmlFor and input id both equal the id prop [33m 323[2mms[22m[39m
+ [32mÔ£ô[39m src/utils/__tests__/contrastUtils.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/useTreasury.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 1302[2mms[22m[39m
+ [31mÔØ»[39m src/components/__tests__/Layout.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 2111[2mms[22m[39m
+[31m     [31m├ù[31m renders the install banner when the browser emits a beforeinstallprompt event[39m[33m 965[2mms[22m[39m
+[31m     [31m├ù[31m dismisses the install banner and stores a remind-later state[39m[33m 346[2mms[22m[39m
+     [32mÔ£ô[39m renders the sidebar toggle control as a real button with aria-expanded and dynamic aria-label[32m 146[2mms[22m[39m
+     [32mÔ£ô[39m toggles sidebar state via keyboard activation (Enter and Space)[32m 59[2mms[22m[39m
+     [32mÔ£ô[39m maintains sane tab order for focusable items in both expanded and collapsed states[32m 80[2mms[22m[39m
+     [32mÔ£ô[39m handles Connect Wallet modal open and close triggers[32m 280[2mms[22m[39m
+     [32mÔ£ô[39m handles mobile menu button toggle, nav link click, and backdrop click[32m 168[2mms[22m[39m
+     [32mÔ£ô[39m hides footer on treasury page[32m 58[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/RecipientStreams.states.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2530[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders nothing-while-loading, then renders streams once the fetcher resolves [33m 421[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m walks the error-retry lifecycle: first-failure ÔåÆ in-flight ÔåÆ repeated-failure escalation ÔåÆ recovered auto-clear [33m 891[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m invokes onRetry without calling fetchStreamsFn when both are provided [33m 691[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/config.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/TruncatedAddress.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 851[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m copies with the Clipboard API and announces success [33m 301[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/SessionRecoveryBanner.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 1198[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m announces via a status role and shows the Restore / Start fresh choice [33m 340[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/Metrics.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 3044[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m moves to the immediately next widget (index + 1) when viewport is below 640 px (1-column layout) [33m 791[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m moves two positions down when viewport is in the sm range (640ÔÇô1023 px, 2-column layout) [33m 802[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m moves three positions down when viewport is at lg (ÔëÑ 1024 px, 3-column layout) [33m 430[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.step2.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 11292[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m sanitizes the step-1 deposit field as the user types [33m 471[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clicking Next with blank rate and duration shows both error states at once [33m 7430[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blurring accrualRate with empty value shows error state [33m 2610[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/RecentStreams.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[33m 5177[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the treasury-specific heading, view action, and streams table [33m 994[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates to /app/streams when View all is clicked [33m 340[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m switches back to table view when Table toggle is clicked [33m 531[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m marks the SVG as aria-hidden when graph view is active [33m 349[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders pan/zoom controls with accessible labels [33m 489[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m pan/zoom controls are keyboard-operable [33m 503[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m allows the user tab past graph controls (graph does not trap focus) [33m 547[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/transactionConfig.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Navbar.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 1242[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m first mount injects one style element with correct keyframes [33m 680[2mms[22m[39m
+ [32mÔ£ô[39m src/utils/__tests__/faviconBadge.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 252[2mms[22m[39m
+ [32mÔ£ô[39m src/components/voice/__tests__/VoiceConfirmModal.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 1423[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m wraps focus between the dialog actions when tabbing forward and backward [33m 884[2mms[22m[39m
+Error: Uncaught [Error: 
+useColorBlindSimulation must be used 
+within a ColorBlindSimulationProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: 
+useColorBlindSimulation must be used 
+within a ColorBlindSimulationProvider
+    at useColorBlindSimulation (C:/User
+s/ABUBAKAR/Fluxora-Frontend/src/compone
+nts/colorBlindSimulation/ColorBlindSimu
+lationProvider.tsx:207:11)
+    at SimulationDisplay (C:/Users/ABUB
+AKAR/Fluxora-Frontend/src/components/co
+lorBlindSimulation/__tests__/ColorBlind
+SimulationProvider.test.tsx:24:5)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+Error: Uncaught [Error: 
+useColorBlindSimulation must be used 
+within a ColorBlindSimulationProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: 
+useColorBlindSimulation must be used 
+within a ColorBlindSimulationProvider
+    at useColorBlindSimulation (C:/User
+s/ABUBAKAR/Fluxora-Frontend/src/compone
+nts/colorBlindSimulation/ColorBlindSimu
+lationProvider.tsx:207:11)
+    at SimulationDisplay (C:/Users/ABUB
+AKAR/Fluxora-Frontend/src/components/co
+lorBlindSimulation/__tests__/ColorBlind
+SimulationProvider.test.tsx:24:5)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+ [32mÔ£ô[39m src/components/colorBlindSimulation/__tests__/ColorBlindSimulationProvider.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 467[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/StreamRow.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 6324[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens the actions menu when the ellipsis button is clicked and closes on Escape [33m 3889[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates through items via Arrow keys in the menu [33m 755[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m toggles the menu closed when the trigger is clicked a second time [33m 313[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m 'View details' menu item navigates to the stream detail route [33m 348[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/StreamsTable.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 4150[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the treasury stream headers and sample row count [33m 908[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m toggles sort direction from ascending to descending when clicking the same column header twice [33m 1071[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m resets to default ascending direction when switching sort column [33m 794[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m preserves relative order for equal-key rows (sort stability) [33m 396[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m supports sorting by rate and status columns [33m 307[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m supports keyboard navigation across rows [33m 381[2mms[22m[39m
+ [32mÔ£ô[39m src/components/common/__tests__/TruncatedReveal.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 676[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/AppNavbar.accessibility.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 40199[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m sidebar toggle and theme control aria-labels are non-empty for any sidebarOpen/theme combination [33m 10092[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m aria-expanded on the sidebar toggle equals current open/closed state after each click [33m 30043[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/environment.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/useWidgetLayout.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 274[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/malformedRecordDefensive.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 2634[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m renders without crashing and shows the core cells [33m 571[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates to the detail route from the View button without selecting the row [33m 465[2mms[22m[39m
+ [32mÔ£ô[39m src/components/voice/__tests__/VoiceCommandManager.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1425[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders microphone button with proper aria-label and keyboard focusable attributes [33m 732[2mms[22m[39m
+ [32mÔ£ô[39m src/components/Streams/__tests__/StreamCreatedModal.copy.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 3443[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m sets copied state only after clipboard write resolves and resets after 2000ms [33m 1279[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses the Web Share API when available for stream links [33m 571[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m announces failure when clipboard write rejects and does not show copied state [33m 514[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m announces failure when execCommand fallback returns false [33m 364[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clears failure announcement after 3000ms without resetting copied timer semantics [33m 304[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/api/__tests__/useStreams.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1316[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/Walletcontext.test.tsx [2m([22m[2m7 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[32m 203[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/useTreasuryOverviewData.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[32m 139[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/WalletStatus.keyboard.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2517[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens the menu and focuses first item on ArrowDown [33m 481[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m navigates down and wraps from last to first using ArrowDown [33m 310[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m traps focus within the menu using Tab and Shift+Tab [33m 320[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m applies keyboard navigation and Escape behavior to the Disconnect confirmation view [33m 959[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/demoMode.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1783[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders fixture data only when VITE_DEMO_MODE is enabled [33m 858[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m explicitly pairs DemoBanner with fixture data ÔÇö never sample data without banner [33m 435[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m defaults to live data and does not render fixture streams [33m 475[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/WalletStatus.copy.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2036[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m copies address successfully and shows success feedback [33m 802[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses fallback copy when clipboard API is unavailable [33m 337[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m handles fallback copy failure [33m 433[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/ThemeSegmentedControl.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 953[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders three options with correct accessibility attributes [33m 360[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m handles keyboard navigation using arrow keys (Right/Down, Left/Up, wraps) [33m 353[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/StreamTimeline.segments.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 934[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the accrual segment for progress past the cliff [33m 368[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/VirtualList.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 498[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/useModalAccessibility.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1252[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m moves focus into the modal when opened [33m 421[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/NavLink.test.tsx [2m([22m[2m21 tests[22m[2m)[22m[33m 816[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/GlowingDot.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[32m 246[2mms[22m[39m
+ [32mÔ£ô[39m src/utils/monthlySummary.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/LoadingSkeletons.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 916[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.offlineQueue.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2127[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m captures a step-3 submission into the queue instead of calling createStream when offline [33m 707[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps Close operable while a submission is queued [33m 391[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m auto-flushes on reconnect and surfaces a success toast with a View stream action [33m 347[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows a recoverable failure banner if the queued submission is rejected on reconnect [33m 382[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/stellarNetwork.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/useTickingNow.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 313[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/createStreamDates.property.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 297[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/__tests__/Home.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 3990[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the hero immediately [33m 700[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m lazily renders the below-fold sections after the observer fires [33m 1371[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m passes automated accessibility checks [33m 1184[2mms[22m[39m
+ [32mÔ£ô[39m src/components/colorBlindSimulation/__tests__/ColorBlindToggle.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 1331[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders radio options for all four modes [33m 318[2mms[22m[39m
+ [32mÔ£ô[39m src/App.test.tsx [2m([22m[2m6 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1037[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps the public home route eager [33m 495[2mms[22m[39m
+ [31mÔØ»[39m src/pages/__tests__/Dashboard.test.tsx [2m([22m[2m9 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3802[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the loaded dashboard without axe violations [33m 1389[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m announces onboarding updates and opens the wallet modal from the CTA [33m 549[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the Total Streaming figure as the sum of active streams depositAmount [33m 382[2mms[22m[39m
+[31m     [31m├ù[31m uses the shared onboarding dismissal key across onboarding and dashboard rendering[39m[33m 816[2mms[22m[39m
+     [32mÔ£ô[39m has exactly one main landmark[32m 68[2mms[22m[39m
+     [32mÔ£ô[39m has exactly one h1 heading[32m 101[2mms[22m[39m
+     [32mÔ£ô[39m maintains correct heading hierarchy without skipped levels[32m 64[2mms[22m[39m
+     [32mÔ£ô[39m renders large safe integer amounts via formatters instead of bare toLocaleString[32m 59[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m passes automated accessibility checks for landmark structure [33m 364[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.failure.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2339[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m surfaces a rejected createStream call and keeps the modal open [33m 833[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m surfaces a synchronously thrown createStream error [33m 337[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m clears the failure alert and retries when Try again is clicked [33m 460[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m guards against duplicate submissions while the request is pending [33m 332[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m does not call onStreamCreated or close modal when transaction status polling fails on-chain [33m 370[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/stellar.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/NavLink.hoverFocusParity.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 646[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m applies aria-current and the styled class to the current route only [33m 376[2mms[22m[39m
+ [32mÔ£ô[39m src/components/Streams/__tests__/StreamCreatedModal.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 2265[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders streamId with # prefix and streamUrl in the URL bar [33m 401[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m shows a share-to-Slack and share-to-Teams action group in the success modal [33m 577[2mms[22m[39m
+ [31mÔØ»[39m src/pages/__tests__/Recipient.test.tsx [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 5651[2mms[22m[39m
+     [2m[90mÔåô[39m[22m resets txState and errorMsg when wallet address changes
+     [2m[90mÔåô[39m[22m clears the confirmed timer on unmount to avoid setState errors
+[31m     [31m├ù[31m renders the loaded recipient portal without axe violations[39m[33m 5047[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m exposes an enabled withdraw action when a connected recipient has balance [33m 392[2mms[22m[39m
+     [32mÔ£ô[39m renders RecipientEmptyState component when wallet is disconnected[32m 58[2mms[22m[39m
+     [32mÔ£ô[39m renders large safe integer balances via formatAssetAmount[32m 144[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/Breadcrumb.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 819[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps the current page as non-interactive text with aria-current [33m 352[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/NewsletterSection.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 1204[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m catches malformed email before requesting the signup endpoint [33m 573[2mms[22m[39m
+ [32mÔ£ô[39m src/data/__tests__/streamRecords.optionalFields.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/useTransactionStatus.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 206[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/TreasuryEmptyState.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 1420[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m forwards variant='treasury' to EmptyState [33m 578[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/RequireWallet.test.tsx [2m([22m[2m23 tests[22m[2m)[22m[33m 453[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.recipient.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1711[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects recipient when it exactly matches connected wallet address [33m 842[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects recipient when it matches connected wallet address with different casing [33m 363[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects recipient when it matches connected wallet address with leading/trailing whitespace [33m 312[2mms[22m[39m
+ [31mÔØ»[39m src/components/navigation/__tests__/AppNavbar.timezone.test.tsx [2m([22m[2m5 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 1282[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the ticking time indicator on desktop and mobile formats [33m 579[2mms[22m[39m
+     [32mÔ£ô[39m opens the tooltip on hover and closes on mouse leave[32m 225[2mms[22m[39m
+[31m     [31m├ù[31m opens the tooltip and triggers a manual refresh on focus[39m[32m 195[2mms[22m[39m
+     [32mÔ£ô[39m closes the tooltip on Escape key press[32m 139[2mms[22m[39m
+[31m     [31m├ù[31m handles timezone resolution failure by falling back to UTC[39m[32m 134[2mms[22m[39m
+Error: Uncaught [Error: useI18n must 
+be used within an I18nProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useI18n must be 
+used within an I18nProvider
+    at Module.useI18n (C:/Users/ABUBAKA
+R/Fluxora-Frontend/src/i18n/index.tsx:1
+96:11)
+    at OutsideProviderConsumer (C:/User
+s/ABUBAKAR/Fluxora-Frontend/src/i18n/__
+tests__/I18nProvider.test.tsx:54:3)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+Error: Uncaught [Error: useI18n must 
+be used within an I18nProvider]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useI18n must be 
+used within an I18nProvider
+    at Module.useI18n (C:/Users/ABUBAKA
+R/Fluxora-Frontend/src/i18n/index.tsx:1
+96:11)
+    at OutsideProviderConsumer (C:/User
+s/ABUBAKAR/Fluxora-Frontend/src/i18n/__
+tests__/I18nProvider.test.tsx:54:3)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+ [31mÔØ»[39m src/i18n/__tests__/I18nProvider.test.tsx [2m([22m[2m10 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 835[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m switches locale and translated output through changeLocale [33m 537[2mms[22m[39m
+     [32mÔ£ô[39m falls back to English for untranslated keys while Spanish remains active[32m 19[2mms[22m[39m
+     [32mÔ£ô[39m selects _one and _other pluralization keys from count[32m 196[2mms[22m[39m
+     [32mÔ£ô[39m throws when useI18n is called outside I18nProvider[32m 54[2mms[22m[39m
+     [32mÔ£ô[39m uses the English fallback catalog when the active catalog lacks a key[32m 2[2mms[22m[39m
+     [32mÔ£ô[39m resolves plural keys from the fallback catalog[32m 1[2mms[22m[39m
+[31m     [31m├ù[31m interpolates parameters and escapes unsafe HTML characters[39m[32m 15[2mms[22m[39m
+     [32mÔ£ô[39m returns the requested key when neither catalog contains it[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m keeps a normal translation when count has no pluralized key[32m 1[2mms[22m[39m
+     [32mÔ£ô[39m returns a normal translation when no parameters are supplied[32m 1[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/onboarding.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mÔ£ô[39m src/i18n/__tests__/i18n.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mÔ£ô[39m src/utils/__tests__/receiptGenerator.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CommandPaletteModal.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1138[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens when custom event 'open-command-palette' is dispatched [33m 499[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.transaction.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1683[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m waits for polled confirmation before opening the success receipt [33m 1271[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m submits the transaction with the correct cliffTime when a cliff date is set [33m 404[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/ErrorPage.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 1194[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the heading [33m 376[2mms[22m[39m
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+Error: Uncaught [Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.]
+    at reportException (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+jsdom@26.1.0\node_modules\jsdom\lib\jsd
+om\living\helpers\runtime-script-errors
+.js:66:24)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:353:9)
+    at invokeEventListeners (C:\Users\A
+BUBAKAR\Fluxora-Frontend\node_modules\.
+pnpm\jsdom@26.1.0\node_modules\jsdom\li
+b\jsdom\living\events\EventTarget-impl.
+js:286:3)
+    at 
+HTMLUnknownElementImpl._dispatch (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:233:9)
+    at 
+HTMLUnknownElementImpl.dispatchEvent (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\events\EventTar
+get-impl.js:104:17)
+    at 
+HTMLUnknownElement.dispatchEvent (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\generated\EventTarg
+et.js:241:34)
+    at Object.invokeGuardedCallbackDev 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4213:16)
+    at invokeGuardedCallback (C:\Users\
+ABUBAKAR\Fluxora-Frontend\node_modules\
+.pnpm\react-dom@18.3.1_react@18.3.1\nod
+e_modules\react-dom\cjs\react-dom.devel
+opment.js:4277:31)
+    at beginWork$1 (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-dom@18.3.1_react@18.3.1\node_modules\
+react-dom\cjs\react-dom.development.js:
+27490:7)
+    at performUnitOfWork (C:\Users\ABUB
+AKAR\Fluxora-Frontend\node_modules\.pnp
+m\react-dom@18.3.1_react@18.3.1\node_mo
+dules\react-dom\cjs\react-dom.developme
+nt.js:26599:12) Error: useNavigate() 
+may be used only in the context of a 
+<Router> component.
+    at Object.invariant [as 
+UNSAFE_invariant] (C:\Users\ABUBAKAR\Fl
+uxora-Frontend\node_modules\.pnpm\@remi
+x-run+router@1.23.2\node_modules\@remix
+-run\router\dist\router.cjs.js:315:11)
+    at useNavigateUnstable (C:\Users\AB
+UBAKAR\Fluxora-Frontend\node_modules\.p
+npm\react-router@6.30.3_react@18.3.1\no
+de_modules\react-router\dist\umd\react-
+router.development.js:223:36)
+    at useNavigate (C:\Users\ABUBAKAR\F
+luxora-Frontend\node_modules\.pnpm\reac
+t-router@6.30.3_react@18.3.1\node_modul
+es\react-router\dist\umd\react-router.d
+evelopment.js:220:48)
+    at CommandPaletteModal (C:/Users/AB
+UBAKAR/Fluxora-Frontend/src/components/
+KeyboardShortcutsModal.tsx:35:20)
+    at renderWithHooks (C:\Users\ABUBAK
+AR\Fluxora-Frontend\node_modules\.pnpm\
+react-dom@18.3.1_react@18.3.1\node_modu
+les\react-dom\cjs\react-dom.development
+.js:15486:18)
+    at mountIndeterminateComponent (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\react-dom@18.3.1_react@18.3
+.1\node_modules\react-dom\cjs\react-dom
+.development.js:20103:13)
+    at beginWork (C:\Users\ABUBAKAR\Flu
+xora-Frontend\node_modules\.pnpm\react-
+dom@18.3.1_react@18.3.1\node_modules\re
+act-dom\cjs\react-dom.development.js:21
+626:16)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30)
+    at innerInvokeEventListeners (C:\Us
+ers\ABUBAKAR\Fluxora-Frontend\node_modu
+les\.pnpm\jsdom@26.1.0\node_modules\jsd
+om\lib\jsdom\living\events\EventTarget-
+impl.js:350:25)
+ [31mÔØ»[39m src/components/__tests__/KeyboardShortcutsModal.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[31m8 failed[39m[2m)[22m[32m 288[2mms[22m[39m
+[31m     [31m├ù[31m opens when '?' is pressed and closes when 'Escape' is pressed[39m[32m 111[2mms[22m[39m
+[31m     [31m├ù[31m closes when the close button is clicked[39m[32m 20[2mms[22m[39m
+[31m     [31m├ù[31m closes when clicking the backdrop[39m[32m 18[2mms[22m[39m
+[31m     [31m├ù[31m does not close when clicking inside the modal content[39m[32m 26[2mms[22m[39m
+[31m     [31m├ù[31m does not open when '?' is pressed inside an editable element[39m[32m 46[2mms[22m[39m
+[31m     [31m├ù[31m does not open when '?' is pressed while another modal (aria-modal='true') is active[39m[32m 31[2mms[22m[39m
+[31m     [31m├ù[31m opens when '?' is pressed while a non-modal element (aria-modal='false') is present[39m[32m 20[2mms[22m[39m
+[31m     [31m├ù[31m closes KeyboardShortcutsModal when '?' is pressed while it is open and another modal is active[39m[32m 8[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Button.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 916[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m renders primary variant by default [33m 359[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/sorobanTxStatus.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CsvDropZone.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1610[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rejects an oversized File before reading contents or parsing [33m 872[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m allows a file exactly at MAX_CSV_FILE_SIZE_BYTES through to parsing [33m 394[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/__tests__/ConnectWallet.styles.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/RecipientStreams.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 713[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.stepper.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 2183[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders an ordered list with aria-current='step' on step 1 initially [33m 751[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m marks step 1 completed (clickable) and step 2 current after advancing [33m 412[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m jumps back to step 1 when its stepper button is clicked from step 2 [33m 322[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m disables the completed-step buttons while a submission is actively in flight [33m 357[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/useLiveAnnouncer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 95[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/ValidationMessage.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2247[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the message string in the output for any non-empty error message [33m 800[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m SVG icon rendered for error type has aria-hidden="true" for any message [33m 416[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m SVG icon rendered for success type has aria-hidden="true" for any message [33m 414[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m rendered element has role="alert" for any error message [33m 327[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/ConnectWallet.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 294[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/useClipboard.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 139[2mms[22m[39m
+ [31mÔØ»[39m src/pages/StreamDetail.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 3304[2mms[22m[39m
+[31m     [31m├ù[31m injects dynamic per-stream Open Graph and Twitter meta tags into document head[39m[33m 1190[2mms[22m[39m
+[31m     [31m├ù[31m uses the current runtime origin for generated og url/image values[39m[33m 1038[2mms[22m[39m
+[31m     [31m├ù[31m handles fallback and status-based cache-busting query parameter[39m[33m 1019[2mms[22m[39m
+     [32mÔ£ô[39m omits the cache-busting query when updatedAt is missing[32m 49[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/WalletIcon.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 623[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.a11y.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 2661[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the open modal without axe violations [33m 1073[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m focuses the first focusable element, traps Tab, closes on Escape, and restores focus [33m 785[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m keeps Create stream unavailable until step-one and step-two inputs validate [33m 793[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/embed-integration.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1007[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m preserves other routes [33m 482[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.review.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1756[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses the same daily rate and duration units from step 2 [33m 1032[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses singular day copy for a one-day stream [33m 308[2mms[22m[39m
+ [31mÔØ»[39m src/components/navigation/__tests__/AppNavbar.disconnect.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 932[2mms[22m[39m
+[31m     [31m├ù[31m requires confirmation before disconnecting and returns focus to the wallet trigger[39m[33m 747[2mms[22m[39m
+[31m     [31m├ù[31m shows the canonical connect-wallet affordance after disconnect[39m[32m 177[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/outOfBandDisconnect.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 807[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m updates dependent components when wallet disconnects out-of-band [33m 798[2mms[22m[39m
+Error: Not implemented: navigation 
+(except hash changes)
+    at module.exports (C:\Users\ABUBAKA
+R\Fluxora-Frontend\node_modules\.pnpm\j
+sdom@26.1.0\node_modules\jsdom\lib\jsdo
+m\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\js
+dom@26.1.0\node_modules\jsdom\lib\jsdom
+\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Users\ABUBA
+KAR\Fluxora-Frontend\node_modules\.pnpm
+\jsdom@26.1.0\node_modules\jsdom\lib\js
+dom\living\window\navigation.js:55:3)
+    at 
+LocationImpl._locationObjectNavigate (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\window\Location
+-impl.js:30:5)
+    at LocationImpl._locationObjectSett
+erNavigate (C:\Users\ABUBAKAR\Fluxora-F
+rontend\node_modules\.pnpm\jsdom@26.1.0
+\node_modules\jsdom\lib\jsdom\living\wi
+ndow\Location-impl.js:24:17)
+    at LocationImpl.set href [as href] 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\jsdom@26.1.0\node_modul
+es\jsdom\lib\jsdom\living\window\Locati
+on-impl.js:46:10)
+    at Location.set href [as href] (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\jsdom@26.1.0\node_modules\j
+sdom\lib\jsdom\living\generated\Locatio
+n.js:125:37)
+    at onClick (C:/Users/ABUBAKAR/Fluxo
+ra-Frontend/src/components/landing-page
+/HeroSection.tsx:119:49)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30) 
+undefined
+ [32mÔ£ô[39m src/components/landing-page/__tests__/HeroSection.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1588[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders metrics from HERO_METRICS by default [33m 773[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m never calls window.alert or window.confirm when every button in the hero is clicked [33m 346[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/__tests__/Recipient.empty.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 580[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders RecipientEmptyState with View docs CTA when a connected wallet has zero active incoming streams [33m 508[2mms[22m[39m
+ [32mÔ£ô[39m src/components/InputWithUnit.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 760[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Footer.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 1177[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders the Fluxora home link [33m 330[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/GetStartedCTA.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 859[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders tokenized styles without hardcoded colors [33m 454[2mms[22m[39m
+ [32mÔ£ô[39m src/hooks/__tests__/usePrefersReducedMotion.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 150[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Pagination.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 329[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/ErrorBoundary.test.tsx [2m([22m[2m3 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1244[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m resets the boundary when Try Again is clicked [33m 922[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m resets and navigates to the dashboard from the fallback action [33m 313[2mms[22m[39m
+ [32mÔ£ô[39m src/components/Streams/__tests__/StreamCreatedModal.viewStream.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1540[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens new window when url is valid and popup is not blocked [33m 823[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/DemoBanner.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 307[2mms[22m[39m
+ [32mÔ£ô[39m src/components/presence/__tests__/PresenceViewerList.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1774[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders empty message when there are no viewers [33m 420[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onClose when Escape key is pressed inside the list [33m 1207[2mms[22m[39m
+ [32mÔ£ô[39m src/lib/__tests__/recentStreamMapper.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 126[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamModal.bounds.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 2577[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m treats rate and duration values exactly at the configured bounds as field-valid [33m 1412[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blocks over-bound accrual rates with an inline validation message [33m 755[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m blocks over-bound durations with an inline validation message [33m 397[2mms[22m[39m
+ [32mÔ£ô[39m src/components/navigation/__tests__/Breadcrumb.stellar.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 408[2mms[22m[39m
+ [32mÔ£ô[39m src/utils/reportExporter.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/networkMismatch.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 220[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Input.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 483[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m updates aria-invalid and aria-describedby when error is shown and cleared [33m 409[2mms[22m[39m
+ [31mÔØ»[39m src/lib/__tests__/createStreamAmounts.property.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 242[2mms[22m[39m
+[31m     [31m├ù[31m handles representative malformed treasury amount strings deterministically[39m[32m 25[2mms[22m[39m
+     [32mÔ£ô[39m sanitizes adversarial amount strings to at most one decimal point and capped precision[32m 78[2mms[22m[39m
+     [32mÔ£ô[39m parses every adversarial amount as a finite non-negative number[32m 57[2mms[22m[39m
+     [32mÔ£ô[39m returns finite non-negative required deposits with cents precision[32m 50[2mms[22m[39m
+     [32mÔ£ô[39m keeps required deposit monotonic in duration for a fixed positive rate[32m 23[2mms[22m[39m
+ [32mÔ£ô[39m src/components/presence/__tests__/PresenceCursorOverlay.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 372[2mms[22m[39m
+Error: Not implemented: navigation 
+(except hash changes)
+    at module.exports (C:\Users\ABUBAKA
+R\Fluxora-Frontend\node_modules\.pnpm\j
+sdom@26.1.0\node_modules\jsdom\lib\jsdo
+m\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\js
+dom@26.1.0\node_modules\jsdom\lib\jsdom
+\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Users\ABUBA
+KAR\Fluxora-Frontend\node_modules\.pnpm
+\jsdom@26.1.0\node_modules\jsdom\lib\js
+dom\living\window\navigation.js:55:3)
+    at 
+LocationImpl._locationObjectNavigate (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\window\Location
+-impl.js:30:5)
+    at LocationImpl._locationObjectSett
+erNavigate (C:\Users\ABUBAKAR\Fluxora-F
+rontend\node_modules\.pnpm\jsdom@26.1.0
+\node_modules\jsdom\lib\jsdom\living\wi
+ndow\Location-impl.js:24:17)
+    at LocationImpl.set href [as href] 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\jsdom@26.1.0\node_modul
+es\jsdom\lib\jsdom\living\window\Locati
+on-impl.js:46:10)
+    at Location.set href [as href] (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\jsdom@26.1.0\node_modules\j
+sdom\lib\jsdom\living\generated\Locatio
+n.js:125:37)
+    at onClick (C:/Users/ABUBAKAR/Fluxo
+ra-Frontend/src/components/landing-page
+/HeroSection.tsx:119:49)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30) 
+undefined
+Error: Not implemented: navigation 
+(except hash changes)
+    at module.exports (C:\Users\ABUBAKA
+R\Fluxora-Frontend\node_modules\.pnpm\j
+sdom@26.1.0\node_modules\jsdom\lib\jsdo
+m\browser\not-implemented.js:9:17)
+    at navigateFetch (C:\Users\ABUBAKAR
+\Fluxora-Frontend\node_modules\.pnpm\js
+dom@26.1.0\node_modules\jsdom\lib\jsdom
+\living\window\navigation.js:77:3)
+    at exports.navigate (C:\Users\ABUBA
+KAR\Fluxora-Frontend\node_modules\.pnpm
+\jsdom@26.1.0\node_modules\jsdom\lib\js
+dom\living\window\navigation.js:55:3)
+    at 
+LocationImpl._locationObjectNavigate (C
+:\Users\ABUBAKAR\Fluxora-Frontend\node_
+modules\.pnpm\jsdom@26.1.0\node_modules
+\jsdom\lib\jsdom\living\window\Location
+-impl.js:30:5)
+    at LocationImpl._locationObjectSett
+erNavigate (C:\Users\ABUBAKAR\Fluxora-F
+rontend\node_modules\.pnpm\jsdom@26.1.0
+\node_modules\jsdom\lib\jsdom\living\wi
+ndow\Location-impl.js:24:17)
+    at LocationImpl.set href [as href] 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\jsdom@26.1.0\node_modul
+es\jsdom\lib\jsdom\living\window\Locati
+on-impl.js:46:10)
+    at Location.set href [as href] (C:\
+Users\ABUBAKAR\Fluxora-Frontend\node_mo
+dules\.pnpm\jsdom@26.1.0\node_modules\j
+sdom\lib\jsdom\living\generated\Locatio
+n.js:125:37)
+    at onClick (C:/Users/ABUBAKAR/Fluxo
+ra-Frontend/src/components/landing-page
+/HeroSection.tsx:119:49)
+    at HTMLUnknownElement.callCallback 
+(C:\Users\ABUBAKAR\Fluxora-Frontend\nod
+e_modules\.pnpm\react-dom@18.3.1_react@
+18.3.1\node_modules\react-dom\cjs\react
+-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserOb
+jectsOperation (C:\Users\ABUBAKAR\Fluxo
+ra-Frontend\node_modules\.pnpm\jsdom@26
+.1.0\node_modules\jsdom\lib\jsdom\livin
+g\generated\EventListener.js:26:30) 
+undefined
+ [32mÔ£ô[39m src/components/landing-page/__tests__/HeroTrustSection.viewport.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 3640[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders hero and trust content correctly at narrow mobile [33m 3272[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders hero and trust content correctly at wide desktop [33m 334[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/CreateStreamFab.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 675[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m opens the create flow and exposes the minimum hit target [33m 398[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/RecentStreams.defensive.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1147[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m renders the row without crashing [33m 590[2mms[22m[39m
+ [32mÔ£ô[39m src/components/wallet-connect/__tests__/Walletbutton.copy.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 1572[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m copies address successfully and shows success feedback when navigator.clipboard is available [33m 1074[2mms[22m[39m
+ [31mÔØ»[39m src/pages/__tests__/Recipient.notification.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 10164[2mms[22m[39m
+[31m     [31m├ù[31m does not request permission until the explicit allow action[39m[33m 5082[2mms[22m[39m
+[31m     [31m├ù[31m keeps dismissed priming in-app and exposes a recovery hint when denied[39m[33m 5073[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/ZeroAccrualBanner.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1665[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders correctly for cliff reason without nextEventDate [33m 836[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m triggers onAction callback when action button is clicked [33m 431[2mms[22m[39m
+       [33m[2mÔ£ô[22m[39m formats nextEventDate using the browser resolved locale (e.g., es-ES) instead of hardcoding en-US [33m 375[2mms[22m[39m
+ [32mÔ£ô[39m src/pages/Dashboard.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 977[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m uses disconnected state from useWallet for the connect banner [33m 814[2mms[22m[39m
+ [32mÔ£ô[39m src/__tests__/recipient-title-badge.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/StatusPill.contrast.test.ts [2m([22m[2m18 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m src/components/__tests__/Sidebar.faviconBadge.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1113[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m renders in-page badge with single digit count and accessible label [33m 457[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m triggers onResetUnread when Recipient nav link is clicked [33m 462[2mms[22m[39m
+ [32mÔ£ô[39m src/components/treasuryOverviewPage/__tests__/WidgetTray.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 775[2mms[22m[39m
+     [33m[2mÔ£ô[22m[39m calls onRestore with the correct widget id when the restore action is triggered [33m 528[2mms[22m[39m

@@ -427,4 +427,91 @@ describe("ToastProvider / useToast", () => {
     unmount();
     act(() => vi.advanceTimersByTime(5000));
   });
+  it("deduplicates identical toasts added within the deduplication window", () => {
+    function DedupeAdder() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            addToast("Duplicate Message", "error");
+            addToast("Duplicate Message", "error");
+          }}
+        >
+          Add Duplicates
+        </button>
+      );
+    }
+    renderWithProvider(<DedupeAdder />);
+    fireEvent.click(screen.getByRole("button", { name: "Add Duplicates" }));
+    
+    const elements = screen.getAllByText("Duplicate Message");
+    expect(elements).toHaveLength(1);
+  });
+
+  it("allows identical toasts if added outside the deduplication window", () => {
+    function DedupeDelayAdder() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            addToast("Duplicate Message Delay", "error");
+          }}
+        >
+          Add Duplicate
+        </button>
+      );
+    }
+    renderWithProvider(<DedupeDelayAdder />);
+    
+    fireEvent.click(screen.getByRole("button", { name: "Add Duplicate" }));
+    act(() => vi.advanceTimersByTime(1100)); // Advance past DEDUPE_WINDOW (1000ms)
+    fireEvent.click(screen.getByRole("button", { name: "Add Duplicate" }));
+    
+    const elements = screen.getAllByText("Duplicate Message Delay");
+    expect(elements).toHaveLength(2);
+  });
+
+  it("replaces an existing toast if an explicit id is provided", () => {
+    function ReplacementAdder() {
+      const { addToast } = useToast();
+      return (
+        <>
+          <button onClick={() => addToast("Pending Transaction", "info", 5000, undefined, "tx-123")}>
+            Add Pending
+          </button>
+          <button onClick={() => addToast("Transaction Success", "success", 5000, undefined, "tx-123")}>
+            Add Success
+          </button>
+        </>
+      );
+    }
+    renderWithProvider(<ReplacementAdder />);
+    fireEvent.click(screen.getByRole("button", { name: "Add Pending" }));
+    expect(screen.getByText("Pending Transaction")).toBeInTheDocument();
+    
+    fireEvent.click(screen.getByRole("button", { name: "Add Success" }));
+    expect(screen.queryByText("Pending Transaction")).not.toBeInTheDocument();
+    expect(screen.getByText("Transaction Success")).toBeInTheDocument();
+  });
+
+  it("does not deduplicate distinct messages with the same variant", () => {
+    function DistinctAdder() {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() => {
+            addToast("Error 1", "error");
+            addToast("Error 2", "error");
+          }}
+        >
+          Add Distinct
+        </button>
+      );
+    }
+    renderWithProvider(<DistinctAdder />);
+    fireEvent.click(screen.getByRole("button", { name: "Add Distinct" }));
+    
+    expect(screen.getByText("Error 1")).toBeInTheDocument();
+    expect(screen.getByText("Error 2")).toBeInTheDocument();
+  });
 });

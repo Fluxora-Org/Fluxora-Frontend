@@ -272,6 +272,7 @@ Several design and accessibility specs live at the repo root and in `docs/`. Ref
 | [MODAL_FOCUS_MANAGEMENT_DESIGN_SPEC.md](MODAL_FOCUS_MANAGEMENT_DESIGN_SPEC.md) | Modal focus management |
 | [docs/environment.md](docs/environment.md) | All `VITE_*` variables |
 | [docs/security.md](docs/security.md) | Contract security model |
+| [docs/supply-chain-policy.md](docs/supply-chain-policy.md) | Dependency vulnerability & license gates |
 | [docs/soroban-contract-abi.md](docs/soroban-contract-abi.md) | Contract ABI reference |
 
 ---

@@ -21,6 +21,7 @@ export interface TreasuryData {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  retryCount: number;
 }
 
 const GENERIC_ERROR = "Unable to load treasury data.";
@@ -43,25 +44,40 @@ function readError(error: unknown): string {
  * Accepts an optional `filters` argument that is forwarded to
  * {@link getStreams}. Changes to `filters` trigger an automatic refetch.
  */
-export function useTreasury(filters?: StreamsFilters): TreasuryData {
+export function useTreasury(
+  filters?: StreamsFilters,
+  /** Changes when another tab changes the active wallet account. */
+  accountContextVersion = 0,
+): TreasuryData {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const accountContextVersionRef = useRef(accountContextVersion);
   const filtersKey = serializeFilters(filters);
 
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
-
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const accountChanged = accountContextVersionRef.current !== accountContextVersion;
+    accountContextVersionRef.current = accountContextVersion;
+    if (accountChanged) {
+      // Do not render the prior account's cached rows while the replacement
+      // request is pending in this tab.
+      setMetrics([]);
+      setStreams([]);
+    }
     setLoading(true);
     setError(null);
+    setRetryCount((count) => count + 1);
 
-    Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
+    Promise.all([
+      getTreasuryMetrics({ signal: controller.signal }),
+      getStreams(filters, { signal: controller.signal }),
+    ])
       .then(([nextMetrics, nextStreams]) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
 
         const activeStreams = nextStreams.filter(s => s.status === "Active");
         
@@ -96,26 +112,28 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
 
         setMetrics(updatedMetrics);
         setStreams(nextStreams);
+        setError(null);
+        setRetryCount(0);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setMetrics([]);
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken, filtersKey]);
+    return () => controller.abort();
+  // Account context is intentionally included even where the backend query is
+  // not account-filtered: cleanup aborts old-account work before it can commit.
+  }, [accountContextVersion, reloadToken, filtersKey]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { metrics, streams, loading, error, refetch };
+  return { metrics, streams, loading, error, refetch, retryCount };
 }
 
 /**
@@ -130,10 +148,12 @@ export function useRecipientStreams(address: string | null | undefined): {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  retryCount: number;
 } {
   const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(Boolean(address));
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -144,33 +164,34 @@ export function useRecipientStreams(address: string | null | undefined): {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setRetryCount((count) => count + 1);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, { signal: controller.signal })
       .then((next) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setStreams(next);
+        setError(null);
+        setRetryCount(0);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [address, reloadToken]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { streams, loading, error, refetch };
+  return { streams, loading, error, refetch, retryCount };
 }
 
 function serializeFilters(filters?: StreamsFilters): string {

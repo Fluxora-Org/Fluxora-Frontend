@@ -55,7 +55,46 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
-// Mock localStorage and sessionStorage for jsdom tests
+if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => ({
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arcTo: vi.fn(),
+      closePath: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      roundRect: vi.fn(),
+      fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      strokeStyle: '',
+      fillStyle: '',
+      lineWidth: 1,
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+    } as unknown as CanvasRenderingContext2D)),
+  });
+
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(() => 'data:image/png;base64,placeholder'),
+  });
+}
+
+// Mock localStorage and sessionStorage for jsdom tests. The guard keeps this
+// block side-effect free in pure node environments (e.g. `.test.ts` files that
+// opt out of jsdom via `// @vitest-environment node`) so loading the setup
+// file never throws `ReferenceError: window is not defined`.
 const createStorageMock = () => {
   let store: Record<string, string> = {};
   return {
@@ -67,8 +106,23 @@ const createStorageMock = () => {
     length: 0,
   } as unknown as Storage;
 };
-Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+}
+
+// jsdom 26 does not implement Blob.prototype.text / File.prototype.text
+// (added to the spec in 2022), so we polyfill it using FileReader.
+if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
+  Blob.prototype.text = function () {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
 
 afterEach(() => {
   cleanup();
@@ -160,3 +214,15 @@ vi.mock('../i18n/index', () => {
     I18nProvider: ({ children }: any) => children,
   };
 });
+
+// jsdom does not implement ResizeObserver, which several layout-aware
+// components construct on mount. Without it they throw during render.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  globalThis.ResizeObserver =
+    ResizeObserverStub as unknown as typeof globalThis.ResizeObserver;
+}

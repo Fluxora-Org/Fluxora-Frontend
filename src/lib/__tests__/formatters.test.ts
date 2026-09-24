@@ -21,6 +21,8 @@ import {
   formatNumber,
   formatAssetAmount,
   formatLocalDate,
+  formatTokenAmount,
+  assertSafeInteger,
 } from "../formatters";
 
 // ─── formatUsdc ──────────────────────────────────────────────────────────────
@@ -129,6 +131,190 @@ describe("formatAssetAmount", () => {
   it("produces no extra space when asset is empty string", () => {
     const result = formatAssetAmount(100, "");
     expect(result).not.toContain("  ");
+  });
+
+  // Regression: without maxFractionDigits the default of 0 would silently round
+  // fractional amounts to whole numbers, giving callers a misleading figure.
+  it("preserves fractional precision when maxFractionDigits is specified", () => {
+    const result = formatAssetAmount(1234.567, "XLM", "", 2);
+    expect(result).toContain("XLM");
+    // Value must NOT have been silently rounded to a whole number
+    expect(result).not.toMatch(/^1[,.]?234 XLM$/);
+    // Two decimal places: locale-agnostic check on the numeric portion
+    const numericPart = result.replace(/[^\d.,]/g, "");
+    const parsed = parseFloat(numericPart.replace(",", ""));
+    expect(parsed).toBeCloseTo(1234.57, 1);
+  });
+
+  it("still rounds to whole number by default (backward-compatible)", () => {
+    const result = formatAssetAmount(1234.9, "XLM");
+    // Default maxFractionDigits = 0: should round to nearest integer
+    const numericPart = result.replace(/[^\d]/g, "");
+    expect(parseInt(numericPart, 10)).toBe(1235);
+  });
+});
+
+// ─── assertSafeInteger ───────────────────────────────────────────────────────
+
+describe("assertSafeInteger", () => {
+  it("does not throw for a safe integer", () => {
+    expect(() => assertSafeInteger(0)).not.toThrow();
+    expect(() => assertSafeInteger(Number.MAX_SAFE_INTEGER)).not.toThrow();
+    expect(() => assertSafeInteger(-Number.MAX_SAFE_INTEGER)).not.toThrow();
+  });
+
+  it("does not throw for a non-integer float", () => {
+    // Floats are allowed through — only integer values are guarded
+    expect(() => assertSafeInteger(1234.56)).not.toThrow();
+  });
+
+  it("throws RangeError for a positive unsafe integer", () => {
+    const unsafe = Number.MAX_SAFE_INTEGER + 1;
+    expect(() => assertSafeInteger(unsafe)).toThrow(RangeError);
+  });
+
+  it("throws RangeError for a negative unsafe integer", () => {
+    const unsafe = -(Number.MAX_SAFE_INTEGER + 1);
+    expect(() => assertSafeInteger(unsafe)).toThrow(RangeError);
+  });
+});
+
+// ─── formatTokenAmount ───────────────────────────────────────────────────────
+
+describe("formatTokenAmount", () => {
+  // ── Basic positive amounts ────────────────────────────────────────────────
+
+  it("formats 1 XLM expressed in stroops (bigint)", () => {
+    // 1 XLM = 10_000_000 stroops, 7 decimals
+    const result = formatTokenAmount(10_000_000n, 7, "XLM");
+    expect(result).toMatch(/1[.,]0{7} XLM/);
+  });
+
+  it("formats zero stroops as 0 (bigint)", () => {
+    const result = formatTokenAmount(0n, 7, "XLM");
+    expect(result).toMatch(/^0[.,]0{7} XLM$/);
+  });
+
+  it("formats a large bigint beyond MAX_SAFE_INTEGER without precision loss", () => {
+    const large = 9_007_199_254_740_993n;
+    const result = formatTokenAmount(large, 0, "USDC");
+    // The exact digits must be present (no rounding)
+    expect(result).toContain("9");
+    expect(result).toContain("USDC");
+    // The raw numeric portion must round-trip without silent truncation
+    const digits = result.replace(/\D/g, "");
+    expect(digits).toContain("9007199254740993".replace(/\D/g, ""));
+  });
+
+  it("accepts a decimal integer string and formats correctly", () => {
+    const result = formatTokenAmount("10000000", 7, "XLM");
+    expect(result).toMatch(/1[.,]0{7} XLM/);
+  });
+
+  it("accepts a safe number and formats correctly", () => {
+    const result = formatTokenAmount(10_000_000, 7, "XLM");
+    expect(result).toMatch(/1[.,]0{7} XLM/);
+  });
+
+  it("appends a suffix when provided", () => {
+    const result = formatTokenAmount(10_000_000n, 7, "XLM", "/mo");
+    expect(result).toMatch(/XLM\/mo$/);
+  });
+
+  it("omits the asset when asset is empty string", () => {
+    const result = formatTokenAmount(10_000_000n, 7);
+    expect(result).not.toContain("XLM");
+    expect(result).not.toContain("  ");
+  });
+
+  it("formats decimals=0 as a pure integer with locale grouping", () => {
+    const result = formatTokenAmount(9_000_000n, 0, "USDC");
+    // Just check the number appears and the asset is present
+    const numericPart = parseInt(result.replace(/\D/g, ""), 10);
+    expect(numericPart).toBe(9_000_000);
+    expect(result).toContain("USDC");
+  });
+
+  // ── Negative amounts with non-zero whole part ─────────────────────────────
+
+  it("formats -1 XLM (negative large magnitude) correctly (bigint)", () => {
+    // -10_000_000 stroops = -1.0000000 XLM
+    const result = formatTokenAmount(-10_000_000n, 7, "XLM");
+    expect(result).toMatch(/^-/);
+    expect(result).toContain("XLM");
+  });
+
+  it("formats -1 XLM correctly (string input)", () => {
+    const result = formatTokenAmount("-10000000", 7, "XLM");
+    expect(result).toMatch(/^-/);
+  });
+
+  it("formats -1 XLM correctly (number input)", () => {
+    const result = formatTokenAmount(-10_000_000, 7, "XLM");
+    expect(result).toMatch(/^-/);
+  });
+
+  // ── #954 regression: negative zero-whole-part ────────────────────────────
+  // raw = -500_000, decimals = 7 → wholePart = 0n, represents -0.05 XLM.
+  // Before the fix this rendered as "0.0500000 XLM" (sign silently dropped).
+
+  it("#954 bigint: -500_000n with 7 decimals starts with '-' (not '0')", () => {
+    const result = formatTokenAmount(-500_000n, 7, "XLM");
+    expect(result).toMatch(/^-/);
+    expect(result).toContain("XLM");
+    // Must NOT start with bare "0" (which would mean sign was lost)
+    expect(result).not.toMatch(/^0/);
+  });
+
+  it("#954 string: '-500000' with 7 decimals starts with '-'", () => {
+    const result = formatTokenAmount("-500000", 7, "XLM");
+    expect(result).toMatch(/^-/);
+    expect(result).not.toMatch(/^0/);
+  });
+
+  it("#954 number: -500_000 with 7 decimals starts with '-'", () => {
+    const result = formatTokenAmount(-500_000, 7, "XLM");
+    expect(result).toMatch(/^-/);
+    expect(result).not.toMatch(/^0/);
+  });
+
+  it("#954 fractional digits are preserved for zero-whole-part negative", () => {
+    // -500_000 / 10^7 = -0.0500000 — verify the fractional digits are correct
+    const result = formatTokenAmount(-500_000n, 7, "XLM");
+    // After the leading '-0<sep>' the fractional part should be '0500000'
+    expect(result).toMatch(/^-0[.,]0500000 XLM$/);
+  });
+
+  it("#954 smallest negative amount (-1 stroop) renders with leading '-'", () => {
+    const result = formatTokenAmount(-1n, 7, "XLM");
+    expect(result).toMatch(/^-/);
+    expect(result).not.toMatch(/^0/);
+  });
+
+  it("#954 positive zero is unaffected (no spurious '-')", () => {
+    const result = formatTokenAmount(0n, 7, "XLM");
+    expect(result).not.toMatch(/^-/);
+  });
+
+  it("#954 positive small amount is unaffected", () => {
+    const result = formatTokenAmount(500_000n, 7, "XLM");
+    expect(result).not.toMatch(/^-/);
+    expect(result).toMatch(/^0/);
+  });
+
+  // ── Input validation ──────────────────────────────────────────────────────
+
+  it("throws TypeError for a non-integer string", () => {
+    expect(() => formatTokenAmount("1234.56", 7, "XLM")).toThrow(TypeError);
+  });
+
+  it("throws TypeError for an empty string", () => {
+    expect(() => formatTokenAmount("", 7, "XLM")).toThrow(TypeError);
+  });
+
+  it("throws RangeError for an unsafe integer number", () => {
+    const unsafe = Number.MAX_SAFE_INTEGER + 1;
+    expect(() => formatTokenAmount(unsafe, 0, "USDC")).toThrow(RangeError);
   });
 });
 

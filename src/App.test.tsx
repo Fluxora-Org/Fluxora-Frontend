@@ -49,8 +49,6 @@ vi.mock("./components/wallet-connect/Walletcontext", () => ({
   WalletProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
-  // RequireWallet guards the /app subtree via useWallet; report a connected,
-  // finished-restoring wallet so the lazy app routes render in these tests.
   useWallet: () => ({
     address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN",
     network: "TESTNET",
@@ -208,4 +206,3 @@ describe("App empty-state-demo routing based on environment", () => {
     expect(await screen.findByRole("heading", { name: "Not found route" })).toBeInTheDocument();
   });
 });
-

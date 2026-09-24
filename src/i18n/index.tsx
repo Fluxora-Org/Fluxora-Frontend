@@ -1,10 +1,17 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { en } from "./en";
+import { createPseudoLocale } from "./zx";
 
 /**
  * Supported locales in the application.
+ *
+ * Note on CJK and composed-input locales:
+ * Locale catalogs provide translated field labels and error messages, while IME composition
+ * handling in components (Input.tsx, InputField.tsx) defers validation feedback and screen reader
+ * announcements until `compositionend` is received. For detailed design specs and guidelines, see
+ * `docs/IME_COMPOSITION_SUPPORT_SPEC.md`.
  */
-export type Locale = "en" | "es";
+export type Locale = "en" | "es" | "zx";
 
 /**
  * The structure of the translation catalog, based on the English catalog.
@@ -38,7 +45,9 @@ export interface I18nContextType {
   locale: Locale;
   /**
    * Retrieves the translated message for a given key, performs interpolation,
-   * escapes user input, and handles pluralization.
+   * and handles pluralization. Parameters are substituted verbatim; React
+   * escapes text content automatically when t() output is used as a JSX text
+   * child, which is the only supported rendering contract.
    */
   t: (key: TranslationKey | PluralizableKey, params?: TranslationParams) => string;
   /** Changes the active locale. */
@@ -89,7 +98,17 @@ const es: Partial<TranslationCatalog> = {
 
 /**
  * Resolves a translation key to its corresponding message, handles fallback,
- * pluralization, and interpolates/escapes parameters.
+ * pluralization, and interpolates parameters.
+ *
+ * Parameters are substituted verbatim — HTML escaping is intentionally omitted
+ * because all current consumers render the result as plain JSX text children
+ * (e.g. `<p>{t("key", { name })}</p>`), and React already escapes text content
+ * before writing to the DOM.  Calling escapeHtml here would cause double-escaping:
+ * a value like "Acme & Co" would appear on-screen as "Acme &amp; Co".
+ *
+ * If a future consumer needs to use t() output inside dangerouslySetInnerHTML,
+ * that call site is responsible for escaping the returned string — do not add
+ * escaping back here.
  *
  * @param catalog The translation catalog to look up keys in.
  * @param key The translation key or a base pluralizable key.
@@ -119,15 +138,14 @@ export function translate(
     return resolvedKey;
   }
 
-  // Interpolation and Escaping
+  // Interpolation — substitute params verbatim; see JSDoc for escaping rationale
   if (params) {
     let result = value;
     for (const [paramKey, paramValue] of Object.entries(params)) {
-      const escapedValue = escapeHtml(String(paramValue));
       // Escape regex-metacharacters in the param key so a caller-controlled key
       // such as "amount.usd" cannot widen the match or throw an invalid-pattern error.
       const escapedKey = escapeRegExp(paramKey);
-      result = result.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), escapedValue);
+      result = result.replace(new RegExp(`\\{${escapedKey}\\}`, "g"), String(paramValue));
     }
     return result;
   }
@@ -150,7 +168,16 @@ export function I18nProvider({ children, defaultLocale = "en" }: I18nProviderPro
   const [locale, setLocale] = useState<Locale>(defaultLocale);
 
   // Active catalog selection
-  const catalog: TranslationCatalog = locale === "en" ? en : ({ ...en, ...es } as TranslationCatalog);
+  const catalog: TranslationCatalog = (() => {
+    switch (locale) {
+      case "zx":
+        return createPseudoLocale(en);
+      case "es":
+        return { ...en, ...es } as TranslationCatalog;
+      default:
+        return en;
+    }
+  })();
 
   const t = (key: TranslationKey | PluralizableKey, params?: TranslationParams): string => {
     return translate(catalog, en, key, params);

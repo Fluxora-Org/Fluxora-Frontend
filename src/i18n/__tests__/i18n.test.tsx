@@ -23,14 +23,26 @@ describe("i18n translate helper", () => {
     expect(result).toBe("38.62 USDC per day");
   });
 
-  it("escapes user-provided parameters to prevent XSS", () => {
+  it("does not HTML-escape params — special characters pass through verbatim for JSX text rendering", () => {
+    // t() is only ever used as a plain JSX text child (e.g. <p>{t(...)}</p>).
+    // React escapes text content itself, so escaping here would cause
+    // double-escaping: "Acme & Co" would render as "Acme &amp; Co".
     const maliciousInput = "<script>alert('xss')</script> & \"quotes\"";
     const result = translate(en, en, "createStream.step3.rateValue", {
       accrualRate: maliciousInput,
     });
     expect(result).toBe(
-      "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt; &amp; &quot;quotes&quot; USDC per day"
+      "<script>alert('xss')</script> & \"quotes\" USDC per day"
     );
+  });
+
+  it("interpolated & < > characters pass through as literal text, not HTML entities", () => {
+    // Plain JSX rendering: React will display these characters correctly on-screen.
+    // If t() escaped them, the screen would show "Acme &amp; Co &lt;10&gt;".
+    const result = translate(en, en, "createStream.step3.rateValue", {
+      accrualRate: "Acme & Co <10>",
+    });
+    expect(result).toBe("Acme & Co <10> USDC per day");
   });
 
   it("handles pluralization for day/days correctly based on count", () => {

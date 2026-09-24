@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun, Type, Search, Command } from "lucide-react";
+import { Menu, X, Type, Search, Command, AlertTriangle } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
@@ -11,8 +11,13 @@ import {
   formatNavbarTime,
   formatLocalISOWithOffset,
   getBrowserTimezone,
+  getFormattedUTCOffset,
 } from "../../lib/timePresentation";
+
 import { VoiceMicButton } from "../voice/VoiceMicButton";
+import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
+
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -149,21 +154,6 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   }, [pathname]);
 }
 
-function getFormattedUTCOffset(date: Date, tz: string): string {
-  if (tz === "UTC") return "UTC+00:00";
-  try {
-    const offsetMin = date.getTimezoneOffset();
-    const absOffsetMin = Math.abs(offsetMin);
-    const offsetHours = Math.floor(absOffsetMin / 60);
-    const offsetMinutes = absOffsetMin % 60;
-    const sign = offsetMin <= 0 ? "+" : "-";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
-  } catch (e) {
-    return "UTC+00:00";
-  }
-}
-
 function NavbarTimeIndicator() {
   const [manualTime, setManualTime] = useState<Date | null>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -288,7 +278,7 @@ export default function AppNavbar({
   onSidebarToggle,
   isSidebarOpen = false,
 }: AppNavbarProps) {
-  const { theme, toggleTheme, easyReadFont, toggleEasyReadFont } = useTheme();
+  const { easyReadFont, toggleEasyReadFont } = useTheme();
   const {
     connected,
     address,
@@ -296,39 +286,85 @@ export default function AppNavbar({
     expectedNetwork,
     isNetworkMismatch,
     disconnect,
+    loading,
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
 
-  // Simulate a brief "connecting" state on first mount when wallet restores session
+  /**
+   * Route-transition lock.
+   *
+   * Design decision: a route change settles asynchronously (data fetches,
+   * lazy routes, pending renders). Until it settles we mark the navbar as
+   * `routeTransitioning` for a short window. While transitioning:
+   *   - Wallet/account *action* controls (disconnect, copy address, explorer,
+   *     workspace links) are locked so an action bound to the previous route's
+   *     context cannot be invoked against the new one.
+   *   - Wallet *identity* (network badge + address, including a wrong-network
+   *     badge) stays visible so the user keeps orientation.
+   *   - Global controls (theme, easy-read font, search, voice) remain available.
+   *
+   * The timer is re-armed on every pathname change, so rapid navigation keeps
+   * the lock active until the last transition settles, and browser
+   * back/forward re-arms it for the restored route.
+   */
+  const location = useLocation();
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    setConnecting(true);
-    const t = setTimeout(() => setConnecting(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+    setRouteTransitioning(true);
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = setTimeout(() => setRouteTransitioning(false), 250);
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, [location.pathname]);
 
-const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
   const breadcrumbs = useBreadcrumbs(location.pathname);
   const showBreadcrumb = isAppView && breadcrumbs.length > 1;
   const links = connected ? APP_PRIMARY_LINKS : ANON_LINKS;
 
-  const handleMobileToggle = () => {
-    if (isAppView && onSidebarToggle) {
-      onSidebarToggle();
-    } else {
-      setMobileMenuOpen((o) => !o);
+  // Anon hamburger — kept as a ref so focus can be deterministically returned
+  // to it whenever the mobile menu closes via keyboard (Escape) or link
+  // activation, instead of being silently dropped to <body>.
+  const hamburgerButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeMobile = useCallback((options?: { restoreFocus?: boolean }) => {
+    setMobileMenuOpen(false);
+    if (options?.restoreFocus) {
+      hamburgerButtonRef.current?.focus();
+    }
+  }, []);
+
+  // Safety net: any route change closes the mobile menu, regardless of
+  // whether it was triggered by clicking a link inside it (browser
+  // back/forward, programmatic navigation, etc. bypass that handler).
+  // This keeps menu state deterministic across rerenders instead of being
+  // contingent on which specific interaction caused the navigation.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && mobileMenuOpen) {
+      closeMobile({ restoreFocus: true });
     }
   };
-
-  const closeMobile = () => setMobileMenuOpen(false);
 
   return (
     <header
       role="banner"
       aria-label="Global navigation"
+      onKeyDown={handleHeaderKeyDown}
       className="sticky top-0 z-50 w-full border-b border-[var(--navbar-border)] bg-[var(--navbar-bg)]/80 backdrop-blur-md"
     >
+      {/* Skip link — visually hidden until focused, lets keyboard users jump past the navbar */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-[var(--navbar-bg)] focus:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] focus:text-sm focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-4">
@@ -413,7 +449,7 @@ const location = useLocation();
               aria-label="Toggle easy-read font"
               aria-pressed={easyReadFont}
               title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
                   : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
@@ -423,30 +459,12 @@ const location = useLocation();
             </button>
 
             {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              {theme === "light" ? (
-                <Moon className="icon-xs" aria-hidden="true" />
-              ) : (
-                <Sun className="icon-xs" aria-hidden="true" />
-              )}
-            </button>
+            <ThemeSegmentedControl />
 
-            {/* Wallet area */}
-            {connecting ? (
+            {/* Wallet area - State precedence: loading > disconnected > wrong network > connected */}
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
-              <WalletStatus
-                address={address}
-                network={network ?? "TESTNET"}
-                expectedNetwork={expectedNetwork}
-                isNetworkMismatch={isNetworkMismatch}
-                onDisconnect={disconnect}
-              />
-            ) : (
+            ) : !connected ? (
               <Link
                 to="/connect-wallet"
                 aria-label="Connect your Stellar wallet"
@@ -454,17 +472,41 @@ const location = useLocation();
               >
                 Connect Wallet
               </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
+              <WalletStatus
+                address={address ?? ""}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={disconnect}
+                disabled={routeTransitioning}
+              />
             )}
           </div>
 
-          {/* Mobile: hamburger (only in Marketing View or if not using sidebar) */}
+          {/* Mobile hamburger — anon (marketing) view only.
+               In app view the sidebar toggle above the logo handles mobile nav. */}
           {!isAppView && (
             <button
-              className="md:hidden flex items-center justify-center w-[44px] h-[44px] rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-              onClick={handleMobileToggle}
-              aria-label={
-                mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
-              }
+              ref={hamburgerButtonRef}
+              type="button"
+              className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
             >
@@ -502,7 +544,7 @@ const location = useLocation();
               key={link.to}
               to={link.to}
               label={link.label}
-              onClick={closeMobile}
+              onClick={() => closeMobile({ restoreFocus: true })}
             />
           ))}
 
@@ -513,7 +555,7 @@ const location = useLocation();
               aria-label="Toggle easy-read font"
               aria-pressed={easyReadFont}
               title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
-              className={`flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
                   : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
@@ -522,45 +564,51 @@ const location = useLocation();
               <Type size={16} aria-hidden="true" />
             </button>
 
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            >
-              {theme === "light" ? (
-                <Moon className="icon-xs" aria-hidden="true" />
-              ) : (
-                <Sun className="icon-xs" aria-hidden="true" />
-              )}
-            </button>
-
-            {connecting ? (
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
-              <WalletStatus
-                address={address}
-                network={network ?? "TESTNET"}
-                expectedNetwork={expectedNetwork}
-                isNetworkMismatch={isNetworkMismatch}
-                onDisconnect={() => {
-                  disconnect();
-                  closeMobile();
-                }}
-              />
-            ) : (
+            ) : !connected ? (
               <Link
                 to="/connect-wallet"
-                onClick={closeMobile}
+                onClick={() => closeMobile({ restoreFocus: true })}
                 aria-label="Connect your Stellar wallet"
                 className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
               >
                 Connect Wallet
               </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  onClick={() => closeMobile({ restoreFocus: true })}
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
+              <WalletStatus
+                address={address ?? ""}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={() => {
+                  disconnect();
+                  closeMobile({ restoreFocus: true });
+                }}
+                disabled={routeTransitioning}
+              />
             )}
           </div>
         </div>
       )}
+
+      {/* Command Palette — rendered inside header but uses fixed positioning */}
+      <KeyboardShortcutsModal />
     </header>
   );
 }

@@ -46,6 +46,53 @@ describe("TransactionReceiptPreview component", () => {
     expect(screen.getByText(/pending rpc confirmation/i)).toBeInTheDocument();
   });
 
+  it("renders explorer link with testnet network segment when network is TESTNET", () => {
+    const testnetData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Testnet",
+    };
+    render(<TransactionReceiptPreview data={testnetData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/testnet/tx/${mockConfirmedData.txHash}`,
+    );
+  });
+
+  it("renders explorer link with public network segment when network is PUBLIC", () => {
+    const publicData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Public Network (Mainnet)",
+    };
+    render(<TransactionReceiptPreview data={publicData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      `https://stellar.expert/explorer/public/tx/${mockConfirmedData.txHash}`,
+    );
+    expect(explorerLink).toHaveAttribute("target", "_blank");
+    expect(explorerLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("keeps contract-derived hashes inside a fixed HTTPS receipt URL", () => {
+    const unsafeHashData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Public Network (Mainnet)",
+      txHash: "javascript:alert(1)",
+    };
+    render(<TransactionReceiptPreview data={unsafeHashData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      "https://stellar.expert/explorer/public/tx/javascript%3Aalert(1)",
+    );
+    expect(explorerLink).toHaveAttribute("target", "_blank");
+    expect(explorerLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("triggers download action when 'Download Receipt' button is clicked", async () => {
     const handleDownloaded = vi.fn();
     render(

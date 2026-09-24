@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { VoiceProvider, useVoiceContext } from "../VoiceContext";
 import { VoiceMicButton } from "../VoiceMicButton";
@@ -110,6 +110,53 @@ describe("Voice Command Navigation System", () => {
 
     expect(screen.getByTestId("voice-state").textContent).toBe(
       "command-recognized"
+    );
+  });
+
+  it("does NOT trigger destructive confirmation for utterances that merely contain the destructive phrase as a substring (Issue #938)", () => {
+    function SubstringTester() {
+      const { state, processSpokenPhrase } = useVoiceContext();
+      return (
+        <div>
+          <span data-testid="state">{state}</span>
+          <button
+            data-testid="negated-btn"
+            onClick={() =>
+              processSpokenPhrase("please don't cancel stream")
+            }
+          >
+            Negated Phrase
+          </button>
+          <button
+            data-testid="exact-btn"
+            onClick={() => processSpokenPhrase("Cancel stream")}
+          >
+            Exact Phrase
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/app"]}>
+        <VoiceProvider>
+          <SubstringTester />
+          <VoiceConfirmModal />
+        </VoiceProvider>
+      </MemoryRouter>
+    );
+
+    // Saying a longer utterance that contains the substring "cancel stream" must
+    // NOT transition to confirming-destructive.
+    fireEvent.click(screen.getByTestId("negated-btn"));
+    expect(screen.getByTestId("state").textContent).not.toBe(
+      "confirming-destructive"
+    );
+
+    // The exact phrase should still work as before.
+    fireEvent.click(screen.getByTestId("exact-btn"));
+    expect(screen.getByTestId("state").textContent).toBe(
+      "confirming-destructive"
     );
   });
 

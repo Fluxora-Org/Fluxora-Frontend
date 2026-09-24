@@ -22,11 +22,22 @@ export interface AppConfig {
   rpcUrl: string | null;
   streamContractId: string | null;
   useMocks: boolean;
+  demoMode: boolean;
 }
 
 export interface ConfigError {
   field: string;
   message: string;
+}
+
+export class ConfigValidationError extends Error {
+  readonly errors: ConfigError[];
+
+  constructor(errors: ConfigError[]) {
+    super(errors.map((error) => error.message).join(" "));
+    this.name = "ConfigValidationError";
+    this.errors = errors;
+  }
 }
 
 /**
@@ -48,7 +59,7 @@ export function validateUrl(
   try {
     parsed = new URL(trimmed);
   } catch {
-    return { field, message: `${field}: "${trimmed}" is not a valid URL` };
+    return { field, message: `${field} must be an absolute HTTPS URL (HTTP is only allowed for localhost during development).` };
   }
 
   const isLocal =
@@ -59,7 +70,7 @@ export function validateUrl(
 
   return {
     field,
-    message: `${field}: protocol "${parsed.protocol}" is not allowed; use https${isLocal ? " or http (localhost only)" : ""}`,
+    message: `${field} must use HTTPS (HTTP is only allowed for localhost during development).`,
   };
 }
 
@@ -88,7 +99,7 @@ export function validateContractId(
   if (!STELLAR_CONTRACT_ID_RE.test(trimmed)) {
     return {
       field,
-      message: `${field}: "${trimmed}" is not a valid Stellar contract ID (expected a 56-character Strkey starting with 'C')`,
+      message: `${field} must be a valid 56-character Stellar contract ID starting with C.`,
     };
   }
   return trimmed;
@@ -107,6 +118,19 @@ export function parseBooleanFlag(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
+function validateBooleanFlag(field: string, value: string | undefined): ConfigError | null {
+  if (value === undefined || value.trim() === "") return null;
+  if (["true", "false", "1", "0"].includes(value)) return null;
+  return { field, message: `${field} must be true, false, 1, or 0.` };
+}
+
+function networkHintMismatch(network: StellarNetwork, rpcUrl: string): boolean {
+  const hostname = new URL(rpcUrl).hostname.toLowerCase();
+  const isTestnet = hostname.includes("testnet");
+  const isPublic = hostname.includes("mainnet") || hostname.includes("public");
+  return (network === "TESTNET" && isPublic) || (network === "PUBLIC" && isTestnet);
+}
+
 export function getNetworkLabel(network: StellarNetwork): string {
   return NETWORK_LABELS[network];
 }
@@ -118,6 +142,9 @@ export function getNetworkPassphrase(network: StellarNetwork): string {
 export { getNetworkExplorerPath };
 
 export function createConfig(env: ImportMetaEnv): AppConfig {
+  const demoMode = parseBooleanFlag(env.VITE_DEMO_MODE);
+  const useMocks = parseBooleanFlag(env.VITE_USE_MOCKS);
+  const normalizedNetwork = env.VITE_NETWORK?.trim().toUpperCase();
   const network = getExpectedStellarNetwork(env.VITE_NETWORK);
 
   const apiUrlResult = optionalUrl("apiUrl", env.VITE_API_URL);
@@ -128,6 +155,17 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
   );
 
   const errors: ConfigError[] = [];
+  if (!demoMode && !normalizedNetwork) {
+    errors.push({ field: "VITE_NETWORK", message: "VITE_NETWORK is required outside demo mode; set it to PUBLIC or TESTNET." });
+  } else if (normalizedNetwork && !["PUBLIC", "TESTNET"].includes(normalizedNetwork)) {
+    errors.push({ field: "VITE_NETWORK", message: "VITE_NETWORK must be PUBLIC or TESTNET." });
+  }
+  for (const booleanError of [
+    validateBooleanFlag("VITE_DEMO_MODE", env.VITE_DEMO_MODE),
+    validateBooleanFlag("VITE_USE_MOCKS", env.VITE_USE_MOCKS),
+  ]) {
+    if (booleanError) errors.push(booleanError);
+  }
   if (apiUrlResult && typeof apiUrlResult === "object")
     errors.push(apiUrlResult);
   if (rpcUrlResult && typeof rpcUrlResult === "object")
@@ -135,8 +173,18 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
   if (contractIdResult && typeof contractIdResult === "object")
     errors.push(contractIdResult);
 
+  if (!demoMode && !useMocks) {
+    if (!env.VITE_RPC_URL?.trim())
+      errors.push({ field: "VITE_RPC_URL", message: "VITE_RPC_URL is required for live mode; set an HTTPS Soroban RPC endpoint or enable demo/mocks." });
+    if (!env.VITE_STREAM_CONTRACT_ID?.trim())
+      errors.push({ field: "VITE_STREAM_CONTRACT_ID", message: "VITE_STREAM_CONTRACT_ID is required for live mode; set the deployed contract ID or enable demo/mocks." });
+  }
+  if (typeof rpcUrlResult === "string" && networkHintMismatch(network, rpcUrlResult)) {
+    errors.push({ field: "VITE_RPC_URL", message: "VITE_RPC_URL appears to target a different Stellar network than VITE_NETWORK." });
+  }
+
   if (errors.length > 0) {
-    throw new Error(errors.map((e) => e.message).join("; "));
+    throw new ConfigValidationError(errors);
   }
 
   return {
@@ -146,7 +194,8 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
     networkPassphrase: getNetworkPassphrase(network),
     rpcUrl: rpcUrlResult as string | null,
     streamContractId: contractIdResult as string | null,
-    useMocks: parseBooleanFlag(env.VITE_USE_MOCKS),
+    useMocks,
+    demoMode,
   };
 }
 
@@ -156,4 +205,31 @@ export function createConfig(env: ImportMetaEnv): AppConfig {
  * Only Vite-exposed `VITE_` values are read here. Do not place secrets in these
  * variables; RPC URLs and contract IDs are public client metadata.
  */
-export const config = createConfig(import.meta.env);
+export interface LoadedConfig {
+  config: AppConfig;
+  error: ConfigValidationError | null;
+}
+
+const SAFE_CONFIG: AppConfig = {
+  apiUrl: null,
+  network: "TESTNET",
+  networkLabel: getNetworkLabel("TESTNET"),
+  networkPassphrase: getNetworkPassphrase("TESTNET"),
+  rpcUrl: null,
+  streamContractId: null,
+  useMocks: true,
+  demoMode: false,
+};
+
+export function loadConfig(env: ImportMetaEnv): LoadedConfig {
+  try {
+    return { config: createConfig(env), error: null };
+  } catch (error) {
+    if (error instanceof ConfigValidationError) {
+      return { config: SAFE_CONFIG, error };
+    }
+    throw error;
+  }
+}
+
+export const { config, error: configError } = loadConfig(import.meta.env);

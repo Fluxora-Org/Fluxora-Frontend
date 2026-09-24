@@ -7,6 +7,7 @@ import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import TruncatedAddress from "../common/TruncatedAddress";
 import "./StreamRow.css";
 
 interface Props {
@@ -24,12 +25,6 @@ interface Props {
   onCompareToggle?: (id: string) => void;
 }
 
-function truncateAddress(address: string) {
-  return address.length > 14
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : address;
-}
-
 function formatAccruedAmount(amount: number) {
   // Use `formatNumber` (locale-aware, no hardcoded "en-US") — issue #388
   return `${formatNumber(amount, 2)} USDC accrued`;
@@ -43,14 +38,12 @@ export default function StreamRow({
   onCompareToggle,
 }: Props) {
   const navigate = useNavigate();
-  const recipientLabel = truncateAddress(stream.recipient);
   const toast = useOptionalToast();
   const { copy } = useClipboard();
 
   // Menu states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState({ x: 0, y: 0 });
-  const [openedViaTrigger, setOpenedViaTrigger] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
 
   // Long press / Touch states
@@ -65,7 +58,6 @@ export default function StreamRow({
 
   const openMenu = (x: number, y: number, viaTrigger: boolean) => {
     setIsMenuOpen(true);
-    setOpenedViaTrigger(viaTrigger);
     setFocusedIndex(0);
 
     let targetX = x;
@@ -297,6 +289,7 @@ export default function StreamRow({
           className="py-4 px-3"
           style={{ width: "2.5rem" }}
           onClick={(e) => e.stopPropagation()}
+          data-label=""
         >
           <input
             type="checkbox"
@@ -313,7 +306,7 @@ export default function StreamRow({
         </td>
       )}
 
-      <td className="py-4 px-3">
+      <td className="py-4 px-3" data-label="STREAM">
         <div
           className="font-medium"
           style={{ color: "var(--color-text-primary)" }}
@@ -327,27 +320,26 @@ export default function StreamRow({
 
       <td
         className="py-4 px-3"
+        data-label="RECIPIENT"
         style={{ color: "var(--color-text-primary)" }}
         title={stream.recipient}
         aria-label={`Recipient ${stream.recipient}`}
       >
-        {recipientLabel}
+        <TruncatedAddress address={stream.recipient} label="" className="stream-row__address" />
       </td>
 
-      <td className="py-4 px-3" style={{ color: "var(--color-text-primary)" }}>
-        <div>{stream.rate}</div>
-        {typeof stream.accruedAmount === "number" && (
-          <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {formatAccruedAmount(stream.accruedAmount)}
-          </div>
-        )}
+      <td className="stream-row__cell py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
+        <div className="stream-row__amount">{stream.rate}</div>
+        <div className="stream-row__amount text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {formatAccruedAmount(stream.accruedAmount)}
+        </div>
       </td>
 
-      <td className="stream-row__cell py-4 px-3">
+      <td className="stream-row__cell py-4 px-3" data-label="STATUS">
         <StatusPill status={stream.status} />
       </td>
 
-      <td className="stream-row__cell py-4 px-3">
+      <td className="stream-row__cell py-4 px-3" data-label="ACTION">
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"

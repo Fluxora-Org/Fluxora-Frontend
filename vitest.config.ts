@@ -18,6 +18,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
+        // Public landing page and its lazy-section infrastructure
+        "src/pages/Home.tsx",
         "src/components/GlowingDot.tsx",
         "src/components/GetStartedCTA.tsx",
         "src/components/InputField.tsx",
@@ -26,6 +28,7 @@ export default defineConfig({
         "src/components/ZeroAccrualBanner.tsx",
         "src/components/useModalAccessibility.ts",
         "src/components/navigation/NavLink.tsx",
+        "src/components/navigation/ThemeSegmentedControl.tsx",
         "src/components/RecentStreams.tsx",
         "src/components/StreamsLoading.tsx",
         "src/components/ToastNotification.tsx",
@@ -33,11 +36,14 @@ export default defineConfig({
         "src/components/WalletIcon.tsx",
         "src/components/treasuryOverviewPage/MetricCard.tsx",
         "src/components/treasuryOverviewPage/StatusPill.tsx",
+        "src/design-tokens.css",
         "src/components/treasuryOverviewPage/Metrics.tsx",
         "src/components/treasuryOverviewPage/RecentStreams.tsx",
         "src/components/treasuryOverviewPage/StreamRow.tsx",
         "src/components/treasuryOverviewPage/useTreasury.ts",
         "src/components/wallet-connect/Walletbutton.tsx",
+        "src/components/wallet-connect/useWalletStateMachine.ts",
+        "src/components/ConnectWalletModal.tsx",
         "src/data/streamRecords.ts",
         "src/fixtures/malformedStreamRecords.ts",
         "src/lib/formatters.ts",
@@ -48,11 +54,33 @@ export default defineConfig({
         "src/lib/recentStreamMapper.ts",
         "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
+        "src/theme/themeBootstrap.ts",
         // Colour-blind simulation module
         "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
         // Contrast utilities
         "src/utils/contrastUtils.ts",
+        // Dynamic favicon badge
+        "src/utils/faviconBadge.ts",
+        // Activity Heatmap
+        "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
+        // Treasury flow Sankey diagram
+        "src/components/treasuryOverviewPage/TreasuryFlowSankey.tsx",
+        // Presence feature
+        "src/components/presence/PresenceBadge.tsx",
+        "src/components/presence/PresenceViewerList.tsx",
+        "src/hooks/usePresenceViewers.ts",
+        "src/hooks/useEmbedAccessibility.ts",
+        // CSV bulk-upload feature
+        "src/components/csv-upload/csvParser.ts",
+        "src/components/csv-upload/CsvDropZone.tsx",
+        "src/components/csv-upload/ColumnMappingStep.tsx",
+        "src/components/csv-upload/PreviewValidateStep.tsx",
+        // Security headers (CSP + browser security header definitions, #1408)
+        "src/lib/securityHeaders.ts",
+        // Issue #1410: split Streams page data loading from table rendering
+        "src/pages/useStreamsData.ts",
+        "src/components/Streams/StreamsListPanel.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

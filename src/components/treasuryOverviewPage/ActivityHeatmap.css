@@ -1,0 +1,182 @@
+/* ========================================
+   ActivityHeatmap Component Styles
+   ======================================== */
+
+.activity-heatmap-container {
+  display: flex;
+  flex-col: column;
+  flex-direction: column;
+  background: var(--color-surface-default, #ffffff);
+  border: 1px solid var(--color-border-default, var(--color-border, #e2e8f0));
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-xl, 24px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  margin-bottom: var(--space-xl, 24px);
+}
+
+.activity-heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md, 12px);
+}
+
+.activity-heatmap-title {
+  margin: 0;
+  font: var(--font-heading-4, 600 16px/24px inherit);
+  color: var(--color-text-primary);
+}
+
+/* Scroll Wrapper for Grid */
+.heatmap-grid-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--space-sm, 8px);
+}
+
+/* Responsive horizontal layout scroll */
+@media (min-width: 640px) {
+  .heatmap-grid-scroll-wrapper {
+    overflow-x: visible;
+  }
+}
+
+.heatmap-grid-scroll-content {
+  width: max-content;
+}
+
+/* Grid Layout: 12 Columns (Weeks), 7 Rows (Mon-Sun) */
+.heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  grid-template-columns: repeat(12, 12px);
+  grid-auto-flow: column;
+  gap: 3px;
+}
+
+/* Cell Style */
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast, 150ms) ease;
+}
+
+/* Focus outline details */
+.heatmap-cell:focus-visible {
+  outline: 2px solid var(--color-focus, #00b8d4);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+  z-index: 10;
+}
+
+/* Level Color Intensities */
+.heatmap-cell--level-0 {
+  background-color: var(--color-surface-2, #f1f5f9);
+}
+
+.heatmap-cell--level-1 {
+  background-color: color-mix(in srgb, var(--color-accent-secondary, #00d4aa) 20%, transparent);
+}
+
+.heatmap-cell--level-2 {
+  background-color: color-mix(in srgb, var(--color-accent-secondary, #00d4aa) 45%, transparent);
+}
+
+.heatmap-cell--level-3 {
+  background-color: color-mix(in srgb, var(--color-accent-secondary, #00d4aa) 70%, transparent);
+}
+
+.heatmap-cell--level-4 {
+  background-color: var(--color-accent-secondary, #00d4aa);
+}
+
+/* Skeleton Loading Animation */
+.skeleton-pulse {
+  animation: skeleton-pulse-keyframes 1.5s ease-in-out infinite;
+  cursor: default;
+}
+
+@keyframes skeleton-pulse-keyframes {
+  0%, 100% {
+    background-color: var(--color-surface-2, #f1f5f9);
+  }
+  50% {
+    background-color: var(--color-surface-elevated, #e2e8f0);
+  }
+}
+
+/* Tooltip Styles */
+.heatmap-tooltip {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  background: var(--color-surface-elevated, #ffffff);
+  border: 1px solid var(--color-border, var(--color-border-default, #cbd5e1));
+  color: var(--color-text-primary, #0f172a);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+  white-space: nowrap;
+}
+
+/* Legend Row styling */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-md, 12px);
+  font-size: var(--font-body-sm);
+}
+
+.legend-label {
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.75rem;
+}
+
+.legend-cells {
+  display: flex;
+  gap: 3px;
+}
+
+.legend-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Table Alternative View Styles */
+.heatmap-table-wrapper {
+  overflow-x: auto;
+  margin-top: var(--space-sm, 8px);
+}
+
+.heatmap-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.heatmap-table th {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 2px solid var(--color-border-default, #e2e8f0);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.heatmap-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border-default, #e2e8f0);
+  color: var(--color-text-primary);
+}
+
+.heatmap-table tbody tr:hover {
+  background-color: var(--color-bg-secondary, #f8fafc);
+}

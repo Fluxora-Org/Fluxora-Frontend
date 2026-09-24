@@ -42,8 +42,11 @@ export default function WalletIcon({ name, iconSrc }: WalletIconProps) {
       {showImg ? (
         <img
           src={iconSrc}
-          alt={name}
+          alt={`${name} wallet logo`}
           onError={() => setImgFailed(true)}
+          loading="lazy"
+          width="32"
+          height="32"
           className="wallet-icon-img"
         />
       ) : (

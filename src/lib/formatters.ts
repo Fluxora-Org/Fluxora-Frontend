@@ -137,26 +137,36 @@ export function formatNumber(value: number, maxFractionDigits = 0): string {
 }
 
 /**
- * Format an amount with an arbitrary asset ticker suffix and no fraction digits.
+ * Format an amount with an arbitrary asset ticker suffix.
  * Useful for treasury-level stream rates such as "5,000 USDC/mo".
+ *
+ * By default no fraction digits are shown. Pass `maxFractionDigits` to
+ * preserve fractional precision; without it, fractional amounts are silently
+ * rounded to whole numbers.
  *
  * **Safe input range**: `amount` must be within `Number.MAX_SAFE_INTEGER`.
  * A `RangeError` is thrown for integer inputs that exceed this bound.
  * For large on-chain amounts use {@link formatTokenAmount}.
  *
- * @param amount - The numeric amount.
- * @param asset  - The asset ticker (e.g. "USDC").
- * @param suffix - Optional suffix appended after the asset (e.g. "/mo").
+ * @param amount            - The numeric amount.
+ * @param asset             - The asset ticker (e.g. "USDC").
+ * @param suffix            - Optional suffix appended after the asset (e.g. "/mo").
+ * @param maxFractionDigits - Maximum decimal places forwarded to `formatNumber`
+ *                            (default 0). Pass a positive value when displaying
+ *                            fractional token amounts such as accrual balances.
  *
  * @example
- * formatAssetAmount(5000, "USDC", "/mo") // → "5,000 USDC/mo"  (en-US)
+ * formatAssetAmount(5000, "USDC", "/mo")       // → "5,000 USDC/mo"     (en-US)
+ * formatAssetAmount(1234.567, "XLM", "", 2)    // → "1,234.57 XLM"      (en-US)
+ * formatAssetAmount(0.005, "USDC", "", 4)      // → "0.005 USDC"        (en-US)
  */
 export function formatAssetAmount(
   amount: number,
   asset: string,
   suffix = "",
+  maxFractionDigits = 0,
 ): string {
-  return `${formatNumber(amount)}${asset ? ` ${asset}` : ""}${suffix}`;
+  return `${formatNumber(amount, maxFractionDigits)}${asset ? ` ${asset}` : ""}${suffix}`;
 }
 
 // ─── Precision-Safe Large-Amount Formatting ──────────────────────────────────
@@ -224,6 +234,44 @@ function parseToBigInt(raw: TokenAmountInput): bigint {
 }
 
 /**
+ * Convert an exact decimal amount string into the token's **smallest unit**
+ * using BigInt string arithmetic, so large and highly precise amounts never
+ * pass through JavaScript `number` (which loses precision beyond
+ * `Number.MAX_SAFE_INTEGER`).
+ *
+ * This is the inverse of {@link formatTokenAmount} for decimal strings: it
+ * scales the value by `10^decimals` exactly and returns the result as a
+ * `bigint`, ready for {@link formatTokenAmount} or for on-chain payloads that
+ * expect smallest-unit integer strings.
+ *
+ * Validation is strict — only an optional leading minus followed by digits
+ * with an optional single decimal point is accepted. Malformed inputs such as
+ * `""`, `"abc"`, `"1.2.3"`, `"NaN"`, `"Infinity"`, or `"1e5"` throw a
+ * `TypeError` so corrupt values can never silently become valid amounts.
+ *
+ * Fractional digits beyond `decimals` are truncated, matching the app's input
+ * sanitization policy (e.g. stream deposits are capped at 7 decimal places).
+ *
+ * @example
+ * amountToSmallestUnits("100.5", 7)             // → 1005000000n
+ * amountToSmallestUnits("0.0000001", 7)         // → 1n
+ * amountToSmallestUnits("9007199254740993.1234567", 7) // → 90071992547409931234567n
+ */
+export function amountToSmallestUnits(value: string, decimals: number): bigint {
+  const trimmed = value.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    throw new TypeError(
+      `amountToSmallestUnits: cannot parse "${trimmed}" as a decimal amount string.`,
+    );
+  }
+  const [integerPart, fractionPart = ""] = trimmed.split(".");
+  const sign = integerPart.startsWith("-") ? "-" : "";
+  const absInteger = integerPart.replace(/^-/, "");
+  const fraction = fractionPart.slice(0, decimals).padEnd(decimals, "0");
+  return BigInt(`${sign}${absInteger}${fraction}`);
+}
+
+/**
  * Format a token amount expressed in the token's **smallest unit** with
  * precision-safe BigInt arithmetic.
  *
@@ -285,10 +333,85 @@ export function formatTokenAmount(
     // Determine the locale decimal separator
     const decimalSep = getDecimalSeparator();
 
-    displayStr = `${wholeFormatted}${decimalSep}${fracStr}`;
+    // When raw is negative but its magnitude is smaller than the divisor,
+    // BigInt truncating division yields wholePart = 0n, so Intl.NumberFormat
+    // renders "0" with no minus sign — silently losing the negative sign.
+    // Fix: detect the sign from the original raw value and prepend "-" when
+    // the whole part is zero but the original amount is negative.
+    const negativePrefix = raw < 0n && wholePart === 0n ? "-" : "";
+
+    displayStr = `${negativePrefix}${wholeFormatted}${decimalSep}${fracStr}`;
   }
 
   return `${displayStr}${asset ? ` ${asset}` : ""}${suffix}`;
+}
+
+// ─── BigInt Arithmetic Utilities ─────────────────────────────────────────────
+
+/**
+ * Parse a raw token amount string to `BigInt` for arithmetic.
+ * Accepts only integer strings (with optional leading minus).
+ * Returns `0n` for empty, whitespace-only, or non-numeric input.
+ *
+ * Unlike {@link parseToBigInt}, this helper never throws — it is designed for
+ * aggregation pipelines where a single malformed value should not abort the
+ * entire computation.
+ *
+ * @internal
+ */
+function safeTokenBigInt(value: string): bigint {
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") return 0n;
+  // Strip fractional part (keep only integer portion for whole-unit arithmetic)
+  const intPart = trimmed.split(".")[0];
+  if (!/^-?\d+$/.test(intPart)) return 0n;
+  return BigInt(intPart);
+}
+
+/**
+ * Sum an array of raw token-amount strings using BigInt arithmetic.
+ * Returns the total as a decimal integer string. Malformed entries are
+ * treated as `0` so a single bad value cannot corrupt the total.
+ *
+ * @example
+ * sumTokenAmounts(["9007199254740993", "1"]) // → "9007199254740994"
+ * sumTokenAmounts([])                         // → "0"
+ */
+export function sumTokenAmounts(amounts: string[]): string {
+  let total = 0n;
+  for (const a of amounts) {
+    total += safeTokenBigInt(a);
+  }
+  return total.toString();
+}
+
+/**
+ * Compare two raw token-amount strings using BigInt arithmetic.
+ * Returns `-1`, `0`, or `1` — suitable as an `Array.prototype.sort` comparator.
+ *
+ * @example
+ * compareTokenAmounts("9007199254740993", "9007199254740992") // → 1
+ * compareTokenAmounts("100", "100")                           // → 0
+ */
+export function compareTokenAmounts(a: string, b: string): number {
+  const bigA = safeTokenBigInt(a);
+  const bigB = safeTokenBigInt(b);
+  if (bigA < bigB) return -1;
+  if (bigA > bigB) return 1;
+  return 0;
+}
+
+/**
+ * Subtract `b` from `a` using BigInt arithmetic.
+ * Returns `max(0, a - b)` as a decimal integer string (clamped to zero).
+ *
+ * @example
+ * subtractTokenAmounts("1000", "300") // → "700"
+ * subtractTokenAmounts("100", "999")  // → "0"
+ */
+export function subtractTokenAmounts(a: string, b: string): string {
+  const diff = safeTokenBigInt(a) - safeTokenBigInt(b);
+  return (diff >= 0n ? diff : 0n).toString();
 }
 
 /**

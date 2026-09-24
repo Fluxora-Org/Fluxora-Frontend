@@ -9,6 +9,14 @@
  * - Handles hash-pending ("Pending confirmation") and hash-confirmed states.
  */
 
+import {
+  getExpectedStellarNetwork,
+  getNetworkExplorerPath,
+  normalizeStellarNetwork,
+} from "../lib/stellarNetwork";
+import { getNetworkLabel } from "../lib/config";
+import { formatTokenAmount } from "../lib/formatters";
+
 export interface ReceiptData {
   streamId: string;
   type: "Creation" | "Withdrawal";
@@ -20,6 +28,108 @@ export interface ReceiptData {
   txHash?: string | null;
   status: "confirmed" | "pending";
   network?: string;
+}
+
+/**
+ * Accepted exact amount inputs for {@link formatReceiptAmount}: a `bigint` or
+ * a decimal integer `string`, both expressed in the token's **smallest unit**.
+ * JavaScript `number` is deliberately excluded so token amounts can never be
+ * routed through the lossy IEEE-754 representation.
+ *
+ * Decimal display-unit strings (with a `.`) are rejected with a `TypeError`:
+ * a bare integer string like `"100"` is ambiguous between 100 display units
+ * and 100 smallest units, and silently guessing could corrupt a receipt.
+ * Convert decimal strings first with {@link amountToSmallestUnits}.
+ */
+export type ReceiptAmountInput = bigint | string;
+
+/**
+ * Strictly parses a smallest-unit integer string, mirroring the formatters'
+ * validation conventions, so malformed values throw instead of ever reaching
+ * the rendered receipt.
+ */
+function parseSmallestUnitsString(value: string): bigint {
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    const hint = trimmed.includes(".")
+      ? " Convert decimal display-unit strings with amountToSmallestUnits() first."
+      : "";
+    throw new TypeError(
+      `formatReceiptAmount: cannot parse "${trimmed}" as a smallest-unit integer string.${hint}`,
+    );
+  }
+  return BigInt(trimmed);
+}
+
+/**
+ * Format the exact token amount displayed on a receipt using the precision-safe
+ * {@link formatTokenAmount} pipeline (BigInt arithmetic + locale-aware Intl
+ * formatting). No JavaScript `number` conversion is involved, so amounts at or
+ * beyond `Number.MAX_SAFE_INTEGER` and amounts with the token's full decimal
+ * precision are preserved exactly.
+ *
+ * @param amount   - The exact amount in the token's **smallest unit**, as a
+ *                  `bigint` or decimal integer `string` (e.g. the withdrawal
+ *                  amount `"42000000000"` for 4,200 USDC at 7 decimals).
+ * @param decimals - Decimal places the token uses (7 for USDC on Stellar).
+ * @param asset    - Asset ticker appended to the formatted amount.
+ *
+ * @example
+ * // 9_007_199_254_740_993.1234567 USDC at 7 decimals
+ * formatReceiptAmount("90071992547409931234567", 7, "USDC")
+ *   // → "9,007,199,254,740,993.1234567 USDC"  (en-US, exact)
+ */
+export function formatReceiptAmount(
+  amount: ReceiptAmountInput,
+  decimals = 7,
+  asset = "USDC",
+): string {
+  const smallestUnits =
+    typeof amount === "bigint" ? amount : parseSmallestUnitsString(amount);
+  return formatTokenAmount(smallestUnits, decimals, asset);
+}
+
+/**
+ * Resolves the human-readable network label shown on the receipt.
+ * Prefer an explicit `data.network` from callers; otherwise use the app config.
+ */
+export function resolveReceiptNetworkLabel(
+  network?: string | null,
+): string {
+  const trimmed = network?.trim();
+  if (trimmed) return trimmed;
+  return getNetworkLabel(getExpectedStellarNetwork());
+}
+
+/**
+ * Maps a receipt network value (code or label) to a stellar.expert path segment.
+ */
+export function resolveReceiptExplorerSegment(
+  network?: string | null,
+): string {
+  const normalized = normalizeStellarNetwork(network);
+  if (normalized) return getNetworkExplorerPath(normalized);
+
+  const label = network?.trim().toLowerCase() ?? "";
+  if (label.includes("public") || label.includes("mainnet")) {
+    return getNetworkExplorerPath("PUBLIC");
+  }
+  if (label.includes("test")) {
+    return getNetworkExplorerPath("TESTNET");
+  }
+
+  return getNetworkExplorerPath(getExpectedStellarNetwork());
+}
+
+/**
+ * Builds a complete stellar.expert transaction explorer URL for receipt text.
+ */
+export function buildReceiptExplorerUrl(
+  txHash: string,
+  network?: string | null,
+): string {
+  const segment = resolveReceiptExplorerSegment(network);
+  return `https://stellar.expert/explorer/${segment}/tx/${encodeURIComponent(txHash)}`;
 }
 
 export function formatTimestamp(isoOrTimestamp?: string): string {
@@ -171,7 +281,7 @@ export function drawReceiptToCanvas(
 
   drawRow(415, "Sender Account", data.sender);
   drawRow(475, "Recipient Beneficiary", data.recipient);
-  drawRow(535, "Network / Ledger", data.network || "Stellar Testnet");
+  drawRow(535, "Network / Ledger", resolveReceiptNetworkLabel(data.network));
 
   // 5. TRANSACTION HASH VERIFICATION BLOCK
   ctx.fillStyle = "#94A3B8";
@@ -205,8 +315,12 @@ export function drawReceiptToCanvas(
     ctx.fillText(data.txHash || "—", 90, 695);
 
     ctx.fillStyle = "#94A3B8";
-    ctx.font = "12px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("Explorer: https://stellar.expert/explorer/testnet/tx/", 90, 725);
+    ctx.font = "11px monospace";
+    ctx.fillText(
+      `Explorer: ${buildReceiptExplorerUrl(data.txHash || "", data.network)}`,
+      90,
+      725,
+    );
   }
 
   // 6. FOOTER & DISCLAIMER

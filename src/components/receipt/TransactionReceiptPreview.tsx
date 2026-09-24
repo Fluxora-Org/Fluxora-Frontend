@@ -8,8 +8,9 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp } from "../../utils/receiptGenerator";
+import { ReceiptData, downloadReceipt, maskAddress, formatTimestamp, buildReceiptExplorerUrl } from "../../utils/receiptGenerator";
 import { clsx } from "clsx";
+import { SAFE_EXTERNAL_LINK_ATTRIBUTES } from "../../lib/safeExternalUrl";
 
 export interface TransactionReceiptPreviewProps {
   data: ReceiptData;
@@ -36,7 +37,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
       setDownloadState("success");
       if (onDownloaded) onDownloaded();
       setTimeout(() => setDownloadState("idle"), 3000);
-    } catch (err: any) {
+    } catch {
       setDownloadState("error");
       setErrorMsg("Failed to export receipt. Please try again.");
     }
@@ -159,9 +160,8 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
             <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-[var(--color-accent-primary)] truncate">
               <span className="truncate">{data.txHash}</span>
               <a
-                href={`https://stellar.expert/explorer/testnet/tx/${data.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={buildReceiptExplorerUrl(data.txHash!, data.network)}
+                {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
                 className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
               >
                 Explorer <ExternalLink size={12} />

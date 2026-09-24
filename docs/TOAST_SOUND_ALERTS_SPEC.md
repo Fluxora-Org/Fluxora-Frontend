@@ -1,76 +1,93 @@
-# Toast sound alerts and persisted mute preference
+# Toast Sound Alerts and Persisted Mute Preference Design Specification
 
-## Goal
+## Goal & Design Intent
 
-Add a short, distinct auditory cue for each toast variant while keeping sound strictly supplemental to the existing text and `aria-live` announcement path. The default experience is muted to avoid surprising autoplay-adjacent audio and to remain privacy-safe for first-time visits.
+Design and implement short, distinct auditory cues for each toast notification variant (`success`, `error`, `info`, `warning`) accompanied by a persisted mute toggle control. Sound alerts serve purely as a supplemental, multi-sensory channel alongside visual rendering and ARIA live-region announcements (`role="alert"` / `role="status"`). The default state is strictly **muted by default** (`toast-sound = "muted"`) to prevent unexpected autoplay audio on user visits.
 
-## Control design
+---
 
-### Placement
+## Control Design & Layout Architecture
 
-- Render the sound-toggle control inside the toast stack container, immediately above the visible toast queue, so it stays near notification controls without blocking the page.
-- Keep the control visually compact and keyboard-reachable with a clear icon/label pair.
-- On small screens, let the control span the available width and keep the helper hint readable.
+### Placement & Component Structure
+- **Container**: Rendered inside the top section of `.toast-stack__controls` within `ToastProvider.tsx`.
+- **Positioning**: Fixed right bottom stack (`position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 1200;`).
+- **Mobile Reflow**: At viewports `≤ 768px`, reflows to stretch across the bottom edge (`right: 1rem; bottom: 1rem; left: 1rem;`) while remaining non-blocking (`pointer-events: none` on container, `pointer-events: auto` on controls).
 
-### States
+### Design Tokens & Visual Redlines
+- **Toggle Button (`.toast-stack__sound-toggle`)**:
+  - Height / Padding: `0.5rem 0.75rem`
+  - Border Radius: `999px` (Pill shape)
+  - Border: `1px solid var(--border)` (Meets 3:1 UI component contrast in light & dark themes)
+  - Background: `color-mix(in srgb, var(--surface) 88%, transparent)`
+  - Text Color: `var(--text)` (Meets > 4.5:1 contrast against surface background)
+  - Typography: `var(--font-label-md, 600 0.75rem/1.2 "Plus Jakarta Sans", sans-serif)`
+  - Focus Ring: `outline: 2px solid var(--focus); outline-offset: 2px;`
+- **Hint Text (`.toast-stack__sound-hint`)**:
+  - Color: `var(--muted)` (Meets > 4.5:1 text contrast)
+  - Typography: `var(--font-body-sm, 400 0.75rem/1.4 "Plus Jakarta Sans", sans-serif)`
+  - Alignment: Right-aligned on desktop, left-aligned on mobile (`≤ 768px`).
 
-1. Muted default
-   - Button label: `Enable sound alerts`
-   - Helper text: `Sound alerts are off by default.`
-   - Persisted state: `toast-sound = "muted"`
-2. Unmuted
-   - Button label: `Mute sound alerts`
-   - Helper text: `Sound alerts are enabled for this browser.`
-   - Persisted state: `toast-sound = "enabled"`
-3. Sound-playing
-   - Triggered only when a toast is added while the preference is enabled.
-   - Sound uses a short oscillator envelope and stops after ~220 ms.
-4. Browser-autoplay-blocked fallback
-   - If audio cannot be created or resumed, the toast still renders normally and remains visible/accessible.
-   - The toggle stays available; the user may retry after a direct interaction.
+---
 
-### Persistence pattern
+## Component State Matrix
 
-Follow the same validated storage approach used by `ThemeProvider`:
+| State Name | Button Label | Icon | Helper Hint Text | Persisted Value (`toast-sound`) | Description |
+| --- | --- | --- | --- | --- | --- |
+| **1. Muted Default** | `Enable sound alerts` | 🔇 | `Sound alerts are off by default.` | `"muted"` (or null) | Initial opt-in state. No audio plays when toasts are triggered. |
+| **2. Unmuted** | `Mute sound alerts` | 🔊 | `Sound alerts are enabled for this browser.` | `"enabled"` | Sound cues synthesize and play on each new toast addition. |
+| **3. Sound Playing** | `Mute sound alerts` | 🔊 | `Sound alerts are enabled for this browser.` | `"enabled"` | Active audio synthesis via Web Audio API (~120ms to 200ms duration). |
+| **4. Autoplay Blocked Fallback** | `Enable sound alerts` | 🔇 | `Sound alerts are off by default.` | `"enabled"` / `"muted"` | If browser AudioContext is suspended or blocked, toast renders visually & via ARIA without error. |
 
-- Storage key: `toast-sound`
-- Allowed values: `"enabled"` and `"muted"`
-- Validation gate: reject any tampered or corrupted value before writing to DOM or persisting it as a preference
-- Sync: listen for the browser `storage` event so other tabs stay aligned
+---
 
-## Sound design by variant
+## Validated Persistence Pattern
 
-Each cue is intentionally short and distinct enough to be recognized without relying on hearing alone.
+Follows the same validated storage pattern used by `ThemeProvider.tsx`:
 
-| Variant | Cue profile | Intended perception |
-| --- | --- | --- |
-| `success` | High, bright triangle tone at ~659 Hz, short rising envelope | Positive confirmation |
-| `error` | Lower square tone at ~220 Hz, abrupt shorter envelope | Warning / failure |
-| `warning` | Mid triangle tone at ~440 Hz, slightly longer tail | Action needed |
-| `info` | Soft triangle tone at ~330 Hz, low-energy | Neutral status update |
+- **Storage Key**: `TOAST_SOUND_STORAGE_KEY = "toast-sound"`
+- **Allowed Values**: `"enabled" | "muted"`
+- **Validation Gate**: `isToastSoundPreference(value: unknown): value is ToastSoundPreference`
+- **Tamper Fallback**: Any corrupted or unrecognized value in `localStorage` automatically falls back to `"muted"`.
+- **Cross-Tab Synchronization**: Subscribes to the window `storage` event to ensure mute preference state stays synchronized across all active browser tabs.
 
-Implementation constraints:
+---
 
-- All cues are under 0.25 s.
-- Sounds are supplemental and never replace the visible toast or the `aria-live` text announcement.
-- Playback is suppressed when the mute preference is `muted`.
+## Sound Design Characteristics by Toast Variant
 
-## Accessibility notes
+All sound cues are synthesized programmatically using the browser's Web Audio API (`AudioContext` oscillator envelopes), requiring zero external audio assets or network requests.
 
-- The toast container continues to expose the existing `role="status"` / `role="alert"` semantics.
-- Sound is additive only; screen-reader users always receive the same visible text and live-region announcement.
-- The toggle is keyboard-operable and exposes a clear accessible label, while the toast dismiss control remains unchanged.
-- The control uses high-contrast text and focus treatment consistent with the existing app design tokens.
+```
+Waveform & Envelope Specifications:
++---------------------------------------------------------------------------+
+| Variant  | Waveform | Frequency (Hz) | Pitch Tone | Duration | Gain Envelope|
++----------+----------+----------------+------------+----------+--------------+
+| success  | Triangle | 659.25 Hz      | E5 Tone    | 150 ms   | Exp decay    |
+| error    | Square   | 220.00 Hz      | A3 Tone    | 200 ms   | Abrupt decay |
+| warning  | Triangle | 440.00 Hz      | A4 Tone    | 180 ms   | Moderate tail|
+| info     | Triangle | 330.00 Hz      | E4 Tone    | 120 ms   | Soft decay   |
++---------------------------------------------------------------------------+
+```
 
-## Testing plan
+### Cue Descriptions
+1. **`success`**: High, bright triangle tone at ~659.25 Hz (E5) with a short 150ms envelope. Conveys positive confirmation.
+2. **`error`**: Low square tone at 220 Hz (A3) with an abrupt 200ms envelope. Conveys warning or system error.
+3. **`warning`**: Mid triangle tone at 440 Hz (A4) with an 180ms envelope tail. Conveys required user attention.
+4. **`info`**: Soft triangle tone at ~330 Hz (E4) with a gentle 120ms envelope. Neutral status update cue.
 
-- Unit tests verify the default muted state and validated `localStorage` persistence.
-- Accessibility tests verify the toggle remains keyboard-operable and the toast semantics still announce correctly.
-- Visual review should confirm the control fits within the toast-stack layout on mobile widths and remains legible in both light/dark themes.
+---
 
-## Engineering hand-off summary
+## WCAG 2.1 AA Accessibility Annotations
 
-- Update: `src/components/toast/ToastProvider.tsx`
-- Update: `src/components/ToastNotification.tsx`
-- Style: `src/components/ToastNotification.css`
-- Test coverage: `src/components/toast/__tests__/ToastProvider.test.tsx`
+- **WCAG 1.1.1 (Non-Text Content) & WCAG 1.4.1 (Use of Color / Audio)**: Sound is strictly additive. Screen readers receive notification content via standard `aria-live` regions (`role="alert"` for error/warning, `role="status"` for success/info). Dismissing toasts or reading notifications does NOT depend on hearing audio cues.
+- **WCAG 1.4.3 (Contrast Minimum)**: Button label and hint text achieve >= 4.5:1 contrast against light and dark background surfaces.
+- **WCAG 2.1.1 (Keyboard Operability)**: Mute toggle is fully focusable (`<button type="button">`) with visible `:focus-visible` rings (`outline: 2px solid var(--focus)`).
+- **WCAG 1.4.13 (Content on Hover/Focus)**: Mute status and hint remain readable during focus and hover states without obscure overlays.
+
+---
+
+## Engineering Hand-off File Map
+
+- **`src/components/ToastNotification.tsx`**: Defines `TOAST_SOUND_CUES`, `playToastSound`, `TOAST_SOUND_STORAGE_KEY`, `isToastSoundPreference`, and `getStoredToastSoundPreference`.
+- **`src/components/toast/ToastProvider.tsx`**: Manages state, localStorage persistence, cross-tab sync, sound playback on `addToast`, and renders `.toast-stack__controls`.
+- **`src/components/ToastNotification.css`**: Styles for `.toast-stack__controls`, `.toast-stack__sound-toggle`, and `.toast-stack__sound-hint`.
+- **`src/components/toast/__tests__/ToastProvider.test.tsx`**: Comprehensive unit tests covering default muted state, persistence, tampered storage fallbacks, accessibility attributes, and queue interactions.

@@ -3,6 +3,7 @@ import { render, fireEvent, within } from '@testing-library/react';
 import CreateStreamModal from '../CreateStreamModal';
 import * as WalletContext from '../wallet-connect/Walletcontext';
 import { ToastProvider } from '../toast/ToastProvider';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 const VALID_STELLAR = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
 
@@ -12,11 +13,13 @@ vi.mock('../wallet-connect/Walletcontext', () => ({
 }));
 
 function renderModal() {
-  return render(
+  const result = render(
     <ToastProvider>
       <CreateStreamModal isOpen={true} onClose={() => {}} />
     </ToastProvider>
   );
+  selectSingleStreamInContainer(result.container);
+  return result;
 }
 
 describe('CreateStreamModal: Self-send validation', () => {

@@ -40,6 +40,7 @@ describe("StreamsTable", () => {
     expect(emptyStateCell).not.toHaveClass("text-gray-500");
     expect(emptyStateCell).toHaveStyle({ color: "var(--color-text-muted)" });
   });
+
   it("toggles sort direction from ascending to descending when clicking the same column header twice", async () => {
     const user = userEvent.setup();
     renderTable(<StreamsTable streams={streams} />);
@@ -163,5 +164,25 @@ describe("StreamsTable", () => {
 
     await user.keyboard("{Home}");
     expect(document.activeElement).toBe(rows[0]);
+  });
+
+  it("has the streams-table-container class on the root element for container-query reflow", () => {
+    renderTable(<StreamsTable streams={streams} />);
+
+    const container = screen.getByRole("grid", { name: "Active streams" }).closest(".streams-table-container");
+    expect(container).toBeInTheDocument();
+  });
+
+  it("every data cell has a data-label attribute for WCAG 1.4.10 card-mode accessibility", () => {
+    renderTable(<StreamsTable streams={streams} />);
+
+    const tbody = screen.getByRole("grid").querySelector("tbody")!;
+    const cells = tbody.querySelectorAll("td");
+
+    cells.forEach((cell) => {
+      // The checkbox column (first, when compare is enabled) may have an empty data-label
+      const dataLabel = cell.getAttribute("data-label");
+      expect(dataLabel).not.toBeNull();
+    });
   });
 });

@@ -50,36 +50,34 @@ export interface Rgb {
   b: number;
 }
 
+import { contrastRatio as themeContrastRatio, relativeLuminance } from '../theme/contrastUtils';
+
+export { relativeLuminance }; // re-export for tests
+
 /**
  * Calculates the WCAG 2.1 relative luminance of an RGB color (0-255).
- * Formula: 0.2126 * R + 0.7152 * G + 0.0722 * B
+ * (Delegates to theme/contrastUtils for canonical math)
  */
 export function luminance(r: number, g: number, b: number): number {
-  const a = [r, g, b].map(v => {
-    const s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+  return relativeLuminance(rgbToHex({ r, g, b }));
 }
 
 /**
  * Calculates the WCAG 2.1 contrast ratio between two hex colors.
  * Returns a number between 1 and 21 (e.g. 4.56).
+ * Returns null if either hex is invalid.
  */
-export function contrastRatio(hex1: string, hex2: string): number {
-  const rgb1 = hexToRgb(hex1);
-  const rgb2 = hexToRgb(hex2);
-  const lum1 = luminance(rgb1.r, rgb1.g, rgb1.b);
-  const lum2 = luminance(rgb2.r, rgb2.g, rgb2.b);
-  const brightest = Math.max(lum1, lum2);
-  const darkest = Math.min(lum1, lum2);
-  const ratio = (brightest + 0.05) / (darkest + 0.05);
-  return Math.round(ratio * 10) / 10;
+export function contrastRatio(hex1: string, hex2: string): number | null {
+  try {
+    return themeContrastRatio(hex1, hex2);
+  } catch {
+    return null;
+  }
 }
 
 /** Alias for `contrastRatio()` for API consistency */
 export function getContrastRatio(hex1: string, hex2: string): number {
-  return contrastRatio(hex1, hex2);
+  return contrastRatio(hex1, hex2) ?? 1;
 }
 
 export interface ContrastEvaluation {
@@ -101,19 +99,18 @@ export function evaluateContrast(
   return {
     ratio,
     passesAA,
-    formattedRatio: `${ratio.toFixed(1)}:1`,
+    formattedRatio: `${ratio.toFixed(2)}:1`,
   };
 }
 
 /** Parses hex string (#FFF or #FFFFFF) to RGB object */
-export function hexToRgb(hex: string): Rgb {
+export function hexToRgb(hex: string): Rgb | null {
   let cleaned = hex.replace('#', '').trim();
   if (cleaned.length === 3) {
     cleaned = cleaned.split('').map(c => c + c).join('');
   }
   if (cleaned.length !== 6 || !/^[0-9A-Fa-f]{6}$/.test(cleaned)) {
-    // Default fallback to black if invalid hex
-    return { r: 0, g: 0, b: 0 };
+    return null;
   }
   const num = parseInt(cleaned, 16);
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
@@ -216,6 +213,7 @@ export type ColorBlindType = keyof typeof COLOR_BLIND_MATRICES;
  */
 export function simulateColorBlindness(hex: string, type: ColorBlindType): string {
   const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
   const matrix = COLOR_BLIND_MATRICES[type];
   return rgbToHex(applyColorMatrix(rgb, matrix));
 }
@@ -233,9 +231,8 @@ export function simulatedContrastRatio(
   hexFg: string,
   hexBg: string,
   type: ColorBlindType,
-): number {
-  return contrastRatio(
-    simulateColorBlindness(hexFg, type),
-    simulateColorBlindness(hexBg, type),
-  );
+): number | null {
+  const simFg = simulateColorBlindness(hexFg, type);
+  const simBg = simulateColorBlindness(hexBg, type);
+  return contrastRatio(simFg, simBg);
 }
