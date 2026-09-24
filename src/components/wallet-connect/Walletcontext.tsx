@@ -19,7 +19,7 @@ import {
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
 import { isValidStellarAddress } from "../../lib/stellar";
-import { getNetworkLabel } from "../../lib/config";
+import { getNetworkLabel, getWalletWatchIntervalMs, WALLET_WATCH_MIN_INTERVAL_MS } from "../../lib/config";
 import {
   subscribeToAccountContext,
   type AccountContextMessage,
@@ -62,8 +62,10 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
  * Values below this floor would hammer the Freighter extension and the RPC
  * endpoint it queries. Any configured or default value is clamped up to this
  * minimum before being passed to the constructor.
+ *
+ * Re-exported from `src/lib/config.ts`, which owns the environment read.
  */
-export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
+export { WALLET_WATCH_MIN_INTERVAL_MS };
 
 /**
  * How often {@link WatchWalletChanges} polls the Freighter extension for
@@ -74,18 +76,15 @@ export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
  * - The value is clamped to a minimum of {@link WALLET_WATCH_MIN_INTERVAL_MS}
  *   to prevent tight polling loops against the wallet extension.
  *
+ * Resolved through `src/lib/config.ts` so this component never reads
+ * `import.meta.env` directly (see issue #1722).
+ *
  * @example
  * // .env
  * VITE_WALLET_WATCH_INTERVAL_MS=5000   // slow network / CI
  * VITE_WALLET_WATCH_INTERVAL_MS=2000   // default (can be omitted)
  */
-export const WALLET_WATCH_INTERVAL_MS: number = (() => {
-  const DEFAULT = 2000;
-  const raw = import.meta.env.VITE_WALLET_WATCH_INTERVAL_MS;
-  const parsed = raw !== undefined && raw !== "" ? Number(raw) : NaN;
-  const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT;
-  return Math.max(resolved, WALLET_WATCH_MIN_INTERVAL_MS);
-})();
+export const WALLET_WATCH_INTERVAL_MS: number = getWalletWatchIntervalMs();
 
 const INITIAL: WalletState = {
   address: null,

@@ -69,6 +69,28 @@ export default tseslint.config(
       ],
     },
   },
+  // Configuration boundary (issue #1722): React components, pages, and hooks
+  // must read configuration through `src/lib/config.ts`, never `import.meta.env`
+  // directly, so values are validated in one place and testable without
+  // manipulating the environment.
+  {
+    files: [
+      "src/App.tsx",
+      "src/components/**/*.{ts,tsx}",
+      "src/pages/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'MetaProperty[meta.name="import"]',
+          message:
+            "Read configuration through src/lib/config.ts instead of import.meta.env — components must not bypass config validation.",
+        },
+      ],
+    },
+  },
   // Node-built scripts (e.g. bundle-size report, supply-chain audits) need Node globals.
   {
     files: ["scripts/**/*.mjs"],
