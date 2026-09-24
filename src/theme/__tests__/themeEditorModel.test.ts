@@ -375,3 +375,430 @@ describe("themeEditorModel — preview token resolution safety", () => {
     expect(resolved.ctaBg).toBe("#00b8d4");
   });
 });
+
+// ─── 7. WCAG Contrast Gate in validateThemeDraft ──────────────────────────────
+//
+// The theme editor model MUST NOT produce a palette that fails WCAG 2.1 AA
+// contrast requirements.  validateThemeDraft is the final submission gate
+// and therefore owns this enforcement.
+//
+// Acceptance criteria (issue #1709):
+//   a) The described behaviour holds in light and dark themes.
+//   b) It holds for a custom theme.
+//   c) A test asserts it directly.
+//   d) A regression causes that test to fail.
+//
+// Structure:
+//   – Section 7a tests a "light" palette (white surfaces, dark text).
+//   – Section 7b tests a "dark" palette (near-black surfaces, light text).
+//   – Section 7c tests a fully custom palette.
+//
+// Each section verifies three properties:
+//   1. A compliant palette passes the gate.
+//   2. A failing pair (text against its own surface) is rejected.
+//   3. The error envelope names the specific token and carries `contrast-fail`
+//      reason code so a regression is immediately locatable.
+
+// ── 7a. Light theme palette ───────────────────────────────────────────────────
+
+describe("themeEditorModel — WCAG contrast gate (light theme palette)", () => {
+  // Build a baseline light palette — white surfaces, high-contrast dark text.
+  const lightPalette = {
+    ...DEFAULTS,
+    "--surface-base": "#ffffff",
+    "--surface-neutral": "#fafbfc",
+    "--text-vivid": "#1a1f36",      // ~15.5:1 on white — passes AA
+    "--text-secondary": "#4a5565",  // ~7.5:1 on white — passes AA
+    "--navbar-bg": "#ffffff",
+    "--navbar-logo-color": "#1a1f36",
+    "--navbar-link-color": "#4a5565",
+    "--color-cta-primary-bg": "#0097a7",
+    "--color-cta-primary-text": "#04131a",  // ~12.8:1 on CTA bg — passes AA
+    "--color-accent-primary": "#0097a7",    // 3.51:1 — passes AA-large (3:1)
+    "--color-accent-secondary": "#00a884",  // 3.03:1 — passes AA-large (3:1)
+  };
+
+  it("accepts a compliant light palette", () => {
+    const result = validateThemeDraft({
+      themeId: "light-compliant",
+      label: "Light Theme",
+      draft: lightPalette,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a light palette where primary text is the same colour as the surface (1:1 contrast)", () => {
+    const badPalette = { ...lightPalette, "--text-vivid": "#ffffff" }; // white on white
+    const result = validateThemeDraft({
+      themeId: "light-bad-text",
+      label: "Light Bad Text",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("invalid-tokens");
+      const contrastError = result.errors.find(
+        (e) => e.token === "--text-vivid" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a light palette where secondary text fails 4.5:1 against the page surface", () => {
+    // #cccccc on #ffffff → ~1.6:1 — clearly fails
+    const badPalette = { ...lightPalette, "--text-secondary": "#cccccc" };
+    const result = validateThemeDraft({
+      themeId: "light-bad-secondary",
+      label: "Light Bad Secondary",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) => e.token === "--text-secondary" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+      expect(contrastError?.ratio).toBeDefined();
+      expect(contrastError!.ratio!).toBeLessThan(4.5);
+    }
+  });
+
+  it("rejects a light palette where CTA text fails 4.5:1 against the CTA background", () => {
+    // CTA bg stays as #0097a7; setting CTA text to the same colour → 1:1
+    const badPalette = {
+      ...lightPalette,
+      "--color-cta-primary-text": "#0097a7",
+    };
+    const result = validateThemeDraft({
+      themeId: "light-bad-cta",
+      label: "Light Bad CTA",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--color-cta-primary-text" &&
+          e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a light palette where navbar link fails 4.5:1 against the navbar background", () => {
+    // Near-white nav link on white bg → ~1:1
+    const badPalette = { ...lightPalette, "--navbar-link-color": "#eeeeee" };
+    const result = validateThemeDraft({
+      themeId: "light-bad-nav",
+      label: "Light Bad Nav",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--navbar-link-color" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("reports contrast ratio and required threshold in the error envelope", () => {
+    const badPalette = { ...lightPalette, "--text-vivid": "#aaaaaa" }; // ~2.3:1
+    const result = validateThemeDraft({
+      themeId: "light-ratio-check",
+      label: "Light Ratio",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const err = result.errors.find(
+        (e) => e.token === "--text-vivid" && e.reason === "contrast-fail",
+      );
+      expect(err).toBeDefined();
+      expect(typeof err!.ratio).toBe("number");
+      expect(typeof err!.required).toBe("number");
+      expect(err!.required).toBe(4.5); // AA normal text
+      expect(err!.ratio!).toBeLessThan(4.5);
+    }
+  });
+});
+
+// ── 7b. Dark theme palette ────────────────────────────────────────────────────
+
+describe("themeEditorModel — WCAG contrast gate (dark theme palette)", () => {
+  // Build a "dark" palette — near-black surfaces, light text.
+  const darkPalette = {
+    ...DEFAULTS,
+    "--surface-base": "#0d1117",
+    "--surface-neutral": "#161b22",
+    "--text-vivid": "#f0f6fc",      // light text on near-black — ~15:1 — passes AA
+    "--text-secondary": "#8b949e",  // muted light text — ~4.6:1 on #0d1117 — passes AA
+    "--navbar-bg": "#161b22",
+    "--navbar-logo-color": "#f0f6fc",  // ~14:1 — passes AA
+    "--navbar-link-color": "#8b949e",  // ~4.6:1 — passes AA
+    "--color-cta-primary-bg": "#238636",
+    "--color-cta-primary-text": "#ffffff",  // white on dark green — passes AA
+    "--color-accent-primary": "#58a6ff",    // blue on #0d1117 — passes AA-large
+    "--color-accent-secondary": "#3fb950",  // green on #0d1117 — passes AA-large
+  };
+
+  it("accepts a compliant dark palette", () => {
+    const result = validateThemeDraft({
+      themeId: "dark-compliant",
+      label: "Dark Theme",
+      draft: darkPalette,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a dark palette where primary text is near-invisible against the dark surface", () => {
+    // Very dark grey (#1c2128) on near-black (#0d1117) → ratio < 2:1
+    const badPalette = { ...darkPalette, "--text-vivid": "#1c2128" };
+    const result = validateThemeDraft({
+      themeId: "dark-bad-text",
+      label: "Dark Bad Text",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("invalid-tokens");
+      const contrastError = result.errors.find(
+        (e) => e.token === "--text-vivid" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a dark palette where secondary text fails 4.5:1 against the dark surface", () => {
+    // Very dark muted (#3d444d) on #0d1117 → well below 4.5:1
+    const badPalette = { ...darkPalette, "--text-secondary": "#3d444d" };
+    const result = validateThemeDraft({
+      themeId: "dark-bad-secondary",
+      label: "Dark Bad Secondary",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--text-secondary" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+      expect(contrastError!.ratio!).toBeLessThan(4.5);
+    }
+  });
+
+  it("rejects a dark palette where CTA text fails against the CTA background", () => {
+    // Dark text (#1c2128) on a dark green CTA bg (#238636) — very low contrast
+    const badPalette = {
+      ...darkPalette,
+      "--color-cta-primary-text": "#1c2128",
+    };
+    const result = validateThemeDraft({
+      themeId: "dark-bad-cta",
+      label: "Dark Bad CTA",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--color-cta-primary-text" &&
+          e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a dark palette where navbar logo fails 4.5:1 against the navbar background", () => {
+    // Same color as bg → 1:1
+    const badPalette = {
+      ...darkPalette,
+      "--navbar-logo-color": "#161b22",
+    };
+    const result = validateThemeDraft({
+      themeId: "dark-bad-navbar-logo",
+      label: "Dark Bad Navbar",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--navbar-logo-color" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("reports reason as contrast-fail with ratio and required threshold on dark failures", () => {
+    const badPalette = { ...darkPalette, "--text-secondary": "#2d333b" };
+    const result = validateThemeDraft({
+      themeId: "dark-ratio-check",
+      label: "Dark Ratio",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const err = result.errors.find(
+        (e) =>
+          e.token === "--text-secondary" && e.reason === "contrast-fail",
+      );
+      expect(err).toBeDefined();
+      expect(err!.ratio).toBeDefined();
+      expect(err!.required).toBe(4.5);
+      expect(err!.ratio!).toBeLessThan(4.5);
+    }
+  });
+});
+
+// ── 7c. Custom theme palette ──────────────────────────────────────────────────
+
+describe("themeEditorModel — WCAG contrast gate (custom theme)", () => {
+  // A custom "midnight teal" brand palette that satisfies WCAG AA.
+  const customPalette = {
+    ...DEFAULTS,
+    "--surface-base": "#001f2a",
+    "--surface-neutral": "#002d3d",
+    "--text-vivid": "#e0f7fa",       // ~16:1 on #001f2a — passes AA
+    "--text-secondary": "#80deea",   // ~7.1:1 on #001f2a — passes AA
+    "--navbar-bg": "#002d3d",
+    "--navbar-logo-color": "#e0f7fa",  // passes AA
+    "--navbar-link-color": "#80deea",  // ~6.4:1 — passes AA
+    "--color-cta-primary-bg": "#0097a7",
+    "--color-cta-primary-text": "#04131a",  // dark text on teal — 5.38:1 — passes AA
+    "--color-accent-primary": "#4dd0e1",    // cyan on dark bg — passes AA-large
+    "--color-accent-secondary": "#26c6da",  // teal on dark bg — passes AA-large
+  };
+
+  it("accepts a compliant custom palette", () => {
+    const result = validateThemeDraft({
+      themeId: "midnight-teal",
+      label: "Midnight Teal",
+      draft: customPalette,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a custom palette where primary text fails contrast against the custom surface", () => {
+    // Very dark teal text (#004d5a) on near-black (#001f2a) → < 2:1
+    const badPalette = { ...customPalette, "--text-vivid": "#004d5a" };
+    const result = validateThemeDraft({
+      themeId: "midnight-teal-bad-text",
+      label: "Midnight Teal Bad Text",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("invalid-tokens");
+      const contrastError = result.errors.find(
+        (e) => e.token === "--text-vivid" && e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a custom palette where CTA text fails against the brand CTA background", () => {
+    // Same teal as CTA bg → 1:1
+    const badPalette = {
+      ...customPalette,
+      "--color-cta-primary-text": "#0097a7",
+    };
+    const result = validateThemeDraft({
+      themeId: "midnight-teal-bad-cta",
+      label: "Midnight Teal Bad CTA",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--color-cta-primary-text" &&
+          e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+    }
+  });
+
+  it("rejects a custom palette where accent primary fails the AA-large (3:1) threshold against the surface", () => {
+    // Dark accent (#005f6b) on dark surface (#001f2a) — ratio < 3:1
+    const badPalette = {
+      ...customPalette,
+      "--color-accent-primary": "#005f6b",
+    };
+    const result = validateThemeDraft({
+      themeId: "midnight-teal-bad-accent",
+      label: "Midnight Teal Bad Accent",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const contrastError = result.errors.find(
+        (e) =>
+          e.token === "--color-accent-primary" &&
+          e.reason === "contrast-fail",
+      );
+      expect(contrastError).toBeDefined();
+      expect(contrastError!.required).toBe(3.0); // AA-large
+      expect(contrastError!.ratio!).toBeLessThan(3.0);
+    }
+  });
+
+  it("carries the contrast ratio in error.message for auditability", () => {
+    const badPalette = { ...customPalette, "--text-vivid": "#004d5a" };
+    const result = validateThemeDraft({
+      themeId: "midnight-teal-audit",
+      label: "Midnight Teal Audit",
+      draft: badPalette,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const err = result.errors.find(
+        (e) => e.token === "--text-vivid" && e.reason === "contrast-fail",
+      );
+      expect(err!.message).toMatch(/achieves/i);
+      expect(err!.message).toMatch(/WCAG 2\.1 AA/i);
+      expect(err!.message).toMatch(/4\.5/); // required ratio in message
+    }
+  });
+
+  it("validates both light and dark palettes reach the same final gate check", () => {
+    // Confirm the gate is exercised regardless of surface brightness by
+    // testing a palette that only partially fails (one broken pair).
+    const partiallyBadLight = {
+      ...DEFAULTS,
+      "--text-vivid": "#eeeeee", // near-white on white surface → fails
+    };
+    const partiallyBadDark = {
+      ...DEFAULTS,
+      "--surface-base": "#0d1117",
+      "--text-vivid": "#111827", // very dark on near-black → fails
+    };
+
+    const lightResult = validateThemeDraft({
+      themeId: "partial-bad-light",
+      label: "Partial Bad Light",
+      draft: partiallyBadLight,
+    });
+    const darkResult = validateThemeDraft({
+      themeId: "partial-bad-dark",
+      label: "Partial Bad Dark",
+      draft: partiallyBadDark,
+    });
+
+    expect(lightResult.ok).toBe(false);
+    expect(darkResult.ok).toBe(false);
+
+    if (!lightResult.ok) {
+      expect(
+        lightResult.errors.some((e) => e.reason === "contrast-fail"),
+      ).toBe(true);
+    }
+    if (!darkResult.ok) {
+      expect(
+        darkResult.errors.some((e) => e.reason === "contrast-fail"),
+      ).toBe(true);
+    }
+  });
+});

@@ -55,6 +55,7 @@ export default defineConfig({
         "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
         "src/theme/themeBootstrap.ts",
+        "src/theme/themeEditorModel.ts",
         // Colour-blind simulation module
         "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
