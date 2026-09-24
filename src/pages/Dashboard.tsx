@@ -12,7 +12,10 @@ import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
-import { readOnboardingDismissed } from "../lib/onboarding";
+import {
+  readOnboardingDismissed,
+  writeOnboardingDismissed,
+} from "../lib/onboarding";
 import { formatAssetAmount } from "../lib/formatters";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -100,6 +103,11 @@ export default function Dashboard() {
 
   const handleDismissOnboarding = () => {
     setShowOnboarding(false);
+  };
+
+  const handleOpenOnboarding = () => {
+    writeOnboardingDismissed(false);
+    setShowOnboarding(true);
   };
 
   const handleOnboardingCreateStream = () => {
@@ -286,7 +294,10 @@ export default function Dashboard() {
         </ErrorBoundary>
       ) : (
         <ErrorBoundary>
-          <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} />
+          <TreasuryEmptyState
+            onCreateStream={() => setIsModalOpen(true)}
+            onOpenOnboarding={handleOpenOnboarding}
+          />
         </ErrorBoundary>
       )}
 
