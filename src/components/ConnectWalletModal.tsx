@@ -551,9 +551,13 @@ export default function ConnectWalletModal({
                     aria-disabled={isDisabled}
                     disabled={isDisabled}
                   >
-                    <div className={styles.walletIcon} aria-hidden="true">
+                    <div
+                      className={styles.walletIcon}
+                      // Spinner is decorative; WalletIcon exposes the wallet name.
+                      aria-hidden={isConnectingThis ? true : undefined}
+                    >
                       {isConnectingThis ? (
-                        <Loader2 size={24} className={styles.spinning} />
+                        <Loader2 size={24} className={styles.spinning} aria-hidden="true" />
                       ) : (
                         <WalletIcon name={wallet.name} iconSrc={wallet.iconSrc} />
                       )}
