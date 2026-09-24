@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -494,14 +495,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Keep hasExplicitChoiceRef in sync with themePreference state
   hasExplicitChoiceRef.current = themePreference !== "auto";
 
-  // Mirror built-in theme to DOM (only when not in custom mode).
-  useEffect(() => {
+  const isFirstMountRef = useRef<boolean>(true);
+  if (isFirstMountRef.current && typeof document !== "undefined") {
+    isFirstMountRef.current = false;
+    const storedCustom = getStoredCustomTheme();
+    if (storedCustom) {
+      applyCustomTokens(storedCustom.validatedTokens);
+      applyTheme("custom");
+    } else {
+      applyTheme(theme);
+    }
+    applyFontPreference(easyReadFont);
+  }
+
+  // Mirror built-in theme to DOM before paint (only when not in custom mode).
+  useLayoutEffect(() => {
     if (document.documentElement.getAttribute("data-theme") !== "custom") {
       applyTheme(theme);
     }
   }, [theme]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFontPreference(easyReadFont);
   }, [easyReadFont]);
 
@@ -661,8 +675,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     TokenValidationError[]
   >([]);
 
-  // Apply persisted custom theme on initial mount.
-  useEffect(() => {
+  // Apply persisted custom theme before paint on initial mount.
+  useLayoutEffect(() => {
     const stored = getStoredCustomTheme();
     if (stored) {
       applyCustomTokens(stored.validatedTokens);
