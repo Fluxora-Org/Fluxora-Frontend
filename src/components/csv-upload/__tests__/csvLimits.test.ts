@@ -31,7 +31,7 @@ function makeBaseRow(overrides: Partial<Record<string, string>> = {}): string {
   return [recipient, deposit, rate, duration].join(',');
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(await import('../../../lib/stellar')).isValidStellarAddress.mockImplementation(
     (addr: string) => addr.startsWith('G') && addr.length === 56,
   );
@@ -93,7 +93,7 @@ describe('CSV parsing limits', () => {
     const result = parseAndValidateCsv(makeCsv([row]));
     expect(result.parseError).toBeUndefined();
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].fieldErrors.recipient).toBe('Recipient is required');
+    expect(result.rows[0].fieldErrors.recipient).toBe('Invalid Stellar address');
   });
 
   it('parses a large synthetic file near the row limit with bounded time', () => {

@@ -25,8 +25,11 @@ import type {
   CsvCancelRequest,
   CsvParseRequest,
   CsvWorkerResponse,
+  CsvProgressPayload,
 } from './csvParseWorker';
 import type { ColumnMapping, ParseResult } from './types';
+
+export type { CsvProgressPayload };
 
 /** Rejects the pending promise of a cancelled parse. */
 export class CsvParseCancelledError extends Error {
@@ -48,6 +51,7 @@ let parseRequestCounter = 0;
 export function parseCsvAsync(
   text: string,
   mapping?: Partial<ColumnMapping>,
+  onProgress?: (progress: CsvProgressPayload) => void,
 ): CsvParseTask {
   const requestId = `csv-parse-${++parseRequestCounter}`;
   let worker: Worker | null = null;
@@ -67,7 +71,15 @@ export function parseCsvAsync(
 
     const parseInline = (): void => {
       try {
-        settleWithResult(parseAndValidateCsv(text, mapping));
+        const result = parseAndValidateCsv(text, mapping);
+        if (result.rows.length > 0) {
+          onProgress?.({
+            processedRows: result.rows.length,
+            totalRows: result.rows.length,
+            percent: 100,
+          });
+        }
+        settleWithResult(result);
       } catch (err) {
         settleWithError(err);
       }
@@ -93,7 +105,9 @@ export function parseCsvAsync(
     worker.onmessage = (event: MessageEvent<CsvWorkerResponse>) => {
       const msg = event.data;
       if (cancelled || msg.requestId !== requestId) return;
-      if (msg.type === 'result') {
+      if (msg.type === 'progress') {
+        onProgress?.(msg.progress);
+      } else if (msg.type === 'result') {
         settleWithResult(msg.result);
       } else if (msg.type === 'error') {
         settleWithError(new Error(msg.error));
