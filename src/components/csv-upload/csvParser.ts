@@ -396,13 +396,13 @@ export function parseAndValidateCsv(
   // Bound per-row complexity before rendering the preview. This runs only
   // when rows are actually going to be parsed (i.e. after the header mapping
   // early exit) so existing mapping behaviour is preserved.
-  for (let i = 0; i < dataLines.length; i++) {
-    const cells = splitCsvLine(dataLines[i]);
+  for (let i = 0; i < prep.dataLines.length; i++) {
+    const cells = splitCsvLine(prep.dataLines[i]);
     if (cells.length > MAX_CSV_COLUMNS) {
       return {
-        detectedHeaders,
-        headersMatch,
-        autoMapping,
+        detectedHeaders: prep.detectedHeaders,
+        headersMatch: prep.headersMatch,
+        autoMapping: prep.autoMapping,
         rows: [],
         parseError: `Row ${i + 1} has ${cells.length} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
       };
@@ -410,9 +410,9 @@ export function parseAndValidateCsv(
     for (const cell of cells) {
       if (cell.length > MAX_CSV_CELL_LENGTH) {
         return {
-          detectedHeaders,
-          headersMatch,
-          autoMapping,
+          detectedHeaders: prep.detectedHeaders,
+          headersMatch: prep.headersMatch,
+          autoMapping: prep.autoMapping,
           rows: [],
           parseError: `Row ${i + 1} contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
         };

@@ -28,6 +28,14 @@ vi.mock("../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../WalletFallback", () => ({
+  default: ({ stage }: { stage?: string }) => (
+    <div data-testid="wallet-fallback" data-stage={stage}>
+      Wallet fallback: {stage}
+    </div>
+  ),
+}));
+
 function LocationProbe() {
   const location = useLocation();
 
@@ -77,9 +85,9 @@ describe("RequireWalletAction", () => {
 
     renderGuard();
 
-    expect(
-      screen.getByText("Restoring wallet session..."),
-    ).toBeInTheDocument();
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toBeInTheDocument();
+    expect(fallback).toHaveAttribute("data-stage", "restoring");
 
     expect(
       screen.queryByText("Protected money-moving route"),
@@ -115,11 +123,9 @@ describe("RequireWalletAction", () => {
 
     renderGuard();
 
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-
-    expect(screen.getByRole("heading", {
-      name: "Wrong network",
-    })).toBeInTheDocument();
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toBeInTheDocument();
+    expect(fallback).toHaveAttribute("data-stage", "network-mismatch");
 
     expect(
       screen.queryByText("Protected money-moving route"),

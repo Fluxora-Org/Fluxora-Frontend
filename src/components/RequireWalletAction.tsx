@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { sanitizeReturnTo } from "./RequireWallet";
+import WalletFallback from "./WalletFallback";
 
 interface RequireWalletActionProps {
   children: ReactNode;
@@ -31,18 +32,7 @@ export default function RequireWalletAction({
   );
 
   if (wallet.loading) {
-    return (
-      <main
-        id="main-content"
-        aria-busy="true"
-        aria-live="polite"
-        className="min-h-[60vh] flex items-center justify-center"
-      >
-        <div role="status" className="text-body-md text-[var(--muted)]">
-          Restoring wallet session...
-        </div>
-      </main>
-    );
+    return <WalletFallback stage="restoring" />;
   }
 
   if (!wallet.connected) {
@@ -56,38 +46,7 @@ export default function RequireWalletAction({
   }
 
   if (wallet.isNetworkMismatch) {
-    return (
-      <main
-        id="main-content"
-        aria-labelledby="wallet-network-required-heading"
-        className="min-h-[60vh] flex items-center justify-center px-4"
-      >
-        <section
-          role="alert"
-          className="w-full max-w-xl rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 text-center"
-        >
-          <h1
-            id="wallet-network-required-heading"
-            className="text-heading-lg font-semibold"
-          >
-            Wrong network
-          </h1>
-
-          <p className="mt-3 text-body-md text-[var(--muted)]">
-            Your wallet is connected to{" "}
-            <strong>
-              {wallet.network?.toUpperCase() ?? "an unsupported network"}
-            </strong>
-            , but Fluxora requires{" "}
-            <strong>{wallet.expectedNetworkLabel}</strong>.
-          </p>
-
-          <p className="mt-2 text-body-sm text-[var(--muted)]">
-            Switch your wallet to the required network and try again.
-          </p>
-        </section>
-      </main>
-    );
+    return <WalletFallback stage="network-mismatch" />;
   }
 
   return <>{children}</>;

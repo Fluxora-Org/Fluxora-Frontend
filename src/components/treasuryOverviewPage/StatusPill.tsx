@@ -139,7 +139,7 @@ export default function StatusPill({ status, iconSize = "xs", onClick }: Props) 
           }
         }}
         style={{ backgroundColor: background, color }}
-        className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize} status-pill-transition ${animateClass} ${interactive ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500" : ""}`}
+        className={`inline-flex items-center rounded-md px-3 py-1 text-sm font-medium icon-${iconSize} status-pill-transition ${animateClass} status-pill ${interactive ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500" : ""}`}
         /*
          * data-status-token: used by design-review tooling and
          * contrastUtils.ts contrast checks to resolve the active token.

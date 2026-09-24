@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getRecipientStreams,
+  getRetryDelayMs,
   getStreamById,
   getStreams,
   getTreasuryMetrics,
@@ -336,6 +337,55 @@ describe("streamsService live mode", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("computes deterministic bounded retry delays with jitter", () => {
+    const first = getRetryDelayMs("/streams", 1, 500, 0.2);
+    const second = getRetryDelayMs("/streams", 1, 500, 0.2);
+
+    expect(first).toBe(second);
+    expect(first).toBeGreaterThanOrEqual(1000);
+    expect(first).toBeLessThanOrEqual(1200);
+    expect(getRetryDelayMs("/streams", 10, 500, 1)).toBe(8000);
+    expect(getRetryDelayMs("/streams", 2, 500, 0)).toBe(2000);
+  });
+
+  it("waits for the deterministic jittered retry delay before retrying", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "1");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "100");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0.5");
+
+    fetchMock
+      .mockRejectedValueOnce(new Error("connection refused"))
+      .mockResolvedValueOnce(jsonResponse({ data: [] }));
+
+    const promise = getStreams();
+    const delayMs = getRetryDelayMs("/streams", 0, 100, 0.5);
+
+    await vi.advanceTimersByTimeAsync(delayMs - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels a pending retry timer when the caller aborts", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "2");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "1000");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0");
+    fetchMock.mockRejectedValue(new Error("connection refused"));
+    const controller = new AbortController();
+
+    const promise = getStreams(undefined, { signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(999);
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to default retries when VITE_FETCH_MAX_RETRIES is unset", async () => {
     vi.useFakeTimers();
     fetchMock.mockRejectedValue(new Error("connection refused"));
@@ -356,6 +406,7 @@ describe("streamsService live mode", () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_FETCH_MAX_RETRIES", "not-a-number");
     vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "also-bad");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0");
     fetchMock.mockRejectedValue(new Error("connection refused"));
 
     const assertion = expect(getStreams()).rejects.toMatchObject({

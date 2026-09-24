@@ -283,3 +283,92 @@
   border-color: var(--color-border-default);
 }
 
+
+/* ─── Forced-colors fallback ───
+   Borders, selection state, and focus rings must use system colors
+   because box-shadow is stripped and background tints become Canvas. */
+@media (forced-colors: active) {
+  .stream-row {
+    border-bottom: 1px solid ButtonBorder;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .stream-row:hover {
+    background: Canvas;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .stream-row:focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: -2px !important;
+    box-shadow: none !important;
+  }
+
+  .stream-row--selected {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+    /* Retain the left accent bar using an inset border instead of box-shadow */
+    border-left: 3px solid HighlightText;
+  }
+
+  .stream-row--selected:focus-visible {
+    outline: 2px solid HighlightText !important;
+    outline-offset: -2px !important;
+    box-shadow: none !important;
+  }
+
+  .stream-row__action-btn {
+    color: LinkText;
+  }
+
+  .stream-row__ellipsis-btn {
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+    color: ButtonText;
+    box-shadow: none;
+  }
+
+  .stream-row__ellipsis-btn:hover {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .stream-row__ellipsis-btn:focus-visible {
+    outline: 2px solid Highlight !important;
+    box-shadow: none !important;
+  }
+
+  .context-menu {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .context-menu__item {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .context-menu__item:hover,
+  .context-menu__item:focus {
+    background: Highlight;
+    color: HighlightText;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .context-menu__item--danger:hover,
+  .context-menu__item--danger:focus {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .context-menu__item:disabled {
+    color: GrayText;
+    background: Canvas;
+  }
+}

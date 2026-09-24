@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import './PreviewValidateStep.css';
 import type { CanonicalHeader, CsvRow } from './types';
 import { validateRow, markDuplicates } from './csvParser';
@@ -301,6 +302,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
   const [liveMessage, setLiveMessage] = useState('');
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const fixButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const { t } = useTranslation();
 
   const validCount = rows.filter((r) => r.status === 'valid').length;
   const errorCount = rows.filter((r) => r.status === 'needs-fix').length;
@@ -383,7 +385,7 @@ const PreviewValidateStep: React.FC<PreviewValidateStepProps> = ({
     );
     markDuplicates(newRows);
     onRowsChange(newRows);
-    setLiveMessage(`${errorCount} invalid rows skipped.`);
+    setLiveMessage(t('invalidRowsSkipped', { count: errorCount }));
   }, [rows, onRowsChange, errorCount]);
 
   const handleReplaceClick = useCallback(() => {
