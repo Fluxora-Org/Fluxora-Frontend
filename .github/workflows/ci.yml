@@ -67,3 +67,6 @@ jobs:
 
       - name: Run E2E tests (gateable)
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream"
+
+      - name: Run landing FCP performance budget
+        run: npm run test:performance
