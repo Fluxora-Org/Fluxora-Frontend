@@ -121,6 +121,7 @@ export default function Recipient() {
   const recipientData = useRecipientPageData({
     address: wallet.address,
     connected: wallet.connected,
+    accountContextVersion: wallet.accountContextVersion,
   });
   const {
     streams: liveStreams,
