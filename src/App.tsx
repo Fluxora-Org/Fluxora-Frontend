@@ -108,9 +108,9 @@ export default function App() {
                       }
                     >
                       <Route index element={lazyAppRoute(<Dashboard />, () => import("./pages/Dashboard"))} />
-                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<Streams />, () => import("./pages/Streams"))}</RequireWalletAction>} />
-                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />, () => import("./pages/StreamDetail"))}</RequireWalletAction>} />
-                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />)}</RequireWalletAction>} />
+                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<Streams />, () => import("./pages/Streams"))}</RequireWalletAction>} />
+                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />, () => import("./pages/StreamDetail"))}</RequireWalletAction>} />
+                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />, () => import("./pages/Recipient"))}</RequireWalletAction>} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />, () => import("./pages/TreasuryPage"))} />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (
