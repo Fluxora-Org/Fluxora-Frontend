@@ -44,6 +44,7 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const mobileOpenerRef = useRef<HTMLElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   function handleTouchStart(event: TouchEvent<HTMLElement>) {
@@ -113,18 +114,47 @@ export default function Sidebar({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen, onMobileClose]);
 
-  // Focus trapping
+  // Move focus into the drawer on open, trap it while open, and return focus
+  // to the control that opened the drawer after it closes.
   useEffect(() => {
-    if (!mobileOpen || !sidebarRef.current) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
 
-    const focusableElements = sidebarRef.current.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstElement = focusableElements[0] as HTMLElement;
-    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const getFocusableElements = () =>
+      Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
+      );
+
+    if (!mobileOpen) {
+      mobileOpenerRef.current?.focus();
+      mobileOpenerRef.current = null;
+      return;
+    }
+
+    if (!sidebar.contains(document.activeElement)) {
+      mobileOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
+
+    const focusableElements = getFocusableElements();
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    firstElement?.focus();
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
+
+      if (focusableElements.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      if (!sidebar.contains(document.activeElement)) {
+        firstElement.focus();
+        e.preventDefault();
+        return;
+      }
 
       if (e.shiftKey) {
         if (document.activeElement === firstElement) {
