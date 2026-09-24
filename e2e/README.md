@@ -7,7 +7,7 @@ npm run test:e2e
 ```
 
 The suite starts the Vite dev server from `playwright.config.ts` and covers the
-current create-stream wizard plus the recipient withdrawal surface. These tests
+current create-stream wizard, the recipient withdrawal surface, and the embedded stream widget display flow. These tests
 use local demo data only; they do not connect to wallets, sign transactions, or
 call deploy credentials.
 
