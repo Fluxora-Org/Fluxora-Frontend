@@ -23,15 +23,18 @@ For first-time contributors:
 
 1. [Prerequisites](#prerequisites)
 2. [Local Setup](#local-setup)
-3. [Environment Variables](#environment-variables)
-4. [Branch Naming](#branch-naming)
-5. [Commit Conventions](#commit-conventions)
-6. [Development Workflow](#development-workflow)
-7. [Testing](#testing)
-8. [Lint and Format](#lint-and-format)
-9. [Design Specs and Docs](#design-specs-and-docs)
-10. [Pull Request Expectations](#pull-request-expectations)
-11. [Security Notes](#security-notes)
+3. [Directory Structure](#directory-structure)
+4. [Environment Variables](#environment-variables)
+5. [Branch Naming](#branch-naming)
+6. [Commit Conventions](#commit-conventions)
+7. [Development Workflow](#development-workflow)
+8. [Testing](#testing)
+9. [Lint and Format](#lint-and-format)
+10. [Design Specs and Docs](#design-specs-and-docs)
+11. [Component and Hook Conventions](#component-and-hook-conventions)
+12. [Accessibility and i18n Expectations](#accessibility-and-i18n-expectations)
+13. [Pull Request Expectations (CI Gates)](#pull-request-expectations-ci-gates)
+14. [Security Notes](#security-notes)
 
 ---
 
@@ -65,6 +68,19 @@ npm run dev
 ```
 
 The app runs at [http://localhost:5173](http://localhost:5173).
+
+---
+
+## Directory Structure
+
+```text
+src/
+  components/   # Layout, shared UI
+  pages/        # Dashboard, Streams, Recipient
+  App.tsx
+  main.tsx
+  index.css
+```
 
 ---
 
@@ -277,10 +293,31 @@ Several design and accessibility specs live at the repo root and in `docs/`. Ref
 
 ---
 
-## Pull Request Expectations
+## Component and Hook Conventions
+
+### Components
+- **Functional Components**: Use standard React 18 functional components with TypeScript.
+- **Single Responsibility**: Keep components small and focused. Extract complex sub-trees into their own files.
+- **Styling**: Component-specific styling and conventions are documented in `docs/COMPONENT_GUIDELINES.md`.
+
+### Custom Hooks
+- **Prefix**: Always prefix custom hooks with `use`.
+- **Separation of Concerns**: Extract side-effects, data fetching (like `useTreasury`), and wallet state into hooks to keep UI components declarative.
+
+---
+
+## Accessibility and i18n Expectations
+
+All new components must meet these baseline standards before merge:
+- **Accessibility (a11y)**: Use semantic HTML elements. Maintain keyboard navigability, provide clear focus states, and manage focus robustly in modals/dialogs. Screen-reader compatibility is required. Detailed expectations are in `docs/COMPONENT_GUIDELINES.md`.
+- **Internationalization (i18n)**: Design layouts to support text expansion and avoid hardcoded formatting for dates or currencies. Use `Intl` APIs where necessary for regional formatting.
+
+---
+
+## Pull Request Expectations (CI Gates)
 
 - Fill in the [PR template](.github/PULL_REQUEST_TEMPLATE.md) completely.
-- Every PR must pass the full CI matrix before merge:
+- Every PR must pass the full CI matrix (CI gates) before merge. You can reproduce these CI gates locally:
   - `npm run build` — TypeScript type check + production bundle
   - `npm run test` — all unit tests green
   - `npm run test:coverage` — all coverage thresholds ≥ 95%
