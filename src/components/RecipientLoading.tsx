@@ -19,7 +19,14 @@ export default function RecipientLoading({ retryCount = 0, onRetry }: RecipientL
   }
 
   return (
-    <div data-testid={LOADING_TEST_IDS.recipient} role="status" aria-label="Loading recipient portal" aria-busy="true">
+    <div
+      data-testid={LOADING_TEST_IDS.recipient}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-label="Loading recipient portal"
+      aria-busy="true"
+    >
       <span className="sr-only">Loading your streams…</span>
 
       {/* Page header */}
