@@ -81,6 +81,9 @@ export default defineConfig({
         // Issue #1410: split Streams page data loading from table rendering
         "src/pages/useStreamsData.ts",
         "src/components/Streams/StreamsListPanel.tsx",
+        // Issue #1656: keyboard shortcuts must not conflict with assistive technology
+        "src/components/KeyboardShortcutsModal.tsx",
+        "src/hooks/useKeyboardShortcuts.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
