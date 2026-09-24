@@ -1,10 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
-import { lazy, useState, type ComponentType, type ReactElement } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useParams,
+} from "react-router-dom";
+import { lazy, useState, useEffect, type ComponentType, type ReactElement } from "react";
+
 import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
+import WalletConnectionNotice from "./components/wallet-connect/WalletConnectionNotice";
 import { ToastProvider } from "./components/toast/ToastProvider";
 import { I18nProvider } from "./i18n";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -18,6 +27,7 @@ import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 import { getRecipientRouteKey } from "./pages/recipientRouteKey";
 import RequireWalletAction from "./components/RequireWalletAction";
+import ApiVersionGuard from "./components/ApiVersionGuard";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -36,7 +46,6 @@ const ComponentGallery = IS_DEV
   ? lazy(() => import("./pages/dev/ComponentGallery"))
   : () => null;
 
-
 function LegacyStreamRedirect() {
   const { streamId } = useParams();
   return (
@@ -49,7 +58,9 @@ function LegacyStreamRedirect() {
 
 function RecipientRoute() {
   const location = useLocation();
-  return <Recipient key={getRecipientRouteKey(location.pathname, location.search)} />;
+  return (
+    <Recipient key={getRecipientRouteKey(location.pathname, location.search)} />
+  );
 }
 
 function lazyAppRoute(
@@ -77,8 +88,27 @@ export default function App() {
     setIsSidebarOpen((prev) => !prev);
   };
 
+  useEffect(() => {
+    const handlePreloadError = (e: Event) => {
+      e.preventDefault();
+      if (
+        window.confirm(
+          "A new version of the application is available. Reload to update?"
+        )
+      ) {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener("vite:preloadError", handlePreloadError);
+    return () => {
+      window.removeEventListener("vite:preloadError", handlePreloadError);
+    };
+  }, []);
+
   return (
     <ThemeProvider>
+      <ApiVersionGuard />
       <I18nProvider>
         <BrowserRouter>
           <VoiceProvider>
@@ -91,10 +121,35 @@ export default function App() {
                   onSidebarToggle={handleSidebarToggle}
                   isSidebarOpen={isSidebarOpen}
                 />
+                <WalletConnectionNotice />
 
                 <ErrorBoundary>
                   <Routes>
                     <Route path="/" element={<Home />} />
+                    <Route
+                      path="/dashboard"
+                      element={<Navigate to="/app" replace />}
+                    />
+                    <Route
+                      path="/streams"
+                      element={<Navigate to="/app/streams" replace />}
+                    />
+                    <Route
+                      path="/streams/:streamId"
+                      element={<LegacyStreamRedirect />}
+                    />
+                    <Route
+                      path="/landing"
+                      element={<Navigate to="/" replace />}
+                    />
+                    <Route
+                      path="/"
+                      element={
+                        <ErrorBoundary>
+                          <Home />
+                        </ErrorBoundary>
+                      }
+                    />
                     <Route path="/dashboard" element={<Navigate to="/app" replace />} />
                     <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
                     <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
@@ -110,25 +165,105 @@ export default function App() {
                       <Route index element={lazyAppRoute(<Dashboard />, () => import("./pages/Dashboard"))} />
                       <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />, () => import("./pages/StreamDetail"))}</RequireWalletAction>} />
                       <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<Streams />, () => import("./pages/Streams"))}</RequireWalletAction>} />
-                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />)}</RequireWalletAction>} />
+                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />, () => import("./pages/Recipient"))}</RequireWalletAction>} />
                       <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />, () => import("./pages/TreasuryPage"))} />
+                      <Route
+                        index
+                        element={lazyAppRoute(
+                          <Dashboard />,
+                          () => import("./pages/Dashboard"),
+                        )}
+                      />
+                      <Route
+                        path="streams"
+                        element={
+                          <RequireWalletAction>
+                            {lazyAppRoute(
+                              <Streams />,
+                              () => import("./pages/Streams"),
+                            )}
+                          </RequireWalletAction>
+                        }
+                      />
+                      <Route
+                        path="streams/:streamId"
+                        element={
+                          <RequireWalletAction>
+                            {lazyAppRoute(
+                              <StreamDetail />,
+                              () => import("./pages/StreamDetail"),
+                            )}
+                          </RequireWalletAction>
+                        }
+                      />
+                      <Route
+                        path="recipient"
+                        element={
+                          <RequireWalletAction>
+                            {lazyAppRoute(<RecipientRoute />)}
+                          </RequireWalletAction>
+                        }
+                      />
+                      <Route
+                        path="treasurypage"
+                        element={lazyAppRoute(
+                          <TreasuryPage />,
+                          () => import("./pages/TreasuryPage"),
+                        )}
+                      />
                       <Route path="error" element={<ErrorPage />} />
                       {IS_DEV && (
                         <Route
                           path="empty-state-demo"
-                          element={lazyAppRoute(<EmptyStateDemo />, () => import("./pages/EmptyStateDemo"))}
+                          element={lazyAppRoute(
+                            <EmptyStateDemo />,
+                            () => import("./pages/EmptyStateDemo"),
+                          )}
                         />
                       )}
                       {IS_DEV && (
                         <Route
                           path="component-gallery"
-                          element={lazyAppRoute(<ComponentGallery />, () => import("./pages/dev/ComponentGallery"))}
+                          element={lazyAppRoute(
+                            <ComponentGallery />,
+                            () => import("./pages/dev/ComponentGallery"),
+                          )}
                         />
                       )}
+                      {/* Nested catch-all: unmatched /app/* must render NotFound
+                          instead of an empty Layout Outlet (blank page). */}
+                      <Route path="*" element={<NotFound />} />
                     </Route>
                     <Route path="/connect-wallet" element={<ConnectWallet />} />
-                    <Route path="/embed/streams/:streamId" element={<EmbedStreamWidget />} />
+                    <Route
+                      path="/embed/streams/:streamId"
+                      element={<EmbedStreamWidget />}
+                    />
                     <Route path="*" element={<NotFound />} />
+                    <Route
+                      path="/connect-wallet"
+                      element={
+                        <ErrorBoundary>
+                          <ConnectWallet />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/embed/streams/:streamId"
+                      element={
+                        <ErrorBoundary>
+                          <EmbedStreamWidget />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="*"
+                      element={
+                        <ErrorBoundary>
+                          <NotFound />
+                        </ErrorBoundary>
+                      }
+                    />
                   </Routes>
                 </ErrorBoundary>
 

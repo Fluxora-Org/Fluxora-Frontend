@@ -53,7 +53,7 @@ describe("Voice Command Navigation System", () => {
         <VoiceProvider>
           <VoiceMicButton variant="navbar" />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const button = screen.getByRole("button");
@@ -67,7 +67,7 @@ describe("Voice Command Navigation System", () => {
         <VoiceProvider>
           <LocationDisplay />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByTestId("location").textContent).toBe("/app");
@@ -75,7 +75,7 @@ describe("Voice Command Navigation System", () => {
     fireEvent.click(screen.getByTestId("test-phrase-btn"));
 
     expect(screen.getByTestId("voice-state").textContent).toBe(
-      "command-recognized"
+      "command-recognized",
     );
     expect(screen.getByTestId("location").textContent).toBe("/app/streams");
   });
@@ -87,7 +87,7 @@ describe("Voice Command Navigation System", () => {
           <LocationDisplay />
           <VoiceConfirmModal />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     // Trigger destructive phrase
@@ -95,7 +95,7 @@ describe("Voice Command Navigation System", () => {
 
     // State should enter confirming-destructive
     expect(screen.getByTestId("voice-state").textContent).toBe(
-      "confirming-destructive"
+      "confirming-destructive",
     );
 
     // Confirmation modal should be visible
@@ -105,12 +105,96 @@ describe("Voice Command Navigation System", () => {
     expect(modal).toHaveTextContent(/Cancel stream/i);
 
     // Confirm button click
-    const confirmBtn = screen.getByRole("button", { name: /^confirm action$/i });
+    const confirmBtn = screen.getByRole("button", {
+      name: /^confirm action$/i,
+    });
     fireEvent.click(confirmBtn);
 
     expect(screen.getByTestId("voice-state").textContent).toBe(
-      "command-recognized"
+      "command-recognized",
     );
+  });
+
+  it("shows the parsed action, amount, recipient and stream before a deliberate confirmation", () => {
+    const phrase = "Cancel stream STR-001 for Alice M. amount 250 USDC";
+    function IssueCommand() {
+      const { processSpokenPhrase } = useVoiceContext();
+      return (
+        <button onClick={() => processSpokenPhrase(phrase)}>
+          Issue command
+        </button>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/app/streams"]}>
+        <VoiceProvider>
+          <LocationDisplay />
+          <IssueCommand />
+          <VoiceConfirmModal />
+        </VoiceProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Issue command" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeVisible();
+    expect(
+      Array.from(
+        dialog.querySelectorAll("dt, dd"),
+        (element) => element.textContent,
+      ),
+    ).toEqual([
+      "Action",
+      "Cancel stream",
+      "Amount",
+      "250 USDC",
+      "Recipient",
+      "Alice M.",
+      "Stream",
+      "STR-001",
+    ]);
+    expect(screen.getByTestId("voice-state")).toHaveTextContent(
+      "confirming-destructive",
+    );
+    expect(screen.getByTestId("location")).toHaveTextContent("/app/streams");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/app/streams");
+
+    fireEvent.click(screen.getByRole("button", { name: "Issue command" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Action" }));
+    expect(screen.getByTestId("voice-state")).toHaveTextContent(
+      "command-recognized",
+    );
+  });
+
+  it("does not confirm an unparsed destructive utterance", () => {
+    function IssueCommand() {
+      const { processSpokenPhrase } = useVoiceContext();
+      return (
+        <button
+          onClick={() =>
+            processSpokenPhrase(
+              "please cancel stream STR-001 for Alice amount 250 USDC",
+            )
+          }
+        >
+          Issue command
+        </button>
+      );
+    }
+    render(
+      <MemoryRouter>
+        <VoiceProvider>
+          <IssueCommand />
+          <VoiceConfirmModal />
+        </VoiceProvider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Issue command" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("does NOT trigger destructive confirmation for utterances that merely contain the destructive phrase as a substring (Issue #938)", () => {
@@ -121,9 +205,7 @@ describe("Voice Command Navigation System", () => {
           <span data-testid="state">{state}</span>
           <button
             data-testid="negated-btn"
-            onClick={() =>
-              processSpokenPhrase("please don't cancel stream")
-            }
+            onClick={() => processSpokenPhrase("please don't cancel stream")}
           >
             Negated Phrase
           </button>
@@ -143,20 +225,20 @@ describe("Voice Command Navigation System", () => {
           <SubstringTester />
           <VoiceConfirmModal />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     // Saying a longer utterance that contains the substring "cancel stream" must
     // NOT transition to confirming-destructive.
     fireEvent.click(screen.getByTestId("negated-btn"));
     expect(screen.getByTestId("state").textContent).not.toBe(
-      "confirming-destructive"
+      "confirming-destructive",
     );
 
     // The exact phrase should still work as before.
     fireEvent.click(screen.getByTestId("exact-btn"));
     expect(screen.getByTestId("state").textContent).toBe(
-      "confirming-destructive"
+      "confirming-destructive",
     );
   });
 
@@ -178,11 +260,13 @@ describe("Voice Command Navigation System", () => {
         <VoiceProvider>
           <UnrecognizedTester />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByText("Run Unknown"));
-    expect(screen.getByTestId("state").textContent).toBe("command-unrecognized");
+    expect(screen.getByTestId("state").textContent).toBe(
+      "command-unrecognized",
+    );
   });
 
   it("renders command list reference panel with grammar categories when opened", () => {
@@ -192,7 +276,7 @@ describe("Voice Command Navigation System", () => {
           <LocationDisplay />
           <VoiceCommandPanel />
         </VoiceProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByTestId("open-panel-btn"));

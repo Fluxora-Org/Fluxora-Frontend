@@ -514,7 +514,7 @@ function StreamDetail({
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
 }) {
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
   return (
     <>
       <button
@@ -885,6 +885,7 @@ export default function Streams() {
     handleResumeDraft,
     resolveSessionOnInteraction,
     announcement,
+    alertAnnouncement,
     clearResolvedOptimisticOps,
   } = data;
 
@@ -910,6 +911,7 @@ export default function Streams() {
       addToast(
         "A pending stream operation did not confirm on-chain and has been reverted.",
         "error",
+        0
       );
     }
     rolledBackToastRef.current = rolledBackCount;
@@ -1122,6 +1124,9 @@ export default function Streams() {
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
+      </div>
 
       {selectedStream ? (
         <StreamDetail
@@ -1325,3 +1330,4 @@ export default function Streams() {
     </div>
   );
 }
+

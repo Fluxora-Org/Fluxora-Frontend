@@ -1,13 +1,18 @@
 import { useRef } from "react";
-import { Sun, Moon, Monitor } from "lucide-react";
+import { Sun, Moon, Zap, Monitor } from "lucide-react";
 import { useTheme, type ThemePreference } from "../../theme/ThemeProvider";
 
 export default function ThemeSegmentedControl() {
   const { theme, themePreference, setThemePreference } = useTheme();
 
+  // Every built-in theme is offered as an explicit choice, with `auto` as the
+  // distinct system-preference mode. Keeping the active theme represented here
+  // means the control always agrees with the DOM `data-theme` after a reload or
+  // a bootstrap-applied theme.
   const options: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
     { value: "light", label: "Light", icon: Sun },
     { value: "dark", label: "Dark", icon: Moon },
+    { value: "cyberpunk", label: "Cyberpunk", icon: Zap },
     { value: "auto", label: "Auto", icon: Monitor },
   ];
 

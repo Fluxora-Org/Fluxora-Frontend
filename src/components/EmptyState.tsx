@@ -219,7 +219,11 @@ export default function EmptyState({
   // When zero-accrual is flagged and variant is not already zero-accrual,
   // override the icon+copy to zero-accrual semantics.
   const effectiveVariant: EmptyStateVariant =
-    zeroAccrual && variant !== "zero-accrual" ? "zero-accrual" : variant;
+    error && variant !== "error"
+      ? "error"
+      : zeroAccrual && variant !== "zero-accrual"
+      ? "zero-accrual"
+      : variant;
   const cfg = CONFIG[effectiveVariant];
   const isConnected = walletConnected;
 

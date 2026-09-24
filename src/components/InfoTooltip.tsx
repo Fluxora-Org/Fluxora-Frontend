@@ -223,6 +223,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
           id={id}
           role="dialog"
           aria-labelledby={`${id}-title`}
+          aria-describedby={`${id}-content`}
           aria-modal="false"
           className={`info-tooltip-popover info-tooltip-popover--${calculatedPosition}`}
         >
@@ -254,7 +255,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
               </svg>
             </button>
           </div>
-          <div className="info-tooltip-content">
+          <div id={`${id}-content`} className="info-tooltip-content">
             {typeof content === 'string' ? <p>{content}</p> : content}
           </div>
         </div>

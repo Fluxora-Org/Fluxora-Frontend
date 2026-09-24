@@ -26,7 +26,12 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
   const [downloadState, setDownloadState] = useState<"idle" | "generating" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const isPending = data.status === "pending" || !data.txHash;
+  // A hash alone is not proof of confirmation. The polling flow supplies the
+  // explicit status, so only this exact combination may render a success
+  // receipt or expose an explorer link.
+  const isConfirmed = data.status === "confirmed" && Boolean(data.txHash);
+  const isFailed = data.status === "failed";
+  const isPending = !isConfirmed && !isFailed;
 
   const handleDownload = async () => {
     setDownloadState("generating");
@@ -70,15 +75,20 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
 
         {/* Status Pill */}
         <div className="flex items-center gap-2">
-          {isPending ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/30">
-              <Clock size={14} className="animate-spin-slow" />
-              Pending Confirmation
-            </span>
-          ) : (
+          {isConfirmed ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
               <CheckCircle2 size={14} />
               On-Chain Confirmed
+            </span>
+          ) : isFailed ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30">
+              <AlertCircle size={14} />
+              Transaction Failed
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/30">
+              <Clock size={14} className="animate-spin-slow" />
+              {data.status === "unknown" ? "Confirmation Unknown" : "Pending Confirmation"}
             </span>
           )}
         </div>
@@ -145,14 +155,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
           </span>
         </div>
 
-        {isPending ? (
-          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
-            <p className="font-semibold">Pending RPC Confirmation</p>
-            <p className="text-[11px] opacity-90">
-              Submitted to Stellar network. The downloaded receipt will reflect current pending status.
-            </p>
-          </div>
-        ) : (
+        {isConfirmed ? (
           <div className="space-y-1 pt-1">
             <span className="text-[11px] text-[var(--text-muted)] block">
               Transaction Hash:
@@ -160,13 +163,31 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
             <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-[var(--color-accent-primary)] truncate">
               <span className="truncate">{data.txHash}</span>
               <a
-                href={buildReceiptExplorerUrl(data.txHash!, data.network)}
+                href={buildReceiptExplorerUrl(data.txHash, data.network)}
                 {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
                 className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
               >
                 Explorer <ExternalLink size={12} />
               </a>
             </div>
+          </div>
+        ) : isFailed ? (
+          <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            <p className="font-semibold">Transaction was not confirmed</p>
+            <p className="text-[11px] opacity-90">
+              Stellar reported a failed transaction. No successful receipt is available.
+            </p>
+          </div>
+        ) : (
+          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+            <p className="font-semibold">
+              {data.status === "unknown" ? "Confirmation unavailable" : "Pending RPC Confirmation"}
+            </p>
+            <p className="text-[11px] opacity-90">
+              {data.status === "unknown"
+                ? "The network did not return a definitive result. Do not treat this as confirmed."
+                : "Submitted to Stellar network. Confirmation is still pending."}
+            </p>
           </div>
         )}
       </div>
@@ -184,7 +205,8 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
         <button
           type="button"
           onClick={handleDownload}
-          disabled={downloadState === "generating"}
+          disabled={downloadState === "generating" || !isConfirmed}
+          title={!isConfirmed ? "A confirmed on-chain transaction is required" : undefined}
           aria-label={`Download ${data.type} receipt as PNG image`}
           className={clsx(
             "w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",

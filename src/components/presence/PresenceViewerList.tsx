@@ -32,7 +32,7 @@ export default function PresenceViewerList({
   // Reactive "now" timestamp that ticks on a coarse cadence (useTickingNow)
   // so the "last seen N seconds ago" text stays live while the list is open
   // without requiring a viewers prop change (Issue #955).
-  const now = useTickingNow();
+  const now = useTickingNow({ precision: "second", intervalMs: 5_000 });
 
   // Get masked name or address
   const getDisplayName = (viewer: Viewer) => {

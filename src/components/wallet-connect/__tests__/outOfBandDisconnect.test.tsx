@@ -6,6 +6,7 @@ import WalletStatus from "../../navigation/WalletStatus";
 import {
   getAddress,
   getNetwork,
+  isAllowed,
   isConnected,
   WatchWalletChanges,
 } from "@stellar/freighter-api";
@@ -19,12 +20,14 @@ vi.unmock("../Walletcontext");
 
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: vi.fn(),
+  isAllowed: vi.fn(),
   getAddress: vi.fn(),
   getNetwork: vi.fn(),
   WatchWalletChanges: vi.fn(),
 }));
 
 const mockedIsConnected = vi.mocked(isConnected);
+const mockedIsAllowed = vi.mocked(isAllowed);
 const mockedGetAddress = vi.mocked(getAddress);
 const mockedGetNetwork = vi.mocked(getNetwork);
 const mockedWatchWalletChanges = vi.mocked(WatchWalletChanges);
@@ -61,8 +64,13 @@ describe("Out-of-band disconnect handling", () => {
     vi.clearAllMocks();
   });
 
-  it("updates dependent components when wallet disconnects out-of-band", async () => {
+  // A watcher-reported empty address is ambiguous (locked vs. revoked). Since
+  // #1678 the provider probes the wallet: a revoked app permission is an
+  // out-of-band disconnect; a lock is a recoverable drop (see
+  // reconnectViewState.test.tsx).
+  it("updates dependent components when wallet access is revoked out-of-band", async () => {
     mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedIsAllowed.mockResolvedValue({ isAllowed: true });
     mockedGetAddress.mockResolvedValue({ address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN" });
     mockedGetNetwork.mockResolvedValue({
       network: "TESTNET",
@@ -96,7 +104,9 @@ describe("Out-of-band disconnect handling", () => {
       expect(mockedWatchWalletChanges).toHaveBeenCalled();
     });
 
-    // Simulate an out-of-band disconnect (e.g. extension locked)
+    // Simulate an out-of-band disconnect: the user revokes this app in Freighter.
+    mockedIsAllowed.mockResolvedValue({ isAllowed: false });
+    mockedGetAddress.mockResolvedValue({ address: "" });
     act(() => {
       watchCallback({ address: "", network: "TESTNET" });
     });
@@ -109,5 +119,46 @@ describe("Out-of-band disconnect handling", () => {
     // In-flight action components should gracefully handle being unmounted
     expect(screen.queryByText("Start action")).not.toBeInTheDocument();
     expect(screen.getByText("Disconnected gracefully")).toBeInTheDocument();
+  });
+
+  it("keeps dependent components mounted when the wallet only locks", async () => {
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedIsAllowed.mockResolvedValue({ isAllowed: true });
+    mockedGetAddress.mockResolvedValue({ address: "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN" });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
+
+    let watchCallback: (state: { address: string; network: string }) => void = () => {};
+    mockedWatchWalletChanges.mockImplementation(function MockWatchWalletChanges() {
+      return {
+        watch: vi.fn((cb) => {
+          watchCallback = cb;
+        }),
+        stop: vi.fn(),
+      } as unknown as typeof WatchWalletChanges;
+    });
+
+    render(
+      <WalletProvider>
+        <Harness />
+      </WalletProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Start action")).toBeInTheDocument();
+      expect(mockedWatchWalletChanges).toHaveBeenCalled();
+    });
+
+    // Locked extension: Freighter reports an empty address but access is still allowed.
+    mockedGetAddress.mockResolvedValue({ address: "" });
+    act(() => {
+      watchCallback({ address: "", network: "TESTNET" });
+    });
+
+    await waitFor(() => expect(mockedGetAddress).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Start action")).toBeInTheDocument();
+    expect(screen.queryByText("Disconnected gracefully")).not.toBeInTheDocument();
   });
 });

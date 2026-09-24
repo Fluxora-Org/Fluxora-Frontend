@@ -17,10 +17,14 @@ import { CANONICAL_HEADERS } from './types';
 export const MAX_CSV_ROWS = 500;
 
 /**
- * Max upload size checked in CsvDropZone before `file.text()`.
+ * Max upload size checked in CsvDropZone before `file.text()` and in `prepareCsvParse`.
  * Sized generously for {@link MAX_CSV_ROWS} short rows (~20× a typical 500-row export).
  */
-export const MAX_CSV_FILE_SIZE_BYTES = 1_048_576; // 1 MiB
+export const MAX_CSV_FILE_SIZE_BYTES = 1_048_576; // 1 MiB (1,048,576 bytes)
+/** Human-readable label for {@link MAX_CSV_FILE_SIZE_BYTES} used in rejection copy. */
+export const MAX_CSV_FILE_SIZE_LABEL = '1 MB';
+/** Alias for {@link MAX_CSV_FILE_SIZE_BYTES}. */
+export const MAX_CSV_BYTES = MAX_CSV_FILE_SIZE_BYTES;
 export const MAX_DEPOSIT_AMOUNT = 10_000_000;
 
 /**
@@ -36,6 +40,15 @@ export const MAX_CSV_COLUMNS = 20;
  * main thread when parsing.
  */
 export const MAX_CSV_CELL_LENGTH = 1000;
+
+/**
+ * Aggregate ceiling on total cells in one import, derived from the two bounds
+ * that are actually enforced before parsing begins: a file can never contain
+ * more than {@link MAX_CSV_ROWS} rows of more than {@link MAX_CSV_COLUMNS}
+ * cells, so the product bounds total parsing work. Exported for tests and UI
+ * copy; there is no separate cell-count check.
+ */
+export const MAX_CSV_CELLS = MAX_CSV_ROWS * MAX_CSV_COLUMNS;
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -258,6 +271,24 @@ export function prepareCsvParse(
   rawText: string,
   mapping?: Partial<ColumnMapping>,
 ): PreparedCsvParse {
+  const byteLength =
+    rawText.length > MAX_CSV_FILE_SIZE_BYTES
+      ? rawText.length
+      : typeof Blob !== 'undefined'
+        ? new Blob([rawText]).size
+        : new TextEncoder().encode(rawText).length;
+
+  if (byteLength > MAX_CSV_FILE_SIZE_BYTES) {
+    return {
+      detectedHeaders: [],
+      dataLines: [],
+      autoMapping: {},
+      effectiveMapping: {},
+      headersMatch: false,
+      parseError: `File is too large. Maximum size is ${MAX_CSV_FILE_SIZE_LABEL}.`,
+    };
+  }
+
   const text = normaliseLineEndings(stripBom(rawText));
   const lines = text.split('\n').filter((l) => l.trim().length > 0);
 
@@ -295,6 +326,35 @@ export function prepareCsvParse(
       headersMatch: false,
       parseError: `This CSV has ${dataLines.length} rows. Maximum is ${MAX_CSV_ROWS}.`,
     };
+  }
+
+  // Bound per-row complexity before any row is parsed: refuse files whose
+  // rows exceed the column or cell-length limits before parsing begins, so
+  // pathological input can never reach the row-parsing loops.
+  for (let i = 0; i < dataLines.length; i++) {
+    const cells = splitCsvLine(dataLines[i]);
+    if (cells.length > MAX_CSV_COLUMNS) {
+      return {
+        detectedHeaders,
+        dataLines,
+        autoMapping: {},
+        effectiveMapping: {},
+        headersMatch: false,
+        parseError: `Row ${i + 1} has ${cells.length} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
+      };
+    }
+    for (const cell of cells) {
+      if (cell.length > MAX_CSV_CELL_LENGTH) {
+        return {
+          detectedHeaders,
+          dataLines,
+          autoMapping: {},
+          effectiveMapping: {},
+          headersMatch: false,
+          parseError: `Row ${i + 1} contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
+        };
+      }
+    }
   }
 
   // Build auto mapping from detected headers
@@ -384,40 +444,14 @@ export function parseAndValidateCsv(
   }
 
   if (!prep.headersMatch && !mapping) {
-    // Return early without rows; caller will show mapping step
+    // Return early without rows; caller will show mapping step. Per-row
+    // bounds have already been enforced by `prepareCsvParse`.
     return {
       detectedHeaders: prep.detectedHeaders,
       headersMatch: false,
       autoMapping: prep.autoMapping,
       rows: [],
     };
-  }
-
-  // Bound per-row complexity before rendering the preview. This runs only
-  // when rows are actually going to be parsed (i.e. after the header mapping
-  // early exit) so existing mapping behaviour is preserved.
-  for (let i = 0; i < prep.dataLines.length; i++) {
-    const cells = splitCsvLine(prep.dataLines[i]);
-    if (cells.length > MAX_CSV_COLUMNS) {
-      return {
-        detectedHeaders: prep.detectedHeaders,
-        headersMatch: prep.headersMatch,
-        autoMapping: prep.autoMapping,
-        rows: [],
-        parseError: `Row ${i + 1} has ${cells.length} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
-      };
-    }
-    for (const cell of cells) {
-      if (cell.length > MAX_CSV_CELL_LENGTH) {
-        return {
-          detectedHeaders: prep.detectedHeaders,
-          headersMatch: prep.headersMatch,
-          autoMapping: prep.autoMapping,
-          rows: [],
-          parseError: `Row ${i + 1} contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
-        };
-      }
-    }
   }
 
   // Parse rows using the effective mapping

@@ -31,6 +31,15 @@ export interface RecognizedCommand {
   command: VoiceCommandDef;
   rawTranscript: string;
   timestamp: number;
+  /** Parsed values to review before executing a destructive voice command. */
+  intent?: VoiceConfirmationIntent;
+}
+
+export interface VoiceConfirmationIntent {
+  action: string;
+  amount: string | null;
+  recipient: string | null;
+  stream: string | null;
 }
 
 export interface VoiceContextValue {

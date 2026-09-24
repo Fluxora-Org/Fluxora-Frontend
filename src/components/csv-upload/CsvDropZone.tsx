@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './CsvDropZone.css';
 import type { UploadZoneState } from './types';
-import { buildTemplateCsv, MAX_CSV_FILE_SIZE_BYTES } from './csvParser';
+import {
+  buildTemplateCsv,
+  MAX_CSV_FILE_SIZE_BYTES,
+  MAX_CSV_FILE_SIZE_LABEL,
+  MAX_CSV_ROWS,
+} from './csvParser';
+import { buildTemplateCsv } from './csvParser';
+import { validateCsvFile } from './csvFileValidation';
 import { CsvParseCancelledError, parseCsvAsync } from './csvParseClient';
-import type { CsvParseTask } from './csvParseClient';
+import type { CsvParseTask, CsvProgressPayload } from './csvParseClient';
 import type { ParseResult } from './types';
 import { ValidationMessage } from '../ValidationMessage';
 
@@ -13,9 +20,6 @@ export interface CsvDropZoneProps {
 }
 
 const ACCEPTED_MIME = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain']);
-
-/** Human-readable ceiling for size-reject copy (matches MAX_CSV_FILE_SIZE_BYTES). */
-const MAX_CSV_FILE_SIZE_LABEL = '1 MB';
 
 /**
  * CsvDropZone — drag-and-drop / click-to-browse CSV upload zone.
@@ -32,6 +36,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedFileName, setParsedFileName] = useState<string | null>(null);
   const [parsedRowCount, setParsedRowCount] = useState<number>(0);
+  const [parseProgress, setParseProgress] = useState<CsvProgressPayload | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Tracks the in-flight worker parse so a new file selection (or unmount)
   // can abort it cleanly instead of letting it finish and clobber state.
@@ -60,6 +65,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
     (message: string) => {
       setZoneState('parse-error');
       setParseError(message);
+      setParseProgress(null);
       restoreZoneFocus();
     },
     [restoreZoneFocus],
@@ -67,21 +73,11 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
 
   const processFile = useCallback(
     async (file: File) => {
-      // Validate extension / mime
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      const isCsv =
-        ext === 'csv' ||
-        ACCEPTED_MIME.has(file.type);
-      if (!isCsv) {
-        reject('Only .csv files are accepted.');
-        return;
-      }
-
-      // Reject oversized files before buffering the entire contents into memory.
-      if (file.size > MAX_CSV_FILE_SIZE_BYTES) {
-        reject(
-          `File is too large. Maximum size is ${MAX_CSV_FILE_SIZE_LABEL}.`,
-        );
+      // Validate type and size from cheap metadata BEFORE reading contents, so
+      // an arbitrary large or wrong-type file never gets buffered into memory.
+      const validation = validateCsvFile(file);
+      if (!validation.ok) {
+        reject(validation.message);
         return;
       }
 
@@ -90,13 +86,16 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
 
       setZoneState('parsing');
       setParseError(null);
+      setParseProgress(null);
 
       let task: CsvParseTask | null = null;
       try {
         const text = await file.text();
         // Parsing/validation runs on a dedicated Web Worker so the UI stays
         // responsive while large files are processed.
-        task = parseCsvAsync(text);
+        task = parseCsvAsync(text, undefined, (progress) => {
+          setParseProgress(progress);
+        });
         inFlightParseRef.current = task;
         const result = await task.promise;
 
@@ -196,7 +195,12 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   ].join(' ');
 
   const statusMessage = (() => {
-    if (zoneState === 'parsing') return 'Parsing file…';
+    if (zoneState === 'parsing') {
+      if (parseProgress && parseProgress.totalRows > 0) {
+        return `Parsing file… ${parseProgress.processedRows} of ${parseProgress.totalRows} rows (${parseProgress.percent}%)`;
+      }
+      return 'Parsing file…';
+    }
     if (zoneState === 'parse-error' && parseError) return parseError;
     if (zoneState === 'parsed' && parsedFileName) {
       return `${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? 's' : ''} detected`;
@@ -304,7 +308,31 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         )}
 
         {zoneState === 'parsing' && (
-          <span className="csv-drop-zone__heading">Parsing file…</span>
+          <>
+            <span className="csv-drop-zone__heading">
+              {parseProgress && parseProgress.totalRows > 0
+                ? `Parsing file… ${parseProgress.percent}%`
+                : 'Parsing file…'}
+            </span>
+            <div
+              role="progressbar"
+              aria-label="CSV parsing progress"
+              aria-valuenow={parseProgress ? parseProgress.percent : 0}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="csv-drop-zone__progress-bar"
+            >
+              <div
+                className="csv-drop-zone__progress-fill"
+                style={{ width: `${parseProgress ? parseProgress.percent : 0}%` }}
+              />
+            </div>
+            {parseProgress && parseProgress.totalRows > 0 && (
+              <span className="csv-drop-zone__subtext">
+                {parseProgress.processedRows} of {parseProgress.totalRows} rows
+              </span>
+            )}
+          </>
         )}
 
         {zoneState !== 'dragging-over' && zoneState !== 'parsing' && zoneState !== 'parsed' && zoneState !== 'parse-error' && (
@@ -315,7 +343,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
 
         {zoneState !== 'parsing' && zoneState !== 'dragging-over' && (
           <span className="csv-drop-zone__hint">
-            Accepts .csv · max 500 rows · 1 MB
+            Accepts .csv · max {MAX_CSV_ROWS} rows · {MAX_CSV_FILE_SIZE_LABEL}
           </span>
         )}
 
@@ -326,7 +354,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
           type="file"
           accept=".csv,text/csv"
           className="sr-only"
-          aria-label="Upload CSV file. Accepts .csv format, maximum 500 rows, 1 MB."
+          aria-label={`Upload CSV file. Accepts .csv format, maximum ${MAX_CSV_ROWS} rows, ${MAX_CSV_FILE_SIZE_LABEL}.`}
           aria-describedby="csv-upload-status"
           onChange={onFileChange}
         />

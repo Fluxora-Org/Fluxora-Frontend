@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
+import { resolveRoutePageChunk } from "./src/lib/routeChunks";
 
 const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
@@ -92,21 +93,10 @@ export default defineConfig(async () => {
           manualChunks(id: string) {
             const normalizedId = id.replace(/\\/g, "/");
 
-            // App-page code splitting (lazy routes).
-            if (normalizedId.includes("/src/pages/Dashboard")) {
-              return "app-dashboard";
-            }
-            if (normalizedId.includes("/src/pages/Streams")) {
-              return "app-streams";
-            }
-            if (normalizedId.includes("/src/pages/Recipient")) {
-              return "app-recipient";
-            }
-            if (normalizedId.includes("/src/pages/TreasuryPage")) {
-              return "app-treasury";
-            }
-            if (normalizedId.includes("/src/pages/EmptyStateDemo")) {
-              return "app-empty-state-demo";
+            // App-page code splitting (lazy routes) — see src/lib/routeChunks.ts.
+            const routeChunk = resolveRoutePageChunk(normalizedId);
+            if (routeChunk) {
+              return routeChunk;
             }
 
             // Below-the-fold landing sections are lazy-loaded from Home and

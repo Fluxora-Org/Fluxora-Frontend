@@ -8,6 +8,7 @@ import type { Metric } from "./Metric";
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
 import { formatAssetAmount } from "../../lib/formatters";
+import { isProductionBuild, readDemoModeFlag } from "../../lib/config";
 
 export interface TreasuryOverviewData {
   metrics: Metric[];
@@ -24,13 +25,19 @@ export interface TreasuryOverviewData {
  * For security reasons, demo mode is strictly disabled in production environments
  * to prevent mock/fixture data from being accidentally exposed to users.
  *
- * @param value - The env flag value to check. Defaults to `import.meta.env.VITE_DEMO_MODE`.
- * @param isProd - Whether the application is running in production. Defaults to `import.meta.env.PROD`.
+ * The flag values flow through `src/lib/config.ts` (never `import.meta.env`
+ * read directly in this component) so the environment is only read in one
+ * validated place and can be stubbed in tests.
+ *
+ * @param value - The demo flag value to check. Defaults to the config module's
+ *   `VITE_DEMO_MODE` reading.
+ * @param isProd - Whether the application is running in production. Defaults to
+ *   the config module's `PROD` reading.
  * @returns `true` if demo mode is enabled and not in production, `false` otherwise.
  */
 export function isTreasuryDemoMode(
-  value: string | undefined = import.meta.env.VITE_DEMO_MODE,
-  isProd: boolean | string = import.meta.env.PROD
+  value: string | undefined = readDemoModeFlag() ? "true" : undefined,
+  isProd: boolean | string = isProductionBuild()
 ): boolean {
   if (isProd) {
     return false;

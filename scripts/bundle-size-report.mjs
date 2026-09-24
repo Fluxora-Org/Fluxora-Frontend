@@ -176,6 +176,48 @@ if (failOnOversize && oversized.length > 0) {
   process.exit(1);
 }
 
+
+// ---------------------------------------------------------------------------
+// Route-level chunk reporting (keeps issue #1748 assertions honest after a real build)
+// ---------------------------------------------------------------------------
+const EXPECTED_ROUTE_CHUNKS = [
+  "app-dashboard",
+  "app-streams",
+  "app-stream-detail",
+  "app-recipient",
+  "app-treasury",
+  "app-embed-stream",
+];
+
+const routeRows = EXPECTED_ROUTE_CHUNKS.map((name) => {
+  const matches = rows.filter((r) => r.isJs && r.name === name);
+  const raw = matches.reduce((s, r) => s + r.raw, 0);
+  const gzip = matches.reduce((s, r) => s + r.gzip, 0);
+  return { name, raw, gzip, present: matches.length > 0 };
+});
+
+console.log("");
+console.log("Route chunk sizes");
+console.log("=================");
+console.log("| Chunk | Raw | Gzip | Status |");
+console.log("| --- | ---: | ---: | :---: |");
+const missingRouteChunks = [];
+for (const row of routeRows) {
+  if (!row.present) {
+    missingRouteChunks.push(row.name);
+    console.log(`| ${row.name} | — | — | ✗ MISSING |`);
+  } else {
+    console.log(`| ${row.name} | ${formatKb(row.raw)} | ${formatKb(row.gzip)} | ✓ OK |`);
+  }
+}
+
+if (failOnOversize && missingRouteChunks.length > 0) {
+  console.error(
+    `\nERROR: missing route chunk(s) (code-splitting regression): ${missingRouteChunks.join(", ")}`,
+  );
+  process.exit(1);
+}
+
 // ── Budget check ──────────────────────────────────────────────────────────────
 console.log("");
 console.log("Budget check");

@@ -129,7 +129,7 @@ export function isAuthorizedEmbedMessage(event: MessageEvent, allowedOrigins: Se
 }
 
 export type ValidationResult = 
-  | { valid: true }
+  | { valid: true; message: EmbedMessage }
   | { valid: false; reason: "untrusted_origin" | "invalid_source" | "invalid_schema" | "stale_message" | "replay_attack" | "missing_nonce" };
 
 export function validateEmbedMessage(
@@ -169,7 +169,7 @@ export function validateEmbedMessage(
     return { valid: false, reason: "invalid_schema" };
   }
 
-  return { valid: true };
+  return { valid: true, message };
 }
 
 // Export nonce generator for embed hosts to create valid messages

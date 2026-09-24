@@ -24,6 +24,7 @@ vi.mock("./utils/env", () => ({
 
 let dashboardModule: DeferredModule;
 let streamsModule: DeferredModule;
+let streamDetailModule: DeferredModule;
 let recipientModule: DeferredModule;
 let treasuryModule: DeferredModule;
 let emptyStateModule: DeferredModule;
@@ -85,6 +86,7 @@ vi.mock("./pages/NotFound", () => ({
 
 vi.mock("./pages/Dashboard", () => dashboardModule.promise);
 vi.mock("./pages/Streams", () => streamsModule.promise);
+vi.mock("./pages/StreamDetail", () => streamDetailModule.promise);
 vi.mock("./pages/Recipient", () => recipientModule.promise);
 vi.mock("./pages/TreasuryPage", () => treasuryModule.promise);
 vi.mock("./pages/EmptyStateDemo", () => emptyStateModule.promise);
@@ -93,6 +95,7 @@ describe("App route code splitting", () => {
   beforeEach(() => {
     dashboardModule = createDeferredPage("Dashboard lazy route");
     streamsModule = createDeferredPage("Streams lazy route");
+    streamDetailModule = createDeferredPage("Stream detail lazy route");
     recipientModule = createDeferredPage("Recipient lazy route");
     treasuryModule = createDeferredPage("Treasury lazy route");
     emptyStateModule = createDeferredPage("Empty state lazy route");
@@ -104,7 +107,7 @@ describe("App route code splitting", () => {
     render(<App />);
 
     expect(
-      screen.queryByRole("status", { name: "Loading app page" }),
+      screen.queryByRole("status", { name: "Loading wallet data…" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Home route" }),
@@ -117,7 +120,7 @@ describe("App route code splitting", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("status", { name: "Loading app page" }),
+      screen.getByRole("status", { name: "Loading wallet data…" }),
     ).toBeInTheDocument();
 
     dashboardModule.resolve();
@@ -125,26 +128,61 @@ describe("App route code splitting", () => {
     expect(await screen.findByText("Dashboard lazy route")).toBeInTheDocument();
     await waitFor(() =>
       expect(
-        screen.queryByRole("status", { name: "Loading app page" }),
+        screen.queryByRole("status", { name: "Loading wallet data…" }),
       ).not.toBeInTheDocument(),
     );
   });
 
-  // Skipped: pre-existing failure unrelated to CI setup — attempts a real
-  // network fetch (getStreamById) that isn't mocked in this test environment
-  // and always rejects with ECONNREFUSED. Tracked as pre-existing test debt.
-  it.skip("lazy-loads deep app routes such as stream details", async () => {
+  it("lazy-loads deep app routes such as stream details", async () => {
     window.history.pushState({}, "", "/app/streams/stream-123");
 
     render(<App />);
 
     expect(
-      screen.getByRole("status", { name: "Loading app page" }),
+      screen.getByRole("status", { name: "Loading wallet data…" }),
+    ).toBeInTheDocument();
+
+    streamDetailModule.resolve();
+
+    expect(
+      await screen.findByText("Stream detail lazy route"),
+    ).toBeInTheDocument();
+  });
+
+  it("lazy-loads the streams list on its own chunk boundary", async () => {
+    window.history.pushState({}, "", "/app/streams");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("status", { name: "Loading wallet data…" }),
     ).toBeInTheDocument();
 
     streamsModule.resolve();
 
     expect(await screen.findByText("Streams lazy route")).toBeInTheDocument();
+  });
+
+  it("prompts for reload on vite:preloadError and reloads when accepted", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const reloadSpy = vi.fn();
+    
+    const originalLocation = window.location;
+    // @ts-ignore
+    delete window.location;
+    window.location = { ...originalLocation, reload: reloadSpy };
+
+    render(<App />);
+
+    const event = new Event("vite:preloadError");
+    window.dispatchEvent(event);
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/reload/i)
+    );
+    expect(reloadSpy).toHaveBeenCalled();
+    
+    window.location = originalLocation;
   });
 });
 
@@ -152,6 +190,7 @@ describe("App landing routes", () => {
   beforeEach(() => {
     dashboardModule = createDeferredPage("Dashboard lazy route");
     streamsModule = createDeferredPage("Streams lazy route");
+    streamDetailModule = createDeferredPage("Stream detail lazy route");
     recipientModule = createDeferredPage("Recipient lazy route");
     treasuryModule = createDeferredPage("Treasury lazy route");
     emptyStateModule = createDeferredPage("Empty state lazy route");
@@ -175,6 +214,7 @@ describe("App empty-state-demo routing based on environment", () => {
   beforeEach(() => {
     dashboardModule = createDeferredPage("Dashboard lazy route");
     streamsModule = createDeferredPage("Streams lazy route");
+    streamDetailModule = createDeferredPage("Stream detail lazy route");
     recipientModule = createDeferredPage("Recipient lazy route");
     treasuryModule = createDeferredPage("Treasury lazy route");
     emptyStateModule = createDeferredPage("Empty state lazy route");
@@ -188,7 +228,7 @@ describe("App empty-state-demo routing based on environment", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("status", { name: "Loading app page" }),
+      screen.getByRole("status", { name: "Loading wallet data…" }),
     ).toBeInTheDocument();
 
     emptyStateModule.resolve();

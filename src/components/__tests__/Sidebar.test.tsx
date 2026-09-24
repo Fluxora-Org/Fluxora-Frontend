@@ -9,6 +9,13 @@ import {
   isMobileViewport,
 } from "../../lib/breakpoints";
 
+vi.mock("../voice/VoiceContext", () => ({
+  VoiceProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock("../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => null,
+}));
+
 vi.mock("react-router-dom", () => ({
   NavLink: ({
     children,
@@ -366,22 +373,40 @@ describe("Sidebar collapse toggle accessibility & keyboard interaction", () => {
     });
   });
 
-  it("handles mobile drawer Escape key and focus trapping", () => {
+  it("opens, traps, and closes the mobile drawer with keyboard focus restoration", () => {
     const onMobileClose = vi.fn();
-    render(
-      <VoiceProvider>
-        <Sidebar
-          collapsed={false}
-          onToggleCollapse={vi.fn()}
-          mobileOpen={true}
-          onMobileClose={onMobileClose}
-        />
-      </VoiceProvider>
+    const view = render(
+      <>
+        <button type="button" aria-label="Open sidebar">Open sidebar</button>
+        <VoiceProvider>
+          <Sidebar
+            collapsed={false}
+            onToggleCollapse={vi.fn()}
+            mobileOpen={false}
+            onMobileClose={onMobileClose}
+          />
+        </VoiceProvider>
+      </>,
+    );
+    const opener = screen.getByRole("button", { name: "Open sidebar" });
+    opener.focus();
+    expect(opener).toHaveFocus();
+
+    view.rerender(
+      <>
+        <button type="button" aria-label="Open sidebar">Open sidebar</button>
+        <VoiceProvider>
+          <Sidebar
+            collapsed={false}
+            onToggleCollapse={vi.fn()}
+            mobileOpen={true}
+            onMobileClose={onMobileClose}
+          />
+        </VoiceProvider>
+      </>,
     );
 
-    // Press Escape key
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(onMobileClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Fluxora home" })).toHaveFocus();
 
     const sidebar = getSidebar();
     const focusables = sidebar.querySelectorAll<HTMLElement>(
@@ -391,26 +416,33 @@ describe("Sidebar collapse toggle accessibility & keyboard interaction", () => {
     const middleEl = focusables[1];
     const lastEl = focusables[focusables.length - 1];
 
-    // Non-Tab key does not interfere
-    fireEvent.keyDown(window, { key: "Enter" });
-
-    // Shift + Tab on middle element does not redirect focus to last element
-    middleEl.focus();
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
-
-    // Shift + Tab on first element focuses last element
+    // Shift + Tab and Tab wrap within the open drawer.
     firstEl.focus();
     fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(lastEl);
 
-    // Tab on middle element does not redirect focus to first element
-    middleEl.focus();
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: false });
-
-    // Tab on last element focuses first element
     lastEl.focus();
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: false });
+    fireEvent.keyDown(window, { key: "Tab" });
     expect(document.activeElement).toBe(firstEl);
+
+    // Escape requests close, and the closed transition restores the opener.
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onMobileClose).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <>
+        <button type="button" aria-label="Open sidebar">Open sidebar</button>
+        <VoiceProvider>
+          <Sidebar
+            collapsed={false}
+            onToggleCollapse={vi.fn()}
+            mobileOpen={false}
+            onMobileClose={onMobileClose}
+          />
+        </VoiceProvider>
+      </>,
+    );
+    expect(opener).toHaveFocus();
   });
 
   it("excludes closed mobile drawer nav links from keyboard tab order via inert", () => {

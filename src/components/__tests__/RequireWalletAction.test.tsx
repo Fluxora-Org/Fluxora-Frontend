@@ -15,12 +15,12 @@ const walletState = vi.hoisted(() => ({
   address: null as string | null,
   network: null as string | null,
   isNetworkMismatch: false,
+  error: null as { type: string } | null,
 }));
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
-    error: null,
     expectedNetwork: "TESTNET",
     expectedNetworkLabel: "Testnet",
     connect: vi.fn(),
@@ -78,6 +78,7 @@ describe("RequireWalletAction", () => {
     walletState.address = null;
     walletState.network = null;
     walletState.isNetworkMismatch = false;
+    walletState.error = null;
   });
 
   it("waits while the wallet session is being restored", () => {
@@ -158,5 +159,15 @@ describe("RequireWalletAction", () => {
     expect(
       screen.queryByText("Protected money-moving route"),
     ).not.toBeInTheDocument();
+  });
+
+  it("explains the missing wallet instead of redirecting when no extension is installed", () => {
+    walletState.error = { type: "not_installed" };
+
+    renderGuard();
+
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toHaveAttribute("data-stage", "no-wallet");
+    expect(screen.queryByTestId("location")).not.toBeInTheDocument();
   });
 });

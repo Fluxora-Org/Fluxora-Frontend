@@ -531,7 +531,11 @@ export type DraftValidationResult =
  * Explicitly evaluates:
  *  1. Authorization: Verifies if user has permission to modify brand themes.
  *  2. Identity: Validates theme slug pattern [a-z0-9_-]+ and non-empty label.
- *  3. Tokens: Validates each override for format, locked/disallowed status, and contrast.
+ *  3. Tokens: Validates each override for format, locked/disallowed status.
+ *  4. Contrast: Checks every CONTRAST_PAIR in the resolved draft against
+ *     WCAG 2.1 AA (4.5:1 normal text, 3:1 large text / UI components).
+ *     Draft values take priority; DEFAULTS fill in any absent tokens so a
+ *     partial override set is still fully evaluated.
  *
  * Retry semantics note:
  *  Validation and live-preview computation are purely synchronous, deterministic,
@@ -638,6 +642,42 @@ export function validateThemeDraft(params: {
         reason: "locked",
         message: `"${key}" is reserved for accessibility and cannot be overridden.`,
       });
+    }
+  }
+
+  // 4. Cross-pair WCAG contrast check.
+  // Evaluate every contrast-sensitive fg/bg pair defined in CONTRAST_PAIRS.
+  // For each pair, prefer the draft value, then fall back to DEFAULTS, then
+  // skip the check entirely (we can't compute contrast without both sides).
+  if (errors.length === 0) {
+    for (const pair of CONTRAST_PAIRS) {
+      const fgValue = draft[pair.fg] ?? DEFAULTS[pair.fg];
+      const bgValue = draft[pair.bg] ?? DEFAULTS[pair.bg];
+
+      if (!fgValue || !bgValue) continue;
+      if (!isValidHex(fgValue) || !isValidHex(bgValue)) continue;
+      if (isTranslucentColor(fgValue) || isTranslucentColor(bgValue)) continue;
+
+      const required =
+        pair.level === "AA-large" ? WCAG_AA_LARGE : WCAG_AA_NORMAL;
+      const ratio = contrastRatio(
+        normaliseHex(fgValue),
+        normaliseHex(bgValue),
+      );
+
+      if (ratio < required) {
+        errors.push({
+          status: "error",
+          token: pair.fg,
+          value: fgValue,
+          reason: "contrast-fail",
+          message:
+            `"${pair.fg}" achieves ${ratio.toFixed(2)}:1 contrast against ` +
+            `"${pair.bg}" (${bgValue}). WCAG 2.1 AA requires ${required}:1.`,
+          ratio,
+          required,
+        });
+      }
     }
   }
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Bring `AppNavbar` and `ConnectButton` into WCAG 2.1 SC 2.5.5 (AAA) compliance by expanding interactive element touch targets to ≥ 44×44px, adding a keyboard focus ring to `ConnectButton`, and updating `TESTING_CHECKLIST.md` with manual QA steps.
+Bring `AppNavbar` and `ConnectButton` into WCAG 2.1 SC 2.5.5 (AAA) compliance by expanding interactive element touch targets to ≥ 44×44px, adding a keyboard focus ring to `ConnectButton`, and updating `docs/archive/TESTING_CHECKLIST.md` with manual QA steps.
 
 ## Tasks
 
@@ -89,8 +89,8 @@ Bring `AppNavbar` and `ConnectButton` into WCAG 2.1 SC 2.5.5 (AAA) compliance by
     - Tag: `// Feature: touch-target-accessibility, Property 4`
     - Use `fc.array(fc.constant("click"), { minLength: 0, maxLength: 10 })` to simulate click sequences; assert `aria-expanded` equals the current `mobileOpen` boolean after each click
 
-- [x] 9. Update TESTING_CHECKLIST.md with Section 7
-  - Append **Section 7: Touch Target Validation** to `TESTING_CHECKLIST.md`
+- [x] 9. Update docs/archive/TESTING_CHECKLIST.md with Section 7
+  - Append **Section 7: Touch Target Validation** to `docs/archive/TESTING_CHECKLIST.md`
   - Section must include:
     - Manual DevTools box-model inspection steps for `AppNavbar` and `ConnectButton`
     - Pass criteria: computed width ≥ 44px and height ≥ 44px for every interactive element

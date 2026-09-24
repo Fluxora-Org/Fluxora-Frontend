@@ -60,7 +60,7 @@
  * Recompute it whenever the script body changes:
  *   node -e "const c=require('crypto'),s=require('fs').readFileSync('index.html','utf8')
  *     .match(/<script id=\"theme-bootstrap\">([\s\S]*?)<\/script>/)[1];
- *     console.log('sha256-'+c.createHash('sha256').update(s).digest('base64'))"
+ *     process.stdout.write('sha256-'+c.createHash('sha256').update(s).digest('base64'))"
  */
 export const CSP_DIRECTIVES =
   "default-src 'self'; " +

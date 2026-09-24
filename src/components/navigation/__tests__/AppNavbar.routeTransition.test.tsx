@@ -108,6 +108,48 @@ function getWalletTrigger() {
 
 // ─── Rapid navigation ─────────────────────────────────────────────────────────
 
+describe("breadcrumb hierarchy matches the real app routes", () => {
+  it("renders the dashboard ancestor and valid links for deep and dynamic routes", () => {
+    mockPathname = "/app/streams/STR-123";
+    render(tree());
+
+    const breadcrumbNav = document.querySelector(
+      'nav[aria-label="Breadcrumb"]',
+    );
+    expect(breadcrumbNav).not.toBeNull();
+
+    const breadcrumbLinks = Array.from(
+      breadcrumbNav?.querySelectorAll("a") ?? [],
+    );
+    expect(
+      breadcrumbLinks.some((link) => link.getAttribute("href") === "/app"),
+    ).toBe(true);
+    expect(
+      breadcrumbLinks.some(
+        (link) => link.getAttribute("href") === "/app/streams",
+      ),
+    ).toBe(true);
+    expect(screen.getByText("STR-123")).toHaveAttribute("aria-current", "page");
+
+    mockPathname = "/app/treasurypage";
+    render(tree());
+
+    const updatedBreadcrumbNav = document.querySelector(
+      'nav[aria-label="Breadcrumb"]',
+    );
+    const updatedLinks = Array.from(
+      updatedBreadcrumbNav?.querySelectorAll("a") ?? [],
+    );
+    expect(
+      updatedLinks.some((link) => link.getAttribute("href") === "/app"),
+    ).toBe(true);
+    expect(screen.getByText("Treasury")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+});
+
 describe("rapid navigation keeps wallet actions locked until the route settles", () => {
   it("locks the wallet trigger during a single navigation and re-enables it after settling", () => {
     const result = mountNavbar();
@@ -136,7 +178,9 @@ describe("rapid navigation keeps wallet actions locked until the route settles",
     expect(getWalletTrigger()).toBeEnabled();
 
     // And no stale action menu from a previous context is left open.
-    expect(screen.queryByRole("menuitem", { name: /^disconnect$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /^disconnect$/i }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -152,7 +196,9 @@ describe("disconnect during a transition is blocked", () => {
 
     // Attempting to interact with the locked trigger is a no-op.
     fireEvent.click(getWalletTrigger());
-    expect(screen.queryByRole("menuitem", { name: /^disconnect$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /^disconnect$/i }),
+    ).not.toBeInTheDocument();
     expect(connectedWallet.disconnect).not.toHaveBeenCalled();
 
     settle();
@@ -165,13 +211,17 @@ describe("disconnect during a transition is blocked", () => {
 
     // Open the menu first.
     fireEvent.click(trigger);
-    expect(screen.getByRole("menuitem", { name: /^disconnect$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /^disconnect$/i }),
+    ).toBeInTheDocument();
 
     // Navigation begins — the lock must dismiss the menu so the previous
     // context's actions cannot be invoked against the new route.
     navigateTo(result, "/app/recipient");
     expect(getWalletTrigger()).toBeDisabled();
-    expect(screen.queryByRole("menuitem", { name: /^disconnect$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /^disconnect$/i }),
+    ).not.toBeInTheDocument();
 
     settle();
     expect(getWalletTrigger()).toBeEnabled();
@@ -253,7 +303,9 @@ describe("back/forward restores the correct, unlocked controls", () => {
 describe("global controls remain available during a transition", () => {
   it("keeps the easy-read font toggle enabled while the wallet actions are locked", () => {
     const result = mountNavbar();
-    const fontToggle = screen.getByRole("button", { name: /toggle easy-read font/i });
+    const fontToggle = screen.getByRole("button", {
+      name: /toggle easy-read font/i,
+    });
     expect(fontToggle).toBeEnabled();
 
     navigateTo(result, "/app/streams");

@@ -8,21 +8,71 @@ import { sanitizeReturnTo } from "../components/RequireWallet";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 
 /**
- * Connnect Wallet onboarding page.
- *
- * Issue #737: this page previously hardcoded `rgba(...)` and `#xxxxxx` color
- * literals inside an inline `styles` object. That meant the visual look was
- * frozen regardless of the user's `data-theme` choice (light vs dark), and
- * the marketing colours drifted out of the design system.
- *
- * The styling now flows entirely through `--connect-*` tokens defined in
- * `src/design-tokens.css`, which provide light and dark variants so the page
- * adapts to the active theme automatically while keeping the cinematic
- * onboarding look.
+ * Wallet failure categories for onboarding.
+ * Issue #1644: Asserts every wallet connection failure has a distinct, actionable message.
  */
-export default function ConnectWallet() {
+export type WalletFailureType =
+  | "rejected"
+  | "timeout"
+  | "wrong_network"
+  | "missing_extension";
+
+export interface WalletFailureInfo {
+  title: string;
+  actionText: string;
+  testId: string;
+}
+
+export function getWalletFailureDetails(
+  failureType: WalletFailureType,
+  expectedNetworkLabel: string = "Testnet"
+): WalletFailureInfo {
+  switch (failureType) {
+    case "rejected":
+      return {
+        title: "Connection Request Rejected",
+        actionText:
+          "The connection request was rejected. Please open your wallet extension and approve the request to continue.",
+        testId: "wallet-error-rejected",
+      };
+    case "timeout":
+      return {
+        title: "Connection Timed Out",
+        actionText:
+          "Wallet connection timed out. Please check your network connection, unlock your extension, and try again.",
+        testId: "wallet-error-timeout",
+      };
+    case "wrong_network":
+      return {
+        title: "Wrong Stellar Network",
+        actionText: `Your wallet is connected to the wrong network. Please switch your wallet extension network to ${expectedNetworkLabel}.`,
+        testId: "wallet-error-wrong-network",
+      };
+    case "missing_extension":
+      return {
+        title: "Wallet Extension Missing",
+        actionText:
+          "Freighter wallet extension is not installed. Please install Freighter from freighter.app to connect your wallet.",
+        testId: "wallet-error-missing-extension",
+      };
+  }
+}
+
+export interface ConnectWalletProps {
+  initialError?: WalletFailureType | null;
+}
+
+/**
+ * Connect Wallet onboarding page.
+ *
+ * Issue #737: styling uses tokens in design-tokens.css.
+ * Issue #1644: handles and asserts distinct, actionable failure messages
+ * for rejection, timeout, wrong network, and missing extension.
+ */
+export default function ConnectWallet({ initialError }: ConnectWalletProps = {}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCtaFocused, setIsCtaFocused] = useState(false);
+  const [modalError, setModalError] = useState<WalletFailureType | null>(null);
   const wallet = useWallet();
   const location = useLocation();
   const state = location.state as { returnTo?: string } | null;
@@ -33,9 +83,30 @@ export default function ConnectWallet() {
     setIsModalOpen(false);
   }, [wallet.connected]);
 
-  if (wallet.connected) {
+  const failureType: WalletFailureType | null = (() => {
+    if (initialError) return initialError;
+    if (modalError) return modalError;
+    if (
+      wallet.isNetworkMismatch ||
+      (wallet.error && "type" in wallet.error && wallet.error.type === "network_mismatch")
+    ) {
+      return "wrong_network";
+    }
+    if (wallet.error && "type" in wallet.error) {
+      if (wallet.error.type === "not_installed") return "missing_extension";
+      if (wallet.error.type === "rejected") return "rejected";
+      if (wallet.error.type === "network_error") return "timeout";
+    }
+    return null;
+  })();
+
+  if (wallet.connected && !wallet.isNetworkMismatch) {
     return <Navigate to={returnTo} replace />;
   }
+
+  const activeError = failureType
+    ? getWalletFailureDetails(failureType, wallet.expectedNetworkLabel)
+    : null;
 
   return (
     <main id="main-content" style={styles.page} aria-labelledby="connect-wallet-heading">
@@ -55,6 +126,21 @@ export default function ConnectWallet() {
           Connect a Stellar wallet to manage treasury streams, track balances,
           and withdraw safely. Fluxora never asks for your private keys.
         </p>
+
+        {activeError && (
+          <div
+            role="alert"
+            aria-live="polite"
+            data-testid={activeError.testId}
+            style={styles.errorBanner}
+          >
+            <div style={styles.errorTitle}>
+              <span aria-hidden="true">⚠️</span>
+              <span>{activeError.title}</span>
+            </div>
+            <p style={styles.errorText}>{activeError.actionText}</p>
+          </div>
+        )}
 
         <ul style={styles.steps} aria-label="Wallet onboarding checklist">
           <li style={styles.stepItem}>Choose a wallet provider</li>
@@ -87,6 +173,12 @@ export default function ConnectWallet() {
       <ConnectWalletModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onError={(err) => {
+          if (err === "not_installed") setModalError("missing_extension");
+          else if (err === "rejected") setModalError("rejected");
+          else if (err === "network_mismatch") setModalError("wrong_network");
+          else if (err === "network_timeout") setModalError("timeout");
+        }}
       />
     </main>
   );
@@ -149,6 +241,30 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.65,
     margin: "0 0 14px 0",
     maxWidth: 460,
+  },
+  errorBanner: {
+    width: "min(420px, 100%)",
+    marginBottom: 16,
+    padding: "12px 16px",
+    borderRadius: 10,
+    background: "var(--status-error-bg)",
+    border: "1px solid var(--status-error)",
+    color: "var(--status-error)",
+    textAlign: "left",
+  },
+  errorTitle: {
+    fontWeight: 700,
+    fontSize: "0.9rem",
+    marginBottom: 4,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  errorText: {
+    fontSize: "0.825rem",
+    lineHeight: 1.45,
+    margin: 0,
+    opacity: 0.95,
   },
   steps: {
     margin: "0 0 20px 0",

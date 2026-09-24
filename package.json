@@ -20,12 +20,12 @@
     "test:e2e": "playwright test --project=chromium --project=firefox",
     "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
+    "test:a11y:unit": "vitest run src/pages/__tests__/a11y.test.tsx",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"
   },
   "dependencies": {
-    "react-helmet-async": "^2.0.5",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",
     "@testing-library/dom": "^10.4.1",
@@ -33,6 +33,8 @@
     "lucide-react": "^0.575.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
+    "react-i18next": "^17.0.15",
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.22.0",
     "tailwind-merge": "^3.5.0"

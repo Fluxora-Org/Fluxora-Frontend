@@ -14,9 +14,15 @@ import {
   VoiceCommandDef,
   RecognizedCommand,
   VoiceContextValue,
+  VoiceConfirmationIntent,
 } from "./voiceTypes";
 
-const DEFAULT_COMMANDS: VoiceCommandDef[] = [
+/**
+ * Single source of truth for both recognition and the command reference UI.
+ * Keeping this exported makes it possible to verify that every accepted
+ * phrase is documented without maintaining a second test-only dictionary.
+ */
+export const DEFAULT_COMMANDS: VoiceCommandDef[] = [
   {
     id: "nav-dashboard",
     phrase: "Go to dashboard",
@@ -34,7 +40,12 @@ const DEFAULT_COMMANDS: VoiceCommandDef[] = [
   {
     id: "nav-recipient",
     phrase: "Go to recipient",
-    aliases: ["open recipient", "recipient", "view recipient", "recipient claims"],
+    aliases: [
+      "open recipient",
+      "recipient",
+      "view recipient",
+      "recipient claims",
+    ],
     category: "Navigation",
     description: "Navigate to recipient claim and withdrawal view",
   },
@@ -61,6 +72,52 @@ const DEFAULT_COMMANDS: VoiceCommandDef[] = [
     requiresConfirmation: true,
   },
 ];
+
+/** Only explicitly delimited details are accepted; a stray substring cannot trigger cancellation. */
+function parseConfirmationIntent(
+  command: VoiceCommandDef,
+  transcript: string,
+): VoiceConfirmationIntent | null {
+  const spoken = transcript.trim().replace(/\s+/g, " ");
+  const prefix = [command.phrase, ...command.aliases].find((candidate) =>
+    spoken.toLowerCase().startsWith(candidate.toLowerCase()),
+  );
+  if (!prefix) return null;
+  const remainder = spoken.slice(prefix.length);
+  if (!remainder) {
+    return {
+      action: command.phrase,
+      amount: null,
+      recipient: null,
+      stream: null,
+    };
+  }
+
+  // "Cancel stream STR-001 for Alice amount 250 USDC"
+  const streamFirst = remainder.match(
+    /^\s+(.+?)\s+for\s+(.+?)\s+amount\s+([\d,]+(?:\.\d+)?\s+[A-Za-z][\w-]*)$/i,
+  );
+  if (streamFirst) {
+    return {
+      action: command.phrase,
+      stream: streamFirst[1].trim(),
+      recipient: streamFirst[2].trim(),
+      amount: streamFirst[3].trim(),
+    };
+  }
+
+  // "Cancel stream amount 250 USDC to Alice from stream STR-001"
+  const amountFirst = remainder.match(
+    /^\s+amount\s+([\d,]+(?:\.\d+)?\s+[A-Za-z][\w-]*)\s+to\s+(.+?)\s+(?:for|from)\s+stream\s+(.+)$/i,
+  );
+  if (!amountFirst) return null;
+  return {
+    action: command.phrase,
+    amount: amountFirst[1].trim(),
+    recipient: amountFirst[2].trim(),
+    stream: amountFirst[3].trim(),
+  };
+}
 
 const VoiceContext = createContext<VoiceContextValue | null>(null);
 
@@ -102,50 +159,65 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   // commands so that longer utterances that happen to contain the phrase
   // "Cancel stream" do not accidentally trigger the destructive confirmation
   // flow (Issue #938).
-  const matchCommand = useCallback((spokenText: string): VoiceCommandDef | "ambiguous" | null => {
-    const clean = spokenText.trim().toLowerCase();
-    if (!clean) return null;
+  const matchCommand = useCallback(
+    (spokenText: string): VoiceCommandDef | "ambiguous" | null => {
+      const clean = spokenText.trim().toLowerCase();
+      if (!clean) return null;
 
-    // "stream" is a shared stem for navigation, creation, and cancellation.
-    // It is never specific enough to select a safe target.
-    if (clean === "stream") return "ambiguous";
+      // "stream" is a shared stem for navigation, creation, and cancellation.
+      // It is never specific enough to select a safe target.
+      if (clean === "stream") return "ambiguous";
 
-    // Exact-match pass — check every command's phrase and aliases first.
-    for (const cmd of DEFAULT_COMMANDS) {
-      if (cmd.phrase.toLowerCase() === clean) return cmd;
-      if (cmd.aliases.some((alias) => alias.toLowerCase() === clean)) return cmd;
-    }
+      // Exact-match pass — check every command's phrase and aliases first.
+      for (const cmd of DEFAULT_COMMANDS) {
+        if (cmd.phrase.toLowerCase() === clean) return cmd;
+        if (cmd.aliases.some((alias) => alias.toLowerCase() === clean))
+          return cmd;
+      }
 
-    // Partial matches must be unique. Returning the first match made phrases
-    // such as "stream" silently choose whichever command appeared first.
-    const partialMatches = DEFAULT_COMMANDS.filter((cmd) => {
-      if (cmd.requiresConfirmation) return false;
-      return (
-        clean.includes(cmd.phrase.toLowerCase()) ||
-        cmd.aliases.some((alias) => clean.includes(alias.toLowerCase()))
+      const destructive = DEFAULT_COMMANDS.find(
+        (cmd) =>
+          cmd.requiresConfirmation &&
+          parseConfirmationIntent(cmd, spokenText)?.amount,
       );
-    });
+      if (destructive) return destructive;
 
-    if (partialMatches.length > 1) return "ambiguous";
-    if (partialMatches.length === 1) return partialMatches[0];
+      // Partial matches must be unique. Returning the first match made phrases
+      // such as "stream" silently choose whichever command appeared first.
+      const partialMatches = DEFAULT_COMMANDS.filter((cmd) => {
+        if (cmd.requiresConfirmation) return false;
+        return (
+          clean.includes(cmd.phrase.toLowerCase()) ||
+          cmd.aliases.some((alias) => clean.includes(alias.toLowerCase()))
+        );
+      });
 
-    return null;
-  }, []);
+      if (partialMatches.length > 1) return "ambiguous";
+      if (partialMatches.length === 1) return partialMatches[0];
+
+      return null;
+    },
+    [],
+  );
 
   // Execute recognized command
   const executeCommand = useCallback(
     (cmd: VoiceCommandDef, rawText: string) => {
+      const intent = cmd.requiresConfirmation
+        ? parseConfirmationIntent(cmd, rawText)
+        : undefined;
       setRecognizedCommand({
         command: cmd,
         rawTranscript: rawText,
         timestamp: Date.now(),
+        intent: intent ?? undefined,
       });
 
       if (cmd.requiresConfirmation) {
         setPendingDestructiveCommand(cmd);
         setState("confirming-destructive");
         announce(
-          `Confirmation required to ${cmd.phrase}. Say confirm or click confirm button.`
+          `Confirmation required to ${cmd.phrase}. Review the action, amount, recipient and stream before confirming.`,
         );
         return;
       }
@@ -174,97 +246,12 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setTimeout(() => {
-        setState((prev) => (prev === "command-recognized" ? "listening" : prev));
+        setState((prev) =>
+          prev === "command-recognized" ? "listening" : prev,
+        );
       }, 2000);
     },
     [navigate, announce]
-  );
-
-  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
-const processSpokenPhrase = useCallback(
-  (phrase: string): boolean => {
-    setTranscript(phrase);
-    setState("processing");
-
-    // Handle active confirmation step
-    if (pendingDestructiveCommand) {
-      const clean = phrase.trim().toLowerCase();
-
-      if (clean === "confirm" || clean === "yes") {
-        confirmDestructiveAction();
-        return true;
-      }
-
-      if (clean === "cancel" || clean === "no" || clean === "abort") {
-        cancelDestructiveAction();
-        return true;
-      }
-
-      // Do not process other commands while confirmation is pending
-      setState("confirming-destructive");
-      return false;
-    }
-
-    const matched = matchCommand(phrase);
-
-    if (matched) {
-      executeCommand(matched, phrase);
-      return true;
-    }
-
-    setState("command-unrecognized");
-    announce(
-      `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
-    );
-
-    setTimeout(() => {
-      setState((prev) =>
-        prev === "command-unrecognized" ? "listening" : prev
-      );
-    }, 3000);
-
-    return false;
-  },
-  [
-    matchCommand,
-    executeCommand,
-    pendingDestructiveCommand,
-    confirmDestructiveAction,
-    cancelDestructiveAction,
-    announce,
-  ]
-);
-
-      const matched = matchCommand(phrase);
-      if (matched === "ambiguous") {
-        setState("command-ambiguous");
-        announce(
-          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-ambiguous" ? "listening" : prev,
-          );
-        }, 3000);
-        return false;
-      }
-      if (matched) {
-        executeCommand(matched, phrase);
-        return true;
-      } else {
-        setState("command-unrecognized");
-        announce(
-          `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-unrecognized" ? "listening" : prev
-          );
-        }, 3000);
-        return false;
-      }
-    },
-    [matchCommand, executeCommand, pendingDestructiveCommand, announce]
   );
 
   // Destructive confirmations
@@ -273,7 +260,7 @@ const processSpokenPhrase = useCallback(
     const cmd = pendingDestructiveCommand;
     setPendingDestructiveCommand(null);
     setState("command-recognized");
-    announce(`Destructive action confirmed: ${cmd.phrase} executed.`);
+    announce(`${cmd.phrase} confirmed. Opening the stream cancellation flow.`);
 
     // Perform action (e.g. navigate to streams with cancel modal parameter)
     navigate("/app/streams?action=cancel");
@@ -288,6 +275,74 @@ const processSpokenPhrase = useCallback(
     setState("listening");
     announce("Destructive action cancelled.");
   }, [announce]);
+
+  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
+  const processSpokenPhrase = useCallback(
+    (phrase: string): boolean => {
+      setTranscript(phrase);
+      setState("processing");
+
+      // Handle active confirmation step
+      if (pendingDestructiveCommand) {
+        const clean = phrase.trim().toLowerCase();
+
+        if (clean === "confirm" || clean === "yes") {
+          confirmDestructiveAction();
+          return true;
+        }
+
+        if (clean === "cancel" || clean === "no" || clean === "abort") {
+          cancelDestructiveAction();
+          return true;
+        }
+
+        // Do not process other commands while confirmation is pending
+        setState("confirming-destructive");
+        return false;
+      }
+
+      const matched = matchCommand(phrase);
+
+      if (matched === "ambiguous") {
+        setState("command-ambiguous");
+        announce(
+          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+        );
+        setTimeout(() => {
+          setState((prev) =>
+            prev === "command-ambiguous" ? "listening" : prev,
+          );
+        }, 3000);
+        return false;
+      }
+
+      if (matched) {
+        executeCommand(matched, phrase);
+        return true;
+      }
+
+      setState("command-unrecognized");
+      announce(
+        `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+      );
+
+      setTimeout(() => {
+        setState((prev) =>
+          prev === "command-unrecognized" ? "listening" : prev
+        );
+      }, 3000);
+
+      return false;
+    },
+    [
+      matchCommand,
+      executeCommand,
+      pendingDestructiveCommand,
+      confirmDestructiveAction,
+      cancelDestructiveAction,
+      announce,
+    ]
+  );
 
   // Start SpeechRecognition
   const startListening = useCallback(() => {
@@ -340,10 +395,13 @@ const processSpokenPhrase = useCallback(
       };
 
       recognition.onerror = (event: any) => {
-        if (event.error === "not-allowed" || event.error === "permission-denied") {
+        if (
+          event.error === "not-allowed" ||
+          event.error === "permission-denied"
+        ) {
           setState("permission-denied");
           announce(
-            "Microphone permission denied. Enable microphone access in browser settings."
+            "Microphone permission denied. Enable microphone access in browser settings.",
           );
         } else {
           setState("idle");

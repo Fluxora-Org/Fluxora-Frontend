@@ -132,52 +132,55 @@ export default function CreateStreamFab({
   };
 
   return (
-    <div ref={containerRef} className="create-stream-fab" data-expanded={expanded || undefined}>
-      {expanded && hasActions ? (
-        <div
-          ref={menuRef}
-          id="create-stream-fab-menu"
-          className="create-stream-fab__menu"
-          role="menu"
-          aria-label="Create stream actions"
-          onKeyDown={handleMenuKeyDown}
-        >
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="create-stream-fab__menu-item"
-              role="menuitem"
-              onClick={() => {
-                action.onSelect();
-                setExpanded(false);
-              }}
-            >
-              {action.icon === "upload" ? <UploadIcon /> : <PlusIcon />}
-              <span>{action.label}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <>
+      <div ref={containerRef} className="create-stream-fab" data-expanded={expanded || undefined}>
+        {expanded && hasActions ? (
+          <div
+            ref={menuRef}
+            id="create-stream-fab-menu"
+            className="create-stream-fab__menu"
+            role="menu"
+            aria-label="Create stream actions"
+            onKeyDown={handleMenuKeyDown}
+          >
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className="create-stream-fab__menu-item"
+                role="menuitem"
+                onClick={() => {
+                  action.onSelect();
+                  setExpanded(false);
+                }}
+              >
+                {action.icon === "upload" ? <UploadIcon /> : <PlusIcon />}
+                <span>{action.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-      <button
-        type="button"
-        className="ui-primary-cta create-stream-fab__button"
-        onClick={handleMainClick}
-        disabled={disabled}
-        aria-label={
-          disabled ? "Create stream (connect wallet first)" : "Create stream"
-        }
-        aria-haspopup={hasActions ? "menu" : undefined}
-        aria-expanded={hasActions ? expanded : undefined}
-        aria-controls={hasActions ? "create-stream-fab-menu" : undefined}
-        title={disabled ? "Connect wallet to create a stream" : "Create stream"}
-      >
-        <PlusIcon rotated={expanded} />
-        <span className="create-stream-fab__label">
-          {expanded ? "Close" : "Create stream"}
-        </span>
-      </button>
-    </div>
+        <button
+          type="button"
+          className="ui-primary-cta create-stream-fab__button"
+          onClick={handleMainClick}
+          disabled={disabled}
+          aria-label={
+            disabled ? "Create stream (connect wallet first)" : "Create stream"
+          }
+          aria-haspopup={hasActions ? "menu" : undefined}
+          aria-expanded={hasActions ? expanded : undefined}
+          aria-controls={hasActions ? "create-stream-fab-menu" : undefined}
+          title={disabled ? "Connect wallet to create a stream" : "Create stream"}
+        >
+          <PlusIcon rotated={expanded} />
+          <span className="create-stream-fab__label">
+            {expanded ? "Close" : "Create stream"}
+          </span>
+        </button>
+      </div>
+      <div className="create-stream-fab__spacer" aria-hidden="true" data-testid="fab-spacer" />
+    </>
   );
 }

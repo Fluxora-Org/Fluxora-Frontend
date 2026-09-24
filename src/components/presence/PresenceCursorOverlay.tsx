@@ -13,7 +13,11 @@ export default function PresenceCursorOverlay({
   if (activeViewers.length === 0) return null;
 
   return (
-    <div className="presence-cursor-overlay" aria-hidden="true">
+    <div 
+      className="presence-cursor-overlay" 
+      aria-hidden="true"
+      style={{ pointerEvents: 'none' }}
+    >
       {activeViewers.map((viewer) => {
         const topPct = Math.min(100, Math.max(0, (viewer.cursorY ?? 0) * 100));
 

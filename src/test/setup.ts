@@ -5,6 +5,25 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import { webcrypto, randomBytes } from 'node:crypto';
 import { en as mockEn } from '../i18n/en';
 
+const mockT = (key: string, params?: any): string => {
+  let resolvedKey = key as string;
+  if (params && typeof params.count === 'number') {
+    const suffix = params.count === 1 ? '_one' : '_other';
+    const pluralKey = `${resolvedKey}${suffix}`;
+    if (pluralKey in mockEn) {
+      resolvedKey = pluralKey;
+    }
+  }
+  let val = (mockEn as any)[resolvedKey];
+  if (!val) return resolvedKey;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
+  }
+  return val;
+};
+
 // Polyfill Web Crypto API for Stellar SDK / @noble/ed25519 in test environment
 const customCrypto = {
   ...webcrypto,
@@ -107,8 +126,10 @@ const createStorageMock = () => {
   } as unknown as Storage;
 };
 if (typeof window !== 'undefined') {
-  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+  // configurable so tests can simulate blocked site data, where merely
+  // accessing window.localStorage throws a SecurityError.
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true, configurable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true, configurable: true });
 }
 
 // jsdom 26 does not implement Blob.prototype.text / File.prototype.text
@@ -163,24 +184,7 @@ vi.mock('../i18n', () => {
   return {
     useI18n: () => ({
       locale: 'en',
-      t: (key: any, params?: any) => {
-        let resolvedKey = key;
-        if (params && typeof params.count === 'number') {
-          const suffix = params.count === 1 ? '_one' : '_other';
-          const pluralKey = `${key}${suffix}`;
-          if (pluralKey in mockEn) {
-            resolvedKey = pluralKey;
-          }
-        }
-        let val = (mockEn as any)[resolvedKey];
-        if (!val) return resolvedKey;
-        if (params) {
-          for (const [k, v] of Object.entries(params)) {
-            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
-          }
-        }
-        return val;
-      },
+      t: mockT,
       changeLocale: vi.fn(),
     }),
     I18nProvider: ({ children }: any) => children,
@@ -191,24 +195,7 @@ vi.mock('../i18n/index', () => {
   return {
     useI18n: () => ({
       locale: 'en',
-      t: (key: any, params?: any) => {
-        let resolvedKey = key;
-        if (params && typeof params.count === 'number') {
-          const suffix = params.count === 1 ? '_one' : '_other';
-          const pluralKey = `${key}${suffix}`;
-          if (pluralKey in mockEn) {
-            resolvedKey = pluralKey;
-          }
-        }
-        let val = (mockEn as any)[resolvedKey];
-        if (!val) return resolvedKey;
-        if (params) {
-          for (const [k, v] of Object.entries(params)) {
-            val = val.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
-          }
-        }
-        return val;
-      },
+      t: mockT,
       changeLocale: vi.fn(),
     }),
     I18nProvider: ({ children }: any) => children,

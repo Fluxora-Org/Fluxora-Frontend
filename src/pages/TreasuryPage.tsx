@@ -106,7 +106,9 @@ export default function TreasuryPage() {
             </Suspense>
           </ErrorBoundary>
         )}
-        <Metrics metrics={metrics || []} loading={loading} error={error} />
+        <ErrorBoundary>
+          <Metrics metrics={metrics || []} loading={loading} error={error} />
+        </ErrorBoundary>
         <ErrorBoundary>
           <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
             <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
