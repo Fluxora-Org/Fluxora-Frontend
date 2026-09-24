@@ -291,3 +291,49 @@ describe("WalletProvider restore loading", () => {
     );
   });
 });
+
+describe("WalletProvider session expiry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockedIsConnected.mockResolvedValue({ isConnected: true });
+    mockedGetAddress.mockResolvedValue({ address: APPROVED_ADDRESS });
+    mockedGetNetwork.mockResolvedValue({
+      network: "TESTNET",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    });
+    mockedWatchWalletChanges.mockImplementation(
+      function MockWatchWalletChanges() {
+        return { watch: vi.fn(), stop: vi.fn() };
+      } as unknown as typeof WatchWalletChanges,
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reflects an expired session as disconnected", async () => {
+    renderWalletProvider();
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        address: APPROVED_ADDRESS,
+        connected: true,
+      }),
+    );
+
+    // Simulate session expiry: getting the address returns empty string without a popup
+    mockedGetAddress.mockResolvedValue({ address: "" });
+
+    // Advance the polling interval (WALLET_WATCH_INTERVAL_MS is 2000)
+    await vi.advanceTimersByTimeAsync(2500);
+
+    await waitFor(() =>
+      expect(walletState()).toMatchObject({
+        connected: false,
+        address: null,
+      }),
+    );
+  });
+});

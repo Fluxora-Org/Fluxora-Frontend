@@ -357,6 +357,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // WatchWalletChanges doesn't always fire when the session expires (wallet locked).
+    // We actively poll getAddress() which returns an empty string when locked without a popup.
+    const pollInterval = setInterval(async () => {
+      if (watcherGenerationRef.current !== generation) return;
+      try {
+        const addrResult = await getAddress();
+        if (watcherGenerationRef.current !== generation) return;
+        
+        if (addrResult.error || !addrResult.address || !isValidStellarAddress(addrResult.address)) {
+          if (stateRef.current.connected) {
+            applyAccountChange(DISCONNECTED);
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }, WALLET_WATCH_INTERVAL_MS);
+
     return () => {
       // Invalidate the callback before stopping the watcher so even a
       // synchronous/delayed callback cannot update state after cleanup.
@@ -368,6 +386,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         watcherRef.current = null;
       }
 
+      clearInterval(pollInterval);
       watcher.stop();
     };
   }, [applyAccountChange, state.connected]);
