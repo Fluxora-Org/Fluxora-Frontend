@@ -149,6 +149,12 @@ export const en = {
   "createStream.error.failedWithMessage": "Failed to create stream: {message}",
   "createStream.success.message": "Stream created successfully on-chain!",
 
+  // ─── WalletConnectionNotice (dropped connection, #1678) ──────────────────────
+  "walletConnection.ariaLabel": "Wallet connection status",
+  "walletConnection.lost": "Wallet connection lost. Your progress is kept.",
+  "walletConnection.reconnecting": "Reconnecting wallet…",
+  "walletConnection.reconnectButton": "Reconnect wallet",
+
   // ─── ConnectWalletModal ───────────────────────────────────────────────────────
 
   // Default view

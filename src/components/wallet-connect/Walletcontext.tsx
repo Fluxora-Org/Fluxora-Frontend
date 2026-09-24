@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   isConnected,
+  isAllowed,
   getAddress,
   getNetwork,
   WatchWalletChanges,
@@ -44,9 +45,40 @@ interface WalletState {
   loading: boolean;
 }
 
+/**
+ * Health of the wallet link, reported separately from whether a session
+ * exists (#1678).
+ *
+ * - `connected`: a session exists and the wallet is reachable.
+ * - `dropped`: the session is kept (same address/network, `connected` stays
+ *   true) but the wallet is locked/unreachable or the browser is offline.
+ *   Views stay mounted; wallet actions must wait for recovery.
+ * - `reconnecting`: the single recovery check is in flight.
+ * - `disconnected`: no session (never connected, restore failed, or the user
+ *   disconnected / revoked access).
+ */
+export type WalletConnectionStatus =
+  | "connected"
+  | "dropped"
+  | "reconnecting"
+  | "disconnected";
+
+type LinkStatus = "ok" | "dropped" | "reconnecting";
+
+type WalletProbe =
+  | { kind: "ok"; address: string; network: string }
+  | { kind: "unreachable" }
+  | { kind: "revoked" };
+
 interface WalletContextType extends WalletState {
   /** Increments for both local and cross-tab account changes. */
   accountContextVersion: number;
+  connectionStatus: WalletConnectionStatus;
+  /**
+   * Re-checks a dropped connection. Single-flight: concurrent calls (and the
+   * automatic online/visibility/focus/watcher triggers) share one check.
+   */
+  reconnect: () => Promise<void>;
   expectedNetwork: StellarNetwork;
   expectedNetworkLabel: string;
   isNetworkMismatch: boolean;
@@ -147,6 +179,36 @@ function classifyWalletError(error: unknown): WalletError {
   return { type: "unknown" };
 }
 
+function isBrowserOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+/**
+ * Silently asks Freighter whether the current session is usable again. Never
+ * opens a popup and never throws.
+ */
+async function probeWallet(): Promise<WalletProbe> {
+  try {
+    const conn = await isConnected();
+    if (conn.error || !conn.isConnected) return { kind: "unreachable" };
+
+    const allowed = await isAllowed();
+    if (!allowed.error && !allowed.isAllowed) return { kind: "revoked" };
+
+    const addr = await getAddress(); // "" while the extension is locked
+    if (addr.error || !addr.address || !isValidStellarAddress(addr.address)) {
+      return { kind: "unreachable" };
+    }
+
+    const net = await getNetwork();
+    if (net.error) return { kind: "unreachable" };
+
+    return { kind: "ok", address: addr.address, network: net.network };
+  } catch {
+    return { kind: "unreachable" };
+  }
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(INITIAL);
   const stateRef = useRef(state);
@@ -160,11 +222,29 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const latestChangeSourceRef = useRef("");
   const channelRef = useRef<ReturnType<typeof subscribeToAccountContext> | null>(null);
   const sourceRef = useRef(`wallet-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`);
+  const [linkStatus, setLinkStatus] = useState<LinkStatus>("ok");
+  const linkStatusRef = useRef<LinkStatus>("ok");
+  // Bumped whenever the link recovers so an older recovery check that is
+  // still in flight cannot overwrite the newer result.
+  const linkGenerationRef = useRef(0);
+  const checkPromiseRef = useRef<Promise<void> | null>(null);
+  const mountedRef = useRef(true);
 
   const expectedNetwork = getExpectedStellarNetwork();
   const expectedNetworkLabel = getNetworkLabel(expectedNetwork);
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
+  const connectionStatus: WalletConnectionStatus = !state.connected
+    ? "disconnected"
+    : linkStatus === "ok"
+      ? "connected"
+      : linkStatus;
+
+  const setLink = useCallback((next: LinkStatus) => {
+    if (next === "ok") linkGenerationRef.current += 1;
+    linkStatusRef.current = next;
+    setLinkStatus(next);
+  }, []);
 
   const applyAccountChange = useCallback((
     next: WalletState,
@@ -172,6 +252,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   ) => {
     accountChangeGenerationRef.current += 1;
     stateRef.current = next;
+    // Any account change (including a disconnect) supersedes a dropped link
+    // and any recovery check still in flight for the previous context.
+    checkPromiseRef.current = null;
+    setLink("ok");
     setAccountContextVersion((version) => version + 1);
     setState(next);
 
@@ -188,7 +272,84 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         source: sourceRef.current,
       });
     }
-  }, []);
+  }, [setLink]);
+
+  /**
+   * Marks the session as dropped without clearing it: address, network and
+   * accountContextVersion are untouched, so no route guard redirects and no
+   * account-scoped data is reset or refetched (#1678).
+   */
+  const markDropped = useCallback(() => {
+    if (!stateRef.current.connected) return;
+    if (linkStatusRef.current === "reconnecting") return;
+    setLink("dropped");
+  }, [setLink]);
+
+  /**
+   * Single-flight recovery check. Only one probe runs at a time; every trigger
+   * that arrives meanwhile shares its promise. It only reads wallet state — it
+   * never replays a request (signing, submission, fetch) that was in flight
+   * when the connection dropped.
+   */
+  const checkConnection = useCallback((): Promise<void> => {
+    if (checkPromiseRef.current) return checkPromiseRef.current;
+    if (!stateRef.current.connected) return Promise.resolve();
+    if (isBrowserOffline()) {
+      markDropped();
+      return Promise.resolve();
+    }
+
+    const accountGeneration = accountChangeGenerationRef.current;
+    const linkGeneration = linkGenerationRef.current;
+    if (linkStatusRef.current !== "ok") setLink("reconnecting");
+
+    const run = (async () => {
+      const result = await probeWallet();
+      if (
+        !mountedRef.current ||
+        !stateRef.current.connected ||
+        accountChangeGenerationRef.current !== accountGeneration ||
+        linkGenerationRef.current !== linkGeneration
+      ) {
+        return;
+      }
+
+      if (result.kind === "revoked") {
+        // The user removed this app's access in the wallet: an explicit
+        // disconnect, so the existing disconnect behaviour applies.
+        watcherGenerationRef.current += 1;
+        applyAccountChange(DISCONNECTED);
+        return;
+      }
+
+      if (result.kind === "unreachable" || isBrowserOffline()) {
+        setLink("dropped");
+        return;
+      }
+
+      const current = stateRef.current;
+      if (result.address === current.address && result.network === current.network) {
+        setLink("ok");
+        return;
+      }
+
+      // A different account (or network) came back: treat it as the account
+      // switch it is, never as a continuation of the old session.
+      applyAccountChange({
+        address: result.address,
+        network: result.network,
+        connected: true,
+        error: null,
+        loading: false,
+      });
+    })();
+
+    checkPromiseRef.current = run;
+    void run.finally(() => {
+      if (checkPromiseRef.current === run) checkPromiseRef.current = null;
+    });
+    return run;
+  }, [applyAccountChange, markDropped, setLink]);
 
   const connect = (address: string, network: string) => {
     if (!isValidStellarAddress(address)) return;
@@ -344,8 +505,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // An empty/invalid address means the extension is locked, unavailable
+      // or has revoked access. Keep the session and report a drop; the probe
+      // tells a revocation (→ disconnect) apart from a lock.
       if (!isValidStellarAddress(address)) {
-        if (stateRef.current.connected) applyAccountChange(DISCONNECTED);
+        if (stateRef.current.connected) {
+          markDropped();
+          void checkConnection();
+        }
         return;
       }
 
@@ -354,6 +521,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         network !== stateRef.current.network
       ) {
         applyAccountChange({ address, network, connected: true, error: null, loading: false });
+      } else if (linkStatusRef.current !== "ok" && !isBrowserOffline()) {
+        // The same account is reachable again (e.g. extension unlocked).
+        setLink("ok");
       }
     });
 
@@ -370,13 +540,45 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       watcher.stop();
     };
-  }, [applyAccountChange, state.connected]);
+  }, [applyAccountChange, checkConnection, markDropped, setLink, state.connected]);
+
+  // Drop detection beyond the extension watcher: network loss, and re-checks
+  // when the page comes back from the background or regains focus.
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const handleOffline = () => markDropped();
+    const handleOnline = () => {
+      void checkConnection();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void checkConnection();
+    };
+    const handleFocus = () => {
+      if (linkStatusRef.current !== "ok") void checkConnection();
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkConnection, markDropped]);
 
   return (
     <WalletContext.Provider
       value={{
         ...state,
         accountContextVersion,
+        connectionStatus,
+        reconnect: checkConnection,
         expectedNetwork,
         expectedNetworkLabel,
         isNetworkMismatch,

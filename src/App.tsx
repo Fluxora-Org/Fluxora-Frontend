@@ -5,6 +5,7 @@ import AppNavbar from "./components/navigation/AppNavbar";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
+import WalletConnectionNotice from "./components/wallet-connect/WalletConnectionNotice";
 import { ToastProvider } from "./components/toast/ToastProvider";
 import { I18nProvider } from "./i18n";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -91,6 +92,7 @@ export default function App() {
                   onSidebarToggle={handleSidebarToggle}
                   isSidebarOpen={isSidebarOpen}
                 />
+                <WalletConnectionNotice />
 
                 <ErrorBoundary>
                   <Routes>
