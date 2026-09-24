@@ -17,6 +17,22 @@ page region beneath it. Selecting "Off" removes the filter entirely.
 
 ---
 
+---
+
+## Persistence (deliberate)
+
+The colour-blind simulation **does not persist across reloads**.
+
+| Concern | Behaviour |
+|---|---|
+| Browser storage | Never read or written (`localStorage` / `sessionStorage`). Known leftover keys are cleared on provider mount. |
+| Default on mount | Always `"none"` unless an explicit `initialMode` prop is passed (tests / story harness only). |
+| Enabling | Requires a deliberate `setSimulation(...)` call (radio toggle or equivalent). Invalid modes are ignored. |
+| Active indication | While simulating, a sticky `ColorBlindActiveBanner` shows the mode and a **Disable simulation** control. |
+| Disable from anywhere | The banner's disable button (and the toggle's Off radio) both call `setSimulation("none")`. |
+
+Rationale: persisting the filter would leave the UI permanently miscoloured after a reload with no obvious cause — exactly the failure mode this guardrail prevents. See `COLORBLIND_PERSISTENCE_POLICY` in `ColorBlindSimulationProvider.tsx`.
+
 ## Simulation presets
 
 | Preset | Type | Description |
@@ -221,7 +237,7 @@ For automated evidence in CI, a Playwright visual-regression test can:
 src/
   components/
     colorBlindSimulation/
-      ColorBlindSimulationProvider.tsx  ← Context, SVG filters, hook
+      ColorBlindSimulationProvider.tsx  ← Context, SVG filters, sticky active banner, hook
       ColorBlindToggle.tsx              ← Radio group UI
       ColorBlindToggle.css              ← Focus ring + responsive styles
       index.ts                          ← Public barrel export
@@ -266,6 +282,8 @@ utils/
 
 - [x] SVG filter matrices for protanopia / deuteranopia / tritanopia
 - [x] `ColorBlindSimulationProvider` with context + hook
+- [x] Sticky active banner + disable from anywhere
+- [x] Documented non-persistence across reloads (in-memory only)
 - [x] `ColorBlindToggle` radio group (keyboard, live region)
 - [x] Toggle integrated in `TreasuryPage.tsx`
 - [x] `StatusPill.tsx` — `data-status-token`, `data-status` annotations

@@ -2,17 +2,21 @@
  * ColorBlindSimulationProvider tests
  * ────────────────────────────────────
  * Unit tests for the context provider, SVG filter rendering,
- * and useColorBlindSimulation hook.
+ * useColorBlindSimulation hook, and unintentional-enable safeguards.
  */
 
 import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   ColorBlindSimulationProvider,
   ColorBlindSvgFilters,
   useColorBlindSimulation,
   SIMULATION_LABELS,
   SVG_FILTER_VALUES,
+  COLORBLIND_STORAGE_KEYS,
+  COLORBLIND_PERSISTENCE_POLICY,
+  clearColorBlindStorageArtifacts,
+  isSimulationMode,
   type SimulationMode,
 } from "../ColorBlindSimulationProvider";
 
@@ -30,6 +34,14 @@ function SimulationDisplay() {
         Set Protanopia
       </button>
       <button onClick={() => setSimulation("none")}>Reset</button>
+      <button
+        onClick={() =>
+          // @ts-expect-error intentional invalid mode for guardrail test
+          setSimulation("not-a-real-mode")
+        }
+      >
+        Set Invalid
+      </button>
     </div>
   );
 }
@@ -131,6 +143,127 @@ describe("ColorBlindSimulationProvider", () => {
       "[data-colorblind-simulation]",
     ) as HTMLElement;
     expect(wrapper.style.filter).toBe("");
+  });
+});
+
+// ─── Unintentional-enable safeguards (issue #1693) ───────────────────────────
+
+describe("colour-blind simulation cannot be left enabled unintentionally", () => {
+  beforeEach(() => {
+    for (const key of COLORBLIND_STORAGE_KEYS) {
+      window.localStorage.setItem(key, "protanopia");
+      window.sessionStorage.setItem(key, "deuteranopia");
+    }
+  });
+
+  afterEach(() => {
+    for (const key of COLORBLIND_STORAGE_KEYS) {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    }
+  });
+
+  it("documents deliberate non-persistence across reloads", () => {
+    expect(COLORBLIND_PERSISTENCE_POLICY.acrossReloads).toBe(false);
+    expect(COLORBLIND_PERSISTENCE_POLICY.storage).toBe("none");
+  });
+
+  it("starts at none even when storage leftovers exist", () => {
+    render(
+      <ColorBlindSimulationProvider>
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    expect(screen.getByTestId("mode").textContent).toBe("none");
+    expect(screen.getByTestId("simulating").textContent).toBe("false");
+  });
+
+  it("clears storage leftovers on mount", () => {
+    render(
+      <ColorBlindSimulationProvider>
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    for (const key of COLORBLIND_STORAGE_KEYS) {
+      expect(window.localStorage.getItem(key)).toBeNull();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+    }
+  });
+
+  it("does not write simulation state to localStorage or sessionStorage", () => {
+    render(
+      <ColorBlindSimulationProvider>
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    act(() => {
+      screen.getByText("Set Protanopia").click();
+    });
+    for (const key of COLORBLIND_STORAGE_KEYS) {
+      expect(window.localStorage.getItem(key)).toBeNull();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+    }
+  });
+
+  it("shows a persistent active banner while simulating", () => {
+    render(
+      <ColorBlindSimulationProvider initialMode="protanopia">
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    expect(screen.getByTestId("colorblind-active-banner")).toBeInTheDocument();
+    expect(screen.getByTestId("colorblind-active-banner").textContent).toMatch(
+      /Protanopia/i,
+    );
+  });
+
+  it("hides the active banner when simulation is off", () => {
+    render(
+      <ColorBlindSimulationProvider>
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    expect(
+      screen.queryByTestId("colorblind-active-banner"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("can be disabled from the sticky banner anywhere it is active", () => {
+    render(
+      <ColorBlindSimulationProvider initialMode="tritanopia">
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    expect(screen.getByTestId("simulating").textContent).toBe("true");
+    act(() => {
+      screen.getByTestId("colorblind-disable-button").click();
+    });
+    expect(screen.getByTestId("mode").textContent).toBe("none");
+    expect(screen.getByTestId("simulating").textContent).toBe("false");
+    expect(
+      screen.queryByTestId("colorblind-active-banner"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores invalid setSimulation values so enable must be deliberate", () => {
+    render(
+      <ColorBlindSimulationProvider>
+        <SimulationDisplay />
+      </ColorBlindSimulationProvider>,
+    );
+    act(() => {
+      screen.getByText("Set Invalid").click();
+    });
+    expect(screen.getByTestId("mode").textContent).toBe("none");
+    expect(isSimulationMode("not-a-real-mode")).toBe(false);
+  });
+
+  it("clearColorBlindStorageArtifacts removes known keys from both stores", () => {
+    clearColorBlindStorageArtifacts(window.localStorage, window.sessionStorage);
+    for (const key of COLORBLIND_STORAGE_KEYS) {
+      expect(window.localStorage.getItem(key)).toBeNull();
+      expect(window.sessionStorage.getItem(key)).toBeNull();
+    }
   });
 });
 
