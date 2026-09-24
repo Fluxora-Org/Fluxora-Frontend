@@ -246,7 +246,7 @@ export const VoiceCommandPanel: React.FC = () => {
         )}
 
         {/* Documented Command Reference Grammar */}
-        <div className="space-y-3">
+        <div className="space-y-3" aria-label="Accepted voice commands">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
             Command Grammar Reference
           </h4>
