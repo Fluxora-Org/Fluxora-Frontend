@@ -13,8 +13,10 @@
  * │   ├─ .truncateReveal__srValue.srOnly   — full value, ALWAYS in DOM   │
  * │   │                       and accessibility tree; never painted      │
  * │   └─ .truncateReveal__chip  aria-hidden="true"                       │
- * │                           — full value, visible only on hover /      │
- * │                             focus-within; purely decorative          │
+ * │                           — full value, painted as an absolutely     │
+ * │                             positioned overlay that floats above the │
+ * │                             wrapper box with ZERO document-flow      │
+ * │                             footprint                                │
  * └──────────────────────────────────────────────────────────────────────┘
  *
  * Accessibility contract
@@ -26,11 +28,30 @@
  *   only and does not participate in the ARIA tree.
  * • The wrapper has no role; it inherits the semantics of its children.
  *
+ * Layout stability contract (Issue #1677)
+ * ───────────────────────────────────────
+ * Revealing the full value must NEVER move a single neighbouring pixel —
+ * neither vertically (row height) nor horizontally (cell width) — in dense
+ * row lists (e.g. the data-streams table) or in a standalone block container.
+ * This is guaranteed structurally, not incidentally:
+ *
+ * • The reveal chip is an out-of-flow overlay (`position: absolute` inside
+ *   accessibility.css). It never participates in the containing block's line
+ *   or column geometry, so it cannot push siblings, grow rows or reflow the
+ *   page when it becomes visible.
+ * • The wrapper, the truncated children and the trigger zone keep their exact
+ *   bounding boxes across the reveal, so the element the pointer is hovering
+ *   stays anchored under the cursor after disclosure completes (no hover
+ *   hand-off flicker, no focus-ring jump for keyboard users).
+ * • The reveal state itself is DOM-shape preserving: it only toggles the
+ *   `data-revealed` attribute, never mounts, unmounts or reorders nodes.
+ *
  * States (visual)
  * ───────────────
  *   truncated-default   — chip opacity 0, translateX(−4 px)
  *   hover-revealed      — .truncateReveal:hover  → chip visible
  *   focus-revealed      — .truncateReveal:focus-within → chip visible
+ *   state-revealed      — .truncateReveal[data-revealed="true"] → chip visible
  *   sr-only-always-present  — .truncateReveal__srValue  always in tree
  *
  * Coordination with InfoTooltip
@@ -51,7 +72,7 @@
  * @see docs/SR_ONLY_REVEAL_PATTERN_SPEC.md
  */
 
-import React from "react";
+import React, { useState } from "react";
 
 export interface TruncatedRevealProps {
   /**
@@ -78,8 +99,9 @@ export interface TruncatedRevealProps {
 
 /**
  * TruncatedReveal wraps any truncated content with the sr-only reveal
- * pattern: the full value is always present for ATs; a visual chip slides
- * in on hover/focus for sighted keyboard users.
+ * pattern: the full value is always present for ATs; a visual chip floats
+ * above the wrapper on hover/focus for sighted users without ever reflowing
+ * the surrounding document (Issue #1677).
  *
  * @example
  * // Stellar address in a breadcrumb
@@ -99,6 +121,33 @@ export default function TruncatedReveal({
   className = "",
   mono = true,
 }: TruncatedRevealProps) {
+  /**
+   * Reveal is a pure visual state machine.
+   *
+   * It is mirrored onto `data-revealed` so the overlay can be driven (and
+   * asserted) from a single explicit attribute in addition to the CSS
+   * `:hover` / `:focus-within` progressive-enhancement rules. Toggling it
+   * never mounts or unmounts a node, which is what keeps the surrounding
+   * layout byte-for-byte identical across the expansion event.
+   */
+  const [revealed, setRevealed] = useState(false);
+
+  const handleMouseLeave = (event: React.MouseEvent<HTMLSpanElement>) => {
+    // Keep the disclosure up while the pointer is still inside the wrapper's
+    // focus scope (e.g. hover + keyboard focus at the same time) so the
+    // overlay does not blink away underneath the cursor.
+    if (event.currentTarget.contains(document.activeElement)) return;
+    setRevealed(false);
+  };
+
+  const handleBlur = (event: React.FocusEvent<HTMLSpanElement>) => {
+    // Focus hopping between two children of the same wrapper must not
+    // conceal the overlay mid-interaction.
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    setRevealed(false);
+  };
+
   const chipClass = [
     "truncateReveal__chip",
     mono ? "truncateReveal__chip--mono" : "",
@@ -107,7 +156,14 @@ export default function TruncatedReveal({
     .join(" ");
 
   return (
-    <span className={`truncateReveal ${className}`.trim()}>
+    <span
+      className={`truncateReveal ${className}`.trim()}
+      data-revealed={revealed ? "true" : "false"}
+      onMouseEnter={() => setRevealed(true)}
+      onMouseLeave={handleMouseLeave}
+      onFocus={() => setRevealed(true)}
+      onBlur={handleBlur}
+    >
       {/* ① Truncated visual — provided by consumer */}
       {children}
 
@@ -121,7 +177,8 @@ export default function TruncatedReveal({
       {/*
        * ③ Visual-only reveal chip
        *    aria-hidden so ATs ignore it entirely (no double-reading).
-       *    Slides in via CSS on .truncateReveal:hover / :focus-within.
+       *    Absolutely positioned (accessibility.css) so revealing it can
+       *    never move the wrapper, its siblings or any row around it.
        */}
       <span className={chipClass} aria-hidden="true">
         {fullValue}
