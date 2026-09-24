@@ -12,10 +12,18 @@
 export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
 
 import {
+  createStorageWriteStatus,
+  getBrowserStorage,
   readBrowserStorage,
   removeBrowserStorage,
   writeBrowserStorage,
 } from "./browserStorage";
+
+/**
+ * Outcome of the most recent session write, so the persistence indicator only
+ * claims persistence after a write actually reached storage (#1663).
+ */
+export const streamsSessionWriteStatus = createStorageWriteStatus();
 
 /** Snapshots older than this are treated as stale and never offered for restore. */
 export const STREAMS_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -80,10 +88,7 @@ export const DEFAULT_STREAM_DRAFT_ACCRUAL_RATE = "38.62";
 export const DEFAULT_STREAM_DRAFT_DURATION = "1";
 
 function getLocalStorage(): Storage | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  return window.localStorage;
+  return getBrowserStorage("localStorage");
 }
 
 /**
@@ -286,28 +291,30 @@ export function readStreamsSession(
 
 /**
  * Persists the current filters/draft snapshot for the given account.
- * Best-effort; failures are swallowed.
+ * Best-effort; failures are swallowed and recorded in
+ * `streamsSessionWriteStatus`.
  *
  * @param snapshot - The session data to persist (without savedAt/accountAddress)
  * @param now - Current timestamp in epoch milliseconds
  * @param accountAddress - The wallet address to scope the session to
  * @param storage - Storage interface (injectable for testing)
+ * @returns true only when the snapshot reached storage
  */
 export function writeStreamsSession(
   snapshot: Omit<StreamsSessionSnapshot, "savedAt" | "accountAddress">,
   now: number,
   accountAddress: string,
   storage: StorageWriter | null = getLocalStorage(),
-): void {
+): boolean {
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
-  if (!storage || !normalizedAccountAddress) return;
+  if (!normalizedAccountAddress) return false;
 
   const full: StreamsSessionSnapshot = {
     ...snapshot,
     savedAt: now,
     accountAddress: normalizedAccountAddress,
   };
-  writeBrowserStorage(
+  const written = writeBrowserStorage(
     getStorageKey(normalizedAccountAddress),
     JSON.stringify({
       version: STREAMS_SESSION_SCHEMA_VERSION,
@@ -315,6 +322,8 @@ export function writeStreamsSession(
     }),
     storage,
   );
+  streamsSessionWriteStatus.record(written);
+  return written;
 }
 
 /**
@@ -331,7 +340,9 @@ export function clearStreamsSession(
   storage: StorageWriter | null = getLocalStorage(),
 ): void {
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
-  if (!storage || !normalizedAccountAddress) return;
+  if (!normalizedAccountAddress) return;
 
-  removeBrowserStorage(getStorageKey(normalizedAccountAddress), storage);
+  streamsSessionWriteStatus.record(
+    removeBrowserStorage(getStorageKey(normalizedAccountAddress), storage),
+  );
 }

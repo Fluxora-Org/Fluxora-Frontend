@@ -107,8 +107,10 @@ const createStorageMock = () => {
   } as unknown as Storage;
 };
 if (typeof window !== 'undefined') {
-  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+  // configurable so tests can simulate blocked site data, where merely
+  // accessing window.localStorage throws a SecurityError.
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true, configurable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true, configurable: true });
 }
 
 // jsdom 26 does not implement Blob.prototype.text / File.prototype.text
