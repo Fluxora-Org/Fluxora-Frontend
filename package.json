@@ -17,6 +17,7 @@
     "test:e2e": "playwright test --project=chromium --project=firefox",
     "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
+    "test:a11y:unit": "vitest run src/pages/__tests__/a11y.test.tsx",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"

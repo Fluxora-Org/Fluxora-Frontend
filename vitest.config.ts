@@ -73,6 +73,12 @@ export default defineConfig({
         "src/components/csv-upload/CsvDropZone.tsx",
         "src/components/csv-upload/ColumnMappingStep.tsx",
         "src/components/csv-upload/PreviewValidateStep.tsx",
+        // Primary pages — covered by unit a11y gate (issue #1716)
+        "src/pages/Dashboard.tsx",
+        "src/pages/ConnectWallet.tsx",
+        "src/pages/Streams.tsx",
+        "src/pages/Recipient.tsx",
+        "src/pages/TreasuryPage.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

@@ -169,7 +169,7 @@ Component-specific styling and accessibility conventions are documented in
 
 
 Pull requests and pushes to `main` run the GitHub Actions CI workflow
-(`.github/workflows/ci.yml`) on Node 18 and Node 20. The workflow installs with
+(`.github/workflows/ci.yml`) on Node 22. The workflow installs with
 `npm ci`, runs `npm run build` for TypeScript and production build verification,
 and runs the full unit test suite.
 
@@ -184,6 +184,45 @@ Thresholds enforced (statements / branches / functions / lines): **95%**
 The baseline is the `include` list in `vitest.config.ts`. When adding a new
 production module that should be covered, append it to that list and add tests
 before opening the PR.
+
+### Accessibility gate
+
+A dedicated `accessibility` CI job runs `npm run test:a11y:unit` on every push
+and pull request to `main`. **A new serious or critical WCAG 2.1 AA violation
+introduced by a PR fails this check and blocks merging.**
+
+The check uses [axe-core](https://github.com/dequelabs/axe-core) via
+[vitest-axe](https://github.com/chaance/vitest-axe) to scan every primary app
+flow in a jsdom environment.
+
+#### Covered flows
+
+| Flow | Route | Test |
+|---|---|---|
+| Dashboard | `/app` | `src/pages/__tests__/a11y.test.tsx` |
+| Connect Wallet | `/connect-wallet` | `src/pages/__tests__/a11y.test.tsx` |
+| Streams | `/app/streams` | `src/pages/__tests__/a11y.test.tsx` |
+| Recipient Portal | `/app/recipient` | `src/pages/__tests__/a11y.test.tsx` |
+| Treasury Overview | `/app/treasurypage` | `src/pages/__tests__/a11y.test.tsx` |
+
+Run the accessibility checks locally with:
+
+```bash
+npm run test:a11y:unit
+```
+
+#### Baseline mechanism
+
+Known pre-existing violations that are not yet fixed are tracked in
+`src/pages/__tests__/a11y-baseline.json`. Each entry caps the violation
+count for a specific axe rule on a specific flow. If a PR introduces a
+**new** occurrence of a baselined rule (or any violation of a non-baselined
+rule), CI fails.
+
+To defer a new violation:
+1. Add an entry to `a11y-baseline.json` with the current node count as `maxCount`.
+2. Open a tracking GitHub issue and reference it in the entry's `_tracking` field.
+3. Remove the entry once the violation is fixed.
 
 ## Streams performance
 
