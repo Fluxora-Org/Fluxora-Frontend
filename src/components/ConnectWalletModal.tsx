@@ -56,6 +56,10 @@ export interface ConnectWalletModalProps {
   onRetryConnection?: () => void;
   /** Handler for downloading extension */
   onDownloadFreighter?: () => void;
+  /** Handler invoked when a wallet connection attempt fails with an error category */
+  onError?: (
+    error: "not_installed" | "rejected" | "network_mismatch" | "network_timeout"
+  ) => void;
   /**
    * Optional flag to explicitly show or hide the Design QA Preview switcher
    * (default: true for reviewability).
@@ -107,6 +111,7 @@ export default function ConnectWalletModal({
   errorState,
   onRetryConnection,
   onDownloadFreighter,
+  onError,
   showStateSwitcher = true,
   expectedNetworkLabel = stableExpectedNetworkLabel,
   actualNetworkLabel = null,
@@ -265,6 +270,7 @@ export default function ConnectWalletModal({
       const ready = await isConnected();
       if (!ready.isConnected) {
         send({ type: "ERROR", error: "not_installed" });
+        onError?.("not_installed");
         if (onDownloadFreighter) {
           onDownloadFreighter();
         }
@@ -274,12 +280,14 @@ export default function ConnectWalletModal({
       const access = await requestAccess();
       if (access.error || !access.address) {
         send({ type: "ERROR", error: "rejected" });
+        onError?.("rejected");
         return;
       }
 
       const net = await withTimeout(getNetwork(), NETWORK_TIMEOUT_MS);
       if (net.error || !net.network) {
         send({ type: "ERROR", error: "rejected" });
+        onError?.("rejected");
         return;
       }
 
@@ -288,6 +296,7 @@ export default function ConnectWalletModal({
       const expectedUpper = expectedNet.toUpperCase();
       if (actualUpper !== expectedUpper) {
         send({ type: "ERROR", error: "network_mismatch" });
+        onError?.("network_mismatch");
         return;
       }
 
@@ -301,8 +310,10 @@ export default function ConnectWalletModal({
     } catch (err) {
       if (err instanceof Error && err.message === "NETWORK_CHECK_TIMEOUT") {
         send({ type: "ERROR", error: "network_timeout" });
+        onError?.("network_timeout");
       } else {
         send({ type: "ERROR", error: "rejected" });
+        onError?.("rejected");
       }
     } finally {
       isRequestInFlight.current = false;
