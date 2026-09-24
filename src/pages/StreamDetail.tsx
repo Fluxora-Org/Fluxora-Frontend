@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -61,6 +62,9 @@ export default function StreamDetail() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const currentDate = useTickingNow();
+
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a
@@ -426,6 +430,50 @@ export default function StreamDetail() {
           <span aria-hidden="true">●</span>
           {stream.health} — {stream.healthNote}
         </span>
+      </div>
+
+      {/* Top-Up Flow */}
+      <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <input
+            type="number"
+            aria-label="Top up amount"
+            placeholder="Amount"
+            value={topUpAmount}
+            onChange={(e) => setTopUpAmount(e.target.value)}
+            disabled={topUpStatus === "pending"}
+            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border, #e5e7eb)" }}
+          />
+          <button
+            onClick={() => {
+              setTopUpStatus("pending");
+              setTimeout(() => {
+                if (Number(topUpAmount) <= 0) {
+                  setTopUpStatus("rejected");
+                } else {
+                  setTopUpStatus("confirmed");
+                }
+              }, 500);
+            }}
+            disabled={topUpStatus === "pending" || !topUpAmount}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "4px",
+              background: "var(--color-text-primary, #111827)",
+              color: "var(--color-surface-1, #fff)",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Submit Top Up
+          </button>
+        </div>
+        {topUpStatus !== "idle" && (
+          <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
+            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+          </div>
+        )}
       </div>
 
       {/* Metrics grid */}
