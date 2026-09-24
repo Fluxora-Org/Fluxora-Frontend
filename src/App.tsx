@@ -125,6 +125,9 @@ export default function App() {
                           element={lazyAppRoute(<ComponentGallery />, () => import("./pages/dev/ComponentGallery"))}
                         />
                       )}
+                      {/* Nested catch-all: unmatched /app/* must render NotFound
+                          instead of an empty Layout Outlet (blank page). */}
+                      <Route path="*" element={<NotFound />} />
                     </Route>
                     <Route path="/connect-wallet" element={<ConnectWallet />} />
                     <Route path="/embed/streams/:streamId" element={<EmbedStreamWidget />} />
