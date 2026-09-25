@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import RecipientEmptyState from "../components/RecipientEmptyState";
+import ConnectWalletModal from "../components/ConnectWalletModal";
 import {
   RecipientStreams,
   type Stream,
@@ -168,6 +169,8 @@ export default function Recipient() {
   >("not-yet-asked");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  // Connect-wallet dialog offered by the not-connected empty state (#1732).
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Local Security Gate States ──
@@ -667,6 +670,9 @@ export default function Recipient() {
           loading={effectiveEmptyStateLoading}
           error={walletConnected ? streamsError : null}
           onRetry={walletConnected ? handlePageRefetch : undefined}
+          onPrimaryAction={
+            walletConnected ? undefined : () => setIsConnectModalOpen(true)
+          }
           ctaDisabled={isRetryingDisabled}
           retryButtonRef={pageRetryButtonRef}
         />
@@ -723,6 +729,16 @@ export default function Recipient() {
               </div>
             </div>
           </section>
+        )}
+
+        {/* ── Connect-wallet dialog (#1732): the not-connected empty state's
+             "Connect wallet" CTA opens this so the visitor can act on the
+             offer, instead of being shown a dead button. ── */}
+        {!walletConnected && (
+          <ConnectWalletModal
+            isOpen={isConnectModalOpen}
+            onClose={() => setIsConnectModalOpen(false)}
+          />
         )}
       </main>
     );
