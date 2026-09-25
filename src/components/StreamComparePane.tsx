@@ -17,7 +17,7 @@
  * • The compare shell has role="region" with aria-label for overall context.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
@@ -33,6 +33,10 @@ interface PaneState {
   streamId: string;
   stream: StreamRecord | null | undefined; // undefined = loading, null = not found
   error: string | null;
+}
+
+interface PaneResult extends PaneState {
+  retry: () => void;
 }
 
 interface Props {
@@ -95,7 +99,10 @@ export const COMPARE_FIELDS: Array<{
   { key: "health", label: "Health" },
 ];
 
-export function fieldValue(r: StreamRecord, field: (typeof COMPARE_FIELDS)[number]): string {
+export function fieldValue(
+  r: StreamRecord,
+  field: (typeof COMPARE_FIELDS)[number],
+): string {
   if (field.format) return field.format(r);
   const raw = r[field.key];
   return raw === undefined || raw === null ? "—" : String(raw);
@@ -103,49 +110,71 @@ export function fieldValue(r: StreamRecord, field: (typeof COMPARE_FIELDS)[numbe
 
 /** Returns the number of fields that differ between two records. */
 export function countDiffs(a: StreamRecord, b: StreamRecord): number {
-  return COMPARE_FIELDS.filter(
-    (f) => fieldValue(a, f) !== fieldValue(b, f),
-  ).length;
+  return COMPARE_FIELDS.filter((f) => fieldValue(a, f) !== fieldValue(b, f))
+    .length;
 }
 
 // ── Hook: fetch a single pane ─────────────────────────────────────────────────
 
-export function usePaneStream(streamId: string): PaneState {
+export function usePaneStream(streamId: string): PaneResult {
   const [state, setState] = useState<PaneState>({
     streamId,
     stream: undefined,
     error: null,
   });
+  const [retryVersion, setRetryVersion] = useState(0);
+  // Bumped on every selection/retry so a superseded response is discarded even
+  // when AbortSignal is ignored by the fetcher.
+  const selectionRef = useState(() => ({ current: 0 }))[0];
 
   useEffect(() => {
-    // If streamId is empty (pane was removed), skip fetching and mark as null
+    // If streamId is empty (pane was removed), skip fetching and mark as null.
     if (!streamId) {
-      setState({ streamId: '', stream: null, error: null });
+      selectionRef.current += 1;
+      setState({ streamId: "", stream: null, error: null });
       return;
     }
 
-    let cancelled = false;
+    const selectionId = ++selectionRef.current;
+    const controller = new AbortController();
     setState({ streamId, stream: undefined, error: null });
 
-    getStreamById(decodeURIComponent(streamId))
+    const isCurrentSelection = () =>
+      selectionRef.current === selectionId && !controller.signal.aborted;
+
+    getStreamById(decodeURIComponent(streamId), controller.signal)
       .then((result) => {
-        if (!cancelled) setState({ streamId, stream: result, error: null });
+        if (!isCurrentSelection()) return;
+        setState({ streamId, stream: result, error: null });
       })
       .catch((err: unknown) => {
-        if (!cancelled)
-          setState({
-            streamId,
-            stream: undefined,
-            error: err instanceof Error ? err.message : "Failed to load stream.",
-          });
+        if (!isCurrentSelection()) return;
+        setState({
+          streamId,
+          stream: undefined,
+          error:
+            err instanceof Error ? err.message : "Failed to load stream.",
+        });
       });
 
     return () => {
-      cancelled = true;
+      // Invalidate this selection and cancel the in-flight request.
+      if (selectionRef.current === selectionId) {
+        selectionRef.current += 1;
+      }
+      controller.abort();
     };
-  }, [streamId]);
+  }, [streamId, retryVersion, selectionRef]);
 
-  return state;
+  const retry = useCallback(() => {
+    setRetryVersion((version) => version + 1);
+  }, []);
+
+  // Effects run after render. Do not expose the previous ID's record during
+  // that gap, otherwise a swap can briefly compare unrelated streams.
+  return state.streamId === streamId
+    ? { ...state, retry }
+    : { streamId, stream: undefined, error: null, retry };
 }
 
 // ── Sub-component: a single pane ─────────────────────────────────────────────
@@ -153,9 +182,10 @@ export function usePaneStream(streamId: string): PaneState {
 interface PaneProps {
   paneLabel: string;
   paneHeadingId: string;
-  state: PaneState;
+  state: PaneResult;
   otherStream: StreamRecord | null | undefined;
   onRemove: () => void;
+  onRetry: () => void;
   currentDate: string;
 }
 
@@ -165,15 +195,13 @@ function CompareStreamPane({
   state,
   otherStream,
   onRemove,
+  onRetry,
   currentDate,
 }: PaneProps) {
   const { stream, error, streamId } = state;
 
   return (
-    <section
-      className={styles.comparePane}
-      aria-labelledby={paneHeadingId}
-    >
+    <section className={styles.comparePane} aria-labelledby={paneHeadingId}>
       {/* Pane header */}
       <div className={styles.paneHeader}>
         <div className={styles.paneLabelGroup}>
@@ -204,7 +232,11 @@ function CompareStreamPane({
       <div className={styles.paneBody}>
         {/* Loading */}
         {stream === undefined && !error && (
-          <div className={styles.paneLoading} aria-busy="true" aria-label="Loading stream">
+          <div
+            className={styles.paneLoading}
+            aria-busy="true"
+            aria-label="Loading stream"
+          >
             <Skeleton width="70%" height={18} />
             <Skeleton width="40%" height={14} />
             <Skeleton height={52} borderRadius={8} />
@@ -227,23 +259,36 @@ function CompareStreamPane({
             }}
           >
             <strong>Error:</strong> {error}
+            <div>
+              <button type="button" onClick={onRetry}>
+                Retry
+              </button>
+            </div>
           </div>
         )}
 
         {/* Removed / empty pane — shown when user removed this pane */}
         {stream === null && !streamId && (
           <div className={styles.emptyPane}>
-            <span className={styles.emptyPaneIcon} aria-hidden="true">🗑️</span>
+            <span className={styles.emptyPaneIcon} aria-hidden="true">
+              🗑️
+            </span>
             <p>Pane removed.</p>
-            <p className={styles.emptyPaneHint}>Select two streams from the table to compare again.</p>
+            <p className={styles.emptyPaneHint}>
+              Select two streams from the table to compare again.
+            </p>
           </div>
         )}
 
         {/* Not found */}
         {stream === null && streamId && (
           <div className={styles.emptyPane}>
-            <span className={styles.emptyPaneIcon} aria-hidden="true">🔍</span>
-            <p>Stream <code>{streamId}</code> not found.</p>
+            <span className={styles.emptyPaneIcon} aria-hidden="true">
+              🔍
+            </span>
+            <p>
+              Stream <code>{streamId}</code> not found.
+            </p>
             <Link to="/app/streams">Browse streams</Link>
           </div>
         )}
@@ -265,8 +310,9 @@ function CompareStreamPane({
             <dl className={styles.alignedFields}>
               {COMPARE_FIELDS.map((field) => {
                 const val = fieldValue(stream, field);
-                const otherVal =
-                  otherStream ? fieldValue(otherStream, field) : null;
+                const otherVal = otherStream
+                  ? fieldValue(otherStream, field)
+                  : null;
                 const isDiff = otherVal !== null && val !== otherVal;
 
                 return (
@@ -282,7 +328,10 @@ function CompareStreamPane({
             </dl>
 
             {/* Timeline — compact compare mode */}
-            <section className={styles.paneTimelineSection} aria-labelledby={`${paneHeadingId}-timeline`}>
+            <section
+              className={styles.paneTimelineSection}
+              aria-labelledby={`${paneHeadingId}-timeline`}
+            >
               <h3
                 id={`${paneHeadingId}-timeline`}
                 className={styles.paneTimelineHeading}
@@ -334,12 +383,19 @@ function CompareStreamPane({
 
 export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
   const [ids, setIds] = useState<[string, string]>([leftId, rightId]);
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
 
-  // Re-sync if the parent swaps the IDs (e.g. deep-linking)
-  useEffect(() => {
+  // Re-sync during render when the parent selection changes (e.g. rapid
+  // deep-link / table selection updates). Avoids one frame where labels
+  // already reflect the new selection while figures still show the old one.
+  const [syncedProps, setSyncedProps] = useState<[string, string]>([
+    leftId,
+    rightId,
+  ]);
+  if (leftId !== syncedProps[0] || rightId !== syncedProps[1]) {
+    setSyncedProps([leftId, rightId]);
     setIds([leftId, rightId]);
-  }, [leftId, rightId]);
+  }
 
   const leftState = usePaneStream(ids[0]);
   const rightState = usePaneStream(ids[1]);
@@ -356,11 +412,11 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
   }
 
   function handleRemoveLeft() {
-    setIds((prev) => ['', prev[1]]);
+    setIds((prev) => ["", prev[1]]);
   }
 
   function handleRemoveRight() {
-    setIds((prev) => [prev[0], '']);
+    setIds((prev) => [prev[0], ""]);
   }
 
   // If both panes have been removed, exit compare mode entirely
@@ -384,7 +440,7 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
       <div className={styles.compareToolbar}>
         <p className={styles.compareToolbarTitle}>
           {activePaneCount === 2
-            ? 'Comparing 2 streams'
+            ? "Comparing 2 streams"
             : `Comparing ${activePaneCount} stream`}
           {diffCount > 0 && activePaneCount === 2 && (
             <span className={styles.diffBadge} style={{ marginLeft: "0.5rem" }}>
@@ -423,6 +479,7 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
           state={leftState}
           otherStream={rightStream}
           onRemove={handleRemoveLeft}
+          onRetry={leftState.retry}
           currentDate={currentDate}
         />
 
@@ -441,6 +498,7 @@ export default function StreamComparePane({ leftId, rightId, onExit }: Props) {
           state={rightState}
           otherStream={leftStream}
           onRemove={handleRemoveRight}
+          onRetry={rightState.retry}
           currentDate={currentDate}
         />
       </div>

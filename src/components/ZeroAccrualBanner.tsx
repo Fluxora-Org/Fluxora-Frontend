@@ -202,9 +202,10 @@ export default function ZeroAccrualBanner({
     return null;
   }
 
-  const cfg = REASON_CONFIG[reason];
-  // Treat empty string the same as absent — always show a meaningful label.
-  const label = actionLabel || cfg.defaultActionLabel;
+  // Fallback to a safe config if reason is unknown at runtime.
+  const cfg = REASON_CONFIG[reason] ?? REASON_CONFIG["rate-zero"];
+  // Trim whitespace so a space-only string falls back to the default label.
+  const label = actionLabel?.trim() || cfg.defaultActionLabel;
   // Only show the date chip when nextEventDate parses to a real date.
   // An invalid string must suppress the chip entirely rather than falling
   // through to a "Not set" placeholder, which would be misleading here.

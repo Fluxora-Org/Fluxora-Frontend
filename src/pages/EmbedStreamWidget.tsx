@@ -16,6 +16,13 @@ import {
   EmbedWidgetLayoutCompact 
 } from "../components/embed/EmbedWidgetLayouts";
 import { useEmbedAccessibility } from "../hooks/useEmbedAccessibility";
+import {
+  getAllowedEmbedOrigins,
+  validateEmbedMessage,
+} from "../lib/embedMessagePolicy";
+import { getFramingContext } from "../lib/embedFramingPolicy";
+import { getNetworkLabel } from "../lib/config";
+import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
 
 /**
  * EmbedStreamWidget - Dedicated embed page for stream status widget
@@ -33,6 +40,11 @@ import { useEmbedAccessibility } from "../hooks/useEmbedAccessibility";
  * - Validates theme/accent query parameters
  * - Falls back to defaults on invalid input
  * - No arbitrary CSS injection
+ * - Only renders balances, progress, and timeline figures when the framing
+ *   page's origin is allowlisted via VITE_EMBED_ALLOWED_ORIGINS; otherwise the
+ *   widget degrades to identity + network + a notice (see
+ *   src/lib/embedFramingPolicy.ts)
+ * - Every render states which network and stream it shows
  */
 export default function EmbedStreamWidget() {
   const { streamId } = useParams<{ streamId: string }>();
@@ -40,11 +52,20 @@ export default function EmbedStreamWidget() {
   const [stream, setStream] = useState<StreamRecord | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [messageTheme, setMessageTheme] = useState<ThemeConfig | null>(null);
+  const [resize, setResize] = useState<{ width?: number; height?: number }>({});
   // retryCount is bumped by the retry button and used as a useEffect dependency
   // so a re-fetch is triggered without remounting the component.
   const [retryCount, setRetryCount] = useState(0);
 
-  const tickingNow = useTickingNow();
+  const tickingNow = useTickingNow({ precision: "minute" });
+
+  // Framing trust is resolved once per mount: env and window topology do not
+  // change over the widget's lifetime.
+  const framing = useMemo(() => getFramingContext(), []);
+
+  // Stellar network the embedded stream lives on, disclosed on every render.
+  const networkLabel = getNetworkLabel(getExpectedStellarNetwork());
 
   /**
    * Derive a stable YYYY-MM-DD date string from the ticking timestamp.
@@ -70,9 +91,29 @@ export default function EmbedStreamWidget() {
   }, [searchParams]);
   
   // Apply theme configuration to document using shared helper
+  const activeThemeConfig = messageTheme ?? themeConfig;
+
   useEffect(() => {
-    return applyThemeConfigSafely(themeConfig);
-  }, [themeConfig]);
+    return applyThemeConfigSafely(activeThemeConfig);
+  }, [activeThemeConfig]);
+
+  useEffect(() => {
+    const allowedOrigins = getAllowedEmbedOrigins();
+    const handleMessage = (event: MessageEvent) => {
+      const validation = validateEmbedMessage(event, allowedOrigins);
+      if (!validation.valid) return;
+      const message = validation.message;
+
+      if (message.action === "theme") {
+        setMessageTheme({ theme: message.theme, accentColor: null });
+      } else {
+        setResize({ width: message.width, height: message.height });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   // Stable retry callback — does not close over changing state.
   const handleRetry = useCallback(() => {
@@ -115,7 +156,6 @@ export default function EmbedStreamWidget() {
       controller.abort();
     };
     // retryCount intentionally included so clicking retry re-runs the fetch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamId, retryCount]);
   
   // Setup embed accessibility
@@ -127,7 +167,7 @@ export default function EmbedStreamWidget() {
   // Loading state
   if (loading) {
     return (
-      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
+      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
         <EmbedWidgetSkeleton widgetPreset={widgetPreset} />
       </EmbedWidgetContainer>
     );
@@ -136,7 +176,7 @@ export default function EmbedStreamWidget() {
   // Error state (invalid stream ID or network error)
   if (error || !stream) {
     return (
-      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
+      <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
         <EmbedWidgetErrorState 
           error={error || "Stream not found"}
           widgetPreset={widgetPreset}
@@ -147,16 +187,21 @@ export default function EmbedStreamWidget() {
     );
   }
   
-  // Success state — render appropriate widget layout
+  // Success state — render appropriate widget layout. The network + stream
+  // disclosure is always shown. When framing trust cannot be established, we
+  // degrade to identity + network + notice and hide all figures.
   const widgetProps = {
     stream,
     currentDate,
-    themeConfig
+    themeConfig: activeThemeConfig
   };
   
   return (
-    <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={themeConfig}>
-      {widgetPreset === "banner" ? (
+    <EmbedWidgetContainer widgetPreset={widgetPreset} themeConfig={activeThemeConfig} resize={resize}>
+      <EmbedWidgetDisclosure networkLabel={networkLabel} streamId={stream.id} />
+      {!framing.trusted ? (
+        <EmbedWidgetDegradedStream stream={stream} />
+      ) : widgetPreset === "banner" ? (
         <EmbedWidgetLayoutBanner {...widgetProps} />
       ) : widgetPreset === "compact" ? (
         <EmbedWidgetLayoutCompact {...widgetProps} />
@@ -175,6 +220,7 @@ interface EmbedWidgetContainerProps {
   children: React.ReactNode;
   widgetPreset: "card" | "banner" | "compact";
   themeConfig: ThemeConfig;
+  resize: { width?: number; height?: number };
 }
 
 /**
@@ -188,7 +234,8 @@ interface EmbedWidgetContainerProps {
 function EmbedWidgetContainer({ 
   children, 
   widgetPreset, 
-  themeConfig 
+  themeConfig,
+  resize
 }: EmbedWidgetContainerProps) {
   return (
     <div 
@@ -200,13 +247,66 @@ function EmbedWidgetContainer({
         // width: 100% lets the inner layout element own its own min/max-width
         // rules via CSS, avoiding inline-style vs. stylesheet specificity fights.
         width: "100%",
-        height: "auto",
+        ...(resize.width ? { maxWidth: `${resize.width}px` } : {}),
+        ...(resize.height ? { minHeight: `${resize.height}px` } : {}),
         backgroundColor: "var(--color-bg-primary, #ffffff)",
         color: "var(--color-text-primary, #1a1f36)",
         isolation: "isolate"
       }}
     >
       {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Disclosure + degraded (trust-failed) state
+// ---------------------------------------------------------------------------
+
+interface EmbedWidgetDisclosureProps {
+  networkLabel: string;
+  streamId: string;
+}
+
+/**
+ * One-line disclosure stating which network and stream the widget renders.
+ * Shown in every success-state render, so a viewer can always verify what a
+ * framed widget is displaying.
+ */
+function EmbedWidgetDisclosure({ networkLabel, streamId }: EmbedWidgetDisclosureProps) {
+  return (
+    <div
+      className="embed-widget-disclosure"
+      role="note"
+      aria-label="Stream context"
+    >
+      {`${networkLabel} · Stream ${streamId}`}
+    </div>
+  );
+}
+
+interface EmbedWidgetDegradedProps {
+  stream: StreamRecord;
+}
+
+/**
+ * Safe fallback when the framing origin could not be verified against
+ * VITE_EMBED_ALLOWED_ORIGINS. Shows only stream identity plus the disclosure,
+ * no balances, progress, rates, or timeline.
+ */
+function EmbedWidgetDegradedStream({ stream }: EmbedWidgetDegradedProps) {
+  return (
+    <div
+      role="article"
+      data-testid="embed-degraded-state"
+      className="embed-widget-degraded"
+      aria-label={`Stream widget: ${stream.name} (unverified host)`}
+    >
+      <h1 className="embed-widget-degraded__title">{stream.name}</h1>
+      <p className="embed-widget-degraded__notice">
+        This widget could not verify the page displaying it. Stream balances and
+        progress are hidden.
+      </p>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import Recipient, {
   isValidWithdrawStreamId,
   selectWithdrawStream,
 } from "./Recipient";
+import { getRecipientRouteKey } from "./recipientRouteKey";
 
 const walletState = vi.hoisted(() => ({
   connected: false,
@@ -47,6 +48,7 @@ const recipientStreamsState = vi.hoisted(() => ({
   loading: false,
   error: null as string | null,
   refetch: vi.fn(),
+  addresses: [] as Array<string | null | undefined>,
 }));
 
 const withdrawMock = vi.hoisted(() => vi.fn());
@@ -72,12 +74,16 @@ vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useRecipientStreams: () => ({
+  useRecipientStreams: (address: string | null | undefined) => {
+    recipientStreamsState.addresses.push(address);
+    return {
     streams: recipientStreamsState.streams,
     loading: recipientStreamsState.loading,
     error: recipientStreamsState.error,
     refetch: recipientStreamsState.refetch,
-  }),
+    retryCount: 0,
+    };
+  },
 }));
 
 vi.mock("../lib/stellar/tx", () => ({
@@ -111,6 +117,7 @@ describe("Recipient wallet source", () => {
     recipientStreamsState.loading = false;
     recipientStreamsState.error = null;
     recipientStreamsState.refetch = vi.fn();
+    recipientStreamsState.addresses = [];
     withdrawMock.mockReset();
     withdrawMock.mockResolvedValue({});
   });
@@ -146,6 +153,28 @@ describe("Recipient wallet source", () => {
     expect(screen.getByText("Withdrawable now")).toBeInTheDocument();
   });
 
+  it("scopes the recipient query to the latest wallet account", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+
+    const { rerender } = renderRecipientAndWaitForMinLoading();
+    walletState.address = "GBQW7K4JQ7ZQWJ3A6VQJ2D4T6N5H7YQ2P4A6M8N0R2T4V6X8Z0C2E4G6I8";
+    rerender(<Recipient />);
+
+    expect(recipientStreamsState.addresses).toContain(walletState.address);
+    expect(recipientStreamsState.addresses[recipientStreamsState.addresses.length - 1]).toBe(walletState.address);
+  });
+
+  it("changes the recipient surface identity when the route query changes", () => {
+    expect(getRecipientRouteKey("/app/recipient", "?view=active")).not.toBe(
+      getRecipientRouteKey("/app/recipient", "?view=history"),
+    );
+    expect(getRecipientRouteKey("/app/recipient", "")).not.toBe(
+      getRecipientRouteKey("/app/streams", ""),
+    );
+  });
+
   it("withdraws using the selected live recipient stream id", async () => {
     walletState.connected = true;
     walletState.address =
@@ -172,6 +201,42 @@ describe("Recipient wallet source", () => {
       "2",
       "42000000000",
     );
+
+    // The receipt shows the exact withdrawn amount (smallest-unit derived),
+    // never a Number-rounded value.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("4,200.0000000 USDC")).toBeInTheDocument();
+  });
+
+  it("renders the exact withdrawal amount on the receipt for fractional balances", async () => {
+    walletState.connected = true;
+    walletState.address =
+      "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.streams = [
+      makeMockStream({
+        id: "2",
+        withdrawableAmount: 4200.1234567,
+        streamedAmount: 5000,
+      }),
+    ];
+
+    renderRecipientAndWaitForMinLoading();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Withdraw 4,200 USDC/i }),
+    );
+
+    await act(async () => {});
+
+    // 4200.1234567 USDC = 42001234567 smallest units — full precision preserved
+    expect(withdrawMock).toHaveBeenCalledWith(
+      walletState.address,
+      "2",
+      "42001234567",
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("4,200.1234567 USDC")).toBeInTheDocument();
   });
 
   it("updates the document title when the tab is blurred and clears it on focus", () => {
@@ -772,6 +837,93 @@ describe("Recipient page error and retry state hardening", () => {
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /connect your wallet/i })).toBeInTheDocument();
+  });
+
+  it("moves focus to the retry button when a service error first appears (WCAG focus order)", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = null;
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [];
+
+    const { rerender } = render(<Recipient />);
+    advancePastMinLoading();
+
+    // Initially no error — connect wallet CTA is present
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // Introduce error — retry button should receive focus
+    recipientStreamsState.error = "Connection lost.";
+    rerender(<Recipient />);
+    act(() => { vi.advanceTimersByTime(0); });
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    const retryBtn = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtn).toHaveFocus();
+  });
+
+  it("retry button is a native button that supports keyboard activation by default", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.error = "retry me";
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    const retryBtn = screen.getByRole("button", { name: "Retry loading data" });
+    // Native <button> element — keyboard events handled by the browser
+    expect(retryBtn.tagName).toBe("BUTTON");
+  });
+
+  it("retry button is disabled while the service is still loading after retry", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    // Start with an error
+    recipientStreamsState.error = "temporary error";
+    recipientStreamsState.loading = false;
+    recipientStreamsState.streams = [];
+
+    renderRecipientAndWaitForMinLoading();
+
+    const retryBtnBefore = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtnBefore).toBeEnabled();
+
+    // Click retry
+    fireEvent.click(retryBtnBefore);
+
+    // Now simulate concurrent loading + still having an error
+    recipientStreamsState.loading = true;
+    act(() => { vi.advanceTimersByTime(0); });
+
+    const retryBtnAfter = screen.getByRole("button", { name: "Retry loading data" });
+    expect(retryBtnAfter).toBeDisabled();
+  });
+
+  it("bypasses full-page loading when wallet disconnects mid-fetch", () => {
+    walletState.connected = true;
+    walletState.address = "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
+    walletState.network = "TESTNET";
+    recipientStreamsState.loading = true;
+    recipientStreamsState.streams = [];
+
+    const { rerender } = render(<Recipient />);
+
+    // Loading skeleton is visible
+    expect(screen.getByRole("status", { name: "Loading recipient portal" })).toBeInTheDocument();
+
+    // Wallet disconnects mid-fetch
+    walletState.connected = false;
+    walletState.address = null;
+    rerender(<Recipient />);
+    act(() => { vi.advanceTimersByTime(0); });
+
+    // Should immediately show empty state, not loading skeleton
+    expect(screen.queryByRole("status", { name: "Loading recipient portal" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Recipient empty state" })).toBeInTheDocument();
   });
 });
 

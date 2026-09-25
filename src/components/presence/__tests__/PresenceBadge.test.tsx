@@ -310,6 +310,63 @@ describe("PresenceBadge", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Loading state
+  // -------------------------------------------------------------------------
+
+  describe("loading state", () => {
+    it("renders loading indicator when isLoading is true", () => {
+      render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const button = screen.getByRole("button");
+      expect(button).toBeInTheDocument();
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-busy", "true");
+      expect(button).toHaveAttribute("aria-label", "Loading presence information");
+    });
+
+    it("displays loading text and animated dots when loading", () => {
+      const { container } = render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      
+      const dots = container.querySelectorAll(".presence-loading-dot");
+      expect(dots).toHaveLength(3);
+    });
+
+    it("does not render viewer list or avatar stack when loading", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} isLoading={true} />);
+      
+      // Should not show avatars even though viewers array has data
+      expect(screen.queryByText("AS")).not.toBeInTheDocument();
+      expect(screen.queryByText("2 viewing")).not.toBeInTheDocument();
+    });
+
+    it("renders normally when isLoading is false", () => {
+      render(<PresenceBadge viewers={[mockViewer1]} isLoading={false} />);
+      
+      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+      expect(screen.getByText("2 viewing")).toBeInTheDocument();
+    });
+
+    it("loading indicator is aria-hidden", () => {
+      const { container } = render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const indicator = container.querySelector(".presence-loading-indicator");
+      expect(indicator).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("loading button cannot be clicked", () => {
+      render(<PresenceBadge viewers={[]} isLoading={true} />);
+      
+      const button = screen.getByRole("button");
+      fireEvent.click(button);
+      
+      // List should not appear because button is disabled
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Tooltip: role and content
   // -------------------------------------------------------------------------
 
@@ -570,6 +627,25 @@ describe("PresenceBadge — edge cases", () => {
 
     // At least one clearTimeout call should have happened at or after unmount.
     expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it("registers exactly one outside-click listener and removes it on unmount", () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
+    const removeSpy = vi.spyOn(document, "removeEventListener");
+
+    const { unmount } = render(<PresenceBadge viewers={[mockViewer1]} />);
+
+    // One mousedown listener is attached while the badge is mounted.
+    const added = addSpy.mock.calls.filter((c) => c[0] === "mousedown");
+    expect(added).toHaveLength(1);
+
+    unmount();
+
+    // The same listener is removed on unmount — no listener leaks after the
+    // badge leaves the route.
+    const removed = removeSpy.mock.calls.filter((c) => c[0] === "mousedown");
+    expect(removed).toHaveLength(1);
+    expect(removed[0][1]).toBe(added[0][1]);
   });
 
   it("announcement is cleared after 3 seconds", () => {

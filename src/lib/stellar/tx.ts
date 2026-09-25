@@ -15,12 +15,72 @@ import { transactionConfig } from "../transactionConfig";
  */
 export class TransactionError extends Error {
   constructor(
-    public type: "rejected" | "network_mismatch" | "simulation" | "rpc" | "timeout" | "unknown",
-    message: string
+    public type: "rejected" | "network_mismatch" | "simulation" | "rpc" | "timeout" | "contract" | "unknown",
+    message: string,
+    public details: {
+      category?: ContractErrorCategory;
+      code?: string;
+      retryable?: boolean;
+    } = {},
   ) {
     super(message);
     this.name = "TransactionError";
   }
+}
+
+export type ContractErrorCategory = "authorization" | "balance" | "validation" | "state" | "unknown";
+
+/** Stable user-facing classification for named errors returned by the stream contract. */
+export const CONTRACT_ERROR_CATEGORIES: Record<string, ContractErrorCategory> = {
+  Unauthorized: "authorization",
+  NotAdmin: "authorization",
+  InsufficientBalance: "balance",
+  InsufficientFunds: "balance",
+  InvalidAmount: "validation",
+  InvalidTime: "validation",
+  StreamNotFound: "state",
+  StreamAlreadyPaused: "state",
+  StreamNotPaused: "state",
+  StreamTerminated: "state",
+};
+
+const CONTRACT_ERROR_PATTERN = /(?:Error\(Contract,\s*#?([A-Za-z0-9_]+)\)|contract(?: error)?(?: code)?[:=\s]+#?([A-Za-z0-9_]+))/i;
+
+function contractErrorText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value instanceof Error) return value.message;
+  if (value && typeof value === "object") {
+    const candidate = value as { error?: unknown; message?: unknown; toString?: () => string };
+    if (typeof candidate.error === "string") return candidate.error;
+    if (typeof candidate.message === "string") return candidate.message;
+    if (candidate.toString && candidate.toString !== Object.prototype.toString) return candidate.toString();
+  }
+  return String(value);
+}
+
+/** Converts a contract failure into safe, actionable UI text without exposing raw RPC/XDR details. */
+export function decodeContractError(value: unknown): TransactionError | null {
+  const source = contractErrorText(value);
+  const match = source.match(CONTRACT_ERROR_PATTERN);
+  if (!match) return null;
+
+  const code = match[1] || match[2] || "unknown";
+  const category = CONTRACT_ERROR_CATEGORIES[code] || "unknown";
+  const guidance = category === "authorization"
+    ? "Check that the connected wallet is authorized for this action."
+    : category === "balance"
+      ? "Check your available balance and try again after funding the account."
+      : category === "validation"
+        ? "Check the transaction details and try again."
+        : category === "state"
+          ? "Refresh the stream state before trying again."
+          : "Check the transaction details and try again if the problem persists.";
+
+  return new TransactionError(
+    "contract",
+    `The smart contract rejected this transaction. ${guidance}`,
+    { category, code, retryable: category !== "authorization" && category !== "state" },
+  );
 }
 
 /**
@@ -37,15 +97,17 @@ function mapFreighterSigningError(err: any): TransactionError {
   if (maybeErr.code && maybeErr.code === "user_rejected") {
     return new TransactionError(
       "rejected",
-      "Transaction signature request was declined by the user."
+      "Transaction signature request was declined by the user.",
+      { retryable: true },
     );
   }
   const errMsg = String(err);
-  const rejectionKeywords = ["reject", "decline", "cancel", "dismiss"];
-  if (rejectionKeywords.some((kw) => new RegExp("\\b" + kw + "\\b", "i").test(errMsg))) {
+  const rejectionKeywords = [/\breject(?:ed)?\b/i, /\bdecline\b/i, /\bcancel\b/i, /\bdismiss\b/i];
+  if (rejectionKeywords.some((pattern) => pattern.test(errMsg))) {
     return new TransactionError(
       "rejected",
-      "Transaction signature request was declined by the user."
+      "Transaction signature request was declined by the user.",
+      { retryable: true },
     );
   }
   return new TransactionError("unknown", `Freighter signing failed: ${errMsg}`);
@@ -189,9 +251,12 @@ async function waitForTransaction(
         return { ...res, txHash: res.txHash || hash };
       }
       if (res.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+        const contractError = decodeContractError(res.resultXdr);
+        if (contractError) throw contractError;
         throw new TransactionError(
           "rpc",
-          `Transaction execution failed on-chain. Result XDR: ${res.resultXdr?.toXDR("base64") || "unknown"}`
+          "Transaction execution failed on-chain. Check the transaction details and try again if the problem persists.",
+          { retryable: true },
         );
       }
     } catch (err: any) {
@@ -296,10 +361,16 @@ async function executeInvocation(
   try {
     sim = await server.simulateTransaction(tx);
   } catch (err: any) {
-    throw new TransactionError("rpc", `Soroban RPC simulation failed to execute: ${err.message || err}`);
+    throw new TransactionError(
+      "rpc",
+      `Soroban RPC simulation failed to execute: ${err.message || err}`,
+      { retryable: true },
+    );
   }
 
   if (!SorobanRpc.Api.isSimulationSuccess(sim)) {
+    const contractError = decodeContractError(sim.error);
+    if (contractError) throw contractError;
     throw new TransactionError("simulation", `Transaction simulation failed: ${sim.error || "Simulation unsuccessful"}`);
   }
 

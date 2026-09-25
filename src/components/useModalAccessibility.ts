@@ -1,42 +1,46 @@
-import { useEffect } from 'react';
-import type { RefObject } from 'react';
+import { useEffect } from "react";
+import type { RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
-  'button:not([disabled])',
-  '[href]',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
   '[tabindex]:not([tabindex="-1"])',
-].join(', ');
+].join(", ");
 
 let scrollLockCount = 0;
-let previousBodyOverflow = '';
-let previousBodyPaddingRight = '';
+let previousBodyOverflow = "";
+let previousBodyPaddingRight = "";
 
 function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
 
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => {
-    if (element.hasAttribute('hidden')) return false;
-    if (element.getAttribute('aria-hidden') === 'true') return false;
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((element) => {
+    if (element.hasAttribute("hidden")) return false;
+    if (element.getAttribute("aria-hidden") === "true") return false;
     if (element.tabIndex < 0) return false;
-    if (element instanceof HTMLInputElement && element.type === 'hidden') return false;
+    if (element instanceof HTMLInputElement && element.type === "hidden")
+      return false;
 
     const style = window.getComputedStyle(element);
-    return style.display !== 'none' && style.visibility !== 'hidden';
+    return style.display !== "none" && style.visibility !== "hidden";
   });
 }
 
 function lockBodyScroll() {
-  if (typeof document === 'undefined') return;
+  if (typeof document === "undefined") return;
 
   if (scrollLockCount === 0) {
     previousBodyOverflow = document.body.style.overflow;
     previousBodyPaddingRight = document.body.style.paddingRight;
 
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.overflow = 'hidden';
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
     if (scrollbarWidth > 0) {
       document.body.style.paddingRight = `${scrollbarWidth}px`;
     }
@@ -46,7 +50,7 @@ function lockBodyScroll() {
 }
 
 function unlockBodyScroll() {
-  if (typeof document === 'undefined' || scrollLockCount === 0) return;
+  if (typeof document === "undefined" || scrollLockCount === 0) return;
 
   scrollLockCount -= 1;
 
@@ -61,6 +65,7 @@ interface UseModalAccessibilityOptions {
   onClose: () => void;
   modalRef: RefObject<HTMLElement>;
   initialFocusRef?: RefObject<HTMLElement>;
+  returnFocusRef?: RefObject<HTMLElement>;
 }
 
 export function useModalAccessibility({
@@ -68,15 +73,26 @@ export function useModalAccessibility({
   onClose,
   modalRef,
   initialFocusRef,
+  returnFocusRef,
 }: UseModalAccessibilityOptions) {
   useEffect(() => {
     if (!isOpen) return;
 
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previouslyFocused =
+      (document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+        ? document.activeElement
+        : returnFocusRef?.current) ??
+      (document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null);
     lockBodyScroll();
 
     const focusInitialElement = () => {
-      const focusTarget = initialFocusRef?.current ?? getFocusableElements(modalRef.current)[0] ?? modalRef.current;
+      const focusTarget =
+        initialFocusRef?.current ??
+        getFocusableElements(modalRef.current)[0] ??
+        modalRef.current;
       focusTarget?.focus();
     };
 
@@ -86,13 +102,13 @@ export function useModalAccessibility({
       const currentModal = modalRef.current;
       if (!currentModal) return;
 
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         onClose();
         return;
       }
 
-      if (event.key !== 'Tab') return;
+      if (event.key !== "Tab") return;
 
       const focusableElements = getFocusableElements(currentModal);
       if (focusableElements.length === 0) {
@@ -120,22 +136,29 @@ export function useModalAccessibility({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.cancelAnimationFrame(frameId);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
       unlockBodyScroll();
 
-      if (
+      const elementToFocus =
         previouslyFocused &&
         previouslyFocused.isConnected &&
         document.contains(previouslyFocused)
-      ) {
-        window.requestAnimationFrame(() => previouslyFocused.focus());
+          ? previouslyFocused
+          : returnFocusRef?.current &&
+              returnFocusRef.current.isConnected &&
+              document.contains(returnFocusRef.current)
+            ? returnFocusRef.current
+            : null;
+
+      if (elementToFocus) {
+        window.requestAnimationFrame(() => elementToFocus.focus());
       }
     };
-  }, [initialFocusRef, isOpen, modalRef, onClose]);
+  }, [initialFocusRef, isOpen, modalRef, onClose, returnFocusRef]);
 
   return {
     focusableSelector: FOCUSABLE_SELECTOR,

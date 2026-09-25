@@ -46,6 +46,31 @@ describe("TransactionReceiptPreview component", () => {
     expect(screen.getByText(/pending rpc confirmation/i)).toBeInTheDocument();
   });
 
+  it("never presents a failed transaction as a confirmed receipt", () => {
+    render(
+      <TransactionReceiptPreview
+        data={{ ...mockConfirmedData, status: "failed" }}
+      />,
+    );
+
+    expect(screen.getByText(/transaction failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/transaction was not confirmed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/on-chain confirmed/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /explorer/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download creation receipt/i })).toBeDisabled();
+  });
+
+  it("treats an unknown result with a hash as unverified", () => {
+    render(
+      <TransactionReceiptPreview
+        data={{ ...mockConfirmedData, status: "unknown" }}
+      />,
+    );
+
+    expect(screen.getByText(/confirmation unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /explorer/i })).not.toBeInTheDocument();
+  });
+
   it("renders explorer link with testnet network segment when network is TESTNET", () => {
     const testnetData: ReceiptData = {
       ...mockConfirmedData,
@@ -72,6 +97,25 @@ describe("TransactionReceiptPreview component", () => {
       "href",
       `https://stellar.expert/explorer/public/tx/${mockConfirmedData.txHash}`,
     );
+    expect(explorerLink).toHaveAttribute("target", "_blank");
+    expect(explorerLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("keeps contract-derived hashes inside a fixed HTTPS receipt URL", () => {
+    const unsafeHashData: ReceiptData = {
+      ...mockConfirmedData,
+      network: "Public Network (Mainnet)",
+      txHash: "javascript:alert(1)",
+    };
+    render(<TransactionReceiptPreview data={unsafeHashData} />);
+
+    const explorerLink = screen.getByRole("link", { name: /explorer/i });
+    expect(explorerLink).toHaveAttribute(
+      "href",
+      "https://stellar.expert/explorer/public/tx/javascript%3Aalert(1)",
+    );
+    expect(explorerLink).toHaveAttribute("target", "_blank");
+    expect(explorerLink).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("triggers download action when 'Download Receipt' button is clicked", async () => {

@@ -7,6 +7,7 @@ import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
 import { stellarExplorerUrl } from "../../lib/stellar";
+import TruncatedAddress from "../common/TruncatedAddress";
 import "./StreamRow.css";
 
 interface Props {
@@ -24,12 +25,6 @@ interface Props {
   onCompareToggle?: (id: string) => void;
 }
 
-function truncateAddress(address: string) {
-  return address.length > 14
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : address;
-}
-
 function formatAccruedAmount(amount: number) {
   // Use `formatNumber` (locale-aware, no hardcoded "en-US") — issue #388
   return `${formatNumber(amount, 2)} USDC accrued`;
@@ -43,7 +38,6 @@ export default function StreamRow({
   onCompareToggle,
 }: Props) {
   const navigate = useNavigate();
-  const recipientLabel = truncateAddress(stream.recipient);
   const toast = useOptionalToast();
   const { copy } = useClipboard();
 
@@ -331,16 +325,14 @@ export default function StreamRow({
         title={stream.recipient}
         aria-label={`Recipient ${stream.recipient}`}
       >
-        {recipientLabel}
+        <TruncatedAddress address={stream.recipient} label="" className="stream-row__address" />
       </td>
 
-      <td className="py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
-        <div>{stream.rate}</div>
-        {typeof stream.accruedAmount === "number" && (
-          <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {formatAccruedAmount(stream.accruedAmount)}
-          </div>
-        )}
+      <td className="stream-row__cell py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
+        <div className="stream-row__amount">{stream.rate}</div>
+        <div className="stream-row__amount text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {formatAccruedAmount(stream.accruedAmount)}
+        </div>
       </td>
 
       <td className="stream-row__cell py-4 px-3" data-label="STATUS">

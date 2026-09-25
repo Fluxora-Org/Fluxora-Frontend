@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../components/toast/ToastProvider";
 
@@ -88,7 +88,7 @@ describe("Recipient page — zero incoming streams for a connected wallet", () =
     render(
       <ToastProvider>
         <Recipient />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     await act(async () => {
@@ -96,11 +96,11 @@ describe("Recipient page — zero incoming streams for a connected wallet", () =
     });
 
     expect(
-      screen.getByRole("region", { name: "Recipient empty state" })
+      screen.getByRole("region", { name: "Recipient empty state" }),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole("heading", { name: /no active streams/i })
+      screen.getByRole("heading", { name: /no active streams/i }),
     ).toBeInTheDocument();
 
     const ctaButton = screen.getByRole("button", { name: /view docs/i });
@@ -111,15 +111,52 @@ describe("Recipient page — zero incoming streams for a connected wallet", () =
     expect(consoleWarnSpy).not.toHaveBeenCalled();
   });
 
+  // ── Issue #1732: not-connected vs no-streams must be distinguishable ──
+
+  it("offers the connect-wallet dialog from the not-connected empty state and hides the security gate (#1732)", async () => {
+    // Start disconnected, no streams — the page must present the
+    // not-connected condition, not the no-streams one.
+    mockWalletState.connected = false;
+
+    render(
+      <ToastProvider>
+        <Recipient />
+      </ToastProvider>,
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(
+      screen.getByRole("heading", { name: /connect your wallet/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /no active streams/i }),
+    ).not.toBeInTheDocument();
+
+    // The not-connected state offers connection: the CTA opens the
+    // canonical ConnectWalletModal dialog.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    });
+    expect(
+      screen.getByRole("dialog", { name: /choose your wallet/i }),
+    ).toBeInTheDocument();
+
+    // The security gate is for connected wallets only.
+    expect(screen.queryByText("Local Security Gate")).not.toBeInTheDocument();
+  });
+
   it("transitions from loading skeleton to RecipientEmptyState when a connected wallet has zero active incoming streams", async () => {
     render(
       <ToastProvider>
         <Recipient />
-      </ToastProvider>
+      </ToastProvider>,
     );
 
     expect(
-      screen.getByRole("status", { name: /loading recipient portal/i })
+      screen.getByRole("status", { name: /loading recipient portal/i }),
     ).toBeInTheDocument();
 
     await act(async () => {
@@ -127,11 +164,11 @@ describe("Recipient page — zero incoming streams for a connected wallet", () =
     });
 
     expect(
-      screen.queryByRole("status", { name: /loading recipient portal/i })
+      screen.queryByRole("status", { name: /loading recipient portal/i }),
     ).not.toBeInTheDocument();
 
     expect(
-      screen.getByRole("region", { name: "Recipient empty state" })
+      screen.getByRole("region", { name: "Recipient empty state" }),
     ).toBeInTheDocument();
 
     expect(consoleErrorSpy).not.toHaveBeenCalled();

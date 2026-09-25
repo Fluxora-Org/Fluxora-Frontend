@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useI18n } from '../i18n';
 
 export type StreamStatus = 'Active' | 'Paused' | 'Completed';
 
@@ -14,6 +15,11 @@ export interface Stream {
 
 import StreamsLoading from './StreamsLoading';
 import EmptyState from './EmptyState';
+import { isSafeUrl } from '../utils/security';
+import {
+  getSafeExternalUrl,
+  SAFE_EXTERNAL_LINK_ATTRIBUTES,
+} from '../lib/safeExternalUrl';
 
 interface RecentStreamsProps {
   streams: Stream[];
@@ -38,18 +44,48 @@ export default function RecentStreams({
   onRetry,
   walletConnected = false
 }: RecentStreamsProps) {
+  const { t } = useI18n();
   const [announcement, setAnnouncement] = useState('');
+  const safeStreams = streams.filter((stream): stream is Stream => {
+    if (!stream || typeof stream !== 'object') {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    const candidate = stream as Partial<Stream>;
+    const isValidStatus =
+      candidate.status === 'Active' ||
+      candidate.status === 'Paused' ||
+      candidate.status === 'Completed';
+
+    if (
+      typeof candidate.id !== 'string' ||
+      candidate.id.trim() === '' ||
+      typeof candidate.name !== 'string' ||
+      candidate.name.trim() === '' ||
+      typeof candidate.recipient !== 'string' ||
+      candidate.recipient.trim() === '' ||
+      typeof candidate.rate !== 'string' ||
+      candidate.rate.trim() === '' ||
+      !isValidStatus
+    ) {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
-    if (streams.length > 0) {
-      setAnnouncement(`Found ${streams.length} matching streams.`);
+    if (safeStreams.length > 0) {
+      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: safeStreams.length }));
     } else {
-      setAnnouncement('No matching streams found.');
+      setAnnouncement(t('recentStreams.noMatchingStreams'));
     }
     
     const timer = setTimeout(() => setAnnouncement(''), 1000);
     return () => clearTimeout(timer);
-  }, [streams.length]);
+  }, [safeStreams.length, t]);
 
   if (loading) {
     return (
@@ -84,7 +120,7 @@ export default function RecentStreams({
     );
   }
 
-  if (streams.length === 0) {
+  if (safeStreams.length === 0) {
     return (
       <section style={sectionContainer}>
         <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -125,7 +161,15 @@ export default function RecentStreams({
             </tr>
           </thead>
           <tbody>
-            {streams.map((stream, index) => (
+            {safeStreams.map((stream, index) => {
+              const safeExternalDetailUrl = getSafeExternalUrl(stream.detailUrl);
+              const detailUrl =
+                safeExternalDetailUrl ??
+                (stream.detailUrl && isSafeUrl(stream.detailUrl)
+                  ? stream.detailUrl
+                  : `/app/streams/${stream.id}`);
+
+              return (
               <tr key={stream.id} style={index % 2 === 0 ? rowEven : rowOdd}>
                 <td style={td}>
                   <div style={streamName}>{stream.name}</div>
@@ -141,8 +185,11 @@ export default function RecentStreams({
                   <StatusPill status={stream.status} />
                 </td>
                 <td style={td}>
-                  <Link 
-                    to={stream.detailUrl || `/app/streams/${stream.id}`} 
+                  <Link
+                    to={detailUrl}
+                    {...(safeExternalDetailUrl
+                      ? SAFE_EXTERNAL_LINK_ATTRIBUTES
+                      : {})}
                     style={viewLink}
                     aria-label={`View details for ${stream.name}`}
                   >
@@ -166,7 +213,8 @@ export default function RecentStreams({
                   </Link>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

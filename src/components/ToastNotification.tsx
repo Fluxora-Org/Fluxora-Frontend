@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import "./ToastNotification.css";
 
 export type ToastVariant = "success" | "error" | "info" | "warning";
@@ -154,6 +155,8 @@ interface ToastNotificationProps {
   /** Optional inline action (e.g. "View stream"). Rendered only when both are set. */
   actionLabel?: string;
   onAction?: () => void;
+  /** Optional reversible action with a five-second, pauseable countdown. */
+  onUndo?: () => void;
 }
 
 const TOAST_COPY: Record<ToastVariant, { label: string; icon: string }> = {
@@ -192,14 +195,189 @@ const FALLBACK_SEMANTICS = {
 
 const FALLBACK_COPY = { label: "Alert", icon: "!" };
 
+export type TransactionReceiptPollResult =
+  | { status: "pending"; attempts: number }
+  | { status: "confirmed"; receipt?: unknown }
+  | { status: "rejected"; receipt?: unknown }
+  | { status: "timeout"; reason: "unknown" | "rejected"; attempts: number };
+
+export interface TransactionReceiptPollingOptions {
+  enabled: boolean;
+  account?: string;
+  intervalMs?: number;
+  maxAttempts?: number;
+  timeoutMs?: number;
+  lastLedgerSequence?: number;
+  fetchReceipt: (signal: AbortSignal) => Promise<{
+    status: "confirmed" | "rejected" | "unknown";
+    receipt?: unknown;
+  }>;
+  fetchLedgerSequence?: (signal: AbortSignal) => Promise<number>;
+  onTerminal?: (
+    result: Extract<TransactionReceiptPollResult, { status: "confirmed" | "rejected" | "timeout" }>,
+  ) => void;
+}
+
+const DEFAULT_RECEIPT_POLL_INTERVAL_MS = 2_000;
+const DEFAULT_RECEIPT_POLL_MAX_ATTEMPTS = 10;
+const DEFAULT_RECEIPT_POLL_TIMEOUT_MS = 20_000;
+
+export function useTransactionReceiptPolling({
+  enabled,
+  account,
+  intervalMs = DEFAULT_RECEIPT_POLL_INTERVAL_MS,
+  maxAttempts = DEFAULT_RECEIPT_POLL_MAX_ATTEMPTS,
+  timeoutMs = DEFAULT_RECEIPT_POLL_TIMEOUT_MS,
+  lastLedgerSequence,
+  fetchReceipt,
+  fetchLedgerSequence,
+  onTerminal,
+}: TransactionReceiptPollingOptions): TransactionReceiptPollResult {
+  const [result, setResult] = useState<TransactionReceiptPollResult>({
+    status: "pending",
+    attempts: 0,
+  });
+  const onTerminalRef = useRef(onTerminal);
+
+  useEffect(() => {
+    onTerminalRef.current = onTerminal;
+  }, [onTerminal]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setResult({ status: "pending", attempts: 0 });
+      return;
+    }
+
+    const controller = new AbortController();
+    let attemptCount = 0;
+    let isSettled = false;
+    let pollTimer: number | undefined;
+    let wallClockTimer: number | undefined;
+
+    const clearTimers = () => {
+      if (pollTimer !== undefined) window.clearTimeout(pollTimer);
+      if (wallClockTimer !== undefined) window.clearTimeout(wallClockTimer);
+      pollTimer = undefined;
+      wallClockTimer = undefined;
+    };
+
+    const settle = (next: TransactionReceiptPollResult) => {
+      if (isSettled || controller.signal.aborted) return;
+      isSettled = true;
+      clearTimers();
+      setResult(next);
+      if (next.status !== "pending") {
+        onTerminalRef.current?.(next);
+      }
+    };
+
+    const schedulePoll = () => {
+      if (isSettled || controller.signal.aborted) return;
+      pollTimer = window.setTimeout(() => {
+        pollTimer = undefined;
+        void runPoll();
+      }, intervalMs);
+    };
+
+    const runPoll = async () => {
+      if (isSettled || controller.signal.aborted) return;
+      attemptCount += 1;
+      setResult({ status: "pending", attempts: attemptCount });
+
+      try {
+        const receipt = await fetchReceipt(controller.signal);
+        if (isSettled || controller.signal.aborted) return;
+
+        if (receipt.status === "confirmed") {
+          settle({ status: "confirmed", receipt: receipt.receipt });
+          return;
+        }
+
+        if (receipt.status === "rejected") {
+          settle({ status: "rejected", receipt: receipt.receipt });
+          return;
+        }
+
+        if (lastLedgerSequence !== undefined && fetchLedgerSequence) {
+          const currentLedger = await fetchLedgerSequence(controller.signal);
+          if (isSettled || controller.signal.aborted) return;
+          if (currentLedger > lastLedgerSequence) {
+            settle({ status: "timeout", reason: "rejected", attempts: attemptCount });
+            return;
+          }
+        }
+      } catch {
+        if (isSettled || controller.signal.aborted) return;
+      }
+
+      if (attemptCount >= maxAttempts) {
+        settle({ status: "timeout", reason: "unknown", attempts: attemptCount });
+        return;
+      }
+
+      schedulePoll();
+    };
+
+    wallClockTimer = window.setTimeout(() => {
+      if (isSettled || controller.signal.aborted) return;
+      settle({ status: "timeout", reason: "unknown", attempts: attemptCount });
+    }, timeoutMs);
+
+    void runPoll();
+
+    return () => {
+      isSettled = true;
+      controller.abort();
+      clearTimers();
+    };
+  }, [
+    enabled,
+    account,
+    intervalMs,
+    maxAttempts,
+    timeoutMs,
+    lastLedgerSequence,
+    fetchLedgerSequence,
+    fetchReceipt,
+  ]);
+
+  return result;
+}
+
 export default function ToastNotification({
   message,
   variant,
   onClose,
   actionLabel,
   onAction,
+  onUndo,
 }: ToastNotificationProps) {
   const semantics = VARIANT_SEMANTICS[variant] ?? FALLBACK_SEMANTICS;
+  const [remainingMs, setRemainingMs] = useState(5000);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (!onUndo || isPaused) return;
+    const timer = window.setInterval(() => {
+      setRemainingMs((remaining) => {
+        const next = Math.max(0, remaining - 100);
+        if (next === 0) onClose();
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [isPaused, onClose, onUndo]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const { label, icon } = TOAST_COPY[variant] ?? FALLBACK_COPY;
 
@@ -207,14 +385,21 @@ export default function ToastNotification({
     <div
       className={`toast-notification toast-notification--${variant}`}
       aria-atomic="true"
-      aria-label={`${label} notification`}
       data-variant={variant}
       {...semantics}
     >
       <div className="toast-notification__icon" aria-hidden="true">
         {icon}
       </div>
-      <div className="toast-notification__content">
+      <div
+        className="toast-notification__content"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onFocus={() => setIsPaused(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setIsPaused(false);
+        }}
+      >
         <p className="toast-notification__eyebrow">{label}</p>
         <p className="toast-notification__message">{message}</p>
         {actionLabel && onAction && (
@@ -229,6 +414,32 @@ export default function ToastNotification({
             {actionLabel}
           </button>
         )}
+        {onUndo && remainingMs > 0 && (
+          <div className="toast-notification__undo">
+            <button
+              type="button"
+              className="toast-notification__action"
+              onClick={() => {
+                onUndo();
+                onClose();
+              }}
+            >
+              Undo
+            </button>
+            <span aria-live="polite" className="toast-notification__undo-countdown">
+              {Math.ceil(remainingMs / 1000)}s
+            </span>
+            <div
+              className="toast-notification__undo-progress"
+              role="progressbar"
+              aria-label="Undo time remaining"
+              aria-valuemin={0}
+              aria-valuemax={5000}
+              aria-valuenow={remainingMs}
+              style={{ transform: `scaleX(${remainingMs / 5000})` }}
+            />
+          </div>
+        )}
       </div>
       <button
         type="button"
@@ -241,4 +452,3 @@ export default function ToastNotification({
     </div>
   );
 }
-

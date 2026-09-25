@@ -39,6 +39,22 @@
   justify-content: center;
 }
 
+/* Mobile Safari resizes the visual viewport when its keyboard opens. Using
+   dynamic viewport units keeps the modal and its footer inside that resized
+   area instead of measuring against the hidden layout viewport. */
+@supports (height: 100dvh) {
+  .create-stream-overlay {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .create-stream-modal {
+    max-height: min(calc(100dvh - 2rem), 600px);
+  }
+}
+
 .create-stream-modal {
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
   max-height: min(90vh, 600px);
@@ -72,6 +88,12 @@
   margin: -2px -4px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+@media (max-width: 640px) {
+  .create-stream-modal .modal-footer {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
 }
 
 .create-stream-modal .modal-body-scroll::-webkit-scrollbar {
@@ -129,6 +151,110 @@
 .transaction-status-box--error {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+/* Offline queue banner */
+.offline-queue-banner {
+  margin-top: 0.875rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--status-warning);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.offline-queue-banner svg {
+  color: var(--status-warning);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.offline-queue-banner__content {
+  flex: 1;
+}
+
+.offline-queue-banner__content strong {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.offline-queue-banner__content p {
+  margin: 0.25rem 0;
+  color: var(--text);
+}
+
+.offline-queue-banner__position {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.offline-queue-banner--failed {
+  border-left-color: var(--danger);
+}
+
+.offline-queue-banner--failed svg {
+  color: var(--danger);
+}
+
+.offline-queue-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.offline-queue-banner__btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.offline-queue-banner__btn:hover {
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+
+.offline-queue-banner__btn--primary {
+  background: var(--color-cta-primary-bg);
+  color: var(--color-cta-primary-text);
+  border-color: var(--color-cta-primary-bg);
+}
+
+.offline-queue-banner__btn--primary:hover {
+  background: var(--color-cta-primary-bg-hover);
+  border-color: var(--color-cta-primary-bg-hover);
+}
+
+/* Responsive overrides for offline queue banner */
+@media (max-width: 768px) {
+  .offline-queue-banner {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .offline-queue-banner__actions {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 360px) {
+  .offline-queue-banner {
+    font-size: 0.6875rem;
+  }
 }
 
 .modal-header {
@@ -799,6 +925,17 @@
   flex: 1;
 }
 
+.review-card-address {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.review-card-address .truncateReveal {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .review-card-title {
   font-size: 0.9375rem;
   font-weight: 600;
@@ -817,6 +954,9 @@
   color: var(--text);
   font-weight: 500;
   word-break: break-all;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .review-card-amount {
@@ -824,12 +964,16 @@
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .review-card-unit {
   font-size: 1rem;
   font-weight: 400;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .review-card-edit {
@@ -947,6 +1091,8 @@
   font-weight: 500;
   margin-left: auto;
   text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Bulk CSV — batch dry-run confirmation screen (styled after step 3 review-summary) */
@@ -2295,4 +2441,3 @@
     transition: none;
   }
 }
-

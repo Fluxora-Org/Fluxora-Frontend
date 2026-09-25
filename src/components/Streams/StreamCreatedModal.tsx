@@ -8,6 +8,11 @@ import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { config } from "../../lib/config";
 import {
+  getSafeExternalUrl,
+  SAFE_EXTERNAL_LINK_ATTRIBUTES,
+} from "../../lib/safeExternalUrl";
+import { rememberCreatedStream } from "../../lib/recentCreatedStreams";
+import {
   type ShareFlowState,
   type ShareProvider,
   MOCK_SHARE_CHANNELS,
@@ -16,6 +21,23 @@ import {
   getShareProviderLabel,
   isProviderConnected,
 } from "../../lib/shareWorkspaces";
+
+const RECEIPT_POLL_INTERVAL_MS = 5_000;
+const RECEIPT_POLL_MAX_ATTEMPTS = 6;
+const RECEIPT_POLL_TIMEOUT_MS = 30_000;
+
+type ReceiptStatus = "pending" | "confirmed" | "failed" | "unknown";
+
+async function fetchReceiptStatus(txHash: string): Promise<ReceiptStatus> {
+  const configWithUrls = config as { networkUrl?: string; horizonUrl?: string };
+  const networkUrl = configWithUrls.networkUrl ?? configWithUrls.horizonUrl ?? "";
+  const baseUrl = networkUrl.replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/transactions/${txHash}`);
+  if (response.status === 404) return "pending";
+  if (!response.ok) return "pending";
+  const data = (await response.json()) as { successful?: boolean };
+  return data.successful === false ? "failed" : "confirmed";
+}
 
 interface StreamCreatedModalProps {
   isOpen: boolean;
@@ -62,12 +84,15 @@ export default function StreamCreatedModal({
   );
   const [listOpen, setListOpen] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
+  const [identifierCopied, setIdentifierCopied] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const channelInputRef = useRef<HTMLInputElement>(null);
   const channelListId = useId();
   const channelInputId = useId();
   const previewHeadingId = useId();
+
+  const [receiptStatus, setReceiptStatus] = useState<ReceiptStatus>("pending");
 
   useEffect(() => {
     if (isOpen) {
@@ -78,6 +103,7 @@ export default function StreamCreatedModal({
       setChannelQuery("");
       setSelectedChannelId(null);
       setListOpen(false);
+      setIdentifierCopied(false);
       const timer = setTimeout(() => setAnnouncement(""), 1000);
       return () => clearTimeout(timer);
     }
@@ -89,6 +115,69 @@ export default function StreamCreatedModal({
     modalRef,
     initialFocusRef: closeButtonRef,
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!txHash) {
+      setReceiptStatus("pending");
+      return;
+    }
+
+    setReceiptStatus("pending");
+
+    let cancelled = false;
+    let stopped = false;
+    let attempts = 0;
+    let pollInFlight = false;
+    let intervalId: number | undefined;
+    let timeoutId: number | undefined;
+
+    const clearTimers = () => {
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+
+    const finish = (status: ReceiptStatus) => {
+      if (cancelled || stopped) return;
+      stopped = true;
+      setReceiptStatus(status);
+      clearTimers();
+    };
+
+    const poll = async () => {
+      if (cancelled || stopped || pollInFlight) return;
+      pollInFlight = true;
+      try {
+        const status = await fetchReceiptStatus(txHash);
+        if (cancelled || stopped) return;
+        if (status === "confirmed" || status === "failed") {
+          finish(status);
+          return;
+        }
+        attempts += 1;
+        if (attempts >= RECEIPT_POLL_MAX_ATTEMPTS) {
+          finish("unknown");
+        }
+      } catch {
+        if (cancelled || stopped) return;
+        attempts += 1;
+        if (attempts >= RECEIPT_POLL_MAX_ATTEMPTS) {
+          finish("unknown");
+        }
+      } finally {
+        pollInFlight = false;
+      }
+    };
+
+    void poll();
+    intervalId = window.setInterval(() => void poll(), RECEIPT_POLL_INTERVAL_MS);
+    timeoutId = window.setTimeout(() => finish("unknown"), RECEIPT_POLL_TIMEOUT_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+    };
+  }, [isOpen, txHash, sender]);
 
   if (!isOpen) return null;
 
@@ -110,6 +199,12 @@ export default function StreamCreatedModal({
     shareFlow === "sending" ||
     shareFlow === "sent" ||
     shareFlow === "send-failed";
+  const safeStreamUrl = getSafeExternalUrl(streamUrl);
+
+  const handleClose = () => {
+    rememberCreatedStream({ streamId, streamUrl });
+    onClose();
+  };
 
   const announce = (message: string, clearMs = 2000) => {
     setAnnouncement(message);
@@ -163,24 +258,40 @@ export default function StreamCreatedModal({
     }
   };
 
+  const handleCopyIdentifier = async () => {
+    const didCopy = await copy(streamId);
+    if (didCopy) {
+      setIdentifierCopied(true);
+      announce("Stream identifier copied");
+      window.setTimeout(() => setIdentifierCopied(false), 2000);
+    } else {
+      announce("Could not copy stream identifier. Please copy it manually.", 3000);
+    }
+  };
+
   /**
    * Opens the stream URL in a new tab.
    * Enforces https: scheme for security (preventing javascript: or data: injection).
    * Detects popup-blocker null return and shows an accessible inline link fallback.
    */
   const handleViewStream = () => {
-    try {
-      const parsedUrl = new URL(streamUrl);
-      if (parsedUrl.protocol !== "https:") {
-        console.error("Invalid URL scheme. Only https is allowed.");
+    if (!safeStreamUrl) {
+      try {
+        const parsedUrl = new URL(streamUrl);
+        if (parsedUrl.protocol !== "https:") {
+          announce("Invalid stream URL. Only secure links are allowed.", 3000);
+          return;
+        }
+      } catch {
+        announce("Invalid stream URL. Please try again.", 3000);
         return;
       }
-    } catch {
-      console.error("Invalid URL provided.");
+
+      announce("Invalid stream URL. Please try again.", 3000);
       return;
     }
 
-    const newWindow = window.open(streamUrl, "_blank", "noopener,noreferrer");
+    const newWindow = window.open(safeStreamUrl, "_blank", "noopener,noreferrer");
     if (!newWindow) {
       setIsPopupBlocked(true);
       announce(
@@ -314,7 +425,7 @@ export default function StreamCreatedModal({
   return (
     <div
       className={`${styles.overlay}${theme === "cyberpunk" ? ` ${styles.cyberpunkSkin}` : ""}`}
-      onClick={onClose}
+      onClick={handleClose}
       data-skin={theme === "cyberpunk" ? "cyberpunk" : undefined}
     >
       <div
@@ -333,7 +444,7 @@ export default function StreamCreatedModal({
         <button
           ref={closeButtonRef}
           className={styles.closeButton}
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close stream created modal"
           type="button"
         >
@@ -372,7 +483,17 @@ export default function StreamCreatedModal({
         <div className={styles.streamInfoCard}>
           <div className={styles.streamIdRow}>
             <span className={styles.streamIdLabel}>Stream ID</span>
-            <span className={styles.streamIdValue}>#{streamId}</span>
+            <div className={styles.streamIdValueGroup}>
+              <code className={styles.streamIdValue}>{streamId}</code>
+              <button
+                className={`${styles.identifierCopyButton} ${identifierCopied ? styles.copied : ""}`}
+                onClick={() => void handleCopyIdentifier()}
+                type="button"
+                aria-label={identifierCopied ? "Copied stream identifier" : "Copy stream identifier"}
+              >
+                {identifierCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
           </div>
           <div className={styles.urlContainer}>
             <div className={styles.urlBar}>{streamUrl}</div>
@@ -619,14 +740,17 @@ export default function StreamCreatedModal({
                   <div className={styles.sharePreviewRow}>
                     <dt>Stream link</dt>
                     <dd>
-                      <a
-                        href={streamUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.sharePreviewLink}
-                      >
-                        {streamUrl}
-                      </a>
+                      {safeStreamUrl ? (
+                        <a
+                          href={safeStreamUrl}
+                          {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
+                          className={styles.sharePreviewLink}
+                        >
+                          {streamUrl}
+                        </a>
+                      ) : (
+                        <span className={styles.sharePreviewLink}>{streamUrl}</span>
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -670,19 +794,18 @@ export default function StreamCreatedModal({
               rate,
               timestamp: new Date().toISOString(),
               txHash: txHash || null,
-              status: txHash ? "confirmed" : "pending",
+              status: receiptStatus,
               network: config.networkLabel,
             }}
           />
         </div>
 
-        {isPopupBlocked && (
+        {isPopupBlocked && safeStreamUrl && (
           <div className={styles.popupBlockedMessage} role="alert">
             Popup blocked.{" "}
             <a
-              href={streamUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={safeStreamUrl}
+              {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
               className={styles.fallbackLink}
             >
               Click here to view your stream
@@ -693,7 +816,10 @@ export default function StreamCreatedModal({
         <div className={styles.actions}>
           <button
             className={`${styles.btn} ${styles.btnSecondary}`}
-            onClick={onCreateAnother}
+            onClick={() => {
+              rememberCreatedStream({ streamId, streamUrl });
+              onCreateAnother();
+            }}
             type="button"
           >
             <svg
@@ -711,6 +837,15 @@ export default function StreamCreatedModal({
             </svg>
             Create another
           </button>
+          {safeStreamUrl && (
+            <a
+              href={safeStreamUrl}
+              {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
+              className={`${styles.btn} ${styles.btnPrimary}`}
+            >
+              Open stream details
+            </a>
+          )}
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}
             onClick={handleViewStream}

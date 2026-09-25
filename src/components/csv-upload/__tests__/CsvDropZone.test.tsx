@@ -1,6 +1,13 @@
-﻿import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CsvDropZone } from '../CsvDropZone';
+import {
+  MAX_CSV_FILE_SIZE_BYTES,
+  MAX_CSV_FILE_SIZE_LABEL,
+  MAX_CSV_ROWS,
+  MAX_CSV_COLUMNS,
+  MAX_CSV_CELL_LENGTH,
+} from '../csvParser';
 import type { ParseResult } from '../types';
 
 function makeFile(content: string, name = 'streams.csv', type = 'text/csv'): File {
@@ -9,13 +16,13 @@ function makeFile(content: string, name = 'streams.csv', type = 'text/csv'): Fil
 
 const HEADER = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
 // Row-level validity (Stellar address, amounts) doesn't affect CsvDropZone's
-// own behavior — it only inspects the top-level parseError / row count — so
+// own behavior -- it only inspects the top-level parseError / row count -- so
 // a structurally valid but not-necessarily-checksum-valid recipient is fine.
-const ONE_ROW_CSV = HEADER + 'GTESTRECIPIENT0000000000000000000000000000000000000000,100,10,30\n';
+const ONE_ROW_CSV = HEADER + 'GTESTRECIPIENT000000000000000000000000000000000,100,10,30\n';
 const TWO_ROW_CSV =
   HEADER +
-  'GTESTRECIPIENT0000000000000000000000000000000000000000,100,10,30\n' +
-  'GTESTRECIPIENT1111111111111111111111111111111111111111,200,5,60\n';
+  'GTESTRECIPIENT000000000000000000000000000000000,100,10,30\n' +
+  'GTESTRECIPIENT1111111111111111111111111111111111,200,5,60\n';
 
 describe('CsvDropZone', () => {
   let onParsed: ReturnType<typeof vi.fn> & ((result: ParseResult, fileName: string, rawText: string) => void);
@@ -27,6 +34,9 @@ describe('CsvDropZone', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  // Documented resource limits enforced by the CSV upload pipeline (see
+  // csvParser.ts): these tests assert behaviour at and beyond each bound.
 
   it('renders the empty-state instructions initially', () => {
     render(<CsvDropZone onParsed={onParsed} />);
@@ -60,7 +70,7 @@ describe('CsvDropZone', () => {
     fireEvent.change(input, { target: { files: [badFile] } });
 
     // "Only .csv files are accepted." renders in both the aria-live status
-    // region and the visible ValidationMessage — scope to the latter by id.
+    // region and the visible ValidationMessage -- scope to the latter by id.
     await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'Only .csv files are accepted.',
@@ -112,7 +122,7 @@ describe('CsvDropZone', () => {
     expect(rawText).toBe(ONE_ROW_CSV);
 
     // Success text renders in both the live-region and the ValidationMessage
-    // — scope to the visible success message by id to avoid ambiguity.
+    // -- scope to the visible success message by id to avoid ambiguity.
     expect(document.getElementById('csv-upload-success')).toHaveTextContent(
       'streams.csv',
     );
@@ -131,6 +141,124 @@ describe('CsvDropZone', () => {
     await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
     expect(document.getElementById('csv-upload-success')).toHaveTextContent(
       '2 rows detected',
+    );
+  });
+
+  it('refuses a CSV file larger than the maximum allowed size before reading it', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const oversizedFile = new File(
+      [new Uint8Array(MAX_CSV_FILE_SIZE_BYTES + 1)],
+      'huge.csv',
+      { type: 'text/csv' },
+    );
+
+    fireEvent.drop(zone, { dataTransfer: { files: [oversizedFile] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        `File is too large. Maximum size is ${MAX_CSV_FILE_SIZE_LABEL}.`,
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('refuses a CSV file with more rows than the maximum allowed', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const rows: string[] = [];
+    for (let i = 0; i <= MAX_CSV_ROWS; i++) {
+      rows.push(`GTESTRECIPIENT${String(i).padStart(4, '0')},100,10,30`);
+    }
+    const tooManyRowsCsv = HEADER + rows.join('\n') + '\n';
+    const file = makeFile(tooManyRowsCsv, 'too-many-rows.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        `This CSV has ${MAX_CSV_ROWS + 1} rows. Maximum is ${MAX_CSV_ROWS}.`,
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('rejects a CSV file with more columns than the maximum allowed', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const columnCount = MAX_CSV_COLUMNS + 1;
+    const columns = Array.from({ length: columnCount }, (_, i) => `col${i}`);
+    const header = columns.join(',') + '\n';
+    const values = columns.map((_, i) => `value${i}`);
+    const row = values.join(',') + '\n';
+    const tooManyColumnsCsv = header + row;
+    const file = makeFile(tooManyColumnsCsv, 'too-many-columns.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        `Row 1 has ${MAX_CSV_COLUMNS + 1} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('rejects a CSV file with a cell longer than the maximum allowed', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const longCell = 'x'.repeat(MAX_CSV_CELL_LENGTH + 1);
+    const longCellCsv = `recipient,deposit_amount\n${longCell},100\n`;
+    const file = makeFile(longCellCsv, 'long-cell.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        `Row 1 contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('tolerates ragged rows: short rows parse with field errors, not a top-level rejection', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const malformedCsv = HEADER + 'recipient1,100,10,30\nrecipient2,200\n';
+    const file = makeFile(malformedCsv, 'malformed.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    // Missing cells resolve to empty strings and surface as per-row field
+    // errors in the preview; there is no top-level "inconsistent columns"
+    // rejection, so the caller still receives the parsed rows.
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    const [result] = onParsed.mock.calls[0] as [ParseResult, string, string];
+    expect(result.parseError).toBeUndefined();
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[1]!.status).toBe('needs-fix');
+  });
+
+  it('accepts a large CSV file that is within the limits', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    // Generate rows just under the row limit; each row is short so the file
+    // stays well under the 1 MB size bound too.
+    const rowCount = MAX_CSV_ROWS - 100;
+    const rows: string[] = [];
+    for (let i = 0; i < rowCount; i++) {
+      rows.push(`GTESTRECIPIENT${String(i).padStart(4, '0')},100,10,30`);
+    }
+    const largeCsv = HEADER + rows.join('\n') + '\n';
+    const file = makeFile(largeCsv, 'large-but-valid.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    const [result] = onParsed.mock.calls[0] as [ParseResult, string, string];
+    expect(result.rows).toHaveLength(rowCount);
+    expect(document.getElementById('csv-upload-success')).toHaveTextContent(
+      `${rowCount} rows detected`,
     );
   });
 
@@ -153,18 +281,18 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'The CSV file has no data rows.',
-      );
-    });
+      ),
+    );
     expect(onParsed).not.toHaveBeenCalled();
   });
 
   it('shows a generic failure message when reading the file throws', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
-    // Duck-typed "file" whose text() rejects — CsvDropZone only calls
+    // Duck-typed "file" whose text() rejects -- CsvDropZone only calls
     // .name, .type, and .text() on the object, so this is enough to
     // exercise the catch branch without depending on real File internals.
     const brokenFile = {
@@ -175,11 +303,11 @@ describe('CsvDropZone', () => {
 
     fireEvent.change(input, { target: { files: [brokenFile] } });
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
         'Failed to read the file. Please try again.',
-      );
-    });
+      ),
+    );
     expect(onParsed).not.toHaveBeenCalled();
   });
 
@@ -213,7 +341,83 @@ describe('CsvDropZone', () => {
     expect(clickSpy).not.toHaveBeenCalled();
   });
 
-  it('downloads the CSV template when the template button is clicked', () => {
+  it('rejects a drop of multiple files with an explicit message', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--parse-error');
+  });
+
+  it('rejects multiple files selected through the file input', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+    const first = makeFile(ONE_ROW_CSV, 'one.csv');
+    const second = makeFile(ONE_ROW_CSV, 'two.csv');
+
+    fireEvent.change(input, { target: { files: [first, second] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only one file can be uploaded at a time.',
+      );
+    });
+    expect(onParsed).not.toHaveBeenCalled();
+  });
+
+  it('restores focus to the drop zone after a rejected file', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const badFile = makeFile('not a csv', 'notes.pdf', 'application/pdf');
+
+    fireEvent.drop(zone, { dataTransfer: { files: [badFile] } });
+
+    await waitFor(() => {
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Only .csv files are accepted.',
+      );
+    });
+
+    // Focus is returned to the drop zone so keyboard/screen-reader users can
+    // retry without hunting for the control.
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('restores focus to the drop zone when the file picker is cancelled', async () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;
+
+    // Cancel: fire change with no files (dialog dismissed without selection).
+    fireEvent.change(input, { target: { files: [] } });
+
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(zone.className).toContain('csv-drop-zone--empty');
+    await waitFor(() => expect(zone).toHaveFocus());
+  });
+
+  it('keeps focus on the drop zone after a keyboard-open with no selection', () => {
+    render(<CsvDropZone onParsed={onParsed} />);
+    const zone = screen.getByRole('button', { name: /upload csv file/i });
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+
+    zone.focus();
+    fireEvent.keyDown(zone, { key: 'Enter' });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(zone).toHaveFocus();
+  });
+
+  it('downloads the CSU template when the template button is clicked', () => {
     render(<CsvDropZone onParsed={onParsed} />);
 
     const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');

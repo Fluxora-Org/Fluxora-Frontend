@@ -107,6 +107,34 @@ describe("useTreasury", () => {
     // If cancelled branch works, no React warning is thrown
   });
 
+  it("does not let a delayed previous-account request repopulate streams", async () => {
+    let resolveOldMetrics!: (value: unknown[]) => void;
+    let resolveOldStreams!: (value: typeof streamRecords) => void;
+    getTreasuryMetrics
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOldMetrics = resolve; }))
+      .mockResolvedValueOnce([]);
+    getStreams
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOldStreams = resolve; }))
+      .mockResolvedValueOnce([]);
+
+    const { result, rerender } = renderHook(
+      ({ accountContextVersion }) => useTreasury(undefined, accountContextVersion),
+      { initialProps: { accountContextVersion: 1 } },
+    );
+
+    rerender({ accountContextVersion: 2 });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      resolveOldMetrics([]);
+      resolveOldStreams(streamRecords);
+    });
+
+    expect(result.current.streams).toEqual([]);
+    expect(result.current.metrics).toEqual([]);
+    expect(getStreams).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the generic error fallback when rejection is not an Error instance", async () => {
     getTreasuryMetrics.mockResolvedValue([]);
     getStreams.mockRejectedValue("plain string rejection");
@@ -202,9 +230,44 @@ describe("useRecipientStreams", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(getRecipientStreams).toHaveBeenCalledWith(RECIPIENT);
+    expect(getRecipientStreams).toHaveBeenCalledWith(
+      RECIPIENT,
+      { signal: expect.any(AbortSignal) },
+    );
     expect(result.current.streams).toEqual([FIRST_RECORD]);
     expect(result.current.error).toBeNull();
+  });
+
+  it("does not expose another recipient's stream from a broad response", async () => {
+    const otherRecipient = {
+      ...FIRST_RECORD,
+      id: "OTHER",
+      recipientAddress: `G${"B".repeat(55)}`,
+    };
+    getRecipientStreams.mockResolvedValue([FIRST_RECORD, otherRecipient]);
+
+    const { result } = renderHook(() => useRecipientStreams(RECIPIENT));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.streams).toEqual([FIRST_RECORD]);
+    expect(result.current.streams).not.toContainEqual(otherRecipient);
+  });
+
+  it("clears old account data and refetches after an account switch", async () => {
+    getRecipientStreams.mockResolvedValue([FIRST_RECORD]);
+
+    const { result, rerender } = renderHook(
+      ({ accountContextVersion }) =>
+        useRecipientStreams(RECIPIENT, accountContextVersion),
+      { initialProps: { accountContextVersion: 1 } },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ accountContextVersion: 2 });
+
+    expect(result.current.streams).toEqual([]);
+    await waitFor(() => expect(getRecipientStreams).toHaveBeenCalledTimes(2));
   });
 
   it("surfaces errors from the service", async () => {

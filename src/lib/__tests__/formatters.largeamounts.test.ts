@@ -26,6 +26,7 @@ import {
   formatUsdcPerMonth,
   formatAssetAmount,
   formatTokenAmount,
+  amountToSmallestUnits,
   assertSafeInteger,
 } from "../formatters";
 
@@ -342,6 +343,89 @@ describe("formatTokenAmount — decimal shifting (decimals > 0)", () => {
     // digit-only string = whole digits + frac digits = 17 + 2 = 19 chars
     // "10000000000000000" + "00" = "1000000000000000000"
     expect(result.replace(/\D/g, "")).toBe("1000000000000000000");
+  });
+});
+
+// ─── amountToSmallestUnits — exact decimal-string scaling ─────────────────────
+// Receipt generation must never route token amounts through JavaScript
+// `number`. `amountToSmallestUnits` scales an exact decimal string to the
+// token's smallest unit with BigInt string arithmetic, so values at and beyond
+// `Number.MAX_SAFE_INTEGER` and values with many decimal places stay exact.
+
+describe("amountToSmallestUnits", () => {
+  it("scales a simple decimal to the token's smallest unit", () => {
+    expect(amountToSmallestUnits("100.5", 7)).toBe(1_005_000_000n);
+  });
+
+  it("scales an integer string with no fraction", () => {
+    expect(amountToSmallestUnits("100", 7)).toBe(1_000_000_000n);
+  });
+
+  it("preserves a value beyond MAX_SAFE_INTEGER exactly", () => {
+    // 9_007_199_254_740_993.1234567 — the integer portion is beyond 2^53
+    expect(amountToSmallestUnits("9007199254740993.1234567", 7)).toBe(
+      90_071_992_547_409_931_234_567n,
+    );
+  });
+
+  it("preserves a very large amount with high precision exactly", () => {
+    expect(amountToSmallestUnits("12345678901234567890.1234567", 7)).toBe(
+      123_456_789_012_345_678_901_234_567n,
+    );
+  });
+
+  it("converts the smallest valid unit to 1", () => {
+    expect(amountToSmallestUnits("0.0000001", 7)).toBe(1n);
+  });
+
+  it("converts zero to 0n", () => {
+    expect(amountToSmallestUnits("0", 7)).toBe(0n);
+    expect(amountToSmallestUnits("0.0000000", 7)).toBe(0n);
+  });
+
+  it("keeps trailing decimal zeros exactly", () => {
+    expect(amountToSmallestUnits("1.0000000", 7)).toBe(10_000_000n);
+  });
+
+  it("truncates fractional digits beyond the supported precision", () => {
+    // 9 decimals requested but the app supports 7 → 8th/9th digits dropped
+    expect(amountToSmallestUnits("1.123456789", 7)).toBe(11_234_567n);
+  });
+
+  it("handles leading zeros in the integer part", () => {
+    expect(amountToSmallestUnits("007.5", 7)).toBe(75_000_000n);
+  });
+
+  it("supports negative amounts", () => {
+    expect(amountToSmallestUnits("-1.5", 7)).toBe(-15_000_000n);
+  });
+
+  it("supports decimals = 0", () => {
+    expect(amountToSmallestUnits("100.5", 0)).toBe(100n);
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(amountToSmallestUnits("  100.5  ", 7)).toBe(1_005_000_000n);
+  });
+
+  // ── Invalid inputs must throw — never silently become a valid amount ──
+
+  it.each([
+    "",
+    "abc",
+    "1.2.3",
+    "NaN",
+    "Infinity",
+    "-Infinity",
+    "1e5",
+    "12,34",
+    ".",
+    "1.",
+    ".5",
+    "-",
+    "1.2.3.4",
+  ])("throws TypeError for malformed input %j", (input) => {
+    expect(() => amountToSmallestUnits(input, 7)).toThrow(TypeError);
   });
 });
 

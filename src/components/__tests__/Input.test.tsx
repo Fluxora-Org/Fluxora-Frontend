@@ -187,3 +187,19 @@ describe('Input Validation ARIA attributes', () => {
     expect(input.getAttribute("aria-describedby")).toBe(hintDescribedBy);
   });
 });
+
+describe('Input invalid transition animation', () => {
+  it('adds the shake class on each valid-to-invalid transition', () => {
+    const { rerender, container } = render(<Input id="shake-input" label="Name" />);
+    const input = container.querySelector('input')!;
+
+    rerender(<Input id="shake-input" label="Name" error="Required" />);
+    expect(input.className).toContain('errorShake');
+    rerender(<Input id="shake-input" label="Name" error="Still required" />);
+    expect(input.className).toContain('errorShake');
+
+    rerender(<Input id="shake-input" label="Name" />);
+    rerender(<Input id="shake-input" label="Name" error="Required again" />);
+    expect(input.className).toContain('errorShake');
+  });
+});

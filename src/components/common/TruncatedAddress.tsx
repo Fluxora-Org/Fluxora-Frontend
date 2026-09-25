@@ -20,6 +20,39 @@ function toCopyState(status: "idle" | "copied" | "shared" | "cancelled" | "faile
 }
 
 /**
+ * Formats a Stellar address with mid-string truncation for compact display.
+ *
+ * This is the single source of truth for the `head…tail` truncation format used
+ * across the app. All components that need a plain truncated string (StreamRow,
+ * WalletButton, WalletStatus, etc.) should call this instead of reimplementing
+ * `addr.slice(0, 6) + "..." + addr.slice(-4)` inline.
+ *
+ * Format: first `prefixLen` characters + "..." + last `suffixLen` characters.
+ * If the address is too short to truncate (length ≤ prefixLen + suffixLen),
+ * the full string is returned unchanged.
+ *
+ * @param address  The Stellar address (or any identifier) to truncate.
+ * @param prefixLen Number of leading characters to keep. Defaults to 6.
+ * @param suffixLen Number of trailing characters to keep. Defaults to 4.
+ * @returns The truncated string, or the original if it is short enough.
+ *
+ * @example
+ * formatAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234567890123456789")
+ * // → "GABCDE...6789"
+ *
+ * @example
+ * formatAddress("GSHORT") // → "GSHORT"  (no truncation needed)
+ */
+export function formatAddress(
+  address: string,
+  prefixLen = 6,
+  suffixLen = 4,
+): string {
+  if (address.length <= prefixLen + suffixLen) return address;
+  return `${address.slice(0, prefixLen)}...${address.slice(-suffixLen)}`;
+}
+
+/**
  * TruncatedAddress component provides a consistent way to display Stellar addresses
  * with truncation (ABCD...WXYZ), optional labeling, and copy-to-clipboard / Web Share API functionality.
  * It uses standard design tokens for typography and colors.
@@ -45,11 +78,10 @@ export default function TruncatedAddress({
   const copyState = toCopyState(status);
   const shareSupported = support.share;
 
-  // Stellar address truncation: first 6 characters + "..." + last 4 characters
-  const truncated =
-    address.length > 12
-      ? `${address.slice(0, 6)}...${address.slice(-4)}`
-      : address;
+  // Stellar address truncation: first 6 characters + "..." + last 4 characters.
+  // Delegates to the shared formatAddress utility so the head/tail counts stay
+  // in sync with all other call sites (StreamRow, WalletButton, etc.).
+  const truncated = formatAddress(address);
 
   // Notify consumers whenever the copy state changes.
   useEffect(() => {

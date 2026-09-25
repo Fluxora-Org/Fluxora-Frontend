@@ -78,13 +78,29 @@ describe('CreateStreamModal review step', () => {
     expect(screen.getByText('123.45')).toBeInTheDocument();
     expect(
       screen.getByText(
-        `${VALID_STELLAR.slice(0, 8)}...${VALID_STELLAR.slice(-4)}`,
+        `${VALID_STELLAR.slice(0, 6)}...${VALID_STELLAR.slice(-4)}`,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('200.00')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/GDU4D7EXAMPLEADDRESS0L50DR/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps maximal review values available without losing address copy access', () => {
+    const { container } = render(
+      <CreateStreamModal isOpen={true} onClose={() => {}} />,
+    );
+
+    fillStep1(container, '365000000.00');
+    fillStep2AndReview(container, { rate: '100000', duration: '3650' });
+
+    expect(screen.getByText('365000000.00')).toBeInTheDocument();
+    expect(screen.getByText('100000 USDC per day')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: `Copy address: ${VALID_STELLAR}` }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(`${VALID_STELLAR.slice(0, 6)}...${VALID_STELLAR.slice(-4)}`)).toBeInTheDocument();
   });
 
   it('keeps required deposit math aligned with daily rate times days', () => {

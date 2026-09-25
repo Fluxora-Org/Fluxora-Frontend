@@ -34,7 +34,7 @@ const streamA: Stream = {
   recipient: "GABC...1111",
   rate: "5,000 USDC/mo",
   accruedAmount: 12000,
-  status: "Active",
+  status: "Active", accruedAmount: 0, startDate: "2026-01-01",
 };
 
 const streamB: Stream = {
@@ -43,7 +43,7 @@ const streamB: Stream = {
   recipient: "GXYZ...2222",
   rate: "2,500 USDC/mo",
   accruedAmount: 6000,
-  status: "Paused",
+  status: "Paused", accruedAmount: 0, startDate: "2026-01-01",
 };
 
 const streamC: Stream = {
@@ -51,7 +51,7 @@ const streamC: Stream = {
   name: "Gamma Grant",
   recipient: "GDEF...3333",
   rate: "1,000 USDC/mo",
-  status: "Completed",
+  status: "Completed", accruedAmount: 0, startDate: "2026-01-01",
 };
 
 const sampleStreams = [streamA, streamB, streamC];
@@ -64,7 +64,7 @@ const recordA: StreamRecord = {
   treasuryName: "Treasury",
   treasuryAddress: "GTREASURY",
   asset: "USDC",
-  status: "Active",
+  status: "Active", accruedAmount: 0, startDate: "2026-01-01",
   monthlyRate: 5000,
   depositAmount: 48000,
   streamedAmount: 12000,
@@ -90,7 +90,7 @@ const recordB: StreamRecord = {
   treasuryName: "Treasury",
   treasuryAddress: "GTREASURY",
   asset: "USDC",
-  status: "Paused",    // differs
+  status: "Paused", accruedAmount: 0, startDate: "2026-01-01",    // differs
   monthlyRate: 2500,   // differs
   depositAmount: 24000,
   streamedAmount: 6000,

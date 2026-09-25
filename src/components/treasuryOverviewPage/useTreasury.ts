@@ -21,6 +21,7 @@ export interface TreasuryData {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  retryCount: number;
 }
 
 const GENERIC_ERROR = "Unable to load treasury data.";
@@ -43,27 +44,40 @@ function readError(error: unknown): string {
  * Accepts an optional `filters` argument that is forwarded to
  * {@link getStreams}. Changes to `filters` trigger an automatic refetch.
  */
-export function useTreasury(filters?: StreamsFilters): TreasuryData {
+export function useTreasury(
+  filters?: StreamsFilters,
+  /** Changes when another tab changes the active wallet account. */
+  accountContextVersion = 0,
+): TreasuryData {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const accountContextVersionRef = useRef(accountContextVersion);
   const filtersKey = serializeFilters(filters);
-  const inFlightRef = useRef<number>(0);
-
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
 
   useEffect(() => {
-    const runId = ++inFlightRef.current;
-    let cancelled = false;
+    const controller = new AbortController();
+    const accountChanged = accountContextVersionRef.current !== accountContextVersion;
+    accountContextVersionRef.current = accountContextVersion;
+    if (accountChanged) {
+      // Do not render the prior account's cached rows while the replacement
+      // request is pending in this tab.
+      setMetrics([]);
+      setStreams([]);
+    }
     setLoading(true);
     setError(null);
+    setRetryCount((count) => count + 1);
 
-    Promise.all([getTreasuryMetrics(), getStreams(filtersRef.current)])
+    Promise.all([
+      getTreasuryMetrics({ signal: controller.signal }),
+      getStreams(filters, { signal: controller.signal }),
+    ])
       .then(([nextMetrics, nextStreams]) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
 
         const activeStreams = nextStreams.filter(s => s.status === "Active");
         
@@ -99,26 +113,27 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
         setMetrics(updatedMetrics);
         setStreams(nextStreams);
         setError(null);
+        setRetryCount(0);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
         setMetrics([]);
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken, filtersKey]);
+    return () => controller.abort();
+  // Account context is intentionally included even where the backend query is
+  // not account-filtered: cleanup aborts old-account work before it can commit.
+  }, [accountContextVersion, reloadToken, filtersKey]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { metrics, streams, loading, error, refetch };
+  return { metrics, streams, loading, error, refetch, retryCount };
 }
 
 /**
@@ -128,19 +143,32 @@ export function useTreasury(filters?: StreamsFilters): TreasuryData {
  * not see treasury-wide data. An empty `address` short-circuits to an empty
  * result without contacting the network.
  */
-export function useRecipientStreams(address: string | null | undefined): {
+export function useRecipientStreams(
+  address: string | null | undefined,
+  accountContextVersion = 0,
+): {
   streams: StreamRecord[];
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  retryCount: number;
 } {
   const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(Boolean(address));
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
-  const inFlightRef = useRef<number>(0);
+  const accountContextVersionRef = useRef(accountContextVersion);
 
   useEffect(() => {
+    const accountChanged = accountContextVersionRef.current !== accountContextVersion;
+    accountContextVersionRef.current = accountContextVersion;
+
+    if (accountChanged) {
+      setStreams([]);
+      setError(null);
+    }
+
     if (!address) {
       setStreams([]);
       setLoading(false);
@@ -148,35 +176,34 @@ export function useRecipientStreams(address: string | null | undefined): {
       return;
     }
 
-    const runId = ++inFlightRef.current;
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setRetryCount((count) => count + 1);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, { signal: controller.signal })
       .then((next) => {
-        if (cancelled || runId !== inFlightRef.current) return;
-        setStreams(next);
+        if (controller.signal.aborted) return;
+        setStreams(next.filter((stream) => stream.recipientAddress === address));
         setError(null);
+        setRetryCount(0);
         setLoading(false);
       })
       .catch((cause) => {
-        if (cancelled || runId !== inFlightRef.current) return;
+        if (controller.signal.aborted) return;
         setStreams([]);
         setError(readError(cause));
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [address, reloadToken]);
+    return () => controller.abort();
+  }, [accountContextVersion, address, reloadToken]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { streams, loading, error, refetch };
+  return { streams, loading, error, refetch, retryCount };
 }
 
 function serializeFilters(filters?: StreamsFilters): string {
@@ -185,5 +212,6 @@ function serializeFilters(filters?: StreamsFilters): string {
     filters.status ?? "",
     filters.recipient ?? "",
     filters.treasury ?? "",
+    filters.period ?? "",
   ].join("|");
 }

@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,11 @@ import {
   type AllowedTokenKey,
   type TokenValidationError,
 } from "./contrastUtils";
+import {
+  readBrowserStorage,
+  removeBrowserStorage,
+  writeBrowserStorage,
+} from "../lib/browserStorage";
 
 // ─── 1. Core "light | dark" union (unchanged) ────────────────────────────────
 
@@ -54,7 +60,9 @@ export function isTheme(value: unknown): value is Theme {
  * @returns `true` when value is boolean or boolean-string.
  */
 export function isEasyReadFont(value: unknown): value is boolean {
-  return value === true || value === false || value === "true" || value === "false";
+  return (
+    value === true || value === false || value === "true" || value === "false"
+  );
 }
 
 /**
@@ -109,16 +117,21 @@ export interface ThemeRegistrationError {
 
 // ─── 3. Storage helpers ───────────────────────────────────────────────────────
 
-export type ThemePreference = "light" | "dark" | "auto";
+export type ThemePreference = "light" | "dark" | "cyberpunk" | "auto";
 
 export function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "auto";
+  return (
+    value === "light" ||
+    value === "dark" ||
+    value === "cyberpunk" ||
+    value === "auto"
+  );
 }
 
 function getStoredTheme(): ThemePreference | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const stored = readBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
     return isThemePreference(stored) ? stored : null;
   } catch {
     return null;
@@ -140,8 +153,10 @@ export function resolveThemeFromPreference(pref: ThemePreference): Theme {
 export function getStoredFontPreference(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    const stored = window.localStorage.getItem(FONT_STORAGE_KEY);
-    return isEasyReadFont(stored) ? stored === "true" || stored === true : false;
+    const stored = readBrowserStorage(FONT_STORAGE_KEY, window.localStorage);
+    return isEasyReadFont(stored)
+      ? stored === "true" || stored === true
+      : false;
   } catch {
     return false;
   }
@@ -154,7 +169,10 @@ export function getStoredFontPreference(): boolean {
  * Falls back to `"light"` in non-browser / SSR environments.
  */
 function getSystemTheme(): Theme {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return "light";
   }
   return window.matchMedia(DARK_MEDIA_QUERY).matches ? "dark" : "light";
@@ -167,7 +185,10 @@ function getSystemTheme(): Theme {
 function getStoredCustomTheme(): RegisteredTheme | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(CUSTOM_THEME_STORAGE_KEY);
+    const raw = readBrowserStorage(
+      CUSTOM_THEME_STORAGE_KEY,
+      window.localStorage,
+    );
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (
@@ -189,7 +210,10 @@ function getStoredCustomTheme(): RegisteredTheme | null {
  * Returns an empty string if no alphanumeric characters remain after sanitisation.
  */
 function sanitiseId(id: string): string {
-  const cleaned = id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  const cleaned = id
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-");
   // Require at least one alphanumeric character (not just hyphens/underscores).
   return /[a-z0-9]/.test(cleaned) ? cleaned : "";
 }
@@ -219,7 +243,7 @@ let pendingVisibilityListener: (() => void) | null = null;
  */
 export function applyTheme(theme: Theme | "custom"): void {
   if (typeof document === "undefined") return;
-  
+
   const root = document.documentElement;
   if (root.getAttribute("data-theme") === theme) return;
 
@@ -248,7 +272,10 @@ export function applyTheme(theme: Theme | "custom"): void {
     pendingVisibilityListener = () => {
       if (!document.hidden) {
         if (pendingVisibilityListener) {
-          document.removeEventListener("visibilitychange", pendingVisibilityListener);
+          document.removeEventListener(
+            "visibilitychange",
+            pendingVisibilityListener,
+          );
           pendingVisibilityListener = null;
         }
         transitionTimeout = window.setTimeout(cleanup, 200);
@@ -268,7 +295,42 @@ export function applyTheme(theme: Theme | "custom"): void {
  */
 export function applyFontPreference(easyRead: boolean): void {
   if (typeof document === "undefined") return;
-  document.documentElement.setAttribute("data-font", easyRead ? "easy-read" : "default");
+  document.documentElement.setAttribute(
+    "data-font",
+    easyRead ? "easy-read" : "default",
+  );
+}
+
+/**
+ * Returns `true` only when `value` is a safe, normalised 3-/6-digit hex
+ * colour (`#rgb` or `#rrggbb`).
+ *
+ * This is the canonical CSS-value guard used throughout the theme subsystem.
+ * It intentionally rejects:
+ *  - Named colours and CSS functions (`rgb()`, `hsl()`, `var()`)
+ *  - Semicolons, braces, and backslashes (declaration-smuggling characters)
+ *  - `javascript:` / `data:` pseudo-schemes and Unicode escapes
+ *  - Any whitespace or non-ASCII characters
+ *
+ * @param value - Candidate CSS value.
+ */
+export function isSafeHexColor(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  // Reject any suspicious characters before the regex check (defence-in-depth).
+  if (
+    value.includes(";") ||
+    value.includes("{") ||
+    value.includes("}") ||
+    value.includes("(") ||
+    value.includes(")") ||
+    value.includes("\\") ||
+    value.includes("\n") ||
+    value.includes("\r") ||
+    value.includes("\t")
+  ) {
+    return false;
+  }
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value);
 }
 
 /**
@@ -287,7 +349,7 @@ export function applyCustomTokens(
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   for (const [token, value] of Object.entries(tokens)) {
-    if (typeof value === "string" && /^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(value)) {
+    if (isSafeHexColor(value)) {
       // Write to --custom-<base-name> slot, e.g. --custom-color-accent-primary
       const slotName = token.replace(/^--/, CUSTOM_PROP_PREFIX);
       root.style.setProperty(slotName, value);
@@ -417,14 +479,18 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // ── built-in theme ──────────────────────────────────────────────────────────
-  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => {
-    return getStoredTheme() ?? "auto";
-  });
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
+    () => {
+      return getStoredTheme() ?? "auto";
+    },
+  );
   const [theme, setThemeState] = useState<Theme>(() => {
     const initialPref = getStoredTheme() ?? "auto";
     return resolveThemeFromPreference(initialPref);
   });
-  const [easyReadFont, setEasyReadState] = useState<boolean>(getStoredFontPreference);
+  const [easyReadFont, setEasyReadState] = useState<boolean>(
+    getStoredFontPreference,
+  );
 
   // Whether the user (in this tab or another) has explicitly picked a theme.
   // While `false`, we keep following the OS preference. A ref keeps the latest
@@ -434,16 +500,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Keep hasExplicitChoiceRef in sync with themePreference state
   hasExplicitChoiceRef.current = themePreference !== "auto";
 
-  // Mirror built-in theme to DOM (only when not in custom mode).
-  useEffect(() => {
-    if (
-      document.documentElement.getAttribute("data-theme") !== "custom"
-    ) {
+  const isFirstMountRef = useRef<boolean>(true);
+  if (isFirstMountRef.current && typeof document !== "undefined") {
+    isFirstMountRef.current = false;
+    const storedCustom = getStoredCustomTheme();
+    if (storedCustom) {
+      applyCustomTokens(storedCustom.validatedTokens);
+      applyTheme("custom");
+    } else {
+      applyTheme(theme);
+    }
+    applyFontPreference(easyReadFont);
+  }
+
+  // Mirror built-in theme to DOM before paint (only when not in custom mode).
+  useLayoutEffect(() => {
+    if (document.documentElement.getAttribute("data-theme") !== "custom") {
       applyTheme(theme);
     }
   }, [theme]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFontPreference(easyReadFont);
   }, [easyReadFont]);
 
@@ -451,30 +528,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemePreferenceState(pref);
     hasExplicitChoiceRef.current = pref !== "auto";
     if (pref === "auto") {
-      try {
-        window.localStorage.removeItem(THEME_STORAGE_KEY);
-      } catch { /* ignore quota errors */ }
+      removeBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
       const systemTheme = getSystemTheme();
       setThemeState(systemTheme);
     } else {
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, pref);
-      } catch { /* ignore quota errors */ }
+      writeBrowserStorage(THEME_STORAGE_KEY, pref, window.localStorage);
       setThemeState(pref);
     }
   }, []);
 
-  const setTheme = useCallback((next: Theme) => {
-    if (next === "light" || next === "dark") {
+  const setTheme = useCallback(
+    (next: Theme) => {
+      // Every built-in `Theme` is now a valid explicit preference, so route the
+      // write through `setThemePreference`. This keeps the persisted preference
+      // (`themePreference`) and the applied theme (`theme`) in lock-step —
+      // including `"cyberpunk"`, which previously bypassed the preference state
+      // and was silently dropped on reload.
       setThemePreference(next);
-    } else {
-      hasExplicitChoiceRef.current = true;
-      try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, next);
-      } catch { /* ignore quota errors */ }
-      setThemeState(next);
-    }
-  }, [setThemePreference]);
+    },
+    [setThemePreference],
+  );
 
   const toggleTheme = useCallback(() => {
     const nextPref = theme === "light" ? "dark" : "light";
@@ -485,11 +558,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-font-transitioning", "true");
     }
-    try {
-      window.localStorage.setItem(FONT_STORAGE_KEY, String(next));
-    } catch {
-      // Ignore persistence failures.
-    }
+    writeBrowserStorage(FONT_STORAGE_KEY, String(next), window.localStorage);
     setEasyReadState(next);
     setTimeout(() => {
       if (typeof document !== "undefined") {
@@ -541,12 +610,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       } else if (event.key === FONT_STORAGE_KEY) {
         if (event.newValue === null) {
           if (typeof document !== "undefined") {
-            document.documentElement.setAttribute("data-font-transitioning", "true");
+            document.documentElement.setAttribute(
+              "data-font-transitioning",
+              "true",
+            );
           }
           setEasyReadState(false);
           setTimeout(() => {
             if (typeof document !== "undefined") {
-              document.documentElement.removeAttribute("data-font-transitioning");
+              document.documentElement.removeAttribute(
+                "data-font-transitioning",
+              );
             }
           }, 150);
           return;
@@ -555,12 +629,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (event.newValue === "true" || event.newValue === "false") {
           const nextVal = event.newValue === "true";
           if (typeof document !== "undefined") {
-            document.documentElement.setAttribute("data-font-transitioning", "true");
+            document.documentElement.setAttribute(
+              "data-font-transitioning",
+              "true",
+            );
           }
           setEasyReadState(nextVal);
           setTimeout(() => {
             if (typeof document !== "undefined") {
-              document.documentElement.removeAttribute("data-font-transitioning");
+              document.documentElement.removeAttribute(
+                "data-font-transitioning",
+              );
             }
           }, 150);
         }
@@ -593,13 +672,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Rehydrate persisted custom theme on mount.
     return getStoredCustomTheme();
   });
-  const [customThemeState, setCustomThemeState] = useState<CustomThemeState>(() =>
-    getStoredCustomTheme() ? "custom-applied" : "default",
+  const [customThemeState, setCustomThemeState] = useState<CustomThemeState>(
+    () => (getStoredCustomTheme() ? "custom-applied" : "default"),
   );
-  const [registrationErrors, setRegistrationErrors] = useState<TokenValidationError[]>([]);
+  const [registrationErrors, setRegistrationErrors] = useState<
+    TokenValidationError[]
+  >([]);
 
-  // Apply persisted custom theme on initial mount.
-  useEffect(() => {
+  // Apply persisted custom theme before paint on initial mount.
+  useLayoutEffect(() => {
     const stored = getStoredCustomTheme();
     if (stored) {
       applyCustomTokens(stored.validatedTokens);
@@ -614,7 +695,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
    * Returns [RegisteredTheme, []] on success, or [null, errors[]] on failure.
    */
   const validateAndBuild = useCallback(
-    (definition: CustomThemeDefinition): [RegisteredTheme | null, TokenValidationError[]] => {
+    (
+      definition: CustomThemeDefinition,
+    ): [RegisteredTheme | null, TokenValidationError[]] => {
       const safeId = sanitiseId(definition.id);
       if (!safeId) {
         return [
@@ -625,7 +708,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
               token: "id",
               value: definition.id,
               reason: "disallowed",
-              message: "Theme id must contain at least one alphanumeric character.",
+              message:
+                "Theme id must contain at least one alphanumeric character.",
             },
           ],
         ];
@@ -644,8 +728,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         resolvedBg,
       );
 
-      if (errors.length > 0) {
-        return [null, errors];
+      let validationErrors = [...errors];
+      const validatedTokens = { ...valid };
+
+      for (const [token, value] of Object.entries(definition.tokenOverrides)) {
+        if (value !== undefined && value !== null && value.trim() !== "") {
+          if (!isSafeHexColor(value)) {
+            delete validatedTokens[token as AllowedTokenKey];
+            validationErrors = validationErrors.filter(
+              (e) => e.token !== token,
+            );
+            validationErrors.push({
+              status: "error",
+              token,
+              value,
+              reason: "invalid-hex",
+              message: `Value "${value}" is not a valid hex colour. Use #RRGGBB or #RGB.`,
+            });
+          }
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        return [null, validationErrors];
       }
 
       return [
@@ -653,7 +758,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           id: safeId,
           label: definition.label,
           tokenOverrides: definition.tokenOverrides,
-          validatedTokens: valid,
+          validatedTokens,
         },
         [],
       ];
@@ -690,20 +795,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const applyCustomTheme = useCallback(() => {
     if (customTheme && customThemeState === "custom-pending-preview") {
-      try {
-        window.localStorage.setItem(
-          CUSTOM_THEME_STORAGE_KEY,
-          JSON.stringify(customTheme),
-        );
-      } catch { /* ignore */ }
+      writeBrowserStorage(
+        CUSTOM_THEME_STORAGE_KEY,
+        JSON.stringify(customTheme),
+        window.localStorage,
+      );
       setCustomThemeState("custom-applied");
     }
   }, [customTheme, customThemeState]);
 
   const clearCustomTheme = useCallback(() => {
-    try {
-      window.localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY);
-    } catch { /* ignore */ }
+    removeBrowserStorage(CUSTOM_THEME_STORAGE_KEY, window.localStorage);
     clearCustomTokens();
     setCustomTheme(null);
     setCustomThemeState("default");
@@ -749,7 +851,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 // ─── 7. Hook ─────────────────────────────────────────────────────────────────

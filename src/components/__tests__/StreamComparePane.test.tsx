@@ -1,4 +1,10 @@
-import { act, renderHook, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  renderHook,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { StreamRecord } from "../../data/streamRecords";
@@ -124,7 +130,9 @@ describe("fieldValue", () => {
 
 describe("countDiffs", () => {
   it("returns 0 for identical records", () => {
-    expect(countDiffs(BASE_RECORD, makeRecord({ id: "STR-other", name: "Clone" }))).toBe(0);
+    expect(
+      countDiffs(BASE_RECORD, makeRecord({ id: "STR-other", name: "Clone" })),
+    ).toBe(0);
   });
 
   it("returns 1 when a single field differs", () => {
@@ -201,10 +209,9 @@ describe("usePaneStream", () => {
   it("updates streamId on rerender and refetches", async () => {
     getStreamById.mockResolvedValue(BASE_RECORD);
 
-    const { result, rerender } = renderHook(
-      (id: string) => usePaneStream(id),
-      { initialProps: "STR-TEST-001" },
-    );
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-TEST-001",
+    });
 
     await waitFor(() => expect(result.current.stream).toBe(BASE_RECORD));
     expect(result.current.streamId).toBe("STR-TEST-001");
@@ -220,36 +227,106 @@ describe("usePaneStream", () => {
     await waitFor(() => expect(result.current.stream).toBe(ALT_RECORD));
   });
 
-  it("ignores stale response after mid-fetch streamId swap (cancellation)", async () => {
+  it("keeps the newest stream when responses resolve out of order", async () => {
     let resolveFirst!: (v: StreamRecord) => void;
-    getStreamById.mockReturnValue(
+    getStreamById.mockReturnValueOnce(
       new Promise<StreamRecord>((resolve) => {
         resolveFirst = resolve;
       }),
     );
+    getStreamById.mockResolvedValueOnce(ALT_RECORD);
 
-    const { result, rerender } = renderHook(
-      (id: string) => usePaneStream(id),
-      { initialProps: "STR-FIRST" },
-    );
-
-    expect(result.current.stream).toBeUndefined();
-
-    getStreamById.mockResolvedValue(ALT_RECORD);
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-FIRST",
+    });
 
     rerender("STR-SECOND");
 
     await waitFor(() => expect(result.current.stream).toBe(ALT_RECORD));
     expect(result.current.streamId).toBe("STR-SECOND");
 
-    // Resolve the stale promise; it should NOT update the state
+    // The older response arrives after the newer response.
     act(() => {
       resolveFirst!(BASE_RECORD);
     });
 
-    // The state should still reflect the second stream
     expect(result.current.stream).toBe(ALT_RECORD);
     expect(result.current.streamId).toBe("STR-SECOND");
+    expect(getStreamById.mock.calls[1]?.[1]).toBeInstanceOf(AbortSignal);
+    expect(getStreamById.mock.calls[0]?.[1]?.aborted).toBe(true);
+  });
+
+  it("settles on the last selection when ids change rapidly", async () => {
+    const resolvers: Array<(v: StreamRecord) => void> = [];
+    getStreamById.mockImplementation(
+      () =>
+        new Promise<StreamRecord>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const third = makeRecord({
+      id: "STR-THIRD",
+      name: "Third Stream",
+      monthlyRate: 7777,
+    });
+
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-FIRST",
+    });
+
+    rerender("STR-SECOND");
+    rerender("STR-THIRD");
+
+    expect(getStreamById).toHaveBeenCalledTimes(3);
+    // Prior in-flight requests must be cancelled on each change.
+    expect(getStreamById.mock.calls[0]?.[1]?.aborted).toBe(true);
+    expect(getStreamById.mock.calls[1]?.[1]?.aborted).toBe(true);
+    expect(getStreamById.mock.calls[2]?.[1]?.aborted).toBe(false);
+
+    act(() => {
+      resolvers[0]!(BASE_RECORD);
+      resolvers[1]!(ALT_RECORD);
+    });
+    // Superseded responses must not win.
+    expect(result.current.stream).toBeUndefined();
+    expect(result.current.streamId).toBe("STR-THIRD");
+
+    act(() => {
+      resolvers[2]!(third);
+    });
+
+    await waitFor(() => expect(result.current.stream).toBe(third));
+    expect(result.current.streamId).toBe("STR-THIRD");
+    expect(result.current.stream?.monthlyRate).toBe(7777);
+  });
+
+  it("discards a superseded response even when AbortSignal is ignored", async () => {
+    let resolveStale!: (v: StreamRecord) => void;
+    getStreamById.mockImplementationOnce(
+      (_id: string, _signal?: AbortSignal) =>
+        new Promise<StreamRecord>((resolve) => {
+          resolveStale = resolve;
+        }),
+    );
+    getStreamById.mockResolvedValueOnce(ALT_RECORD);
+
+    const { result, rerender } = renderHook((id: string) => usePaneStream(id), {
+      initialProps: "STR-STALE",
+    });
+
+    rerender("STR-FRESH");
+
+    await waitFor(() => expect(result.current.stream).toBe(ALT_RECORD));
+
+    // Simulate a fetcher that ignores abort and still resolves.
+    act(() => {
+      resolveStale!(BASE_RECORD);
+    });
+
+    expect(result.current.stream).toBe(ALT_RECORD);
+    expect(result.current.streamId).toBe("STR-FRESH");
+    expect(result.current.stream?.name).toBe("Alt Stream");
   });
 });
 
@@ -258,6 +335,159 @@ describe("usePaneStream", () => {
 describe("StreamComparePane rendering", () => {
   beforeEach(() => {
     getStreamById.mockResolvedValue(BASE_RECORD);
+  });
+
+  it("keeps displayed figures aligned with the last rapid selection", async () => {
+    const leftFinal = makeRecord({
+      id: "STR-LEFT-FINAL",
+      name: "Left Final",
+      monthlyRate: 4242,
+    });
+    const rightFinal = makeRecord({
+      id: "STR-RIGHT-FINAL",
+      name: "Right Final",
+      monthlyRate: 8787,
+      status: "Paused",
+    });
+
+    getStreamById.mockImplementation((id: string) => {
+      if (id === "STR-LEFT-FINAL") return Promise.resolve(leftFinal);
+      if (id === "STR-RIGHT-FINAL") return Promise.resolve(rightFinal);
+      return new Promise(() => {});
+    });
+
+    const onExit = vi.fn();
+    const { rerender } = render(
+      <StreamComparePane
+        leftId="STR-LEFT-1"
+        rightId="STR-RIGHT-1"
+        onExit={onExit}
+      />,
+    );
+
+    rerender(
+      <StreamComparePane
+        leftId="STR-LEFT-2"
+        rightId="STR-RIGHT-2"
+        onExit={onExit}
+      />,
+    );
+    rerender(
+      <StreamComparePane
+        leftId="STR-LEFT-FINAL"
+        rightId="STR-RIGHT-FINAL"
+        onExit={onExit}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Left Final")).toBeInTheDocument();
+      expect(screen.getByText("Right Final")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("4,242 USDC/mo")).toBeInTheDocument();
+    expect(screen.getByText("8,787 USDC/mo")).toBeInTheDocument();
+    expect(screen.queryByText("Test Stream")).not.toBeInTheDocument();
+  });
+
+  it("does not show a removed pane's late response", async () => {
+    let resolveRemoved!: (value: StreamRecord) => void;
+    getStreamById.mockImplementationOnce(
+      () =>
+        new Promise<StreamRecord>((resolve) => {
+          resolveRemoved = resolve;
+        }),
+    );
+    getStreamById.mockResolvedValueOnce(ALT_RECORD);
+
+    const onExit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <StreamComparePane
+        leftId="STR-REMOVED"
+        rightId="STR-RIGHT"
+        onExit={onExit}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Alt Stream")).toBeInTheDocument(),
+    );
+    await user.click(
+      screen.getAllByLabelText(/Remove .* from comparison/i)[0]!,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Pane removed.")).toBeInTheDocument(),
+    );
+
+    act(() => {
+      resolveRemoved!(BASE_RECORD);
+    });
+
+    expect(screen.getByText("Pane removed.")).toBeInTheDocument();
+    expect(screen.queryByText("Test Stream")).not.toBeInTheDocument();
+    expect(onExit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the successful pane visible when its comparison request fails", async () => {
+    getStreamById.mockImplementation((id: string) => {
+      if (id === "STR-FAILED") {
+        return Promise.reject(new Error("Not authorized to view this stream"));
+      }
+      return Promise.resolve(ALT_RECORD);
+    });
+
+    render(
+      <StreamComparePane
+        leftId="STR-FAILED"
+        rightId="STR-RIGHT"
+        onExit={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Not authorized to view this stream",
+      );
+      expect(screen.getByText("Alt Stream")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText(/difference/i)).not.toBeInTheDocument();
+  });
+
+  it("retries a failed comparison pane without refetching the other pane", async () => {
+    getStreamById
+      .mockRejectedValueOnce(new Error("Temporary comparison failure"))
+      .mockResolvedValueOnce(ALT_RECORD)
+      .mockResolvedValueOnce(BASE_RECORD);
+
+    const user = userEvent.setup();
+    render(
+      <StreamComparePane
+        leftId="STR-FAILED"
+        rightId="STR-RIGHT"
+        onExit={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Temporary comparison failure",
+      );
+      expect(screen.getByText("Alt Stream")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Stream")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(getStreamById).toHaveBeenCalledTimes(3);
+    expect(getStreamById.mock.calls[1]?.[0]).toBe("STR-RIGHT");
+    expect(getStreamById.mock.calls[2]?.[0]).toBe("STR-FAILED");
   });
 
   it("renders both panes and the toolbar with diff badge", async () => {
@@ -296,7 +526,9 @@ describe("StreamComparePane rendering", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText(/Remove .* from comparison/i)).toHaveLength(2);
+      expect(
+        screen.getAllByLabelText(/Remove .* from comparison/i),
+      ).toHaveLength(2);
     });
 
     const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
@@ -330,7 +562,9 @@ describe("StreamComparePane rendering", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText(/Remove .* from comparison/i)).toHaveLength(2);
+      expect(
+        screen.getAllByLabelText(/Remove .* from comparison/i),
+      ).toHaveLength(2);
     });
 
     const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
@@ -364,7 +598,9 @@ describe("StreamComparePane rendering", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText(/Remove .* from comparison/i)).toHaveLength(2);
+      expect(
+        screen.getAllByLabelText(/Remove .* from comparison/i),
+      ).toHaveLength(2);
     });
 
     const removeBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
@@ -379,7 +615,9 @@ describe("StreamComparePane rendering", () => {
     expect(onExit).not.toHaveBeenCalled();
 
     // Now remove the right pane via the remaining Remove button
-    const remainingRemoveBtns = screen.getAllByLabelText(/Remove .* from comparison/i);
+    const remainingRemoveBtns = screen.getAllByLabelText(
+      /Remove .* from comparison/i,
+    );
     await user.click(remainingRemoveBtns[0]);
 
     // onExit should be called since both panes are now empty

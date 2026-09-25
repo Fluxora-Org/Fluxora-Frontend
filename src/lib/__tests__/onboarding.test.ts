@@ -128,15 +128,19 @@ describe("onboarding storage helpers", () => {
     );
   });
 
-  it("does not throw when injected storage's setItem throws", () => {
+  it("keeps dismissal in memory when injected storage's setItem throws", () => {
     const storage = {
+      getItem: vi.fn(() => {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }),
       setItem: vi.fn(() => {
-        throw new Error("storage setItem error");
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
       }),
       removeItem: vi.fn(),
     };
 
-    expect(() => writeOnboardingDismissed(true, storage)).not.toThrow();
+    writeOnboardingDismissed(true, storage);
+    expect(readOnboardingDismissed(storage)).toBe(true);
     expect(storage.setItem).toHaveBeenCalledWith(
       ONBOARDING_DISMISSED_STORAGE_KEY,
       "true",

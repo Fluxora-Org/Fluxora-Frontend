@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { Stream } from "./Stream";
 import "./ActivityHeatmap.css";
 
@@ -113,13 +113,64 @@ const getIntensityLevel = (count: number): number => {
   return 4;
 };
 
-const INTENSITY_LABELS: Record<number, string> = {
-  0: "no activity",
-  1: "low",
-  2: "medium",
-  3: "high",
-  4: "highest",
-};
+/**
+ * Canonical intensity scale — the single source of truth for both the legend
+ * copy and the sr-only data-table labels.
+ *
+ * Each level carries:
+ *  - `countRange`: the stream-event range the level covers, rendered as visible
+ *    text in the legend so the scale is stated in numbers, not colour.
+ *  - `description`: the short label mirrored into the sr-only data table.
+ *
+ * The **number of pips** drawn inside a cell / legend swatch equals `level`.
+ * That is the colour-independent channel: 0–4 unique markers keep intensity
+ * readable in greyscale and under every colour-blind simulation (WCAG 1.4.1).
+ */
+export const HEATMAP_INTENSITY_SCALE = [
+  { level: 0, countRange: "0", description: "no activity" },
+  { level: 1, countRange: "1", description: "low" },
+  { level: 2, countRange: "2–3", description: "medium" },
+  { level: 3, countRange: "4–6", description: "high" },
+  { level: 4, countRange: "7+", description: "highest" },
+] as const;
+
+export type HeatmapIntensityLevel = (typeof HEATMAP_INTENSITY_SCALE)[number]["level"];
+
+const INTENSITY_LABELS: Record<number, string> = Object.fromEntries(
+  HEATMAP_INTENSITY_SCALE.map(({ level, description }) => [level, description]),
+);
+
+/**
+ * Colour-independent marker count for an intensity level. Clamped to the
+ * 0–4 range so an out-of-range value can never break the pip rendering.
+ */
+export function getIntensityPipCount(level: number): number {
+  if (!Number.isFinite(level)) return 0;
+  return Math.min(4, Math.max(0, Math.trunc(level)));
+}
+
+/**
+ * Renders the colour-independent density marker (`level` pips) used inside
+ * every cell and legend swatch.
+ *
+ * Decorative only: the numeric value is already exposed textually through the
+ * cell's `aria-label` and the always-present sr-only data table, so the marker
+ * is hidden from assistive technology to keep the accessible name intact.
+ */
+function IntensityPips({ level }: { level: number }) {
+  const count = getIntensityPipCount(level);
+  return (
+    <span
+      className="heatmap-cell-pips"
+      data-pip-count={count}
+      aria-hidden="true"
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <span key={i} className="heatmap-cell-pip" />
+      ))}
+    </span>
+  );
+}
 
 const getCellLabel = (dateStr: string, count: number): string => {
   if (count === 0) {
@@ -127,6 +178,88 @@ const getCellLabel = (dateStr: string, count: number): string => {
   }
   return `${dateStr}: ${count} stream event${count === 1 ? "" : "s"}`;
 };
+
+/**
+ * Builds the trailing `totalDays` calendar days ending on `endDate`
+ * (inclusive), oldest first. Pure and range-agnostic on purpose: the
+ * mounted component always calls this with `totalDays = 84` (the range is
+ * intentionally locked — see `docs/TREASURY_ACTIVITY_HEATMAP_SPEC.md` §2),
+ * but keeping the builder itself range-agnostic lets the regression suite
+ * exercise a much larger synthetic grid to benchmark the "maximum range"
+ * case from #1457 without changing production behavior.
+ */
+export function buildTrailingDays(totalDays: number, endDate: Date): Date[] {
+  const dates: Date[] = [];
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const d = new Date(endDate);
+    d.setDate(endDate.getDate() - i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+interface HeatmapCellProps {
+  level: number;
+  label: string;
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave: () => void;
+  onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
+  onBlur: () => void;
+}
+
+/**
+ * Test-only render counter incremented on every `HeatmapCell` render. Not
+ * read anywhere in application code — it exists purely so the regression
+ * suite (`__tests__/ActivityHeatmap.test.tsx`, "Cell memoization") can
+ * assert that hover/focus interaction does not force cell re-renders.
+ * Incrementing an integer is negligible overhead in production.
+ */
+export const __heatmapCellRenderStats = { count: 0 };
+
+/**
+ * A single date cell in the heatmap grid.
+ *
+ * Memoized (#1457): `ActivityHeatmap`'s `hoveredCell` state changes on
+ * every hover/focus/blur/mouseleave, but only `HeatmapTooltip` actually
+ * depends on that state — none of the 84+ sibling cells' own visual output
+ * does. Each cell's props (`level`, `label`) only change when `streams`
+ * changes, and the four event-handler props are stable references
+ * (`useCallback` with an empty dependency array in the parent), so
+ * `React.memo`'s shallow prop comparison reliably skips re-rendering every
+ * cell that isn't the one being interacted with.
+ *
+ * Memoization was chosen over virtualization or a bounded/configurable
+ * range (the other two options #1457 called out) because it requires no
+ * new range prop and, unlike virtualizing the grid (removing off-screen
+ * cells from the DOM), it exactly preserves the existing keyboard tab
+ * order across every cell and the existing per-cell tooltip behavior
+ * (§5.1, §13 of the spec) — nothing about interaction changes, only how
+ * much render work a hover triggers.
+ */
+export const HeatmapCell = React.memo(function HeatmapCell({
+  level,
+  label,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+}: HeatmapCellProps) {
+  __heatmapCellRenderStats.count++;
+  return (
+    <button
+      type="button"
+      className={`heatmap-cell heatmap-cell--level-${level}`}
+      data-intensity-level={level}
+      aria-label={label}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    >
+      <IntensityPips level={level} />
+    </button>
+  );
+});
 
 /**
  * Classifies the data into one of three descriptive tones, exposed via the
@@ -171,16 +304,19 @@ const Legend: React.FC<LegendProps> = ({ skeleton = false }) => (
     aria-label={
       skeleton
         ? "Activity intensity legend (loading)"
-        : "Activity intensity legend, from less to more: 5 levels of stream-event count"
+        : "Activity intensity legend, from less to more: 0 events, 1 event, 2 to 3 events, 4 to 6 events, 7 or more events. Each square is marked with 0 to 4 dots so intensity is readable without colour discrimination."
     }
   >
     <span className="legend-label">Less</span>
     <div className="legend-cells" aria-hidden="true">
-      <div className="legend-cell heatmap-cell--level-0" />
-      <div className="legend-cell heatmap-cell--level-1" />
-      <div className="legend-cell heatmap-cell--level-2" />
-      <div className="legend-cell heatmap-cell--level-3" />
-      <div className="legend-cell heatmap-cell--level-4" />
+      {HEATMAP_INTENSITY_SCALE.map(({ level, countRange }) => (
+        <div key={level} className="legend-item">
+          <div className={`legend-cell heatmap-cell--level-${level}`}>
+            <IntensityPips level={level} />
+          </div>
+          <span className="legend-range">{countRange}</span>
+        </div>
+      ))}
     </div>
     <span className="legend-label">More</span>
   </div>
@@ -206,6 +342,20 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
     setViewMode(nextMode);
     localStorage.setItem(LOCAL_STORAGE_KEY, nextMode);
   };
+
+  // Stable across renders (empty dep arrays) so `HeatmapCell`'s
+  // `React.memo` comparison isn't defeated by new function identities on
+  // every hover-driven re-render. The cell's own aria-label already holds
+  // the exact string the tooltip needs, so we read it off the DOM node
+  // instead of closing over a per-cell `label` value.
+  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    setHoveredCell({ element: e.currentTarget, label: e.currentTarget.getAttribute("aria-label") || "" });
+  }, []);
+  const handleCellMouseLeave = useCallback(() => setHoveredCell(null), []);
+  const handleCellFocus = useCallback((e: React.FocusEvent<HTMLButtonElement>) => {
+    setHoveredCell({ element: e.currentTarget, label: e.currentTarget.getAttribute("aria-label") || "" });
+  }, []);
+  const handleCellBlur = useCallback(() => setHoveredCell(null), []);
 
   if (error) {
     return (
@@ -235,12 +385,7 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
   const endDate = new Date(today);
   endDate.setHours(12, 0, 0, 0); // Normalized to avoid DST offset issues
 
-  const dates: Date[] = [];
-  for (let i = 83; i >= 0; i--) {
-    const d = new Date(endDate);
-    d.setDate(endDate.getDate() - i);
-    dates.push(d);
-  }
+  const dates: Date[] = buildTrailingDays(84, endDate);
 
   // Calculate activity counts
   const counts: Record<string, number> = {};
@@ -363,15 +508,14 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
                   const label = getCellLabel(formatted, count);
 
                   return (
-                    <button
+                    <HeatmapCell
                       key={formatted}
-                      type="button"
-                      className={`heatmap-cell heatmap-cell--level-${level}`}
-                      aria-label={label}
-                      onMouseEnter={(e) => setHoveredCell({ element: e.currentTarget, label })}
-                      onMouseLeave={() => setHoveredCell(null)}
-                      onFocus={(e) => setHoveredCell({ element: e.currentTarget, label })}
-                      onBlur={() => setHoveredCell(null)}
+                      level={level}
+                      label={label}
+                      onMouseEnter={handleCellMouseEnter}
+                      onMouseLeave={handleCellMouseLeave}
+                      onFocus={handleCellFocus}
+                      onBlur={handleCellBlur}
                     />
                   );
                 })}
@@ -429,3 +573,4 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
     </div>
   );
 }
+

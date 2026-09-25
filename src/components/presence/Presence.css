@@ -32,6 +32,46 @@
   box-shadow: var(--focus-ring);
 }
 
+/* Loading state */
+.presence-badge-trigger--loading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.presence-loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+}
+
+.presence-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-text-secondary, #718096);
+  animation: presence-pulse 1.4s ease-in-out infinite;
+}
+
+.presence-loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.presence-loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes presence-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Avatar stack */
 .presence-avatar-stack {
   display: inline-flex;

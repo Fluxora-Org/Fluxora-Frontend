@@ -153,6 +153,24 @@
   outline-offset: 2px;
 }
 
+/* Progress bar shown while parsing */
+.csv-drop-zone__progress-bar {
+  width: 100%;
+  max-width: 240px;
+  height: 6px;
+  background: var(--surface-overlay, rgba(255, 255, 255, 0.1));
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+
+.csv-drop-zone__progress-fill {
+  height: 100%;
+  background: var(--accent, #00d4aa);
+  border-radius: 9999px;
+  transition: width 0.15s ease;
+}
+
 /* Live region: visually hidden, read by screen readers only */
 .csv-drop-zone__live-region {
   position: absolute;

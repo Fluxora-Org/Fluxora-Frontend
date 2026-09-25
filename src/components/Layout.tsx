@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
+import { InstallPWABanner } from "./InstallPWABanner";
 import "./Layout.css";
 
 /**
@@ -51,6 +52,7 @@ export default function Layout() {
   return (
     <div>
       <a href="#main-content" className="skip-link" onClick={handleSkipLinkClick}>Skip to main content</a>
+      <InstallPWABanner />
       <div
         className={[
           "app-layout",

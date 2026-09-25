@@ -92,6 +92,38 @@ describe("EmptyState — loading state", () => {
   });
 });
 
+describe("EmptyState — empty, loading, and error states are distinct", () => {
+  it("renders different content for each state", () => {
+    const onRetry = vi.fn();
+    const { container: emptyContainer } = render(
+      <EmptyState variant="treasury" walletConnected={true} />
+    );
+    const emptyOutput = emptyContainer.textContent;
+
+    const { container: loadingContainer } = render(
+      <EmptyState variant="treasury" walletConnected={true} loading />
+    );
+    const loadingOutput = loadingContainer.textContent;
+
+    const { container: errorContainer } = render(
+      <EmptyState
+        variant="treasury"
+        walletConnected={true}
+        error="Network error"
+        onRetry={onRetry}
+      />
+    );
+    const errorOutput = errorContainer.textContent;
+
+    expect(emptyOutput).toContain("No streams yet");
+    expect(loadingOutput).toContain("Loading content, please wait");
+    expect(errorOutput).toContain("Something went wrong");
+    expect(errorOutput).toContain("Network error");
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(new Set([emptyOutput, loadingOutput, errorOutput]).size).toBe(3);
+  });
+});
+
 // ── Error banner ──────────────────────────────────────────────────────────────
 
 describe("EmptyState — error state", () => {
@@ -121,6 +153,24 @@ describe("EmptyState — error state", () => {
 // ── CTA button ────────────────────────────────────────────────────────────────
 
 describe("EmptyState — CTA button", () => {
+  it("keeps retry and primary actions distinct when both are supplied", () => {
+    const onRetry = vi.fn();
+    const onPrimaryAction = vi.fn();
+    render(
+      <EmptyState
+        variant="error"
+        error="Network error"
+        onRetry={onRetry}
+        onPrimaryAction={onPrimaryAction}
+      />,
+    );
+
+    screen.getByRole("button", { name: "Retry loading data" }).click();
+    screen.getByRole("button", { name: "Try again" }).click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onPrimaryAction).toHaveBeenCalledTimes(1);
+  });
+
   it("renders CTA with correct aria-label when disconnected", () => {
     render(<EmptyState variant="treasury" walletConnected={false} />);
     expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument();
@@ -181,6 +231,55 @@ describe("EmptyState — search-no-results variant", () => {
     expect(
       screen.getByRole("region", { name: "Search no results state" })
     ).toBeInTheDocument();
+  });
+});
+
+describe("EmptyState — distinct filtered-empty vs genuinely-empty states", () => {
+  it("filtered-empty (search-no-results) exposes a reset action, not a create action", () => {
+    const onClearFilters = vi.fn();
+    render(
+      <EmptyState
+        variant="search-no-results"
+        walletConnected={true}
+        onClearFilters={onClearFilters}
+      />
+    );
+
+    expect(
+      screen.getByRole("heading", { name: /no results found/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /clear filters/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create stream/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("genuinely-empty (streams) exposes a create action, not a clear-filters action", () => {
+    render(<EmptyState variant="streams" walletConnected={true} />);
+
+    expect(
+      screen.getByRole("heading", { name: /no streams yet/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create stream/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /clear filters/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("error-empty exposes a retry action distinct from both", () => {
+    const onRetry = vi.fn();
+    render(<EmptyState variant="error" error="Load failed" onRetry={onRetry} />);
+
+    expect(
+      screen.getByRole("heading", { name: /something went wrong/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /clear filters/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /create stream/i })
+    ).not.toBeInTheDocument();
   });
 });
 

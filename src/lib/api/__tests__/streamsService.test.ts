@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getRecipientStreams,
+  getRetryDelayMs,
   getStreamById,
   getStreams,
   getTreasuryMetrics,
@@ -9,6 +10,35 @@ import {
 import { streamRecords } from "../../../data/streamRecords";
 
 const VALID_RECIPIENT = `G${"A".repeat(55)}`;
+
+/**
+ * A payload that satisfies the declared {@link StreamRecord} schema. Used by
+ * tests that exercise successful responses through the live API client.
+ */
+const VALID_RECORD = {
+  id: "STR-001",
+  name: "Dev Grant",
+  recipientName: "Alice M.",
+  recipientAddress: "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P",
+  treasuryName: "Protocol Growth Treasury",
+  treasuryAddress: "GAJSINKGK5UHTCU3VS645X7QAEJCGNCFKZTXRCM2VO6M3XXPAAISFPVT",
+  asset: "USDC",
+  status: "Active",
+  monthlyRate: 5000,
+  depositAmount: 48000,
+  streamedAmount: 19250,
+  withdrawableAmount: 4200,
+  remainingAmount: 28750,
+  progress: 40,
+  startDate: "2026-01-15",
+  endDate: "2026-10-15",
+  summary: "Core grant stream.",
+  health: "Healthy",
+  healthNote: "Healthy.",
+  auditNote: "No intervention required.",
+  tags: ["Engineering"],
+  timeline: [],
+};
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -116,11 +146,12 @@ describe("streamsService live mode", () => {
 
   it("URL-encodes the stream id when fetching a single record", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ data: { id: "STR/1?", name: "Rogue" } }),
+      jsonResponse({ data: { ...VALID_RECORD, id: "STR/1?" } }),
     );
 
-    await getStreamById("STR/1?");
+    const record = await getStreamById("STR/1?");
 
+    expect(record?.id).toBe("STR/1?");
     expect(fetchMock.mock.calls[0]![0]).toBe(
       "https://api.example.test/streams/STR%2F1%3F",
     );
@@ -152,7 +183,68 @@ describe("streamsService live mode", () => {
     controller.abort();
 
     await expect(promise).rejects.toThrow();
-    expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
+  });
+
+  it("times out slow requests and throws StreamsServiceError with kind 'timeout'", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getStreams(undefined, { timeoutMs: 1000 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      name: "StreamsServiceError",
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry when a request times out", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "3");
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getTreasuryMetrics({ timeoutMs: 500 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    await assertion;
+    // Exactly 1 attempt, no retries on timeout
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports passing StreamsRequestOptions to getRecipientStreams and getStreamById", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = getRecipientStreams(VALID_RECIPIENT, { timeoutMs: 800 });
+    const assertion = expect(promise).rejects.toMatchObject({
+      kind: "timeout",
+    });
+
+    await vi.advanceTimersByTimeAsync(800);
+    await assertion;
   });
 
   it("validates recipient addresses before issuing a request", async () => {
@@ -234,20 +326,27 @@ describe("streamsService live mode", () => {
     expect(requestedUrl.startsWith("http://localhost:8787")).toBe(true);
   });
 
-  it("skips malformed metric entries during normalization", async () => {
+  it("rejects malformed metric entries with a diagnosable shape error", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({
         data: [
           { label: "", value: "ignored", desc: "" },
-          { label: "Active Streams", value: "9", desc: "" },
+          { label: "Active Streams", value: 9, desc: "" },
           null,
         ],
       }),
     );
 
-    const metrics = await getTreasuryMetrics();
-    expect(metrics).toHaveLength(1);
-    expect(metrics[0]!.label).toBe("Active Streams");
+    const error = await getTreasuryMetrics().catch((err) => err);
+
+    expect(error).toBeInstanceOf(StreamsServiceError);
+    expect(error).toMatchObject({ kind: "shape" });
+    expect(error.issues).toEqual([
+      "[0].label must be a non-empty string",
+      "[1].value must be a non-empty string",
+      "[2] must be an object, received null",
+    ]);
+    expect(error.message).toContain("[1].value must be a non-empty string");
   });
 
   it("honors VITE_FETCH_MAX_RETRIES=0 with exactly zero retries", async () => {
@@ -275,6 +374,55 @@ describe("streamsService live mode", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("computes deterministic bounded retry delays with jitter", () => {
+    const first = getRetryDelayMs("/streams", 1, 500, 0.2);
+    const second = getRetryDelayMs("/streams", 1, 500, 0.2);
+
+    expect(first).toBe(second);
+    expect(first).toBeGreaterThanOrEqual(1000);
+    expect(first).toBeLessThanOrEqual(1200);
+    expect(getRetryDelayMs("/streams", 10, 500, 1)).toBe(8000);
+    expect(getRetryDelayMs("/streams", 2, 500, 0)).toBe(2000);
+  });
+
+  it("waits for the deterministic jittered retry delay before retrying", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "1");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "100");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0.5");
+
+    fetchMock
+      .mockRejectedValueOnce(new Error("connection refused"))
+      .mockResolvedValueOnce(jsonResponse({ data: [] }));
+
+    const promise = getStreams();
+    const delayMs = getRetryDelayMs("/streams", 0, 100, 0.5);
+
+    await vi.advanceTimersByTimeAsync(delayMs - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels a pending retry timer when the caller aborts", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("VITE_FETCH_MAX_RETRIES", "2");
+    vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "1000");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0");
+    fetchMock.mockRejectedValue(new Error("connection refused"));
+    const controller = new AbortController();
+
+    const promise = getStreams(undefined, { signal: controller.signal });
+    await vi.advanceTimersByTimeAsync(999);
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to default retries when VITE_FETCH_MAX_RETRIES is unset", async () => {
     vi.useFakeTimers();
     fetchMock.mockRejectedValue(new Error("connection refused"));
@@ -295,6 +443,7 @@ describe("streamsService live mode", () => {
     vi.useFakeTimers();
     vi.stubEnv("VITE_FETCH_MAX_RETRIES", "not-a-number");
     vi.stubEnv("VITE_FETCH_INITIAL_DELAY_MS", "also-bad");
+    vi.stubEnv("VITE_FETCH_JITTER_RATIO", "0");
     fetchMock.mockRejectedValue(new Error("connection refused"));
 
     const assertion = expect(getStreams()).rejects.toMatchObject({

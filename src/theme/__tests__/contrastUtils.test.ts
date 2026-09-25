@@ -59,6 +59,34 @@ describe("hexToRgb", () => {
     expect(r).toBeCloseTo(1);
     expect(r).toBeLessThanOrEqual(1);
   });
+
+  it("parses 4-digit hex (#RGBA) — alpha is ignored in RGB tuple", () => {
+    const [r, g, b] = hexToRgb("#ff0080cc");
+    expect(r).toBeCloseTo(1);
+    expect(g).toBeCloseTo(0);
+    expect(b).toBeCloseTo(0x80 / 255, 3);
+  });
+
+  it("parses 8-digit hex (#RRGGBBAA) — alpha is ignored in RGB tuple", () => {
+    const [r, g, b] = hexToRgb("#00ff0080");
+    expect(r).toBeCloseTo(0);
+    expect(g).toBeCloseTo(1);
+    expect(b).toBeCloseTo(0);
+  });
+
+  it("parses fully opaque 8-digit hex", () => {
+    const [r, g, b] = hexToRgb("#000000ff");
+    expect(r).toBe(0);
+    expect(g).toBe(0);
+    expect(b).toBe(0);
+  });
+
+  it("parses fully transparent 8-digit hex", () => {
+    const [r, g, b] = hexToRgb("#ffffff00");
+    expect(r).toBeCloseTo(1);
+    expect(g).toBeCloseTo(1);
+    expect(b).toBeCloseTo(1);
+  });
 });
 
 // ─── relativeLuminance ───────────────────────────────────────────────────────
@@ -81,9 +109,6 @@ describe("relativeLuminance", () => {
   });
 
   it("returns a value consistent with the IEC 61966-2-1 linearisation formula", () => {
-    // #777777 → verified via the WCAG linearisation formula:
-    // channel = 0x77/255 = 0.4667; linearised ≈ 0.1855
-    // L = 0.2126R + 0.7152G + 0.0722B ≈ 0.1845
     expect(relativeLuminance("#777777")).toBeCloseTo(0.1845, 3);
   });
 });
@@ -99,7 +124,7 @@ describe("contrastRatio", () => {
     expect(contrastRatio("#00b8d4", "#00b8d4")).toBeCloseTo(1);
   });
 
-  it("is commutative (fg/bg order does not matter)", () => {
+  it("is commutative for opaque colours", () => {
     const a = contrastRatio("#00b8d4", "#ffffff");
     const b = contrastRatio("#ffffff", "#00b8d4");
     expect(a).toBeCloseTo(b);
@@ -112,7 +137,6 @@ describe("contrastRatio", () => {
   });
 
   it("Fluxora teal (#00b8d4) vs white fails 4.5:1", () => {
-    // ~2.59:1 — should fail AA for normal text.
     expect(contrastRatio("#00b8d4", "#ffffff")).toBeLessThan(4.5);
   });
 });
@@ -135,9 +159,6 @@ describe("meetsAA", () => {
 
 describe("meetsAALarge", () => {
   it("requires only 3:1 — teal on white passes large-text AA", () => {
-    // #00b8d4 vs #ffffff ≈ 2.59:1 — still fails 3:1 for this colour.
-    // Use a colour that's between 3:1 and 4.5:1.
-    // #767676 vs #fff ≈ 4.48:1 — barely passes large but let's test the boundary.
     expect(meetsAALarge("#000000", "#ffffff")).toBe(true);
   });
 
@@ -151,21 +172,36 @@ describe("meetsAALarge", () => {
 describe("isValidHex", () => {
   it("accepts 6-digit with #", () => expect(isValidHex("#00b8d4")).toBe(true));
   it("accepts 3-digit with #", () => expect(isValidHex("#fff")).toBe(true));
-  it("accepts 6-digit without #", () => expect(isValidHex("00b8d4")).toBe(true));
+  it("accepts 6-digit without #", () =>
+    expect(isValidHex("00b8d4")).toBe(true));
   it("rejects empty string", () => expect(isValidHex("")).toBe(false));
-  it("rejects 4-digit hex", () => expect(isValidHex("#1234")).toBe(false));
-  it("rejects non-hex characters", () => expect(isValidHex("#gggggg")).toBe(false));
-  it("rejects CSS rgb() value", () => expect(isValidHex("rgb(0,0,0)")).toBe(false));
-  it("rejects injection attempt", () => expect(isValidHex("#fff; color:red")).toBe(false));
+  it("accepts 4-digit hex with alpha", () =>
+    expect(isValidHex("#1234")).toBe(true));
+  it("accepts 8-digit hex with alpha", () =>
+    expect(isValidHex("#ff000080")).toBe(true));
+  it("rejects non-hex characters", () =>
+    expect(isValidHex("#gggggg")).toBe(false));
+  it("rejects CSS rgb() value", () =>
+    expect(isValidHex("rgb(0,0,0)")).toBe(false));
+  it("rejects injection attempt", () =>
+    expect(isValidHex("#fff; color:red")).toBe(false));
+  it("rejects 5-digit hex", () => expect(isValidHex("#12345")).toBe(false));
+  it("rejects 7-digit hex", () => expect(isValidHex("#1234567")).toBe(false));
 });
 
 // ─── normaliseHex ─────────────────────────────────────────────────────────────
 
 describe("normaliseHex", () => {
-  it("adds # prefix if missing", () => expect(normaliseHex("00b8d4")).toBe("#00b8d4"));
+  it("adds # prefix if missing", () =>
+    expect(normaliseHex("00b8d4")).toBe("#00b8d4"));
   it("lowercases", () => expect(normaliseHex("#00B8D4")).toBe("#00b8d4"));
-  it("trims whitespace", () => expect(normaliseHex("  #00b8d4  ")).toBe("#00b8d4"));
+  it("trims whitespace", () =>
+    expect(normaliseHex("  #00b8d4  ")).toBe("#00b8d4"));
   it("preserves 3-digit hex", () => expect(normaliseHex("FFF")).toBe("#fff"));
+  it("preserves 4-digit hex", () =>
+    expect(normaliseHex("FF0080CC")).toBe("#ff0080cc"));
+  it("preserves 8-digit hex", () =>
+    expect(normaliseHex("FF000080")).toBe("#ff000080"));
 });
 
 // ─── ALLOWED_TOKEN_KEYS / LOCKED_TOKEN_KEYS integrity ────────────────────────
@@ -208,28 +244,40 @@ describe("validateToken", () => {
   });
 
   it("rejects a locked token (focus-ring-color)", () => {
-    const result = validateToken("--focus-ring-color", "#ff0000") as TokenValidationError;
+    const result = validateToken(
+      "--focus-ring-color",
+      "#ff0000",
+    ) as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("locked");
     expect(result.message).toMatch(/reserved for accessibility/i);
   });
 
   it("rejects a disallowed (unknown) token", () => {
-    const result = validateToken("--some-random-token", "#ffffff") as TokenValidationError;
+    const result = validateToken(
+      "--some-random-token",
+      "#ffffff",
+    ) as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("disallowed");
   });
 
   it("rejects an invalid hex value", () => {
-    const result = validateToken("--color-accent-primary", "not-a-colour") as TokenValidationError;
+    const result = validateToken(
+      "--color-accent-primary",
+      "not-a-colour",
+    ) as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("invalid-hex");
     expect(result.message).toMatch(/not a valid hex/i);
   });
 
   it("rejects a contrast-fail when bg is provided", () => {
-    // #00b8d4 on #ffffff ≈ 2.59:1 — fails AA for normal text.
-    const result = validateToken("--navbar-logo-color", "#00b8d4", "#ffffff") as TokenValidationError;
+    const result = validateToken(
+      "--navbar-logo-color",
+      "#00b8d4",
+      "#ffffff",
+    ) as TokenValidationError;
     expect(result.status).toBe("error");
     expect(result.reason).toBe("contrast-fail");
     expect(result.ratio).toBeLessThan(WCAG_AA_NORMAL);
@@ -237,10 +285,11 @@ describe("validateToken", () => {
   });
 
   it("passes when contrast meets the threshold", () => {
-    // #1a1f36 on #ffffff → well above 4.5:1.
     const result = validateToken("--navbar-logo-color", "#1a1f36", "#ffffff");
     expect(result.status).toBe("ok");
-    expect((result as { ratio?: number }).ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
+    expect((result as { ratio?: number }).ratio).toBeGreaterThanOrEqual(
+      WCAG_AA_NORMAL,
+    );
   });
 
   it("normalises the hex value to lowercase with # prefix on success", () => {
@@ -250,9 +299,30 @@ describe("validateToken", () => {
   });
 
   it("does not perform contrast check when bgHex is undefined", () => {
-    // A colour that would fail contrast on white, but no bg provided.
     const result = validateToken("--navbar-logo-color", "#00b8d4");
     expect(result.status).toBe("ok");
+  });
+
+  it("accepts 8-digit hex with alpha", () => {
+    const result = validateToken("--color-accent-primary", "#0097a780");
+    expect(result.status).toBe("ok");
+    expect(result.value).toBe("#0097a780");
+  });
+
+  it("accepts 4-digit hex with alpha", () => {
+    const result = validateToken("--color-accent-primary", "#09a");
+    expect(result.status).toBe("ok");
+    expect(result.value).toBe("#09a");
+  });
+
+  it("contrast-fails translucent foreground below threshold", () => {
+    const result = validateToken(
+      "--navbar-logo-color",
+      "#00b8d480",
+      "#ffffff",
+    ) as TokenValidationError;
+    expect(result.status).toBe("error");
+    expect(result.reason).toBe("contrast-fail");
   });
 });
 
@@ -276,22 +346,24 @@ describe("validateCustomTheme", () => {
     });
     expect(errors.some((e) => e.token === "--focus-ring-color")).toBe(true);
     expect(valid["--color-accent-primary"]).toBe("#1a1f36");
-    // The locked token must never appear in valid.
     expect("--focus-ring-color" in valid).toBe(false);
   });
 
   it("filters out unknown tokens and reports them as errors", () => {
-    const { errors } = validateCustomTheme({ "--unknown-brand-color": "#ff0000" });
+    const { errors } = validateCustomTheme({
+      "--unknown-brand-color": "#ff0000",
+    });
     expect(errors.some((e) => e.reason === "disallowed")).toBe(true);
   });
 
   it("reports invalid-hex tokens as errors", () => {
-    const { errors } = validateCustomTheme({ "--color-accent-primary": "not-hex" });
+    const { errors } = validateCustomTheme({
+      "--color-accent-primary": "not-hex",
+    });
     expect(errors.some((e) => e.reason === "invalid-hex")).toBe(true);
   });
 
   it("performs cross-pair contrast check when resolvedBg is provided", () => {
-    // navbar-logo-color (#00b8d4) vs navbar-bg (#ffffff) → fails 4.5:1.
     const { errors } = validateCustomTheme(
       { "--navbar-logo-color": "#00b8d4", "--navbar-bg": "#ffffff" },
       "#ffffff",
@@ -301,11 +373,11 @@ describe("validateCustomTheme", () => {
 
   it("passes a fully valid org brand override", () => {
     const { valid, errors } = validateCustomTheme({
-      "--color-accent-primary": "#2563eb",  // blue — passes AA-large on white
+      "--color-accent-primary": "#2563eb",
       "--color-accent-secondary": "#1d4ed8",
       "--navbar-bg": "#1e3a5f",
-      "--navbar-logo-color": "#ffffff",     // white on navy → 12+:1 ✓
-      "--navbar-link-color": "#e2e8f0",     // light on navy → passes ✓
+      "--navbar-logo-color": "#ffffff",
+      "--navbar-link-color": "#e2e8f0",
       "--color-cta-primary-bg": "#2563eb",
       "--color-cta-primary-text": "#ffffff",
     });
@@ -328,6 +400,22 @@ describe("validateCustomTheme", () => {
 
   it("constant WCAG_AA_LARGE is 3.0", () => {
     expect(WCAG_AA_LARGE).toBe(3.0);
+  });
+
+  it("handles alpha hex in overrides", () => {
+    const { valid, errors } = validateCustomTheme({
+      "--color-accent-primary": "#0097a780",
+    });
+    expect(errors).toHaveLength(0);
+    expect(valid["--color-accent-primary"]).toBe("#0097a780");
+  });
+
+  it("cross-pair uses alpha-aware contrast", () => {
+    const { errors } = validateCustomTheme(
+      { "--navbar-logo-color": "#00b8d480", "--navbar-bg": "#ffffff" },
+      "#ffffff",
+    );
+    expect(errors.some((e) => e.reason === "contrast-fail")).toBe(true);
   });
 });
 
@@ -406,25 +494,18 @@ describe("validateCustomTheme — retry after failure", () => {
 
 describe("contrast boundary values", () => {
   it("meetsAA passes at exactly 4.5:1", () => {
-    // Use the WCAG example pair that yields exactly 4.5:1:
-    // #767676 vs #ffffff ≈ 4.54:1 (passes).
     expect(meetsAA("#767676", "#ffffff")).toBe(true);
   });
 
   it("meetsAALarge passes at exactly 3:1", () => {
-    // #959595 vs #ffffff ≈ 2.85:1 — fails.
-    // #8e8e8e vs #ffffff ≈ 3.48:1 — passes.
     expect(meetsAALarge("#8e8e8e", "#ffffff")).toBe(true);
   });
 
   it("meetsAA fails just below 4.5:1", () => {
-    // #767676 vs #fff ≈ 4.54:1 — passes.
-    // #777777 vs #fff ≈ 4.48:1 — fails.
     expect(meetsAA("#777777", "#ffffff")).toBe(false);
   });
 
   it("meetsAALarge fails just below 3:1", () => {
-    // #959595 vs #fff ≈ 2.85:1 — fails.
     expect(meetsAALarge("#959595", "#ffffff")).toBe(false);
   });
 
@@ -462,8 +543,11 @@ describe("locked tokens exhaustive rejection", () => {
 
   it("rejects status semantic tokens (WCAG 1.4.1 safety)", () => {
     const statusTokens = LOCKED_TOKEN_KEYS.filter(
-      (k) => k.startsWith("--status-") || k.startsWith("--color-success") ||
-        k.startsWith("--color-warning") || k.startsWith("--color-danger") ||
+      (k) =>
+        k.startsWith("--status-") ||
+        k.startsWith("--color-success") ||
+        k.startsWith("--color-warning") ||
+        k.startsWith("--color-danger") ||
         k.startsWith("--color-info"),
     );
     for (const token of statusTokens) {
@@ -478,10 +562,10 @@ describe("locked tokens exhaustive rejection", () => {
 describe("validateCustomTheme — mixed overrides", () => {
   it("splits valid and invalid tokens correctly", () => {
     const { valid, errors } = validateCustomTheme({
-      "--color-accent-primary": "#1a1f36",     // valid
-      "--focus-ring-color": "#ff0000",         // locked
-      "--some-unknown": "#000000",             // disallowed
-      "--navbar-bg": "not-hex",                // invalid-hex
+      "--color-accent-primary": "#1a1f36",
+      "--focus-ring-color": "#ff0000",
+      "--some-unknown": "#000000",
+      "--navbar-bg": "not-hex",
     });
     expect(valid["--color-accent-primary"]).toBe("#1a1f36");
     expect("--focus-ring-color" in valid).toBe(false);
@@ -505,7 +589,7 @@ describe("validateCustomTheme — mixed overrides", () => {
 describe("validateCustomTheme — cross-pair contrast", () => {
   it("removes fg from valid set when contrast fails against overridden bg", () => {
     const { valid, errors } = validateCustomTheme({
-      "--navbar-logo-color": "#00b8d4",  // teal ≈ 2.59:1 on white → fails
+      "--navbar-logo-color": "#00b8d4",
       "--navbar-bg": "#ffffff",
     });
     expect("--navbar-logo-color" in valid).toBe(false);
@@ -514,7 +598,7 @@ describe("validateCustomTheme — cross-pair contrast", () => {
 
   it("keeps fg in valid set when contrast passes against overridden bg", () => {
     const { valid, errors } = validateCustomTheme({
-      "--navbar-logo-color": "#ffffff",  // white on dark bg → passes
+      "--navbar-logo-color": "#ffffff",
       "--navbar-bg": "#1e3a5f",
     });
     expect(valid["--navbar-logo-color"]).toBe("#ffffff");
@@ -524,7 +608,7 @@ describe("validateCustomTheme — cross-pair contrast", () => {
   it("uses resolvedBg when bg token is not in overrides", () => {
     const { valid, errors } = validateCustomTheme(
       { "--navbar-logo-color": "#00b8d4" },
-      "#ffffff", // resolvedBg
+      "#ffffff",
     );
     expect("--navbar-logo-color" in valid).toBe(false);
     expect(errors.some((e) => e.reason === "contrast-fail")).toBe(true);
@@ -554,9 +638,206 @@ describe("hex edge cases", () => {
     expect(normaliseHex("  FFF  ")).toBe("#fff");
   });
 
-  it("contrastRatio is commutative for non-symmetric colours", () => {
+  it("contrastRatio is commutative for non-symmetric opaque colours", () => {
     const a = contrastRatio("#ff0000", "#0000ff");
     const b = contrastRatio("#0000ff", "#ff0000");
     expect(a).toBeCloseTo(b);
+  });
+});
+
+// ─── Alpha-aware contrast calculations ───────────────────────────────────────
+
+describe("alpha-aware contrast", () => {
+  // ── Fully opaque colours ──────────────────────────────────────────────
+
+  it("fully opaque colours produce identical results to non-alpha algorithm", () => {
+    const opaqueRatio = contrastRatio("#1a1f36", "#ffffff");
+    const opaqueFf = contrastRatio("#1a1f36ff", "#ffffff");
+    expect(opaqueRatio).toBeCloseTo(opaqueFf);
+  });
+
+  it("fully transparent foreground on white background yields 1:1", () => {
+    // #00000000 (black, fully transparent) over white → effective is white → 1:1.
+    const ratio = contrastRatio("#00000000", "#ffffff");
+    expect(ratio).toBeCloseTo(1);
+  });
+
+  it("fully transparent foreground on black background yields 1:1", () => {
+    // #ffffff00 (white, fully transparent) over black → effective is black → 1:1.
+    const ratio = contrastRatio("#ffffff00", "#000000");
+    expect(ratio).toBeCloseTo(1);
+  });
+
+  // ── Partially transparent colours ─────────────────────────────────────
+
+  it("50% transparent black over white yields lower contrast than opaque black", () => {
+    const opaqueRatio = contrastRatio("#000000", "#ffffff");
+    const translucentRatio = contrastRatio("#00000080", "#ffffff");
+    expect(opaqueRatio).toBeGreaterThan(translucentRatio);
+    expect(translucentRatio).toBeGreaterThan(1);
+  });
+
+  it("10% transparent red over white — closer to white than opaque red", () => {
+    const opaqueRatio = contrastRatio("#ff0000", "#ffffff");
+    const translucentRatio = contrastRatio("#ff00001a", "#ffffff");
+    expect(translucentRatio).toBeLessThan(opaqueRatio);
+    expect(translucentRatio).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Commutativity with alpha (fg/bg order matters) ────────────────────
+
+  it("contrastRatio is NOT commutative when alpha is involved (fg vs bg matters)", () => {
+    const a = contrastRatio("#1a1f3680", "#ffffff");
+    const b = contrastRatio("#ffffff", "#1a1f3680");
+    // These differ because in (a) the translucent colour is the fg composited
+    // over white, while in (b) the translucent colour resolves against white
+    // and the opaque white remains white.
+    // Both should be valid, but they may not be identical.
+    expect(a).toBeGreaterThan(1);
+    expect(b).toBeGreaterThan(1);
+  });
+
+  it("commutativity preserved when both alpha values are the same", () => {
+    // When both colours have the same alpha, the behaviour is still
+    // non-commutative since fg is composited against resolved bg.
+    const a = contrastRatio("#ff000080", "#00ff0080");
+    const b = contrastRatio("#00ff0080", "#ff000080");
+    expect(a).toBeGreaterThan(1);
+    expect(b).toBeGreaterThan(1);
+  });
+
+  // ── Translucent foreground over background ────────────────────────────
+
+  it("translucent black over white produces a composited result", () => {
+    // #00000080 = ~50% black → composited over #ffffff.
+    // Effective fg ≈ (0.498, 0.498, 0.498), contrast ≈ 4.00:1.
+    const ratio = contrastRatio("#00000080", "#ffffff");
+    expect(ratio).toBeCloseTo(4.0, 0);
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("translucent white over black produces a composited result", () => {
+    // #ffffff80 = ~50% white → composited over #000000.
+    // Effective fg ≈ (0.502, 0.502, 0.502), contrast ≈ 5.32:1.
+    const ratio = contrastRatio("#ffffff80", "#000000");
+    expect(ratio).toBeCloseTo(5.32, 0);
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("translucent colour never achieves higher contrast than opaque version", () => {
+    const opaqueRatio = contrastRatio("#1a1f36", "#ffffff");
+    const translucentRatio = contrastRatio("#1a1f3680", "#ffffff");
+    expect(opaqueRatio).toBeGreaterThanOrEqual(translucentRatio);
+  });
+
+  // ── Layered / translucent backgrounds ─────────────────────────────────
+
+  it("translucent background is resolved against white (page-base)", () => {
+    // bg: #00000080 (50% black) resolved against white → #808080 effective.
+    // fg: #ffffff on effective bg #808080 → contrast ≈ 4.00:1.
+    const ratio = contrastRatio("#ffffff", "#00000080");
+    expect(ratio).toBeCloseTo(4.0, 0);
+  });
+
+  it("translucent fg over translucent bg resolves both layers correctly", () => {
+    // fg: #00000080 (50% black)
+    // bg: #ffffff80 (50% white) resolved against white → white.
+    // Effective: composite(50% black, white) → ≈ 4.00:1.
+    const ratio = contrastRatio("#00000080", "#ffffff80");
+    expect(ratio).toBeCloseTo(4.0, 0);
+  });
+
+  it("fully transparent bg (ffffff00) resolves to white", () => {
+    // #000000 on fully transparent white → bg resolves to white → 21:1.
+    const ratio = contrastRatio("#000000", "#ffffff00");
+    expect(ratio).toBeCloseTo(21);
+  });
+
+  it("multiple alpha layers resolve deterministically", () => {
+    const r1 = contrastRatio("#ff000040", "#0000ff40");
+    const r2 = contrastRatio("#ff000040", "#0000ff40");
+    expect(r1).toBeCloseTo(r2);
+  });
+
+  // ── Large-text contrast thresholds ────────────────────────────────────
+
+  it("meetsAALarge works correctly with translucent foreground", () => {
+    // #00000080 over white → effective contrast ≈ 4.00:1 → passes AA-large (3:1).
+    expect(meetsAALarge("#00000080", "#ffffff")).toBe(true);
+  });
+
+  it("meetsAALarge fails with very translucent foreground that becomes near-white", () => {
+    // #0000000d (5% black) over white → almost white → fails AA-large.
+    const ratio = contrastRatio("#0000000d", "#ffffff");
+    expect(ratio).toBeLessThan(WCAG_AA_LARGE);
+    expect(meetsAALarge("#0000000d", "#ffffff")).toBe(false);
+  });
+
+  it("meetsAA with translucent foreground that composes to pass AA", () => {
+    // #1a1f36 (opaque dark navy) passes AA on white.
+    // At 80% alpha, #1a1f36cc over white → still fairly dark, should pass.
+    const ratio = contrastRatio("#1a1f36cc", "#ffffff");
+    expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
+  });
+
+  it("meetsAA fails when translucent colour reduces contrast below threshold", () => {
+    // #1a1f36 at 50% alpha over white → less dark → lower contrast.
+    const ratio = contrastRatio("#1a1f3680", "#ffffff");
+    const opaqueRatio = contrastRatio("#1a1f36", "#ffffff");
+    expect(ratio).toBeLessThan(opaqueRatio);
+  });
+
+  // ── Boundary contrast values ──────────────────────────────────────────
+
+  it("translucent colour that composes to above AA boundary (4.5:1)", () => {
+    // 80% alpha black over white: effective grey ≈ (0.20, 0.20, 0.20) → higher contrast.
+    const ratio = contrastRatio("#000000cc", "#ffffff");
+    expect(ratio).toBeGreaterThan(WCAG_AA_NORMAL);
+  });
+
+  it("translucent grey near AA boundary", () => {
+    // 80% grey (#80808080) over white → effective ≈ (0.90, 0.90, 0.90) → low contrast.
+    const ratio = contrastRatio("#80808080", "#ffffff");
+    expect(ratio).toBeLessThan(WCAG_AA_NORMAL);
+  });
+
+  // ── Invalid colour input ──────────────────────────────────────────────
+
+  it("invalid hex in contrastRatio throws TypeError (existing behaviour)", () => {
+    expect(() => contrastRatio("invalid", "#ffffff")).toThrow(TypeError);
+  });
+
+  it("invalid bg hex in contrastRatio throws TypeError (existing behaviour)", () => {
+    expect(() => contrastRatio("#000000", "not-hex")).toThrow(TypeError);
+  });
+
+  it("empty string in contrastRatio throws TypeError", () => {
+    expect(() => contrastRatio("", "#ffffff")).toThrow(TypeError);
+  });
+
+  // ── Result range ──────────────────────────────────────────────────────
+
+  it("result stays in [1, 21] for alpha colours", () => {
+    const r = contrastRatio("#ff000080", "#00000080");
+    expect(r).toBeGreaterThanOrEqual(1);
+    expect(r).toBeLessThanOrEqual(21);
+  });
+
+  // ── Existing behaviour preserved ──────────────────────────────────────
+
+  it("opaque black on white still passes AA (no regression)", () => {
+    expect(meetsAA("#000000", "#ffffff")).toBe(true);
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21);
+  });
+
+  it("opaque white on black still passes AA (no regression)", () => {
+    expect(meetsAA("#ffffff", "#000000")).toBe(true);
+    expect(contrastRatio("#ffffff", "#000000")).toBeCloseTo(21);
+  });
+
+  it("same opaque colour still yields 1:1 (no regression)", () => {
+    expect(contrastRatio("#808080", "#808080")).toBeCloseTo(1);
   });
 });

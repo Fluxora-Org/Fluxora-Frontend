@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { en } from "./en";
+import { createPseudoLocale } from "./zx";
 
 /**
  * Supported locales in the application.
@@ -10,7 +11,7 @@ import { en } from "./en";
  * announcements until `compositionend` is received. For detailed design specs and guidelines, see
  * `docs/IME_COMPOSITION_SUPPORT_SPEC.md`.
  */
-export type Locale = "en" | "es";
+export type Locale = "en" | "es" | "zx";
 
 /**
  * The structure of the translation catalog, based on the English catalog.
@@ -167,7 +168,16 @@ export function I18nProvider({ children, defaultLocale = "en" }: I18nProviderPro
   const [locale, setLocale] = useState<Locale>(defaultLocale);
 
   // Active catalog selection
-  const catalog: TranslationCatalog = locale === "en" ? en : ({ ...en, ...es } as TranslationCatalog);
+  const catalog: TranslationCatalog = (() => {
+    switch (locale) {
+      case "zx":
+        return createPseudoLocale(en);
+      case "es":
+        return { ...en, ...es } as TranslationCatalog;
+      default:
+        return en;
+    }
+  })();
 
   const t = (key: TranslationKey | PluralizableKey, params?: TranslationParams): string => {
     return translate(catalog, en, key, params);

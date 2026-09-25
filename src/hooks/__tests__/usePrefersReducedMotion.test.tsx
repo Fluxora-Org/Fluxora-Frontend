@@ -104,8 +104,10 @@ describe("usePrefersReducedMotion", () => {
   });
 
   it("returns false when matchMedia is unavailable", () => {
-    // @ts-ignore simulate an older/non-browser test environment
-    delete window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: undefined,
+    });
 
     const { result } = renderHook(() => usePrefersReducedMotion());
 

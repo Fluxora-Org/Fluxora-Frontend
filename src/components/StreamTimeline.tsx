@@ -1,5 +1,6 @@
 import React from "react";
-import "./StreamTimeline.module.css";
+import "./StreamTimeline.css";
+import { useI18n } from "../i18n";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { createDateTimeFormat, formatNumber } from "../lib/formatters";
 
@@ -15,11 +16,103 @@ export interface StreamTimelineProps {
   /**
    * Set to `true` when rendered inside a compare pane.
    * Applies `data-compare="true"` to the container so the
-   * half-width CSS rules in StreamTimeline.module.css activate,
+   * half-width CSS rules in StreamTimeline.css activate,
    * compacting bar height, legend, and cliff-label positioning.
    */
   compareMode?: boolean;
+  /**
+   * When enabled, renders a transaction state demo at the bottom
+   * of the timeline. The demo simulates pending, confirmed,
+   * rejected, and timeout outcomes, and enforces duplicate
+   * submission prevention and retry behavior.
+   */
+  showTransactionDemo?: boolean;
+  /**
+   * Controls the simulated outcome for the transaction demo.
+   * Only used when `showTransactionDemo` is `true`.
+   * Defaults to `"confirmed`.
+   */
+  transactionDemoOutcome?: "confirmed" | "rejected" | "timeout";
 }
+
+type TransactionStatus =
+  "idle" | "pending" | "confirmed" | "rejected" | "timeout";
+
+const TransactionDemo: React.FC<{
+  mockOutcome: Exclude<TransactionStatus, "idle" | "pending">;
+}> = ({ mockOutcome }) => {
+  const { t } = useI18n();
+  const [status, setStatus] = React.useState<TransactionStatus>("idle");
+  const [message, setMessage] = React.useState(
+    "Transaction state idle. Click submit to start.",
+  );
+
+  const handleSubmit = () => {
+    if (status === "pending") return;
+    setStatus("pending");
+    setMessage("Transaction pending... Please wait for confirmation.");
+  };
+
+  React.useEffect(() => {
+    if (status !== "pending") return;
+    const timer = setTimeout(() => {
+      const successCount = mockOutcome === "confirmed" ? 1 : 0;
+      const failureCount =
+        mockOutcome === "rejected" || mockOutcome === "timeout" ? 1 : 0;
+      const skippedCount = 0;
+      setStatus(mockOutcome);
+      setMessage(
+        [
+          `${successCount} successes`,
+          `${failureCount} failures`,
+          `${skippedCount} skipped`,
+        ].join(", "),
+      );
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [status, mockOutcome]);
+
+  const isPending = status === "pending";
+  const isFailed = status === "rejected" || status === "timeout";
+  const buttonLabel = isPending
+    ? "Submitting..."
+    : isFailed
+      ? "Retry"
+      : "Submit Transaction";
+
+  return (
+    <div className="transaction-demo" data-transaction-status={status}>
+      <h4>Transaction State Demo</h4>
+      <div
+        className="transaction-demo__status"
+        role="status"
+        aria-live="polite"
+      >
+        {message}
+      </div>
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={isPending}
+        className="transaction-demo__submit"
+      >
+        {buttonLabel}
+      </button>
+      {status === "confirmed" && (
+        <button
+          type="button"
+          onClick={() => {
+            setStatus("idle");
+            setMessage("Transaction state idle. Click submit to start.");
+          }}
+          className="transaction-demo__reset"
+        >
+          Reset
+        </button>
+      )}
+    </div>
+  );
+};
 
 /**
  * StreamTimeline Component
@@ -49,7 +142,10 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   status,
   isLoading = false,
   compareMode = false,
+  showTransactionDemo = false,
+  transactionDemoOutcome = "confirmed",
 }) => {
+  const { t } = useI18n();
   const [animateClass, setAnimateClass] = React.useState("");
   const prevStatusRef = React.useRef(status);
 
@@ -108,6 +204,8 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
     0,
     Math.min(100, ((currentTime - start.getTime()) / totalDuration) * 100),
   );
+  const vestedPercent = Math.max(0, accrualPercent - cliffPercent);
+  const unvestedPercent = 100 - Math.max(accrualPercent, cliffPercent);
 
   // Format date for display. Resolves user locale via navigator.language
   // (with a validated "en-US" fallback) consistent with src/lib/formatters.ts.
@@ -140,16 +238,25 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
       <div className="stream-timeline__sr-summary" role="doc-subtitle">
         <h3 className="sr-only">Timeline Summary</h3>
         <ul className="sr-only">
-          <li>Start date: {formatDate(start)}</li>
-          {cliff && <li>Cliff end date: {formatDate(cliff)}</li>}
+          <li>Start: {formatDate(start)}</li>
+          {cliff && <li>Cliff end: {formatDate(cliff)}</li>}
           <li>Current date: {formatDate(current)}</li>
-          <li>End date: {formatDate(end)}</li>
-          <li>Stream status: {status}</li>
-          <li>Progress: {accrualPercent.toFixed(0)}% complete</li>
-          <li>Withdrawable: ${formatNumber(withdrawableAmount)}</li>
-          <li>Total amount: ${formatNumber(totalAmount)}</li>
+          <li>End: {formatDate(end)}</li>
+          <li>Status: {status}</li>
+          <li>Timeline progress: {accrualPercent.toFixed(0)}%</li>
+          <li>Withdrawable: {formatNumber(withdrawableAmount)}</li>
+          <li>Total amount: {formatNumber(totalAmount)}</li>
         </ul>
       </div>
+
+      <p className="stream-timeline__text-summary">
+        {cliff &&
+          cliffPercent > 0 &&
+          `Cliff period: ${cliffPercent.toFixed(0)}%. `}
+        Vested period: {vestedPercent.toFixed(0)}%. Unvested period:{" "}
+        {unvestedPercent.toFixed(0)}%.
+        {` Withdrawable: ${formatNumber(withdrawableAmount)} of ${formatNumber(totalAmount)}. Status: ${status}.`}
+      </p>
 
       {/* Visual timeline bar */}
       <div
@@ -186,7 +293,7 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
             className={`stream-timeline-bar__segment stream-timeline-bar__segment--accrual is-${status}`}
             style={{ width: `${accrualPercent - cliffPercent}%` }}
             role="img"
-            aria-label={`Accrual period: ${cliff ? formatDate(cliff) : formatDate(start)} to ${formatDate(current)}`}
+            aria-label={`Vested period: ${cliff ? formatDate(cliff) : formatDate(start)} to ${formatDate(current)}`}
           >
             {accrualPercent - cliffPercent > 8 && (
               <span className="stream-timeline-bar__segment-label">
@@ -197,12 +304,12 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         )}
 
         {/* Remaining segment (empty) */}
-        {accrualPercent < 100 && (
+        {unvestedPercent > 0 && (
           <div
             className={`stream-timeline-bar__segment stream-timeline-bar__segment--remaining is-${status}`}
-            style={{ width: `${100 - accrualPercent}%` }}
+            style={{ width: `${unvestedPercent}%` }}
             role="img"
-            aria-label={`Remaining period: ${formatDate(current)} to ${formatDate(end)}`}
+            aria-label={`Unvested period: ${formatDate(new Date(Math.max(current.getTime(), cliffEnd, start.getTime())))} to ${formatDate(end)}`}
           />
         )}
 
@@ -254,11 +361,11 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
         </div>
         <div className="stream-timeline-legend__item">
           <div className="stream-timeline-legend__swatch stream-timeline-legend__swatch--accrual" />
-          <span>Accrual phase (unlocking)</span>
+          <span>Vested period (solid)</span>
         </div>
         <div className="stream-timeline-legend__item">
           <div className="stream-timeline-legend__swatch stream-timeline-legend__swatch--remaining" />
-          <span>Remaining (locked)</span>
+          <span>Unvested period (dotted)</span>
         </div>
       </div>
 
@@ -272,6 +379,11 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
           <span className="stream-timeline__loading-spinner" />
           <span>Loading timeline...</span>
         </div>
+      )}
+
+      {/* Transaction state demo (optional) */}
+      {showTransactionDemo && (
+        <TransactionDemo mockOutcome={transactionDemoOutcome} />
       )}
     </div>
   );

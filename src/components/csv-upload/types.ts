@@ -1,9 +1,18 @@
-/**
+/*
  * Shared types for the CSV bulk-upload flow.
  *
  * These are pure data types — no React imports needed — so the CSV parser,
  * validation logic, and components all share a single source of truth.
  */
+
+export type CanonicalHeader = (typeof CANONICAL_HEADERS)[number];
+
+/** A single located parse/validation error: which row, optionally which column, and what was expected. */
+export interface CsvParseError {
+  row: number;
+  column?: CanonicalHeader;
+  message: string;
+}
 
 /** Canonical column names used internally after mapping. */
 export const CANONICAL_HEADERS = [
@@ -14,6 +23,26 @@ export const CANONICAL_HEADERS = [
 ] as const;
 
 export type CanonicalHeader = (typeof CANONICAL_HEADERS)[number];
+
+/**
+ * Hard limits for CSV uploads to prevent denial of service.
+ * These are enforced in `csvParser.ts` before any parsing or preview rendering.
+ * The rendered preview is bounded by `MAX_TOTAL_CELLS` to avoid excessive DOM nodes.
+ */
+export const CSV_LIMITS = {
+  /** Maximum file size in bytes (1 MB = 1024 * 1024). */
+  MAX_FILE_BYTES: 1024 * 1024,
+  /** Maximum number of data rows (excluding the header row). */
+  MAX_ROWS: 500,
+  /** Maximum number of columns (including the header row). */
+  MAX_COLUMNS: 50,
+  /** Maximum number of characters per cell. */
+  MAX_CELL_CHARS: 1000,
+  /** Maximum total cells (rows × columns) allowed in the preview. */
+  MAX_TOTAL_CELLS: 10_000,
+} as const;
+
+export type CsvLimits = typeof CSV_LIMITS;
 
 /** Maps each canonical field to the CSV column name that was selected. */
 export type ColumnMapping = Record<CanonicalHeader, string>;
@@ -46,10 +75,14 @@ export interface ParseResult {
   headersMatch: boolean;
   /** Best-effort pre-populated mapping (populated even on mismatch). */
   autoMapping: Partial<ColumnMapping>;
-  /** Parsed rows — only present when `headersMatch` is true (or after manual mapping). */
+  /** Parsed rows — only present when `headersMatch` is true (or after manual mapping)
+   * and the CSV is within `CSV_LIMITS`. */
   rows: CsvRow[];
-  /** Top-level parse error (wrong file type, empty, oversized, > 500 rows). */
+  /** Top-level parse error (wrong file type, empty, or exceeds any CSV_LIMITs threshold). */
   parseError?: string;
+
+  /** Every located parse/validation error found for this file, if any. */
+  parseErrors?: CsvParseError[];
 }
 
 /** State of the upload zone. */

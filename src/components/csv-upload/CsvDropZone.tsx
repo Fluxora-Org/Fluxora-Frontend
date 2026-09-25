@@ -1,7 +1,16 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './CsvDropZone.css';
 import type { UploadZoneState } from './types';
-import { parseAndValidateCsv, buildTemplateCsv, MAX_CSV_FILE_SIZE_BYTES } from './csvParser';
+import {
+  buildTemplateCsv,
+  MAX_CSV_FILE_SIZE_BYTES,
+  MAX_CSV_FILE_SIZE_LABEL,
+  MAX_CSV_ROWS,
+} from './csvParser';
+
+import { validateCsvFile } from './csvFileValidation';
+import { CsvParseCancelledError, parseCsvAsync } from './csvParseClient';
+import type { CsvParseTask, CsvProgressPayload } from './csvParseClient';
 import type { ParseResult } from './types';
 import { ValidationMessage } from '../ValidationMessage';
 
@@ -11,9 +20,6 @@ export interface CsvDropZoneProps {
 }
 
 const ACCEPTED_MIME = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain']);
-
-/** Human-readable ceiling for size-reject copy (matches MAX_CSV_FILE_SIZE_BYTES). */
-const MAX_CSV_FILE_SIZE_LABEL = '1 MB';
 
 /**
  * CsvDropZone — drag-and-drop / click-to-browse CSV upload zone.
@@ -30,40 +36,71 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedFileName, setParsedFileName] = useState<string | null>(null);
   const [parsedRowCount, setParsedRowCount] = useState<number>(0);
+  const [parseProgress, setParseProgress] = useState<CsvProgressPayload | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Tracks the in-flight worker parse so a new file selection (or unmount)
+  // can abort it cleanly instead of letting it finish and clobber state.
+  const inFlightParseRef = useRef<CsvParseTask | null>(null);
+
+  useEffect(() => {
+    return () => {
+      inFlightParseRef.current?.cancel();
+    };
+  }, []);
+  const zoneRef = useRef<HTMLLabelElement>(null);
+
+  /**
+   * Restore keyboard/screen-reader focus to the drop zone after a rejection or
+   * after a cancel so the user can retry from a stable, announced control.
+   */
+  const restoreZoneFocus = useCallback(() => {
+    window.requestAnimationFrame(() => zoneRef.current?.focus());
+  }, []);
+
+  /**
+   * Record a rejection: surface the message in the live region + visible
+   * error, and return focus to the drop zone for retryability.
+   */
+  const reject = useCallback(
+    (message: string) => {
+      setZoneState('parse-error');
+      setParseError(message);
+      setParseProgress(null);
+      restoreZoneFocus();
+    },
+    [restoreZoneFocus],
+  );
 
   const processFile = useCallback(
     async (file: File) => {
-      // Validate extension / mime
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      const isCsv =
-        ext === 'csv' ||
-        ACCEPTED_MIME.has(file.type);
-      if (!isCsv) {
-        setZoneState('parse-error');
-        setParseError('Only .csv files are accepted.');
+      // Validate type and size from cheap metadata BEFORE reading contents, so
+      // an arbitrary large or wrong-type file never gets buffered into memory.
+      const validation = validateCsvFile(file);
+      if (!validation.ok) {
+        reject(validation.message);
         return;
       }
 
-      // Reject oversized files before buffering the entire contents into memory.
-      if (file.size > MAX_CSV_FILE_SIZE_BYTES) {
-        setZoneState('parse-error');
-        setParseError(
-          `File is too large. Maximum size is ${MAX_CSV_FILE_SIZE_LABEL}.`,
-        );
-        return;
-      }
+      // Abort any parse still in flight before starting a new one.
+      inFlightParseRef.current?.cancel();
 
       setZoneState('parsing');
       setParseError(null);
+      setParseProgress(null);
 
+      let task: CsvParseTask | null = null;
       try {
         const text = await file.text();
-        const result = parseAndValidateCsv(text);
+        // Parsing/validation runs on a dedicated Web Worker so the UI stays
+        // responsive while large files are processed.
+        task = parseCsvAsync(text, undefined, (progress) => {
+          setParseProgress(progress);
+        });
+        inFlightParseRef.current = task;
+        const result = await task.promise;
 
         if (result.parseError) {
-          setZoneState('parse-error');
-          setParseError(result.parseError);
+          reject(result.parseError);
           return;
         }
 
@@ -72,12 +109,19 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         setParsedRowCount(rowCount);
         setZoneState('parsed');
         onParsed(result, file.name, text);
-      } catch {
+      } catch (err) {
+        // A cancelled parse is expected (new file selected / unmount); leave
+        // the zone in its current state without surfacing an error.
+        if (err instanceof CsvParseCancelledError) return;
         setZoneState('parse-error');
         setParseError('Failed to read the file. Please try again.');
+      } finally {
+        if (task && inFlightParseRef.current === task) {
+          inFlightParseRef.current = null;
+        }
       }
     },
-    [onParsed],
+    [onParsed, reject],
   );
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
@@ -97,24 +141,39 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const file = e.dataTransfer.files?.[0];
-      if (file) {
-        void processFile(file);
-      } else {
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) {
         setZoneState('empty');
+        return;
       }
+      // Explicit single-file contract: reject multi-file drops.
+      if (files.length > 1) {
+        reject('Only one file can be uploaded at a time.');
+        return;
+      }
+      void processFile(files[0]!);
     },
-    [processFile],
+    [processFile, reject],
   );
 
   const onFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) void processFile(file);
+      const files = e.target.files;
+      if (files && files.length > 1) {
+        reject('Only one file can be uploaded at a time.');
+        e.target.value = '';
+        return;
+      }
+      if (files && files.length === 1) {
+        void processFile(files[0]!);
+      } else {
+        // Cancel (or cleared selection): return focus to the drop zone.
+        restoreZoneFocus();
+      }
       // Reset so re-selecting the same file triggers onChange
       e.target.value = '';
     },
-    [processFile],
+    [processFile, reject, restoreZoneFocus],
   );
 
   // ── Template download ──────────────────────────────────────────────────────
@@ -136,7 +195,12 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   ].join(' ');
 
   const statusMessage = (() => {
-    if (zoneState === 'parsing') return 'Parsing file…';
+    if (zoneState === 'parsing') {
+      if (parseProgress && parseProgress.totalRows > 0) {
+        return `Parsing file… ${parseProgress.processedRows} of ${parseProgress.totalRows} rows (${parseProgress.percent}%)`;
+      }
+      return 'Parsing file…';
+    }
     if (zoneState === 'parse-error' && parseError) return parseError;
     if (zoneState === 'parsed' && parsedFileName) {
       return `${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? 's' : ''} detected`;
@@ -150,11 +214,17 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       {/* ── Drop zone label ── */}
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <label
+        ref={zoneRef}
         htmlFor="csv-file-input"
         className={zoneClass}
         aria-label="Upload CSV file. Drag and drop or click to browse."
         role="button"
         tabIndex={0}
+        aria-describedby={
+          zoneState === 'parse-error' && parseError
+            ? 'csv-upload-status csv-upload-error'
+            : 'csv-upload-status'
+        }
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -238,7 +308,31 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         )}
 
         {zoneState === 'parsing' && (
-          <span className="csv-drop-zone__heading">Parsing file…</span>
+          <>
+            <span className="csv-drop-zone__heading">
+              {parseProgress && parseProgress.totalRows > 0
+                ? `Parsing file… ${parseProgress.percent}%`
+                : 'Parsing file…'}
+            </span>
+            <div
+              role="progressbar"
+              aria-label="CSV parsing progress"
+              aria-valuenow={parseProgress ? parseProgress.percent : 0}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="csv-drop-zone__progress-bar"
+            >
+              <div
+                className="csv-drop-zone__progress-fill"
+                style={{ width: `${parseProgress ? parseProgress.percent : 0}%` }}
+              />
+            </div>
+            {parseProgress && parseProgress.totalRows > 0 && (
+              <span className="csv-drop-zone__subtext">
+                {parseProgress.processedRows} of {parseProgress.totalRows} rows
+              </span>
+            )}
+          </>
         )}
 
         {zoneState !== 'dragging-over' && zoneState !== 'parsing' && zoneState !== 'parsed' && zoneState !== 'parse-error' && (
@@ -249,7 +343,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
 
         {zoneState !== 'parsing' && zoneState !== 'dragging-over' && (
           <span className="csv-drop-zone__hint">
-            Accepts .csv · max 500 rows · 1 MB
+            Accepts .csv · max {MAX_CSV_ROWS} rows · {MAX_CSV_FILE_SIZE_LABEL}
           </span>
         )}
 
@@ -260,7 +354,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
           type="file"
           accept=".csv,text/csv"
           className="sr-only"
-          aria-label="Upload CSV file. Accepts .csv format, maximum 500 rows, 1 MB."
+          aria-label={`Upload CSV file. Accepts .csv format, maximum ${MAX_CSV_ROWS} rows, ${MAX_CSV_FILE_SIZE_LABEL}.`}
           aria-describedby="csv-upload-status"
           onChange={onFileChange}
         />

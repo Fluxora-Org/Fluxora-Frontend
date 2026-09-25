@@ -4,10 +4,12 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
   type ReactNode,
 } from "react";
 import {
   isConnected,
+  isAllowed,
   getAddress,
   getNetwork,
   WatchWalletChanges,
@@ -18,7 +20,11 @@ import {
   type StellarNetwork,
 } from "../../lib/stellarNetwork";
 import { isValidStellarAddress } from "../../lib/stellar";
-import { getNetworkLabel } from "../../lib/config";
+import { getNetworkLabel, getWalletWatchIntervalMs, WALLET_WATCH_MIN_INTERVAL_MS } from "../../lib/config";
+import {
+  subscribeToAccountContext,
+  type AccountContextMessage,
+} from "../../lib/accountContextSync";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -39,7 +45,40 @@ interface WalletState {
   loading: boolean;
 }
 
+/**
+ * Health of the wallet link, reported separately from whether a session
+ * exists (#1678).
+ *
+ * - `connected`: a session exists and the wallet is reachable.
+ * - `dropped`: the session is kept (same address/network, `connected` stays
+ *   true) but the wallet is locked/unreachable or the browser is offline.
+ *   Views stay mounted; wallet actions must wait for recovery.
+ * - `reconnecting`: the single recovery check is in flight.
+ * - `disconnected`: no session (never connected, restore failed, or the user
+ *   disconnected / revoked access).
+ */
+export type WalletConnectionStatus =
+  | "connected"
+  | "dropped"
+  | "reconnecting"
+  | "disconnected";
+
+type LinkStatus = "ok" | "dropped" | "reconnecting";
+
+type WalletProbe =
+  | { kind: "ok"; address: string; network: string }
+  | { kind: "unreachable" }
+  | { kind: "revoked" };
+
 interface WalletContextType extends WalletState {
+  /** Increments for both local and cross-tab account changes. */
+  accountContextVersion: number;
+  connectionStatus: WalletConnectionStatus;
+  /**
+   * Re-checks a dropped connection. Single-flight: concurrent calls (and the
+   * automatic online/visibility/focus/watcher triggers) share one check.
+   */
+  reconnect: () => Promise<void>;
   expectedNetwork: StellarNetwork;
   expectedNetworkLabel: string;
   isNetworkMismatch: boolean;
@@ -55,8 +94,10 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
  * Values below this floor would hammer the Freighter extension and the RPC
  * endpoint it queries. Any configured or default value is clamped up to this
  * minimum before being passed to the constructor.
+ *
+ * Re-exported from `src/lib/config.ts`, which owns the environment read.
  */
-export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
+export { WALLET_WATCH_MIN_INTERVAL_MS };
 
 /**
  * How often {@link WatchWalletChanges} polls the Freighter extension for
@@ -67,18 +108,15 @@ export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
  * - The value is clamped to a minimum of {@link WALLET_WATCH_MIN_INTERVAL_MS}
  *   to prevent tight polling loops against the wallet extension.
  *
+ * Resolved through `src/lib/config.ts` so this component never reads
+ * `import.meta.env` directly (see issue #1722).
+ *
  * @example
  * // .env
  * VITE_WALLET_WATCH_INTERVAL_MS=5000   // slow network / CI
  * VITE_WALLET_WATCH_INTERVAL_MS=2000   // default (can be omitted)
  */
-export const WALLET_WATCH_INTERVAL_MS: number = (() => {
-  const DEFAULT = 2000;
-  const raw = import.meta.env.VITE_WALLET_WATCH_INTERVAL_MS;
-  const parsed = raw !== undefined && raw !== "" ? Number(raw) : NaN;
-  const resolved = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT;
-  return Math.max(resolved, WALLET_WATCH_MIN_INTERVAL_MS);
-})();
+export const WALLET_WATCH_INTERVAL_MS: number = getWalletWatchIntervalMs();
 
 const INITIAL: WalletState = {
   address: null,
@@ -140,58 +178,258 @@ function classifyWalletError(error: unknown): WalletError {
   return { type: "unknown" };
 }
 
+function isBrowserOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+/**
+ * Silently asks Freighter whether the current session is usable again. Never
+ * opens a popup and never throws.
+ */
+async function probeWallet(): Promise<WalletProbe> {
+  try {
+    const conn = await isConnected();
+    if (conn.error || !conn.isConnected) return { kind: "unreachable" };
+
+    const allowed = await isAllowed();
+    if (!allowed.error && !allowed.isAllowed) return { kind: "revoked" };
+
+    const addr = await getAddress(); // "" while the extension is locked
+    if (addr.error || !addr.address || !isValidStellarAddress(addr.address)) {
+      return { kind: "unreachable" };
+    }
+
+    const net = await getNetwork();
+    if (net.error) return { kind: "unreachable" };
+
+    return { kind: "ok", address: addr.address, network: net.network };
+  } catch {
+    return { kind: "unreachable" };
+  }
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>(INITIAL);
+  const stateRef = useRef(state);
+  const [accountContextVersion, setAccountContextVersion] = useState(0);
   const watcherRef = useRef<InstanceType<typeof WatchWalletChanges> | null>(
     null,
   );
-  const disconnectVersionRef = useRef(0);
-
-  const clearWatcher = () => {
-    watcherRef.current?.stop();
-    watcherRef.current = null;
-  };
+  const watcherGenerationRef = useRef(0);
+  const accountChangeGenerationRef = useRef(0);
+  const latestRemoteChangeRef = useRef(0);
+  const latestChangeSourceRef = useRef("");
+  const channelRef = useRef<ReturnType<typeof subscribeToAccountContext> | null>(null);
+  const sourceRef = useRef(`wallet-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`);
+  const [linkStatus, setLinkStatus] = useState<LinkStatus>("ok");
+  const linkStatusRef = useRef<LinkStatus>("ok");
+  // Bumped whenever the link recovers so an older recovery check that is
+  // still in flight cannot overwrite the newer result.
+  const linkGenerationRef = useRef(0);
+  const checkPromiseRef = useRef<Promise<void> | null>(null);
+  const mountedRef = useRef(true);
 
   const expectedNetwork = getExpectedStellarNetwork();
   const expectedNetworkLabel = getNetworkLabel(expectedNetwork);
   const isNetworkMismatch =
     state.connected && isStellarNetworkMismatch(state.network, expectedNetwork);
+  const connectionStatus: WalletConnectionStatus = !state.connected
+    ? "disconnected"
+    : linkStatus === "ok"
+      ? "connected"
+      : linkStatus;
+
+  const setLink = useCallback((next: LinkStatus) => {
+    if (next === "ok") linkGenerationRef.current += 1;
+    linkStatusRef.current = next;
+    setLinkStatus(next);
+  }, []);
+
+  const applyAccountChange = useCallback((
+    next: WalletState,
+    options: { broadcast: boolean; changedAt?: number } = { broadcast: true },
+  ) => {
+    accountChangeGenerationRef.current += 1;
+    stateRef.current = next;
+    // Any account change (including a disconnect) supersedes a dropped link
+    // and any recovery check still in flight for the previous context.
+    checkPromiseRef.current = null;
+    setLink("ok");
+    setAccountContextVersion((version) => version + 1);
+    setState(next);
+
+    if (options.broadcast) {
+      const changedAt = options.changedAt ?? Date.now();
+      latestRemoteChangeRef.current = Math.max(latestRemoteChangeRef.current, changedAt);
+      latestChangeSourceRef.current = sourceRef.current;
+      channelRef.current?.publish({
+        type: "account-context",
+        address: next.address,
+        network: next.network,
+        connected: next.connected,
+        changedAt,
+        source: sourceRef.current,
+      });
+    }
+  }, [setLink]);
+
+  /**
+   * Marks the session as dropped without clearing it: address, network and
+   * accountContextVersion are untouched, so no route guard redirects and no
+   * account-scoped data is reset or refetched (#1678).
+   */
+  const markDropped = useCallback(() => {
+    if (!stateRef.current.connected) return;
+    if (linkStatusRef.current === "reconnecting") return;
+    setLink("dropped");
+  }, [setLink]);
+
+  /**
+   * Single-flight recovery check. Only one probe runs at a time; every trigger
+   * that arrives meanwhile shares its promise. It only reads wallet state — it
+   * never replays a request (signing, submission, fetch) that was in flight
+   * when the connection dropped.
+   */
+  const checkConnection = useCallback((): Promise<void> => {
+    if (checkPromiseRef.current) return checkPromiseRef.current;
+    if (!stateRef.current.connected) return Promise.resolve();
+    if (isBrowserOffline()) {
+      markDropped();
+      return Promise.resolve();
+    }
+
+    const accountGeneration = accountChangeGenerationRef.current;
+    const linkGeneration = linkGenerationRef.current;
+    if (linkStatusRef.current !== "ok") setLink("reconnecting");
+
+    const run = (async () => {
+      const result = await probeWallet();
+      if (
+        !mountedRef.current ||
+        !stateRef.current.connected ||
+        accountChangeGenerationRef.current !== accountGeneration ||
+        linkGenerationRef.current !== linkGeneration
+      ) {
+        return;
+      }
+
+      if (result.kind === "revoked") {
+        // The user removed this app's access in the wallet: an explicit
+        // disconnect, so the existing disconnect behaviour applies.
+        watcherGenerationRef.current += 1;
+        applyAccountChange(DISCONNECTED);
+        return;
+      }
+
+      if (result.kind === "unreachable" || isBrowserOffline()) {
+        setLink("dropped");
+        return;
+      }
+
+      const current = stateRef.current;
+      if (result.address === current.address && result.network === current.network) {
+        setLink("ok");
+        return;
+      }
+
+      // A different account (or network) came back: treat it as the account
+      // switch it is, never as a continuation of the old session.
+      applyAccountChange({
+        address: result.address,
+        network: result.network,
+        connected: true,
+        error: null,
+        loading: false,
+      });
+    })();
+
+    checkPromiseRef.current = run;
+    void run.finally(() => {
+      if (checkPromiseRef.current === run) checkPromiseRef.current = null;
+    });
+    return run;
+  }, [applyAccountChange, markDropped, setLink]);
 
   const connect = (address: string, network: string) => {
     if (!isValidStellarAddress(address)) return;
-    setState({ address, network, connected: true, error: null, loading: false });
+    applyAccountChange({
+      address,
+      network,
+      connected: true,
+      error: null,
+      loading: false,
+    });
   };
 
   const disconnect = () => {
-    disconnectVersionRef.current += 1;
-    clearWatcher();
-    setState(DISCONNECTED);
+    // Invalidate any callback captured by the previous watcher before the
+    // disconnected state is exposed to consumers.
+    watcherGenerationRef.current += 1;
+    applyAccountChange(DISCONNECTED);
   };
+
+  // A remote account change invalidates restore work started by this tab before
+  // the message arrived. This is what keeps a delayed Freighter/API result for
+  // the previous account from becoming visible again.
+  useEffect(() => {
+    const subscription = subscribeToAccountContext((message: AccountContextMessage) => {
+      if (
+        message.source === sourceRef.current ||
+        message.changedAt < latestRemoteChangeRef.current ||
+        (message.changedAt === latestRemoteChangeRef.current &&
+          message.source <= latestChangeSourceRef.current)
+      ) return;
+      if (message.connected && (!message.address || !isValidStellarAddress(message.address))) return;
+      latestRemoteChangeRef.current = message.changedAt;
+      latestChangeSourceRef.current = message.source;
+      applyAccountChange(
+        message.connected
+          ? { address: message.address, network: message.network, connected: true, error: null, loading: false }
+          : DISCONNECTED,
+        { broadcast: false, changedAt: message.changedAt },
+      );
+    });
+    channelRef.current = subscription;
+    return () => {
+      if (channelRef.current === subscription) channelRef.current = null;
+      subscription.close();
+    };
+  }, [applyAccountChange]);
 
   // Silently restore session if the user already approved this app.
   useEffect(() => {
     let cancelled = false;
-    const restoreDisconnectVersion = disconnectVersionRef.current;
+    const restoreGeneration = accountChangeGenerationRef.current;
 
     const finishRestore = () => {
-      if (cancelled || disconnectVersionRef.current !== restoreDisconnectVersion) {
+      if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) {
         return;
       }
-      setState((prev) => (prev.loading ? { ...prev, loading: false } : prev));
+
+      setState((prev) => {
+        const next = prev.loading ? { ...prev, loading: false } : prev;
+        stateRef.current = next;
+        return next;
+      });
     };
 
     const restoreError = (error: unknown) => {
-      if (cancelled || disconnectVersionRef.current !== restoreDisconnectVersion) {
+      if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) {
         return;
       }
-      setState((prev) => ({
-        ...prev,
-        address: null,
-        network: null,
-        connected: false,
-        error: classifyWalletError(error),
-        loading: false,
-      }));
+
+      setState((prev) => {
+        const next = {
+          ...prev,
+          address: null,
+          network: null,
+          connected: false,
+          error: classifyWalletError(error),
+          loading: false,
+        };
+        stateRef.current = next;
+        return next;
+      });
     };
 
     (async () => {
@@ -217,7 +455,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
 
         if (!isValidStellarAddress(addr.address)) {
-          restoreError({ message: "Invalid Stellar address returned by Freighter" });
+          restoreError({
+            message: "Invalid Stellar address returned by Freighter",
+          });
           return;
         }
 
@@ -227,14 +467,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (
-          cancelled ||
-          disconnectVersionRef.current !== restoreDisconnectVersion
-        ) {
-          return;
-        }
-
-        setState({
+        if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) return;
+        applyAccountChange({
           address: addr.address,
           network: net.network,
           connected: true,
@@ -254,30 +488,115 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   // Watch for account / network switches inside Freighter.
   useEffect(() => {
-    clearWatcher();
-    if (!state.connected) return undefined;
+    if (!state.connected) {
+      return undefined;
+    }
 
+    const generation = ++watcherGenerationRef.current;
     const watcher = new WatchWalletChanges(WALLET_WATCH_INTERVAL_MS);
+
     watcherRef.current = watcher;
+
     watcher.watch(({ address, network }) => {
-      if (!isValidStellarAddress(address)) {
-        setState((prev) => (prev.connected ? DISCONNECTED : prev));
+      // A callback from an old watcher must never be allowed to mutate the
+      // current wallet state.
+      if (watcherGenerationRef.current !== generation) {
         return;
       }
-      setState((prev) =>
-        address === prev.address && network === prev.network
-          ? prev
-          : { address, network, connected: true, error: null, loading: false },
-      );
+
+      // An empty/invalid address means the extension is locked, unavailable
+      // or has revoked access. Keep the session and report a drop; the probe
+      // tells a revocation (→ disconnect) apart from a lock.
+      if (!isValidStellarAddress(address)) {
+        if (stateRef.current.connected) {
+          markDropped();
+          void checkConnection();
+        }
+        return;
+      }
+
+      if (
+        address !== stateRef.current.address ||
+        network !== stateRef.current.network
+      ) {
+        applyAccountChange({ address, network, connected: true, error: null, loading: false });
+      } else if (linkStatusRef.current !== "ok" && !isBrowserOffline()) {
+        // The same account is reachable again (e.g. extension unlocked).
+        setLink("ok");
+      }
     });
 
-    return clearWatcher;
-  }, [state.connected]);
+    // WatchWalletChanges doesn't always fire when the session expires (wallet locked).
+    // We actively poll getAddress() which returns an empty string when locked without a popup.
+    const pollInterval = setInterval(async () => {
+      if (watcherGenerationRef.current !== generation) return;
+      try {
+        const addrResult = await getAddress();
+        if (watcherGenerationRef.current !== generation) return;
+        
+        if (addrResult.error || !addrResult.address || !isValidStellarAddress(addrResult.address)) {
+          if (stateRef.current.connected) {
+            applyAccountChange(DISCONNECTED);
+          }
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }, WALLET_WATCH_INTERVAL_MS);
+
+    return () => {
+      // Invalidate the callback before stopping the watcher so even a
+      // synchronous/delayed callback cannot update state after cleanup.
+      if (watcherGenerationRef.current === generation) {
+        watcherGenerationRef.current += 1;
+      }
+
+      if (watcherRef.current === watcher) {
+        watcherRef.current = null;
+      }
+
+      clearInterval(pollInterval);
+      watcher.stop();
+    };
+  }, [applyAccountChange, checkConnection, markDropped, setLink, state.connected]);
+
+  // Drop detection beyond the extension watcher: network loss, and re-checks
+  // when the page comes back from the background or regains focus.
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const handleOffline = () => markDropped();
+    const handleOnline = () => {
+      void checkConnection();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void checkConnection();
+    };
+    const handleFocus = () => {
+      if (linkStatusRef.current !== "ok") void checkConnection();
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkConnection, markDropped]);
 
   return (
     <WalletContext.Provider
       value={{
         ...state,
+        accountContextVersion,
+        connectionStatus,
+        reconnect: checkConnection,
         expectedNetwork,
         expectedNetworkLabel,
         isNetworkMismatch,

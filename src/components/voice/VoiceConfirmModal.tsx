@@ -5,6 +5,7 @@ import { useVoiceContext } from "./VoiceContext";
 export const VoiceConfirmModal: React.FC = () => {
   const {
     state,
+    recognizedCommand,
     pendingDestructiveCommand,
     confirmDestructiveAction,
     cancelDestructiveAction,
@@ -44,6 +45,11 @@ export const VoiceConfirmModal: React.FC = () => {
 
   if (!isOpen || !pendingDestructiveCommand) return null;
 
+  const intent =
+    recognizedCommand?.command.id === pendingDestructiveCommand.id
+      ? recognizedCommand.intent
+      : undefined;
+
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -60,7 +66,12 @@ export const VoiceConfirmModal: React.FC = () => {
       ) ?? [],
     ).filter((element) => {
       const style = window.getComputedStyle(element);
-      return !element.hasAttribute("disabled") && element.tabIndex !== -1 && style.display !== "none" && style.visibility !== "hidden";
+      return (
+        !element.hasAttribute("disabled") &&
+        element.tabIndex !== -1 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden"
+      );
     });
 
     if (focusableElements.length === 0) {
@@ -70,7 +81,9 @@ export const VoiceConfirmModal: React.FC = () => {
     }
 
     const activeElement = document.activeElement as HTMLElement | null;
-    const currentIndex = focusableElements.indexOf(activeElement as HTMLElement);
+    const currentIndex = focusableElements.indexOf(
+      activeElement as HTMLElement,
+    );
 
     if (activeElement && !dialogRef.current?.contains(activeElement)) {
       event.preventDefault();
@@ -140,13 +153,24 @@ export const VoiceConfirmModal: React.FC = () => {
             </span>
             . Destructive commands are never executed blind.
           </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border border-[var(--border-neutral)] p-3 text-sm text-[var(--text-vivid)]">
+            <dt className="font-semibold">Action</dt>
+            <dd>{intent?.action ?? pendingDestructiveCommand.phrase}</dd>
+            <dt className="font-semibold">Amount</dt>
+            <dd>{intent?.amount ?? "Not specified in command"}</dd>
+            <dt className="font-semibold">Recipient</dt>
+            <dd>{intent?.recipient ?? "Not specified in command"}</dd>
+            <dt className="font-semibold">Stream</dt>
+            <dd>{intent?.stream ?? "Not specified in command"}</dd>
+          </dl>
         </div>
 
         {/* Spoken instructions */}
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex gap-2.5 items-center">
           <AlertTriangle size={16} className="flex-shrink-0" />
           <span>
-            Say <strong>"Confirm"</strong> or click button below to proceed. Say <strong>"Cancel"</strong> to abort.
+            Say <strong>"Confirm"</strong> or click button below to proceed. Say{" "}
+            <strong>"Cancel"</strong> to abort.
           </span>
         </div>
 

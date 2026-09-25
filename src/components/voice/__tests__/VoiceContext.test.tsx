@@ -95,6 +95,15 @@ function VoiceConsumer({
         phrase-unknown
       </button>
       <button
+        data-testid="phrase-ambiguous"
+        onClick={() => {
+          const r = ctx.processSpokenPhrase("stream");
+          onReturnValue?.(r);
+        }}
+      >
+        phrase-ambiguous
+      </button>
+      <button
         data-testid="phrase-confirm"
         onClick={() => ctx.processSpokenPhrase("confirm")}
       >
@@ -389,6 +398,22 @@ describe("VoiceContext — processSpokenPhrase: unrecognized phrase", () => {
     act(() => { vi.advanceTimersByTime(3000); });
     // Should still be command-recognized (or listening from its own timer)
     expect(screen.getByTestId("state").textContent).not.toBe("command-unrecognized");
+  });
+});
+
+describe("VoiceContext — ambiguous phrase safety", () => {
+  beforeEach(() => {
+    (window as any).SpeechRecognition = vi.fn();
+  });
+
+  it("does not choose the first command for an ambiguous stream phrase", () => {
+    const spy = vi.fn();
+    renderVoice("/app", spy);
+    fireEvent.click(screen.getByTestId("phrase-ambiguous"));
+    expect(screen.getByTestId("state").textContent).toBe("command-ambiguous");
+    expect(screen.getByTestId("recognized").textContent).toBe("none");
+    expect(screen.getByTestId("location").textContent).toBe("/app");
+    expect(spy).toHaveBeenCalledWith(false);
   });
 });
 

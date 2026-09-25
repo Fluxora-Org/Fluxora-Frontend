@@ -121,6 +121,14 @@ describe("ZeroAccrualBanner — action button visibility", () => {
     expect(button).toHaveAccessibleName("View streams");
     expect(button.textContent?.trim()).not.toBe("");
   });
+
+  it("falls back to defaultActionLabel when actionLabel is whitespace only", () => {
+    // actionLabel="   " is truthy but visually empty; the component must trim it.
+    renderBanner({ reason: "cliff", onAction: vi.fn(), actionLabel: "   " });
+    const button = screen.getByRole("button");
+    expect(button).toHaveAccessibleName("View stream details");
+    expect(button.textContent?.trim()).toBe("View stream details");
+  });
 });
 
 // ─── onAction callback ────────────────────────────────────────────────────────
@@ -228,6 +236,28 @@ describe("ZeroAccrualBanner — nextEventDate chip", () => {
   it("renders no chip when nextEventDate is an empty string", () => {
     renderBanner({ reason: "cliff", nextEventDate: "" });
     expect(screen.queryByText(/Cliff date:/i)).not.toBeInTheDocument();
+  });
+
+  it("renders chip when nextEventDate is a numeric timestamp string (JS parses '0' as epoch)", () => {
+    // new Date("0") → Jan 1, 2000 in JS. The component defers to native
+    // Date parsing; this test verifies the date is rendered without crashing.
+    renderBanner({ reason: "cliff", nextEventDate: "0" });
+    expect(screen.getByText(/Cliff date:/i)).toBeInTheDocument();
+  });
+
+  it("renders chip when nextEventDate has only a year component (JS parses '2027' as ISO year)", () => {
+    // new Date("2027") → Jan 1, 2027 in JS. The component defers to native
+    // Date parsing; this test verifies the date is rendered without crashing.
+    renderBanner({ reason: "cliff", nextEventDate: "2027" });
+    expect(screen.getByText(/Cliff date:/i)).toBeInTheDocument();
+  });
+
+  it("renders chip for valid date-time string with timezone offset", () => {
+    renderBanner({
+      reason: "schedule-future",
+      nextEventDate: "2027-08-01T12:00:00+05:30",
+    });
+    expect(screen.getByText(/Stream start:/i)).toBeInTheDocument();
   });
 });
 
@@ -410,5 +440,51 @@ describe("ZeroAccrualBanner — edge-case visibility locks", () => {
   it("suppresses rendering when isResponsiveHide is true", () => {
     const { container } = renderBanner({ reason: "cliff", isResponsiveHide: true });
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("suppresses rendering when ALL lock props are true simultaneously", () => {
+    const { container } = renderBanner({
+      reason: "cliff",
+      isLoading: true,
+      isEmpty: true,
+      isRetry: true,
+      isKeyboardOpen: true,
+      isResponsiveHide: true,
+    });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders normally when all lock props are explicitly false", () => {
+    const { container } = renderBanner({
+      reason: "cliff",
+      isLoading: false,
+      isEmpty: false,
+      isRetry: false,
+      isKeyboardOpen: false,
+      isResponsiveHide: false,
+    });
+    expect(container).not.toBeEmptyDOMElement();
+  });
+
+  it("removes banner from DOM (not just hidden) when suppressed", () => {
+    // Verify the banner element with role="status" is absent from the DOM,
+    // not merely visually hidden. Stale live regions can confuse AT.
+    const { container, rerender } = renderBanner({ reason: "cliff" });
+    expect(container.querySelector('[role="status"]')).toBeInTheDocument();
+
+    rerender(<ZeroAccrualBanner reason="cliff" isLoading />);
+    expect(container.querySelector('[role="status"]')).not.toBeInTheDocument();
+  });
+
+  it("does not crash on unknown reason and renders fallback content", () => {
+    // Simulates a runtime value that bypasses TypeScript (e.g. from an API).
+    const { container } = renderBanner({
+      reason: "unknown" as ZeroAccrualReason,
+    });
+    // Must not throw; fallback (rate-zero) content should render.
+    expect(container).not.toBeEmptyDOMElement();
+    expect(
+      screen.getByText("Streams configured with zero rate"),
+    ).toBeInTheDocument();
   });
 });

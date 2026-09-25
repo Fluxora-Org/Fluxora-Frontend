@@ -15,6 +15,20 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import RecentStreams, { type Stream, type StreamStatus } from '../RecentStreams';
 
+const mockTranslate = vi.fn((key: string, options?: { count?: number }) => {
+  if (key === 'recentStreams.foundMatchingStreams') {
+    const count = options?.count ?? 0;
+    if (count === 0) return 'No matching streams found.';
+    if (count === 1) return 'Found 1 matching stream.';
+    return `Found ${count} matching streams.`;
+  }
+  return key;
+});
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: mockTranslate }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -54,8 +68,19 @@ describe('RecentStreams', () => {
     renderWithRouter(<RecentStreams streams={streams} />);
 
     const liveRegion = document.querySelector('[aria-live="polite"]') as HTMLElement;
-    expect(liveRegion).toBeTruthy();
-    expect(liveRegion.textContent).toBe('Found 1 matching streams.');
+    expect(liveRegion.textContent).toBe('Found 1 matching stream.');
+  });
+
+  it('uses the plural form for multiple matching streams', () => {
+    const streams = [
+      makeStream({ id: 'stream-2' }),
+      makeStream({ id: 'stream-3' }),
+      makeStream({ id: 'stream-4' }),
+    ];
+    renderWithRouter(<RecentStreams streams={streams} />);
+
+    const liveRegion = document.querySelector('[aria-live="polite"]') as HTMLElement;
+    expect(liveRegion.textContent).toBe('Found 3 matching streams.');
   });
 
   it('sets the announcement to "No matching streams found." for an empty list', () => {

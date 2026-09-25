@@ -124,4 +124,34 @@ describe('CreateStreamModal — batch dry-run confirmation screen', () => {
     fireEvent.click(checkbox);
     expect(submitBtn).toBeEnabled();
   });
+
+  test('calculates totals excluding duplicate-recipient rows and shows duplicate warning', async () => {
+    // 1 unique valid row + 2 duplicate rows with identical address
+    const DUPLICATE_ROW_1 = `${VALID_ROW}`;
+    const DUPLICATE_ROW_2 = `${VALID_ROW}`;
+    await openDryRunStep(HEADER + SECOND_VALID_ROW + DUPLICATE_ROW_1 + DUPLICATE_ROW_2);
+
+    const region = screen.getByRole('region', { name: /Outcome preview/i });
+    // Total streams should be 1 (only SECOND_VALID_ROW is unique & valid)
+    expect(within(region).getByText('Total streams')).toBeInTheDocument();
+    expect(within(region).getByText('1')).toBeInTheDocument();
+    // Total deposit should be 200.00 (from SECOND_VALID_ROW only)
+    expect(within(region).getByText('200.00 USDC')).toBeInTheDocument();
+
+    // Check duplicate rows badge count
+    expect(within(region).getByText(/Duplicate recipients: 2/i)).toBeInTheDocument();
+
+    // Check per-row outcome table has "Duplicate — will skip" for duplicate rows
+    const duplicateOutcomes = screen.getAllByText('Duplicate — will skip');
+    expect(duplicateOutcomes).toHaveLength(2);
+
+    // Warning banner should be displayed for the duplicate rows
+    const warning = screen.getByRole('alert');
+    expect(warning).toHaveTextContent(/may fail mid-batch/i);
+
+    // Confirmation label should only count valid rows (1)
+    expect(
+      screen.getByText(/I understand this will create 1 streams/i),
+    ).toBeInTheDocument();
+  });
 });

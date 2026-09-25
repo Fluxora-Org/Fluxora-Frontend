@@ -3,8 +3,8 @@
 // The original suite (#770) was written against a planned
 // `isLoading`/`streams`/`error`/`onRetry`/`onEmptyPrimaryAction` prop shape
 // that never landed in the shipped component. The component today exposes
-// `fetchStreamsFn` (returns `Promise<Stream[]>`) and `pollIntervalMs`, so
-// the assertions are wired against the real API.
+// `fetchStreamsFn` (returns `Promise<{ streams, nextCursor }>`) and
+// `pollIntervalMs`, so the assertions are wired against the real API.
 //
 // See `src/components/recipient/RecipientStreams.tsx` for the source of truth.
 import { render, screen, waitFor } from "@testing-library/react";
@@ -14,6 +14,11 @@ import {
   RecipientStreams,
   type Stream,
 } from "../recipient/RecipientStreams";
+
+/** Wrap a Stream[] into the paginated response shape the component expects. */
+function page(streams: Stream[], nextCursor: string | null = null) {
+  return { streams, nextCursor };
+}
 
 const sampleStream: Stream = {
   id: "stream-1",
@@ -31,7 +36,7 @@ const pausedStream: Stream = {
   isPinned: false,
 };
 
-function renderWith(fetchStreamsFn: () => Promise<Stream[]>) {
+function renderWith(fetchStreamsFn: (cursor: string | null) => Promise<{ streams: Stream[]; nextCursor: string | null }>) {
   return render(
     <RecipientStreams fetchStreamsFn={fetchStreamsFn} pollIntervalMs={0} />,
   );
@@ -39,7 +44,7 @@ function renderWith(fetchStreamsFn: () => Promise<Stream[]>) {
 
 describe("RecipientStreams (real fetchStreamsFn API)", () => {
   it("renders nothing-while-loading, then renders streams once the fetcher resolves", async () => {
-    const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream]);
+    const fetchStreamsFn = vi.fn().mockResolvedValue(page([sampleStream]));
 
     renderWith(fetchStreamsFn);
 
@@ -71,7 +76,7 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
   });
 
   it("renders the manual refresh button labelled 'Refresh Status'", async () => {
-    const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream]);
+    const fetchStreamsFn = vi.fn().mockResolvedValue(page([sampleStream]));
 
     renderWith(fetchStreamsFn);
     await waitFor(() =>
@@ -90,7 +95,7 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
   });
 
   it("toggles the pinned state of a stream via the star button", async () => {
-    const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream]);
+    const fetchStreamsFn = vi.fn().mockResolvedValue(page([sampleStream]));
 
     renderWith(fetchStreamsFn);
     await waitFor(() =>
@@ -119,12 +124,12 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
       // the recovered (auto-clear) state; the first two retries have to
       // fail so retryCount reaches the escalation threshold (>= 2).
       const deferreds: {
-        resolve: (v: Stream[]) => void;
+        resolve: (v: { streams: Stream[]; nextCursor: string | null }) => void;
         reject: (e: Error) => void;
       }[] = [];
       const fetchStreamsFn = vi.fn().mockImplementation(
         () =>
-          new Promise<Stream[]>((resolve, reject) => {
+          new Promise<{ streams: Stream[]; nextCursor: string | null }>((resolve, reject) => {
             deferreds.push({ resolve, reject });
           }),
       );
@@ -193,7 +198,7 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
       expect(
         await screen.findByRole("button", { name: /refreshing/i }),
       ).toBeDisabled();
-      deferreds[3]!.resolve([sampleStream]);
+      deferreds[3]!.resolve(page([sampleStream]));
 
       await waitFor(() =>
         expect(
@@ -244,12 +249,12 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
 
   describe("Stream Filters", () => {
     it("filters streams by status when clicking filter buttons", async () => {
-      const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream, pausedStream]);
+      const fetchStreamsFn = vi.fn().mockResolvedValue(page([sampleStream, pausedStream]));
       renderWith(fetchStreamsFn);
-      
+
       const amountActive = new RegExp(`${String(sampleStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
       const amountPaused = new RegExp(`${String(pausedStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
-      
+
       // Wait for both streams to render initially
       await waitFor(() => {
         expect(screen.getByText(amountActive)).toBeInTheDocument();
@@ -259,36 +264,36 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
       // Click "Active" filter
       const activeFilter = screen.getByRole("button", { name: "Active" });
       await userEvent.click(activeFilter);
-      
+
       expect(screen.getByText(amountActive)).toBeInTheDocument();
       expect(screen.queryByText(amountPaused)).not.toBeInTheDocument();
 
       // Click "Paused" filter
       const pausedFilter = screen.getByRole("button", { name: "Paused" });
       await userEvent.click(pausedFilter);
-      
+
       expect(screen.queryByText(amountActive)).not.toBeInTheDocument();
       expect(screen.getByText(amountPaused)).toBeInTheDocument();
-      
+
       // Click "All" filter
       const allFilter = screen.getByRole("button", { name: "All" });
       await userEvent.click(allFilter);
-      
+
       expect(screen.getByText(amountActive)).toBeInTheDocument();
       expect(screen.getByText(amountPaused)).toBeInTheDocument();
     });
 
     it("displays specific empty state when a filter returns no streams and allows clearing filters", async () => {
-      const fetchStreamsFn = vi.fn().mockResolvedValue([sampleStream]);
+      const fetchStreamsFn = vi.fn().mockResolvedValue(page([sampleStream]));
       renderWith(fetchStreamsFn);
-      
+
       const amountActive = new RegExp(`${String(sampleStream.amount).replace(/[,]/g, "[,\\s]")}\\s+XLM`);
       await waitFor(() => expect(screen.getByText(amountActive)).toBeInTheDocument());
 
       // Click "Paused" filter which should yield no results
       const pausedFilter = screen.getByRole("button", { name: "Paused" });
       await userEvent.click(pausedFilter);
-      
+
       // The stream is hidden and the empty state is shown
       expect(screen.queryByText(amountActive)).not.toBeInTheDocument();
       expect(screen.getByText("No paused streams found.")).toBeInTheDocument();

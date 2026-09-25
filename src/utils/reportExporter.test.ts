@@ -5,6 +5,9 @@ import {
   buildReportCSV,
   downloadReportCSV,
   printReportAsPDF,
+  MAX_REPORT_RANGE_DAYS,
+  MAX_REPORT_ROWS,
+  ReportExportError,
 } from "./reportExporter";
 import type { Stream } from "../components/treasuryOverviewPage/Stream";
 
@@ -14,7 +17,7 @@ function makeStream(overrides: Partial<Stream>): Stream {
     name: "Test Stream",
     recipient: "GRECIPIENT",
     rate: "10 USDC",
-    status: "Active",
+    status: "Active", accruedAmount: 0, startDate: "2026-01-01",
     ...overrides,
   };
 }
@@ -41,13 +44,28 @@ describe("filterStreamsByDateRange", () => {
     const result = filterStreamsByDateRange(streams, "", "2026-03-31");
     expect(result.map((s) => s.id)).toEqual(["1", "2", "4"]);
   });
+
+  it("rejects malformed and oversized date ranges", () => {
+    expect(filterStreamsByDateRange(streams, "not-a-date", "2026-03-31")).toEqual([]);
+    const end = new Date(Date.UTC(2026, 0, 1 + MAX_REPORT_RANGE_DAYS));
+    expect(filterStreamsByDateRange(streams, "2026-01-01", end.toISOString().slice(0, 10))).toEqual([]);
+  });
+
+  it("caps unfiltered results deterministically", () => {
+    const largeInput = Array.from({ length: MAX_REPORT_ROWS + 2 }, (_, index) =>
+      makeStream({ id: String(index) }),
+    );
+    expect(filterStreamsByDateRange(largeInput, "", "")).toHaveLength(MAX_REPORT_ROWS);
+    const boundedResults = filterStreamsByDateRange(largeInput, "", "");
+    expect(boundedResults[boundedResults.length - 1]?.id).toBe(String(MAX_REPORT_ROWS - 1));
+  });
 });
 
 describe("groupStreams", () => {
   const streams: Stream[] = [
-    makeStream({ id: "1", recipient: "A", status: "Active" }),
-    makeStream({ id: "2", recipient: "B", status: "Paused" }),
-    makeStream({ id: "3", recipient: "A", status: "Completed" }),
+    makeStream({ id: "1", recipient: "A", status: "Active", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "2", recipient: "B", status: "Paused", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "3", recipient: "A", status: "Completed", accruedAmount: 0, startDate: "2026-01-01" }),
   ];
 
   it("returns a single ungrouped bucket for None", () => {
@@ -70,8 +88,8 @@ describe("groupStreams", () => {
 
 describe("buildReportCSV", () => {
   const streams: Stream[] = [
-    makeStream({ id: "1", name: "Stream One", recipient: "A", status: "Active" }),
-    makeStream({ id: "2", name: "Stream Two", recipient: "B", status: "Paused" }),
+    makeStream({ id: "1", name: "Stream One", recipient: "A", status: "Active", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "2", name: "Stream Two", recipient: "B", status: "Paused", accruedAmount: 0, startDate: "2026-01-01" }),
   ];
 
   it("includes a header row and one row per stream", () => {
@@ -95,6 +113,12 @@ describe("buildReportCSV", () => {
       "None"
     );
     expect(csv.split("\n")[1]).toBe('"Stream, ""special"""');
+  });
+
+  it("rejects unsupported fields and neutralizes hostile labels", () => {
+    expect(() => buildReportCSV(streams, ["unknown" as never], "None")).toThrow(ReportExportError);
+    const csv = buildReportCSV([makeStream({ name: "=SUM(A1:A2)" })], ["name"], "None");
+    expect(csv).toContain("'=SUM(A1:A2)");
   });
 });
 
@@ -121,7 +145,7 @@ describe("downloadReportCSV", () => {
     vi.spyOn(document.body, "removeChild").mockImplementation((node) => node);
 
     downloadReportCSV(
-      [makeStream({ name: "Alpha", status: "Active" })],
+      [makeStream({ name: "Alpha", status: "Active", accruedAmount: 0, startDate: "2026-01-01" })],
       ["name", "status"],
       "None",
       "Test-Report",
@@ -159,7 +183,7 @@ describe("printReportAsPDF", () => {
     vi.spyOn(window, "open").mockReturnValue(printWindow as unknown as Window);
 
     printReportAsPDF(
-      [makeStream({ name: "Alpha", status: "Active" })],
+      [makeStream({ name: "Alpha", status: "Active", accruedAmount: 0, startDate: "2026-01-01" })],
       ["name", "status"],
       "None",
     );
@@ -168,5 +192,22 @@ describe("printReportAsPDF", () => {
     expect(printWindow.document.close).toHaveBeenCalled();
     expect(printWindow.focus).toHaveBeenCalled();
     expect(printWindow.print).toHaveBeenCalled();
+  });
+
+  it("escapes hostile PDF labels and does not open a window when canceled", () => {
+    const printWindow = {
+      document: { write: vi.fn(), close: vi.fn() },
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    vi.spyOn(window, "open").mockReturnValue(printWindow as unknown as Window);
+    printReportAsPDF([makeStream({ name: "<img src=x onerror=alert(1)>" })], ["name"], "None");
+    expect(printWindow.document.write.mock.calls[0]![0]).toContain("&lt;img src=x onerror=alert(1)&gt;");
+
+    const controller = new AbortController();
+    controller.abort();
+    expect(() => downloadReportCSV([makeStream({})], ["name"], "None", "Report", controller.signal)).toThrow(
+      /canceled/i,
+    );
   });
 });

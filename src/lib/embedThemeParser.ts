@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /**
  * Embed Theme Parser
  * 
@@ -118,7 +120,7 @@ export function applyThemeConfigSafely(config: ThemeConfig): () => void {
     }
   } catch (error) {
     // Silently fail - theme application errors shouldn't break the widget
-    console.warn("Failed to apply theme configuration:", error);
+    logger.error("Failed to apply theme configuration", error);
   }
   
   // Return cleanup function
@@ -146,7 +148,7 @@ export function applyThemeConfigSafely(config: ThemeConfig): () => void {
       }
     } catch (error) {
       // Silently fail cleanup
-      console.warn("Failed to restore original theme:", error);
+      logger.error("Failed to restore original theme", error);
     }
   };
 }

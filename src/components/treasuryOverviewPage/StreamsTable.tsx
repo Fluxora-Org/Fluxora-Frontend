@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import StreamRow from "./StreamRow";
 import { Stream } from "./Stream";
+import { DemoDataBadge } from "./DemoBanner";
 import "./StreamsTable.css";
 
 export type SortColumn = "stream" | "recipient" | "rate" | "status";
@@ -13,14 +14,38 @@ interface Props {
    * Receives the two selected stream IDs in left-pane / right-pane order.
    */
   onCompare?: (leftId: string, rightId: string) => void;
+  isDemoMode?: boolean;
 }
 
-export default function StreamsTable({ streams, onCompare }: Props) {
+export default function StreamsTable({ streams, onCompare, isDemoMode }: Props) {
   /** IDs selected for comparison. Capped at 2. */
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showTrailingFade, setShowTrailingFade] = useState(false);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateFade = () => {
+      setShowTrailingFade(
+        container.scrollWidth > container.clientWidth + 1 &&
+          container.scrollLeft < container.scrollWidth - container.clientWidth - 1,
+      );
+    };
+
+    updateFade();
+    container.addEventListener("scroll", updateFade, { passive: true });
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(container);
+    return () => {
+      container.removeEventListener("scroll", updateFade);
+      observer.disconnect();
+    };
+  }, [streams.length, sortColumn, sortDirection]);
 
   // Legacy single-select kept for visual highlight; driven by compareIds[0].
   const selectedId = compareIds[0] ?? null;
@@ -218,7 +243,18 @@ export default function StreamsTable({ streams, onCompare }: Props) {
         </div>
       )}
 
+      <div className="streams-table-scroll-shell">
+      <div className="flex items-center gap-3 mb-2">
+        {isDemoMode && <DemoDataBadge />}
+      </div>
       <div
+        ref={scrollContainerRef}
+        onScroll={() => setShowTrailingFade(
+          scrollContainerRef.current
+            ? scrollContainerRef.current.scrollLeft <
+              scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth - 1
+            : false,
+        )}
         className="overflow-x-auto rounded-lg"
         style={{
           border: "1px solid var(--color-border-default)",
@@ -350,6 +386,8 @@ export default function StreamsTable({ streams, onCompare }: Props) {
             )}
           </tbody>
         </table>
+      </div>
+      {showTrailingFade && <div className="streams-table-trailing-fade" aria-hidden="true" />}
       </div>
     </div>
   );

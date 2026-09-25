@@ -1,89 +1,217 @@
-import { describe, expect, it } from "vitest";
-import * as fc from "fast-check";
+/**
+ * Property-based tests for src/lib/createStreamAmounts.ts (issue #1753 —
+ * "Assert amounts are never rendered through floating-point arithmetic").
+ *
+ * Every assertion compares the module's output against an **independent,
+ * contract-style exact computation**: the operands are materialised as integer
+ * minor units with `amountToSmallestUnits`, combined with `bigint` arithmetic,
+ * and only then formatted. Because that path never touches a `number`, equality
+ * proves the module's rendered figure matches the chain's integer value exactly.
+ *
+ * Invariants covered:
+ *  1. `sanitizeAmount` only ever emits ≤ 1 decimal point and ≤ AMOUNT_DECIMAL_PLACES
+ *     fractional digits, and is idempotent.
+ *  2. `parseAmountToMinorUnits` is an exact integer parse — never a float.
+ *  3. `calculateRequiredDeposit` equals the contract-computed value for
+ *     arbitrary inputs, including values far beyond 2^53.
+ *  4. Formatting ⟷ parsing is lossless (round-trip).
+ *  5. The deposit is monotonic in duration for a fixed rate.
+ */
+
+import { describe, it, expect } from "vitest";
+import fc from "fast-check";
+import { amountToSmallestUnits } from "../formatters";
 import {
   AMOUNT_DECIMAL_PLACES,
-  calculateRequiredDeposit,
-  parseAmount,
   sanitizeAmount,
+  parseAmountToMinorUnits,
+  formatAmountFromMinorUnits,
+  calculateRequiredDeposit,
 } from "../createStreamAmounts";
 
-const fcOptions = { numRuns: 120, seed: 294 };
-const adversarialAmount = fc.string({ minLength: 0, maxLength: 96 });
+const fcOptions = { numRuns: 250, seed: 1753 };
 
-function fractionalLength(value: string): number {
-  const [, fraction = ""] = value.split(".");
-  return fraction.length;
+const SCALE = 10n ** BigInt(AMOUNT_DECIMAL_PLACES);
+const MAX_FINITE_AMOUNT = 999_999_999_999_999n;
+const MAX_MINOR_UNITS = MAX_FINITE_AMOUNT * SCALE;
+
+/**
+ * Contract-side parse: uses the already-tested exact string→BigInt helper from
+ * `formatters.ts` (a different code path from `createStreamAmounts.ts`).
+ */
+function contractMinorUnits(value: string): bigint {
+  const minorUnits = amountToSmallestUnits(value, AMOUNT_DECIMAL_PLACES);
+  return minorUnits > MAX_MINOR_UNITS ? MAX_MINOR_UNITS : minorUnits;
 }
 
-describe("create stream amount parsing properties", () => {
-  it("handles representative malformed treasury amount strings deterministically", () => {
-    expect(sanitizeAmount("$001,234.5678 USDC")).toBe("001234.56");
-    expect(sanitizeAmount("12..34.56")).toBe("12.34");
-    expect(sanitizeAmount("-Infinity")).toBe("");
-    expect(parseAmount("-.5")).toBe(0.5);
-    expect(calculateRequiredDeposit("2.50", "4")).toBe("10.00");
+/** Contract-side required deposit, computed entirely in integer minor units. */
+function contractRequiredDepositMinor(rate: string, duration: string): bigint {
+  const product = contractMinorUnits(rate) * contractMinorUnits(duration);
+  const rounded = (product + SCALE / 2n) / SCALE;
+  return rounded > MAX_MINOR_UNITS ? MAX_MINOR_UNITS : rounded;
+}
+
+/**
+ * Deterministic amount-string arbitrary: up to 15 integer digits
+ * (the sanitizer's cap) with exactly two decimals.
+ */
+const fcAmountString = fc
+  .tuple(
+    fc.integer({ min: 0, max: 999_999_999_999_999 }),
+    fc.integer({ min: 0, max: 99 }),
+  )
+  .map(([whole, fraction]) => `${whole}.${fraction.toString().padStart(2, "0")}`);
+
+// ─── 1. sanitizeAmount ────────────────────────────────────────────────────────
+
+describe("sanitizeAmount property invariants", () => {
+  it("never emits more than one decimal point or more than AMOUNT_DECIMAL_PLACES decimals", () => {
+    fc.assert(
+      fc.property(fc.string({ minLength: 0, maxLength: 32 }), (input) => {
+        const sanitized = sanitizeAmount(input);
+        // "" is the rejection signal; anything else is a well-formed amount.
+        return /^(\d{0,15})(\.\d{0,2})?$/.test(sanitized);
+      }),
+      fcOptions,
+    );
   });
 
-  it("sanitizes adversarial amount strings to at most one decimal point and capped precision", () => {
+  it("is idempotent — sanitizing an already-sanitized value changes nothing", () => {
     fc.assert(
-      fc.property(adversarialAmount, (input) => {
-        const sanitized = sanitizeAmount(input);
+      fc.property(fc.string({ minLength: 0, maxLength: 32 }), (input) => {
+        const once = sanitizeAmount(input);
+        return sanitizeAmount(once) === once;
+      }),
+      fcOptions,
+    );
+  });
+});
 
-        expect(sanitized).toMatch(/^[0-9]*\.?[0-9]*$/);
-        expect((sanitized.match(/\./g) ?? []).length).toBeLessThanOrEqual(1);
-        expect(fractionalLength(sanitized)).toBeLessThanOrEqual(
-          AMOUNT_DECIMAL_PLACES,
+// ─── 2. parseAmountToMinorUnits ───────────────────────────────────────────────
+
+describe("parseAmountToMinorUnits exactness", () => {
+  it("always returns a bigint (never a floating-point number)", () => {
+    fc.assert(
+      fc.property(fcAmountString, (amount) => {
+        return typeof parseAmountToMinorUnits(amount) === "bigint";
+      }),
+      fcOptions,
+    );
+  });
+
+  it("equals the contract-computed integer minor units for arbitrary amounts", () => {
+    fc.assert(
+      fc.property(fcAmountString, (amount) => {
+        return parseAmountToMinorUnits(amount) === contractMinorUnits(amount);
+      }),
+      fcOptions,
+    );
+  });
+
+  it("returns an in-range non-negative value for arbitrary (possibly garbage) input", () => {
+    fc.assert(
+      fc.property(fc.string({ minLength: 0, maxLength: 24 }), (input) => {
+        const minorUnits = parseAmountToMinorUnits(input);
+        return minorUnits >= 0n && minorUnits <= MAX_MINOR_UNITS;
+      }),
+      fcOptions,
+    );
+  });
+});
+
+// ─── 3. calculateRequiredDeposit ──────────────────────────────────────────────
+
+describe("calculateRequiredDeposit equals the contract value", () => {
+  it("matches the exact integer deposit for arbitrary rate/duration pairs", () => {
+    fc.assert(
+      fc.property(fcAmountString, fcAmountString, (rate, duration) => {
+        const actual = calculateRequiredDeposit(rate, duration);
+        const expected = formatAmountFromMinorUnits(
+          contractRequiredDepositMinor(rate, duration),
+        );
+        return actual === expected;
+      }),
+      fcOptions,
+    );
+  });
+
+  it("never renders a value through floating point, even beyond 2^53", () => {
+    // 99999999999999.99 * 0.50 uses 16 significant digits.
+    // The old float path returned "49999999999999.99"; the exact value is:
+    expect(calculateRequiredDeposit("99999999999999.99", "0.50")).toBe(
+      "50000000000000.00",
+    );
+
+    // 123456789012345.67 * 7.25 — float returned "895061720339506.13".
+    expect(calculateRequiredDeposit("123456789012345.67", "7.25")).toBe(
+      "895061720339506.11",
+    );
+
+    // 100000000000000.01 is not representable as a double.
+    expect(parseAmountToMinorUnits("100000000000000.01")).toBe(
+      10000000000000001n,
+    );
+  });
+
+  it("rounds the exact product half-up to AMOUNT_DECIMAL_PLACES", () => {
+    // 0.05 * 1.10 = 0.0550 exactly → 0.06 when rounded half-up.
+    expect(calculateRequiredDeposit("0.05", "1.10")).toBe("0.06");
+    // 1.50 * 30 = 45.00
+    expect(calculateRequiredDeposit("1.50", "30")).toBe("45.00");
+  });
+});
+
+// ─── 4. Round-trip ────────────────────────────────────────────────────────────
+
+describe("format ⟷ parse round-trip", () => {
+  it("is lossless for arbitrary amounts", () => {
+    fc.assert(
+      fc.property(fcAmountString, (amount) => {
+        const minorUnits = parseAmountToMinorUnits(amount);
+        return (
+          parseAmountToMinorUnits(formatAmountFromMinorUnits(minorUnits)) ===
+          minorUnits
         );
       }),
       fcOptions,
     );
   });
 
-  it("parses every adversarial amount as a finite non-negative number", () => {
+  it("formats with exactly AMOUNT_DECIMAL_PLACES decimals", () => {
     fc.assert(
-      fc.property(adversarialAmount, (input) => {
-        const parsed = parseAmount(input);
-
-        expect(Number.isFinite(parsed)).toBe(true);
-        expect(parsed).toBeGreaterThanOrEqual(0);
+      fc.property(fcAmountString, (amount) => {
+        const formatted = formatAmountFromMinorUnits(
+          parseAmountToMinorUnits(amount),
+        );
+        const fraction = formatted.split(".")[1] ?? "";
+        return fraction.length === AMOUNT_DECIMAL_PLACES;
       }),
       fcOptions,
     );
   });
+});
 
-  it("returns finite non-negative required deposits with cents precision", () => {
-    fc.assert(
-      fc.property(adversarialAmount, adversarialAmount, (rate, duration) => {
-        const deposit = calculateRequiredDeposit(rate, duration);
-        const parsed = Number.parseFloat(deposit);
+// ─── 5. Monotonicity ──────────────────────────────────────────────────────────
 
-        expect(Number.isFinite(parsed)).toBe(true);
-        expect(parsed).toBeGreaterThanOrEqual(0);
-        expect(deposit).toMatch(/^\d+\.\d{2}$/);
-      }),
-      fcOptions,
-    );
-  });
-
-  it("keeps required deposit monotonic in duration for a fixed positive rate", () => {
+describe("calculateRequiredDeposit monotonicity", () => {
+  it("does not decrease as the duration grows for a fixed rate", () => {
     fc.assert(
       fc.property(
-        fc.double({ min: 0.01, max: 10_000, noNaN: true }),
-        fc.double({ min: 0, max: 10_000, noNaN: true }),
-        fc.double({ min: 0, max: 10_000, noNaN: true }),
-        (rate, firstDuration, secondDuration) => {
-          const lowDuration = Math.min(firstDuration, secondDuration).toFixed(2);
-          const highDuration = Math.max(firstDuration, secondDuration).toFixed(2);
-          const rateInput = rate.toFixed(2);
+        fcAmountString,
+        fcAmountString,
+        fcAmountString,
+        (rate, durationA, durationB) => {
+          const minorA = contractMinorUnits(durationA);
+          const minorB = contractMinorUnits(durationB);
 
-          const lowDeposit = Number.parseFloat(
-            calculateRequiredDeposit(rateInput, lowDuration),
+          const depositA = parseAmountToMinorUnits(
+            calculateRequiredDeposit(rate, durationA),
           );
-          const highDeposit = Number.parseFloat(
-            calculateRequiredDeposit(rateInput, highDuration),
+          const depositB = parseAmountToMinorUnits(
+            calculateRequiredDeposit(rate, durationB),
           );
 
-          expect(highDeposit).toBeGreaterThanOrEqual(lowDeposit);
+          return minorA <= minorB ? depositA <= depositB : depositB <= depositA;
         },
       ),
       fcOptions,

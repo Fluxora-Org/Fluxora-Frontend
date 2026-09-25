@@ -1,17 +1,234 @@
+import { useState, useEffect, useRef } from "react";
 import StreamTimeline from "../StreamTimeline";
 import { StreamRecord, StreamStatus } from "../../data/streamRecords";
 import { ThemeConfig } from "../../lib/embedThemeParser";
 import { formatNumber } from "../../lib/formatters";
 import "./EmbedWidgetLayouts.css";
 
-interface EmbedWidgetLayoutProps {
+const EMBED_MESSAGE_MAX_STRING_LENGTH = 500;
+const EMBED_MESSAGE_MAX_URL_LENGTH = 2048;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isDateString(value: unknown): value is string {
+  return isBoundedString(value, 32) && !Number.isNaN(Date.parse(value));
+}
+
+function isThemeConfig(value: unknown): value is ThemeConfig {
+  if (!isRecord(value) || Object.keys(value).length === 0) return false;
+  return Object.values(value).every((entry) =>
+    isBoundedString(entry, EMBED_MESSAGE_MAX_STRING_LENGTH)
+  );
+}
+
+function isStream(value: unknown): value is StreamRecord {
+  if (!isRecord(value)) return false;
+  return (
+    isBoundedString(value.name, 200) &&
+    isBoundedString(value.asset, 20) &&
+    (value.status === "Active" || value.status === "Paused" || value.status === "Completed") &&
+    isDateString(value.startDate) &&
+    (value.cliffDate === null || value.cliffDate === undefined || isDateString(value.cliffDate)) &&
+    isDateString(value.endDate) &&
+    isFiniteNumber(value.depositAmount) && value.depositAmount >= 0 &&
+    isFiniteNumber(value.monthlyRate) && value.monthlyRate >= 0 &&
+    isFiniteNumber(value.streamedAmount) && value.streamedAmount >= 0 &&
+    isFiniteNumber(value.remainingAmount) && value.remainingAmount >= 0 &&
+    isFiniteNumber(value.withdrawableAmount) && value.withdrawableAmount >= 0 &&
+    isFiniteNumber(value.progress) && value.progress >= 0 && value.progress <= 100
+  );
+}
+
+function isSafeUrl(value: string): boolean {
+  if (value.length === 0 || value.length > EMBED_MESSAGE_MAX_URL_LENGTH) return false;
+  try {
+    const parsed = new URL(value, "https://floxora.local");
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export interface EmbedThemeMessage {
+  type: "theme";
+  theme: ThemeConfig;
+}
+
+export interface EmbedStreamMessage {
+  type: "stream";
+  stream: StreamRecord;
+  currentDate?: string;
+}
+
+export interface EmbedNavigateMessage {
+  type: "navigate";
+  url: string;
+  target?: "_blank" | "_self" | "_top" | "_parent";
+}
+
+export type EmbedMessage =
+  | EmbedThemeMessage
+  | EmbedStreamMessage
+  | EmbedNavigateMessage;
+
+export function validateEmbedMessage(message: unknown): message is EmbedMessage {
+  if (!isRecord(message) || !isBoundedString(message.type, 20)) return false;
+  switch (message.type) {
+    case "theme":
+      return "theme" in message && isThemeConfig(message.theme);
+    case "stream":
+      return (
+        "stream" in message &&
+        isStream(message.stream) &&
+        (message.currentDate === undefined || isDateString(message.currentDate))
+      );
+    case "navigate":
+      return (
+        "url" in message &&
+        typeof message.url === "string" &&
+        isSafeUrl(message.url) &&
+        (message.target === undefined ||
+          message.target === "_blank" ||
+          message.target === "_self" ||
+          message.target === "_top" ||
+          message.target === "_parent")
+      );
+    default:
+      return false;
+  }
+}
+
+export interface EmbedLayoutMinDimensions {
+  minWidth: number;
+  minHeight: number;
+}
+
+/**
+ * Documented minimum supported sizes per layout preset.
+ * Below these dimensions, layouts degrade deliberately to prevent
+ * unreadable text or clipped/overlapping content.
+ */
+export const EMBED_LAYOUT_MIN_DIMENSIONS: Record<
+  "card" | "banner" | "compact",
+  EmbedLayoutMinDimensions
+> = {
+  card: { minWidth: 300, minHeight: 250 },
+  banner: { minWidth: 500, minHeight: 80 },
+  compact: { minWidth: 200, minHeight: 50 },
+};
+
+export interface EmbedWidgetLayoutProps {
   stream: StreamRecord;
   currentDate: string;
   themeConfig: ThemeConfig;
+  width?: number;
+  height?: number;
+}
+
+function useMinDimensions(
+  ref: React.RefObject<HTMLDivElement | null>,
+  minWidth: number,
+  minHeight: number,
+  overrideWidth?: number,
+  overrideHeight?: number
+) {
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
+    width: overrideWidth ?? 0,
+    height: overrideHeight ?? 0,
+  });
+
+  useEffect(() => {
+    if (overrideWidth !== undefined || overrideHeight !== undefined) {
+      setDimensions({
+        width: overrideWidth ?? 0,
+        height: overrideHeight ?? 0,
+      });
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+
+    const updateSize = () => {
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || el.offsetWidth || 0;
+      const h = rect.height || el.offsetHeight || 0;
+      if (w > 0 || h > 0) {
+        setDimensions({ width: w, height: h });
+      }
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const rect = entry.contentRect;
+          const w = rect.width || entry.borderBoxSize?.[0]?.inlineSize || 0;
+          const h = rect.height || entry.borderBoxSize?.[0]?.blockSize || 0;
+          if (w > 0 || h > 0) {
+            setDimensions({ width: w, height: h });
+          }
+        }
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+  }, [ref, overrideWidth, overrideHeight]);
+
+  const isBelowMin =
+    (dimensions.width > 0 && dimensions.width < minWidth) ||
+    (dimensions.height > 0 && dimensions.height < minHeight);
+
+  return { dimensions, isBelowMin };
+}
+
+interface EmbedWidgetDegradedSizeProps {
+  layoutName: "card" | "banner" | "compact";
+  stream: StreamRecord;
+  dimensions: { width: number; height: number };
+  minDimensions: EmbedLayoutMinDimensions;
+}
+
+function EmbedWidgetDegradedSize({
+  layoutName,
+  stream,
+  dimensions,
+  minDimensions,
+}: EmbedWidgetDegradedSizeProps) {
+  return (
+    <div
+      className="embed-widget-degraded-size"
+      role="article"
+      aria-label={`Stream widget: ${stream.name} (undersized)`}
+      data-testid="embed-widget-degraded-size"
+      data-layout={layoutName}
+    >
+      <div className="embed-widget-degraded-size__header">
+        <span className="embed-widget-degraded-size__title">{stream.name}</span>
+        <StatusBadge status={stream.status} compact />
+      </div>
+      <p className="embed-widget-degraded-size__notice">
+        Widget size too small ({dimensions.width}×{dimensions.height}px). Minimum supported size for {layoutName} layout is {minDimensions.minWidth}×{minDimensions.minHeight}px.
+      </p>
+    </div>
+  );
 }
 
 /**
  * Card Layout - Designed for narrow sidebars (300px-420px)
+ * 
+ * Minimum supported size: 300px × 250px
  * 
  * Features:
  * - Stream title and status badge
@@ -22,15 +239,45 @@ interface EmbedWidgetLayoutProps {
  */
 export function EmbedWidgetLayoutCard({ 
   stream, 
-  currentDate 
+  currentDate,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.card;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-card embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="card"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
   
   return (
     <div 
+      ref={containerRef}
       className="embed-widget-card"
       role="article"
       aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
     >
       {/* Header with title and status */}
       <div className="embed-widget-card__header">
@@ -124,6 +371,8 @@ export function EmbedWidgetLayoutCard({
 /**
  * Banner Layout - Horizontal layout optimized for 600px+ widths
  * 
+ * Minimum supported size: 500px × 80px
+ * 
  * Features:
  * - Title and status
  * - Timeline visualization
@@ -133,15 +382,45 @@ export function EmbedWidgetLayoutCard({
  */
 export function EmbedWidgetLayoutBanner({ 
   stream, 
-  currentDate 
+  currentDate,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.banner;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-banner embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="banner"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
   
   return (
     <div 
+      ref={containerRef}
       className="embed-widget-banner"
       role="article"
       aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
     >
       {/* Left section: Title and status */}
       <div className="embed-widget-banner__info">
@@ -200,6 +479,8 @@ export function EmbedWidgetLayoutBanner({
 /**
  * Compact Layout - Minimal layout optimized for 200-300px widths
  * 
+ * Minimum supported size: 200px × 50px
+ * 
  * Features:
  * - Status badge
  * - Progress percentage
@@ -207,13 +488,43 @@ export function EmbedWidgetLayoutBanner({
  * - Attribution
  */
 export function EmbedWidgetLayoutCompact({ 
-  stream 
+  stream,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.compact;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-compact embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="compact"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   return (
     <div 
+      ref={containerRef}
       className="embed-widget-compact"
       role="article"
       aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
     >
       {/* Status and progress in a single row */}
       <div className="embed-widget-compact__main">

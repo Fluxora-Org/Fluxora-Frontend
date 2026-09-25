@@ -65,24 +65,48 @@ export const Pagination: React.FC<PaginationProps> = ({
   }
 
   return (
-    <nav data-testid="pagination-container" className="pagination-container fluxora-pagination">
+      <nav
+        data-testid="pagination-container"
+        className="pagination-container fluxora-pagination"
+        aria-label="Pagination"
+      >
       <div className="page-buttons">
         <button
           onClick={() => onPageChange(normalizedPage - 1)}
           disabled={normalizedPage <= 1}
+          aria-disabled={normalizedPage <= 1}
           className="page-nav-btn"
+          aria-label="Go to previous page"
         >
           Previous
         </button>
 
-        <span data-testid="pagination-info" className="pagination-info">
+        <span data-testid="pagination-info" className="pagination-info" aria-live="polite" aria-atomic="true">
           Page {normalizedPage} of {totalPages}
         </span>
 
+        <div className="page-number-list" aria-label="Pages">
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={`page-num-btn${page === normalizedPage ? ' is-active' : ''}`}
+              aria-current={page === normalizedPage ? 'page' : undefined}
+              aria-label={page === normalizedPage ? `Page ${page}` : `Go to page ${page}`}
+              onClick={() => onPageChange(page)}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+
         <button
+          type="button"
           onClick={() => onPageChange(normalizedPage + 1)}
           disabled={normalizedPage >= totalPages}
+          aria-disabled={normalizedPage >= totalPages}
           className="page-nav-btn"
+          aria-label="Go to next page"
         >
           Next
         </button>

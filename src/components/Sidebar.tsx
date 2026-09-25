@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type TouchEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   VIEWPORT_RESIZE_DEBOUNCE_MS,
@@ -30,6 +30,9 @@ interface SidebarProps {
   onResetUnread?: () => void;
 }
 
+const SIDEBAR_SWIPE_DISTANCE_PX = 64;
+const SIDEBAR_SWIPE_VELOCITY_PX_PER_MS = 0.35;
+
 export default function Sidebar({
   collapsed,
   onToggleCollapse,
@@ -41,6 +44,31 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const mobileOpenerRef = useRef<HTMLElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
+    if (!mobileOpen || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLElement>) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || !mobileOpen) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const elapsed = Math.max(1, Date.now() - start.time);
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isFastEnough = Math.abs(deltaX) / elapsed >= SIDEBAR_SWIPE_VELOCITY_PX_PER_MS;
+
+    if (isHorizontal && deltaX < 0 && (Math.abs(deltaX) >= SIDEBAR_SWIPE_DISTANCE_PX || isFastEnough)) {
+      onMobileClose();
+    }
+  }
 
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
@@ -86,18 +114,47 @@ export default function Sidebar({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen, onMobileClose]);
 
-  // Focus trapping
+  // Move focus into the drawer on open, trap it while open, and return focus
+  // to the control that opened the drawer after it closes.
   useEffect(() => {
-    if (!mobileOpen || !sidebarRef.current) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
 
-    const focusableElements = sidebarRef.current.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstElement = focusableElements[0] as HTMLElement;
-    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const getFocusableElements = () =>
+      Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
+      );
+
+    if (!mobileOpen) {
+      mobileOpenerRef.current?.focus();
+      mobileOpenerRef.current = null;
+      return;
+    }
+
+    if (!sidebar.contains(document.activeElement)) {
+      mobileOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
+
+    const focusableElements = getFocusableElements();
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    firstElement?.focus();
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
+
+      if (focusableElements.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      if (!sidebar.contains(document.activeElement)) {
+        firstElement.focus();
+        e.preventDefault();
+        return;
+      }
 
       if (e.shiftKey) {
         if (document.activeElement === firstElement) {
@@ -142,6 +199,8 @@ export default function Sidebar({
       {/* Sidebar Drawer */}
       <aside
         ref={sidebarRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         id="app-sidebar"
         className={cn(
           "fixed left-0 top-0 z-50 h-screen bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col",
