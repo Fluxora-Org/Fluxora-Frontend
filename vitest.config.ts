@@ -92,6 +92,12 @@ export default defineConfig({
         // Issue #1656: keyboard shortcuts must not conflict with assistive technology
         "src/components/KeyboardShortcutsModal.tsx",
         "src/hooks/useKeyboardShortcuts.ts",
+        // Issue #1669: zero-accrual banner condition utility
+        "src/lib/zeroAccrualBannerCondition.ts",
+        // Issue #1724: Input ARIA invalid state (component already covered; utility explicit)
+        "src/components/Input.tsx",
+        // Issue #1788: focus management on route change
+        "src/hooks/useRouteFocus.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
