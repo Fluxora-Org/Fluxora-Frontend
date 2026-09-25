@@ -17,7 +17,9 @@ describe('computeStreamEndDate', () => {
   });
 
   it('returns null for non-Date input', () => {
-    // @ts-expect-error intentional bad input
+    // @ts-expect-error — guardrail test: proves the validation branch rejects
+    // non-Date input. The parameter must go on accepting only Date; once the
+    // runtime guard is removed from createStreamDates.ts, drop this case.
     expect(computeStreamEndDate('2025-01-01', 1)).toBeNull();
   });
 

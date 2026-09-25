@@ -3,11 +3,21 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EmbedStreamWidget from '../EmbedStreamWidget';
 import { getStreamById } from '../../lib/api/streamsService';
+import { getFramingContext } from '../../lib/embedFramingPolicy';
 
 // Mock the streams service
 vi.mock('../../lib/api/streamsService', () => ({
   getStreamById: vi.fn()
 }));
+
+// Framing trust is mocked so the widget tests exercise the trusted and
+// degraded render paths deterministically; the policy itself is unit-tested in
+// src/lib/__tests__/embedFramingPolicy.test.ts.
+vi.mock('../../lib/embedFramingPolicy', () => ({
+  getFramingContext: vi.fn()
+}));
+
+const mockedGetFramingContext = vi.mocked(getFramingContext);
 
 // Mock the useTickingNow hook
 vi.mock('../../hooks/useTickingNow', () => ({
@@ -49,6 +59,13 @@ const mockStream = {
 describe('EmbedStreamWidget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Existing tests assume the full (trusted) widget; framing-specific tests
+    // override this per test.
+    mockedGetFramingContext.mockReturnValue({
+      trusted: true,
+      isFramed: true,
+      embedderOrigin: 'https://host.example'
+    });
   });
 
   afterEach(() => {
@@ -252,6 +269,39 @@ describe('EmbedStreamWidget', () => {
         expect(screen.getByText('40%')).toBeInTheDocument();
         expect(screen.getByText('Fluxora')).toBeInTheDocument();
       });
+    });
+
+    it('states which network and stream it renders', async () => {
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('note')).toHaveTextContent('Testnet · Stream STR-001');
+      });
+    });
+
+    it('degrades safely when the framing origin is not allowlisted (hostile framing)', async () => {
+      mockedGetFramingContext.mockReturnValue({
+        trusted: false,
+        isFramed: true,
+        embedderOrigin: 'https://evil.example'
+      });
+
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        // Identity + network disclosure remain so viewers know what this is.
+        expect(screen.getByTestId('embed-degraded-state')).toBeInTheDocument();
+        expect(screen.getByText('Test Stream')).toBeInTheDocument();
+        expect(screen.getByText(/could not verify the page/)).toBeInTheDocument();
+        expect(screen.getByRole('note')).toHaveTextContent('Testnet · Stream STR-001');
+      });
+
+      // No sensitive figures leak into the degraded render: no progress, no
+      // rates/amounts, no timeline, no branding.
+      expect(screen.queryByText('40%')).not.toBeInTheDocument();
+      expect(screen.queryByText(/USDC/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Powered by Fluxora/)).not.toBeInTheDocument();
     });
 
     it('applies dark theme', async () => {
@@ -1010,6 +1060,66 @@ describe('EmbedStreamWidget', () => {
       await waitFor(() => {
         const container = document.querySelector('.embed-widget-container') as HTMLElement;
         expect(container.style.isolation).toBe('isolate');
+      });
+    });
+  });
+
+  describe('PostMessage Integration Contract', () => {
+    it('responds to valid theme messages by updating the container theme', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "theme",
+          theme: "dark",
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container?.getAttribute('data-theme')).toBe('dark');
+      });
+    });
+
+    it('responds to valid resize messages by updating container styles', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "resize",
+          width: 500,
+          height: 800,
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container') as HTMLElement;
+        expect(container.style.maxWidth).toBe('500px');
+        expect(container.style.minHeight).toBe('800px');
       });
     });
   });

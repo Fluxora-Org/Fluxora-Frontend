@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import type { StreamRecord } from "../data/streamRecords";
 import StreamOGImageTemplate from "./StreamOGImageTemplate";
 import { X, Share2, Copy, Check } from "lucide-react";
+import { useModalAccessibility } from "./useModalAccessibility";
 
 interface StreamOGPreviewModalProps {
   stream: StreamRecord;
   isOpen: boolean;
   onClose: () => void;
+  triggerRef?: React.RefObject<HTMLElement>;
 }
 
 /**
@@ -20,39 +22,31 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
   stream,
   isOpen,
   onClose,
+  triggerRef,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  useModalAccessibility({
+    isOpen,
+    onClose,
+    modalRef,
+    initialFocusRef: closeButtonRef,
+    returnFocusRef: triggerRef,
+  });
+
   // Compute OG Image URL with cache-busting timestamp
-  const parsedEndDate = stream.endDate ? Date.parse(stream.endDate) : Number.NaN;
+  const parsedEndDate = stream.endDate
+    ? Date.parse(stream.endDate)
+    : Number.NaN;
   const timestamp = Number.isFinite(parsedEndDate) ? parsedEndDate : 0;
   const ogImageUrl = `https://fluxora.app/og-image/${stream.id}.png?v=${timestamp}`;
-  const streamPageUrl = typeof window !== "undefined" ? window.location.href : `https://fluxora.app/app/streams/${stream.id}`;
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Focus close button on open
-    const focusTimeout = setTimeout(() => {
-      closeButtonRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      clearTimeout(focusTimeout);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const streamPageUrl =
+    typeof window !== "undefined"
+      ? window.location.href
+      : `https://fluxora.app/app/streams/${stream.id}`;
 
   if (!isOpen) return null;
 
@@ -107,6 +101,7 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
       aria-modal="true"
       aria-labelledby="og-preview-title"
       ref={modalRef}
+      tabIndex={-1}
       onClick={(e) => {
         if (e.target === modalRef.current) onClose();
       }}
@@ -155,7 +150,8 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
                 margin: "0.25rem 0 0 0",
               }}
             >
-              Auto-generated 1200x630 card for social share previews (Twitter, LinkedIn, Slack)
+              Auto-generated 1200x630 card for social share previews (Twitter,
+              LinkedIn, Slack)
             </p>
           </div>
 
@@ -163,6 +159,8 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
             ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close social preview modal"
+            type="button"
+            data-testid="close-og-preview-btn"
             style={{
               background: "rgba(255, 255, 255, 0.08)",
               border: "1px solid rgba(255, 255, 255, 0.12)",
@@ -232,6 +230,8 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button
               onClick={handleCopyOgUrl}
+              type="button"
+              data-testid="copy-og-url-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -246,12 +246,18 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
                 cursor: "pointer",
               }}
             >
-              {copiedUrl ? <Check size={16} color="#34D399" /> : <Copy size={16} />}
+              {copiedUrl ? (
+                <Check size={16} color="#34D399" />
+              ) : (
+                <Copy size={16} />
+              )}
               <span>{copiedUrl ? "Copied URL!" : "Copy Image URL"}</span>
             </button>
 
             <button
               onClick={handleShareOrCopyStream}
+              type="button"
+              data-testid="share-og-stream-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -267,11 +273,7 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
                 boxShadow: "0 4px 12px rgba(6, 182, 212, 0.3)",
               }}
             >
-              {copiedLink ? (
-                <Check size={16} />
-              ) : (
-                <Share2 size={16} />
-              )}
+              {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
               <span>{copiedLink ? "Copied Stream Link!" : "Share Stream"}</span>
             </button>
           </div>

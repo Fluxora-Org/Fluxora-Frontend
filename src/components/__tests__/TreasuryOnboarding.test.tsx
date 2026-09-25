@@ -60,7 +60,7 @@ beforeEach(() => {
     expectedNetworkLabel: "Testnet",
     isNetworkMismatch: false,
     connect: vi.fn(),
-    disconnect: vi.fn(),
+    disconnect: vi.fn(), accountContextVersion: 1, connectionStatus: "connected", reconnect: vi.fn(),
   });
 });
 
@@ -133,7 +133,7 @@ describe("TreasuryOnboarding — step content", () => {
       expectedNetworkLabel: "Public Network (Mainnet)",
       isNetworkMismatch: false,
       connect: vi.fn(),
-      disconnect: vi.fn(),
+      disconnect: vi.fn(), accountContextVersion: 1, connectionStatus: "connected", reconnect: vi.fn(),
     });
     const user = userEvent.setup();
     renderOnboarding();

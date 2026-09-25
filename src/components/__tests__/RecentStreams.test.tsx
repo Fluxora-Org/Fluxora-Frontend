@@ -15,6 +15,20 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import RecentStreams, { type Stream, type StreamStatus } from '../RecentStreams';
 
+const mockTranslate = vi.fn((key: string, options?: { count?: number }) => {
+  if (key === 'recentStreams.foundMatchingStreams') {
+    const count = options?.count ?? 0;
+    if (count === 0) return 'No matching streams found.';
+    if (count === 1) return 'Found 1 matching stream.';
+    return `Found ${count} matching streams.`;
+  }
+  return key;
+});
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: mockTranslate }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

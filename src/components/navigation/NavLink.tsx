@@ -62,6 +62,9 @@ function segmentMatch(pathname: string, to: string, end = false): boolean {
  * - Icon + label support
  * - Keyboard accessible (Tab, Enter)
  * - `end` prop for exact-match index links
+ * - Active state conveyed beyond colour: an extra rendered marker plus an
+ *   underline and weight change, all of which survive greyscale and every
+ *   colour-blind simulation (issue #1741)
  */
 export default function NavLink({
   to,
@@ -92,6 +95,7 @@ export default function NavLink({
       aria-current={isActive ? "page" : undefined}
       aria-disabled={disabled ? "true" : undefined}
       tabIndex={disabled ? -1 : undefined}
+      data-active={isActive ? "true" : "false"}
       className={[
         styles.navItem,
         disabled ? styles.disabled : "",
@@ -103,6 +107,22 @@ export default function NavLink({
     >
       {icon && <span className={styles.navIcon}>{icon}</span>}
       <span className={styles.navLabel}>{label}</span>
+      {/*
+       * Non-colour active cue (issue #1741): the slot always reserves
+       * its space so navigation causes no layout shift, and the marker
+       * inside is rendered only for the active route. Its *presence* —
+       * a solid geometric shape — stays identifiable in greyscale and
+       * under every colour-blind simulation. Decorative: the
+       * programmatic cue is `aria-current="page"`.
+       */}
+      <span className={styles.activeSlot} aria-hidden="true">
+        {isActive && (
+          <span
+            className={styles.activeIndicator}
+            data-testid="navlink-active-indicator"
+          />
+        )}
+      </span>
     </Link>
   );
 }

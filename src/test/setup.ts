@@ -5,6 +5,13 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import { webcrypto, randomBytes } from 'node:crypto';
 import { en as mockEn } from '../i18n/en';
 
+// Default the configuration validation to a valid, mock-backed environment so
+// component tests can render <App /> and the lazy route/error-boundary flows
+// without requiring VITE_* secrets in the runner (see src/lib/config.ts).
+// Individual tests may still override these with vi.stubEnv / vi.unstubAllEnvs.
+vi.stubEnv('VITE_NETWORK', 'TESTNET');
+vi.stubEnv('VITE_USE_MOCKS', 'true');
+
 const mockT = (key: string, params?: any): string => {
   let resolvedKey = key as string;
   if (params && typeof params.count === 'number') {
@@ -126,8 +133,10 @@ const createStorageMock = () => {
   } as unknown as Storage;
 };
 if (typeof window !== 'undefined') {
-  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
-  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+  // configurable so tests can simulate blocked site data, where merely
+  // accessing window.localStorage throws a SecurityError.
+  Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true, configurable: true });
+  Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true, configurable: true });
 }
 
 // jsdom 26 does not implement Blob.prototype.text / File.prototype.text

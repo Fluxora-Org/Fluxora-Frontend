@@ -13,7 +13,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     // Playwright owns the e2e/ specs; keep them out of the vitest run.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    // .kilo/.kiro are benchmark-tooling worktree/spec artifacts, never tests.
+    exclude: [
+      ...configDefaults.exclude,
+      "e2e/**",
+      ".kilo/**",
+      ".kiro/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -43,6 +49,7 @@ export default defineConfig({
         "src/components/treasuryOverviewPage/useTreasury.ts",
         "src/components/wallet-connect/Walletbutton.tsx",
         "src/components/wallet-connect/useWalletStateMachine.ts",
+        "src/components/wallet-connect/WalletConnectionNotice.tsx",
         "src/components/ConnectWalletModal.tsx",
         "src/data/streamRecords.ts",
         "src/fixtures/malformedStreamRecords.ts",
@@ -55,6 +62,7 @@ export default defineConfig({
         "src/lib/sorobanTxStatus.ts",
         "src/theme/ThemeProvider.tsx",
         "src/theme/themeBootstrap.ts",
+        "src/theme/themeEditorModel.ts",
         // Colour-blind simulation module
         "src/components/colorBlindSimulation/ColorBlindSimulationProvider.tsx",
         "src/components/colorBlindSimulation/ColorBlindToggle.tsx",
@@ -81,6 +89,9 @@ export default defineConfig({
         // Issue #1410: split Streams page data loading from table rendering
         "src/pages/useStreamsData.ts",
         "src/components/Streams/StreamsListPanel.tsx",
+        // Issue #1656: keyboard shortcuts must not conflict with assistive technology
+        "src/components/KeyboardShortcutsModal.tsx",
+        "src/hooks/useKeyboardShortcuts.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

@@ -68,6 +68,7 @@ export const en = {
   "createStream.step2.customStartDateHelper": "When the stream begins accruing USDC",
   "createStream.step2.cliffPeriodLabel": "Cliff period",
   "createStream.step2.optionalLabel": "(optional)",
+  "createStream.step2.cliffHint": "Funds accrue during the cliff and become withdrawable after the cliff date",
   "createStream.step2.cliffTooltipTitle": "What is a cliff?",
   "createStream.step2.cliffTooltipAria": "Learn more about cliff periods",
   "createStream.step2.cliffTooltipBody1": "A cliff is a vesting lockup period. During the cliff:",
@@ -144,10 +145,17 @@ export const en = {
   "createStream.validation.cliffDatePast": "Cliff date must not be in the past.",
   "createStream.validation.cliffDateAfterStart": "Cliff date must be on or after the start date.",
   "createStream.validation.walletNotConnected": "Please connect your wallet first.",
+  "createStream.validation.walletConnectionLost": "Wallet connection lost. Reconnect your wallet to continue — your entries are kept.",
   "createStream.validation.networkMismatch": "Wrong Stellar network. Expected {expected}, but wallet is connected to {actual}. Please switch network in Freighter.",
   "createStream.error.generic": "Stream creation failed. Please try again.",
   "createStream.error.failedWithMessage": "Failed to create stream: {message}",
   "createStream.success.message": "Stream created successfully on-chain!",
+
+  // ─── WalletConnectionNotice (dropped connection, #1678) ──────────────────────
+  "walletConnection.ariaLabel": "Wallet connection status",
+  "walletConnection.lost": "Wallet connection lost. Your progress is kept.",
+  "walletConnection.reconnecting": "Reconnecting wallet…",
+  "walletConnection.reconnectButton": "Reconnect wallet",
 
   // ─── ConnectWalletModal ───────────────────────────────────────────────────────
 

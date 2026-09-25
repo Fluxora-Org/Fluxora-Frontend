@@ -20,6 +20,7 @@ describe("ToastNotification aria-live semantics", () => {
       const el = screen.getByRole(expectedRole as "alert" | "status");
       expect(el).toHaveAttribute("aria-live", expectedLive);
       expect(el).toHaveAttribute("aria-atomic", "true");
+      expect(el).not.toHaveAttribute("aria-label");
     },
   );
 
@@ -32,6 +33,7 @@ describe("ToastNotification aria-live semantics", () => {
     const el = screen.getByRole("alert");
     expect(el).toHaveAttribute("aria-live", "assertive");
     expect(el).toHaveAttribute("aria-atomic", "true");
+      expect(el).not.toHaveAttribute("aria-label");
     expect(screen.getByText("unknown msg")).toBeInTheDocument();
   });
 
@@ -78,3 +80,4 @@ describe("ToastNotification keyboard interactions", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+

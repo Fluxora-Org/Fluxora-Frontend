@@ -2,6 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
+import {
+  formatAmountString,
+  multiplyAmountStrings,
+  parseAmountString,
+  toSmallestUnitsString,
+} from '../lib/amountPrecision';
 import { InfoTooltip } from './InfoTooltip';
 import { useModalAccessibility } from './useModalAccessibility';
 import { useWallet } from './wallet-connect/Walletcontext';
@@ -98,32 +104,40 @@ export const MAX_DURATION_DAYS = 3_650;
 export const MAX_REQUIRED_DEPOSIT = MAX_ACCRUAL_RATE * MAX_DURATION_DAYS;
 
 /**
- * Converts a user-entered decimal string into the numeric value used by stream
- * rate, duration, and deposit calculations.
+ * Converts a user-entered decimal string into a numeric value.
+ *
+ * Used only for range/threshold checks (rate and duration bounds, unit counts).
+ * The value that is presented or submitted to the contract must go through the
+ * exact, string-based helpers below so it never round-trips through a
+ * floating-point number.
  */
 function parseStreamNumber(value: string): number {
-  return parseFloat(value.replace(/,/g, ""));
+  const exact = parseAmountString(value.replace(/,/g, ""));
+  return exact === "" ? NaN : Number(exact);
 }
 
 /**
  * Calculates the total USDC deposit required for a daily stream rate across the
- * entered duration in days.
+ * entered duration in days using exact decimal arithmetic (no `number`).
  */
 function calculateRequiredDeposit(
   dailyRate: string,
   durationDays: string,
 ): string {
-  return (
-    parseStreamNumber(dailyRate || "0") * parseStreamNumber(durationDays || "0")
-  ).toFixed(2);
+  const rate = parseAmountString(dailyRate || "0");
+  const days = parseAmountString(durationDays || "0");
+  if (rate === "" || days === "") return "0.00";
+  return multiplyAmountStrings(rate, days, 2);
 }
 
 /**
  * Formats a validated deposit amount for the review step without substituting
- * fabricated placeholder values.
+ * fabricated placeholder values. The amount is never converted through a
+ * floating-point number, so the presented value matches what was stored.
  */
 function formatReviewDeposit(value: string): string {
-  return parseStreamNumber(value).toFixed(2);
+  const exact = parseAmountString(value.replace(/,/g, ""));
+  return exact === "" ? "0.00" : formatAmountString(exact, 2);
 }
 
 /** Formats the daily duration unit with singular/plural copy. */
@@ -316,12 +330,14 @@ export default function CreateStreamModal({
   const optimisticOpIdRef = useRef<string | null>(null);
 
   const txSubmission = useTransactionSubmission({
-    timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
-    cancelOnUnmount: true,
+    // timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
+    // cancelOnUnmount: true,
     submit: async (idempotencyKey) => {
       const sender = wallet.address!;
-      const parsedAmount = parseFloat(depositAmount.replace(/,/g, "")) || 0;
-      const amountStr = Math.floor(parsedAmount * 10_000_000).toString();
+      const parsedAmount = parseStreamNumber(depositAmount) || 0;
+      // Convert the exact entered decimal string into USDC smallest units
+      // without ever passing it through a floating-point number.
+      const amountStr = toSmallestUnitsString(depositAmount, 7);
       const start = startTimeOption === "now"
         ? Math.floor(Date.now() / 1000)
         : Math.floor(new Date(customStartDate).getTime() / 1000);
@@ -401,6 +417,11 @@ export default function CreateStreamModal({
       optimisticOpIdRef.current = null;
     },
   });
+  // A dropped wallet connection keeps the form mounted (#1678) but must not
+  // start a new signing/submission until the wallet is reachable again.
+  const walletConnectionLost =
+    wallet.connectionStatus === "dropped" ||
+    wallet.connectionStatus === "reconnecting";
   const isConfirmationPending = txSubmission.status === "pending";
   const isBusyCreating = txSubmission.isSubmitting;
   const submitButtonLabel =
@@ -528,7 +549,7 @@ export default function CreateStreamModal({
     } catch (err) {
       const message = getStreamErrorMessage(err);
       setStreamError(message);
-      addToast(t("createStream.error.failedWithMessage", { message }), "error");
+      addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
       onStreamError?.(err);
     } finally {
       submitInFlightRef.current = false;
@@ -559,12 +580,12 @@ export default function CreateStreamModal({
 
     if (flushedFromQueueRef.current) {
       flushedFromQueueRef.current = false;
-      addToast(t("createStream.queue.flushSuccessToast"), "success", undefined, {
+      addToast(t("createStream.queue.flushSuccessToast"), "success", 0, {
         label: t("createStream.queue.viewStreamAction"),
         onClick: () => onStreamCreated?.(createdData),
       });
     } else {
-      addToast(t("createStream.success.message"), "success");
+      addToast(t("createStream.success.message"), "success", 0);
     }
     onStreamCreated?.(createdData);
     onClose();
@@ -918,6 +939,10 @@ export default function CreateStreamModal({
         setError(t("createStream.validation.walletNotConnected"));
         return;
       }
+      if (walletConnectionLost) {
+        setError(t("createStream.validation.walletConnectionLost"));
+        return;
+      }
       if (wallet.isNetworkMismatch) {
         setError(t("createStream.validation.networkMismatch", {
           expected: wallet.expectedNetwork,
@@ -959,6 +984,10 @@ export default function CreateStreamModal({
         setError(t("createStream.validation.walletNotConnected"));
         return;
       }
+      if (walletConnectionLost) {
+        setError(t("createStream.validation.walletConnectionLost"));
+        return;
+      }
       if (wallet.isNetworkMismatch) {
         setError(t("createStream.validation.networkMismatch", {
           expected: wallet.expectedNetwork,
@@ -985,7 +1014,7 @@ export default function CreateStreamModal({
       } catch (err) {
         const message = getStreamErrorMessage(err);
         setStreamError(message);
-        addToast(t("createStream.error.failedWithMessage", { message }), "error");
+        addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
         onStreamError?.(err);
       }
 
@@ -1448,9 +1477,10 @@ export default function CreateStreamModal({
       onClose();
     } else {
       addToast(
-        `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
-        'error',
-      );
+          `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
+          'error',
+          0
+        );
     }
   };
 
@@ -2343,6 +2373,9 @@ export default function CreateStreamModal({
                 </div>
                 <span>{t("createStream.step2.enableCliffLabel")}</span>
               </div>
+              <span className="validation-message validation-message--hint">
+                {t("createStream.step2.cliffHint")}
+              </span>
               {cliffEnabled && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <InputField
@@ -3321,6 +3354,9 @@ export default function CreateStreamModal({
                             </div>
                             <span>{t("createStream.step2.enableCliffLabel")}</span>
                           </div>
+                          <span className="validation-message validation-message--hint">
+                            {t("createStream.step2.cliffHint")}
+                          </span>
                           {cliffEnabled && (
                             <div style={{ marginTop: '0.75rem' }}>
                               <InputField
@@ -3572,3 +3608,5 @@ export default function CreateStreamModal({
     </div>
   );
 }
+
+

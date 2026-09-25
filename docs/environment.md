@@ -28,6 +28,13 @@ Copy `.env.example` to `.env` or `.env.local` to override these configurations i
 ### `VITE_API_URL`
 - **Purpose**: Base URL endpoint for the Fluxora backend REST API services.
 - **Required/Optional**: Optional. If not set (or empty), frontend operations requiring the backend may gracefully fail or fall back to mock data paths (if `VITE_USE_MOCKS` is enabled).
+
+The frontend checks `${VITE_API_URL}/version` once at startup when live API mode
+is enabled. The endpoint must return a JSON object such as `{ "version": "1.2.0" }`
+or the `X-Fluxora-API-Version` response header. The supported range is `1.x`;
+patch and minor releases are compatible, while a new major version requires a
+coordinated frontend release. An incompatible version shows a reload/update
+notice instead of silently using an unknown API contract.
 - **Format**: A valid absolute URL including the protocol (`http://` or `https://`).
 - **Example**: `https://api.fluxora.example.com`
 

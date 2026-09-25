@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, renderHook, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,6 +20,7 @@ import {
   getStoredFontPreference,
   type CustomThemeDefinition,
 } from "../ThemeProvider";
+import { removeBrowserStorage } from "../../lib/browserStorage";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,12 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   localStorage.clear();
+  // browserStorage keeps an in-memory fallback for writes that threw (e.g.
+  // quota errors). localStorage.clear() does not reset that fallback, so
+  // remove the keys explicitly to avoid cross-test pollution.
+  removeBrowserStorage(THEME_STORAGE_KEY, window.localStorage);
+  removeBrowserStorage(FONT_STORAGE_KEY, window.localStorage);
+  removeBrowserStorage(CUSTOM_THEME_STORAGE_KEY, window.localStorage);
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-font");
   document.documentElement.removeAttribute("data-font-transitioning");
@@ -766,3 +774,138 @@ describe("ThemeProvider — themePreference and setThemePreference", () => {
     expect(screen.getByTestId("theme")).toHaveTextContent("light");
   });
 });
+
+describe("ThemeProvider — first paint theme application (#1706)", () => {
+  interface FirstPaintThemeSnapshot {
+    theme: string | null;
+    customAccent: string;
+    font: string | null;
+  }
+
+  function FirstPaintProbe({
+    onProbe,
+  }: {
+    onProbe: (snapshot: FirstPaintThemeSnapshot) => void;
+  }) {
+    useLayoutEffect(() => {
+      onProbe({
+        theme: document.documentElement.getAttribute("data-theme"),
+        customAccent: document.documentElement.style.getPropertyValue(
+          "--custom-color-accent-primary",
+        ),
+        font: document.documentElement.getAttribute("data-font"),
+      });
+    }, []);
+
+    return <div data-testid="first-paint-probe">rendered</div>;
+  }
+
+  it("applies light theme to document.documentElement before first paint", () => {
+    mockMatchMedia(false); // OS prefers light
+    let snapshot: FirstPaintThemeSnapshot | null = null;
+
+    render(
+      <ThemeProvider>
+        <FirstPaintProbe
+          onProbe={(s) => {
+            snapshot = s;
+          }}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.theme).toBe("light");
+    expect(currentDataTheme()).toBe("light");
+  });
+
+  it("applies dark theme to document.documentElement before first paint when stored", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    mockMatchMedia(false);
+    let snapshot: FirstPaintThemeSnapshot | null = null;
+
+    render(
+      <ThemeProvider>
+        <FirstPaintProbe
+          onProbe={(s) => {
+            snapshot = s;
+          }}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.theme).toBe("dark");
+    expect(currentDataTheme()).toBe("dark");
+  });
+
+  it("applies dark theme to document.documentElement before first paint when OS prefers dark", () => {
+    mockMatchMedia(true); // OS prefers dark, no stored theme
+    let snapshot: FirstPaintThemeSnapshot | null = null;
+
+    render(
+      <ThemeProvider>
+        <FirstPaintProbe
+          onProbe={(s) => {
+            snapshot = s;
+          }}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.theme).toBe("dark");
+    expect(currentDataTheme()).toBe("dark");
+  });
+
+  it("applies custom theme and custom CSS tokens to document.documentElement before first paint", () => {
+    const customBlob = JSON.stringify({
+      id: "acme-corp",
+      label: "Acme Corp",
+      tokenOverrides: VALID_BRAND.tokenOverrides,
+      validatedTokens: VALID_BRAND.tokenOverrides,
+    });
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, customBlob);
+    mockMatchMedia(false);
+
+    let snapshot: FirstPaintThemeSnapshot | null = null;
+
+    render(
+      <ThemeProvider>
+        <FirstPaintProbe
+          onProbe={(s) => {
+            snapshot = s;
+          }}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.theme).toBe("custom");
+    expect(snapshot?.customAccent).toBe("#1e40af");
+    expect(currentDataTheme()).toBe("custom");
+    expect(customProp("--custom-color-accent-primary")).toBe("#1e40af");
+  });
+
+  it("applies easy-read font before first paint when stored", () => {
+    localStorage.setItem(FONT_STORAGE_KEY, "true");
+    mockMatchMedia(false);
+
+    let snapshot: FirstPaintThemeSnapshot | null = null;
+
+    render(
+      <ThemeProvider>
+        <FirstPaintProbe
+          onProbe={(s) => {
+            snapshot = s;
+          }}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.font).toBe("easy-read");
+    expect(currentDataFont()).toBe("easy-read");
+  });
+});
+

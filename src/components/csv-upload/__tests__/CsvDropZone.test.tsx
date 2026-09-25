@@ -1,6 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CsvDropZone } from '../CsvDropZone';
+import {
+  MAX_CSV_FILE_SIZE_BYTES,
+  MAX_CSV_FILE_SIZE_LABEL,
+  MAX_CSV_ROWS,
+  MAX_CSV_COLUMNS,
+  MAX_CSV_CELL_LENGTH,
+} from '../csvParser';
 import type { ParseResult } from '../types';
 
 function makeFile(content: string, name = 'streams.csv', type = 'text/csv'): File {
@@ -28,19 +35,16 @@ describe('CsvDropZone', () => {
     vi.restoreAllMocks();
   });
 
-  // Resource limits enforced by the CSV upload pipeline.
-  const MAX_FILE_BYTES = 1_000_000;
-  const MAX_ROWS = 10_000;
-  const MAX_COLUMNS = 100;
-  const MAX_CELL_LENGTH = 10_000;
+  // Documented resource limits enforced by the CSV upload pipeline (see
+  // csvParser.ts): these tests assert behaviour at and beyond each bound.
 
   it('renders the empty-state instructions initially', () => {
     render(<CsvDropZone onParsed={onParsed} />);
-    expect(screen.getByText('Drag & drop your CSV here')).toBeInDocument();
-    expect(screen.getByText('or (click to browse files)')).toBeInDocument();
+    expect(screen.getByText('Drag & drop your CSV here')).toBeInTheDocument();
+    expect(screen.getByText('or click to browse files')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /upload csv file/i }),
-    ).toBeInDocument();
+    ).toBeInTheDocument();
   });
 
   it('shows a dragging-over state while a file is dragged over the zone', () => {
@@ -140,11 +144,11 @@ describe('CsvDropZone', () => {
     );
   });
 
-  it('rejects a CSV file larger than the maximum allowed size', async () => {
+  it('refuses a CSV file larger than the maximum allowed size before reading it', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
     const oversizedFile = new File(
-      [new Uint8Array(MAX_FILE_BYTES + 1)],
+      [new Uint8Array(MAX_CSV_FILE_SIZE_BYTES + 1)],
       'huge.csv',
       { type: 'text/csv' },
     );
@@ -153,17 +157,17 @@ describe('CsvDropZone', () => {
 
     await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        'File size exceeds the 1MB limit.',
+        `File is too large. Maximum size is ${MAX_CSV_FILE_SIZE_LABEL}.`,
       );
     });
     expect(onParsed).not.toHaveBeenCalled();
   });
 
-  it('rejects a CSV file with more rows than the maximum allowed', async () => {
+  it('refuses a CSV file with more rows than the maximum allowed', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
     const rows: string[] = [];
-    for (let i = 0; i <= MAX_ROWS; i++) {
+    for (let i = 0; i <= MAX_CSV_ROWS; i++) {
       rows.push(`GTESTRECIPIENT${String(i).padStart(4, '0')},100,10,30`);
     }
     const tooManyRowsCsv = HEADER + rows.join('\n') + '\n';
@@ -173,7 +177,7 @@ describe('CsvDropZone', () => {
 
     await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        `The CSV file contains too many rows. The maximum allowed is ${MAX_ROWS.toLocaleString()}.`,
+        `This CSV has ${MAX_CSV_ROWS + 1} rows. Maximum is ${MAX_CSV_ROWS}.`,
       );
     });
     expect(onParsed).not.toHaveBeenCalled();
@@ -182,7 +186,7 @@ describe('CsvDropZone', () => {
   it('rejects a CSV file with more columns than the maximum allowed', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    const columnCount = MAX_COLUMNS + 1;
+    const columnCount = MAX_CSV_COLUMNS + 1;
     const columns = Array.from({ length: columnCount }, (_, i) => `col${i}`);
     const header = columns.join(',') + '\n';
     const values = columns.map((_, i) => `value${i}`);
@@ -194,7 +198,7 @@ describe('CsvDropZone', () => {
 
     await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        `The CSV file contains too many columns. The maximum allowed is ${MAX_COLUMNS}.`,
+        `Row 1 has ${MAX_CSV_COLUMNS + 1} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
       );
     });
     expect(onParsed).not.toHaveBeenCalled();
@@ -203,7 +207,7 @@ describe('CsvDropZone', () => {
   it('rejects a CSV file with a cell longer than the maximum allowed', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    const longCell = 'x'.repeat(MAX_CELL_LENGTH + 1);
+    const longCell = 'x'.repeat(MAX_CSV_CELL_LENGTH + 1);
     const longCellCsv = `recipient,deposit_amount\n${longCell},100\n`;
     const file = makeFile(longCellCsv, 'long-cell.csv');
 
@@ -211,13 +215,13 @@ describe('CsvDropZone', () => {
 
     await waitFor(() => {
       expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        `a cell in the CSV file exceeds the maximum length of ${MAX_CELL_LENGTH} characters.`,
+        `Row 1 contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
       );
     });
     expect(onParsed).not.toHaveBeenCalled();
   });
 
-  it('rejects a CSV file with inconsistent column counts', async () => {
+  it('tolerates ragged rows: short rows parse with field errors, not a top-level rejection', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
     const malformedCsv = HEADER + 'recipient1,100,10,30\nrecipient2,200\n';
@@ -225,19 +229,22 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await waitFor(() => {
-      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
-        'The CSV file has inconsistent column counts.',
-      );
-    });
-    expect(onParsed).not.toHaveBeenCalled();
+    // Missing cells resolve to empty strings and surface as per-row field
+    // errors in the preview; there is no top-level "inconsistent columns"
+    // rejection, so the caller still receives the parsed rows.
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    const [result] = onParsed.mock.calls[0] as [ParseResult, string, string];
+    expect(result.parseError).toBeUndefined();
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[1]!.status).toBe('needs-fix');
   });
 
   it('accepts a large CSV file that is within the limits', async () => {
     render(<CsvDropZone onParsed={onParsed} />);
     const zone = screen.getByRole('button', { name: /upload csv file/i });
-    // Generate 9,000 rows to stay well under the row limit and file size limit.
-    const rowCount = 9_000;
+    // Generate rows just under the row limit; each row is short so the file
+    // stays well under the 1 MB size bound too.
+    const rowCount = MAX_CSV_ROWS - 100;
     const rows: string[] = [];
     for (let i = 0; i < rowCount; i++) {
       rows.push(`GTESTRECIPIENT${String(i).padStart(4, '0')},100,10,30`);
@@ -251,7 +258,7 @@ describe('CsvDropZone', () => {
     const [result] = onParsed.mock.calls[0] as [ParseResult, string, string];
     expect(result.rows).toHaveLength(rowCount);
     expect(document.getElementById('csv-upload-success')).toHaveTextContent(
-      `${rowCount.toLocaleString()} rows detected`,
+      `${rowCount} rows detected`,
     );
   });
 
@@ -274,7 +281,11 @@ describe('CsvDropZone', () => {
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText('The CSV file has no data rows.')).toBeInDocument());
+    await waitFor(() =>
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'The CSV file has no data rows.',
+      ),
+    );
     expect(onParsed).not.toHaveBeenCalled();
   });
 
@@ -292,7 +303,11 @@ describe('CsvDropZone', () => {
 
     fireEvent.change(input, { target: { files: [brokenFile] } });
 
-    await waitFor(() => expect(screen.getByText('Failed to read the file. Please try again.')).toBeInDocument());
+    await waitFor(() =>
+      expect(document.getElementById('csv-upload-error')).toHaveTextContent(
+        'Failed to read the file. Please try again.',
+      ),
+    );
     expect(onParsed).not.toHaveBeenCalled();
   });
 

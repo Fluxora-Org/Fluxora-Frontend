@@ -6,7 +6,7 @@
  *
  * WCAG 2.1 AA Compliant:
  * - Receipt text contrast ratio >= 4.5:1 in exported files and preview.
- * - Handles hash-pending ("Pending confirmation") and hash-confirmed states.
+ * - Handles pending, confirmed, failed, and unknown confirmation states.
  */
 
 import {
@@ -26,7 +26,7 @@ export interface ReceiptData {
   rate?: string;
   timestamp: string;
   txHash?: string | null;
-  status: "confirmed" | "pending";
+  status: "confirmed" | "pending" | "failed" | "unknown";
   network?: string;
 }
 
@@ -213,7 +213,10 @@ export function drawReceiptToCanvas(
   ctx.stroke();
 
   // 2. STATUS BADGE & TIMESTAMP
-  const isPending = data.status === "pending" || !data.txHash;
+  // Only an explicit confirmed status may be rendered as a successful
+  // exported receipt. Failed and unknown results remain unverified even if a
+  // transaction hash is available.
+  const isPending = data.status !== "confirmed" || !data.txHash;
 
   ctx.fillStyle = isPending ? "#FEF3C7" : "#DCFCE7";
   ctx.strokeStyle = isPending ? "#F59E0B" : "#10B981";

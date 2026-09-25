@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   treasuryDemoMetrics,
   treasuryDemoStreams,
@@ -8,6 +8,12 @@ import type { Metric } from "./Metric";
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
 import { formatAssetAmount } from "../../lib/formatters";
+import { isProductionBuild, readDemoModeFlag } from "../../lib/config";
+import {
+  getPeriodBoundaries,
+  type PeriodBoundary,
+  type TreasuryPeriod,
+} from "./Header";
 
 export interface TreasuryOverviewData {
   metrics: Metric[];
@@ -16,6 +22,9 @@ export interface TreasuryOverviewData {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  period: TreasuryPeriod;
+  resolvedPeriod: TreasuryPeriod;
+  boundaries: PeriodBoundary;
 }
 
 /**
@@ -24,13 +33,19 @@ export interface TreasuryOverviewData {
  * For security reasons, demo mode is strictly disabled in production environments
  * to prevent mock/fixture data from being accidentally exposed to users.
  *
- * @param value - The env flag value to check. Defaults to `import.meta.env.VITE_DEMO_MODE`.
- * @param isProd - Whether the application is running in production. Defaults to `import.meta.env.PROD`.
+ * The flag values flow through `src/lib/config.ts` (never `import.meta.env`
+ * read directly in this component) so the environment is only read in one
+ * validated place and can be stubbed in tests.
+ *
+ * @param value - The demo flag value to check. Defaults to the config module's
+ *   `VITE_DEMO_MODE` reading.
+ * @param isProd - Whether the application is running in production. Defaults to
+ *   the config module's `PROD` reading.
  * @returns `true` if demo mode is enabled and not in production, `false` otherwise.
  */
 export function isTreasuryDemoMode(
-  value: string | undefined = import.meta.env.VITE_DEMO_MODE,
-  isProd: boolean | string = import.meta.env.PROD
+  value: string | undefined = readDemoModeFlag() ? "true" : undefined,
+  isProd: boolean | string = isProductionBuild()
 ): boolean {
   if (isProd) {
     return false;
@@ -62,11 +77,26 @@ export function toLegacyStream(record: StreamRecord): Stream {
  * Under demo mode, it immediately yields mock data. Otherwise, it retrieves
  * real metrics and streams from the `useTreasury` upstream source.
  *
+ * @param period - The selected treasury period (defaults to "30d").
  * @returns The current {@link TreasuryOverviewData} state.
  */
-export function useTreasuryOverviewData(): TreasuryOverviewData {
+export function useTreasuryOverviewData(
+  period: TreasuryPeriod = "30d"
+): TreasuryOverviewData {
   const isDemoMode = isTreasuryDemoMode();
-  const treasury = useTreasury();
+  const filters = useMemo(() => ({ period }), [period]);
+  const treasury = useTreasury(filters);
+
+  const lastResolvedPeriodRef = useRef<TreasuryPeriod>(period);
+  if (!treasury.loading && !treasury.error) {
+    lastResolvedPeriodRef.current = period;
+  }
+
+  const resolvedPeriod = isDemoMode ? period : lastResolvedPeriodRef.current;
+  const boundaries = useMemo(
+    () => getPeriodBoundaries(resolvedPeriod),
+    [resolvedPeriod]
+  );
 
   return useMemo<TreasuryOverviewData>(() => {
     if (isDemoMode) {
@@ -77,6 +107,9 @@ export function useTreasuryOverviewData(): TreasuryOverviewData {
         loading: false,
         error: null,
         refetch: () => {},
+        period,
+        resolvedPeriod: period,
+        boundaries: getPeriodBoundaries(period),
       };
     }
 
@@ -87,6 +120,19 @@ export function useTreasuryOverviewData(): TreasuryOverviewData {
       loading: treasury.loading,
       error: treasury.error,
       refetch: treasury.refetch,
+      period,
+      resolvedPeriod,
+      boundaries,
     };
-  }, [isDemoMode, treasury.metrics, treasury.streams, treasury.loading, treasury.error, treasury.refetch]);
+  }, [
+    isDemoMode,
+    treasury.metrics,
+    treasury.streams,
+    treasury.loading,
+    treasury.error,
+    treasury.refetch,
+    period,
+    resolvedPeriod,
+    boundaries,
+  ]);
 }

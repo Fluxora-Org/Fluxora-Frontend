@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef/ useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchStreams, type StreamFilters } from "../api/streams";
 import type { StreamRecord } from "../data/streamRecords";
 
@@ -10,7 +10,7 @@ interface UseStreamListResult {
 }
 
 export function useStreamList(filters: StreamFilters): UseStreamListResult {
-  const [streams, setStreams] = useState<StreamRecord[]([]);
+  const [streams, setStreams] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const controllerRef = useRef<AbortController | null>(null);

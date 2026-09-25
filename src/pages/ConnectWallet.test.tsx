@@ -1,30 +1,27 @@
 import { render, screen } from "@testing-library/react";
+import { isInaccessible } from "@testing-library/dom";
+import { computeAccessibleName } from "dom-accessibility-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  MemoryRouter,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import ConnectWallet from "./ConnectWallet";
 import RequireWallet from "../components/RequireWallet";
 
 // Mutable wallet state shared by the mocked context so individual tests can
-// flip `connected`/`loading` to exercise the redirect + post-connect flow.
+// flip `connected`/`loading`/`error`/`isNetworkMismatch` to exercise flows.
 const walletState = vi.hoisted(() => ({
   connected: true,
   loading: false,
-  address: "GCONNECTED",
-  network: "TESTNET",
+  address: "GCONNECTED" as string | null,
+  network: "TESTNET" as string | null,
+  error: null as any,
+  isNetworkMismatch: false,
 }));
 
 vi.mock("../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
-    error: null,
     expectedNetwork: "TESTNET",
     expectedNetworkLabel: "Testnet",
-    isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
   }),
@@ -85,6 +82,8 @@ describe("ConnectWallet return destination", () => {
   beforeEach(() => {
     walletState.connected = true;
     walletState.loading = false;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
   });
 
   afterEach(() => {
@@ -127,6 +126,8 @@ describe("ConnectWallet return destination", () => {
 describe("RequireWallet -> ConnectWallet returnTo integration", () => {
   beforeEach(() => {
     walletState.loading = false;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
   });
 
   it("encodes the original path as returnTo when redirecting an unauthenticated user", () => {
@@ -143,5 +144,156 @@ describe("RequireWallet -> ConnectWallet returnTo integration", () => {
     renderGatedRoute("/app/dashboard");
 
     expect(screen.getByText("Protected content")).toBeInTheDocument();
+  });
+});
+
+describe("ConnectWallet failure messages (#1644)", () => {
+  beforeEach(() => {
+    walletState.connected = false;
+    walletState.loading = false;
+    walletState.address = null;
+    walletState.network = null;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
+  });
+
+  it("renders a distinct actionable message when connection request is rejected", () => {
+    render(
+      <MemoryRouter>
+        <ConnectWallet initialError="rejected" />
+      </MemoryRouter>,
+    );
+
+    const alert = screen.getByTestId("wallet-error-rejected");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Connection Request Rejected")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The connection request was rejected\. Please open your wallet extension/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when wallet connection times out", () => {
+    render(
+      <MemoryRouter>
+        <ConnectWallet initialError="timeout" />
+      </MemoryRouter>,
+    );
+
+    const alert = screen.getByTestId("wallet-error-timeout");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Connection Timed Out")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Wallet connection timed out\. Please check your network connection/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when connected to wrong network", () => {
+    walletState.isNetworkMismatch = true;
+    render(
+      <MemoryRouter>
+        <ConnectWallet />
+      </MemoryRouter>,
+    );
+
+    const alert = screen.getByTestId("wallet-error-wrong-network");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Your wallet is connected to the wrong network\. Please switch your wallet extension network to Testnet/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when extension is missing", () => {
+    walletState.error = { type: "not_installed" };
+    render(
+      <MemoryRouter>
+        <ConnectWallet />
+      </MemoryRouter>,
+    );
+
+    const alert = screen.getByTestId("wallet-error-missing-extension");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Wallet Extension Missing")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Freighter wallet extension is not installed\. Please install Freighter/i,
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ConnectWallet decorative indicators accessibility (#1674)", () => {
+  beforeEach(() => {
+    walletState.connected = false;
+    walletState.loading = false;
+    walletState.address = null;
+    walletState.network = null;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
+  });
+
+  it("asserts decorative GlowingDot indicators are hidden from the accessibility tree and carry no accessible name", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ConnectWallet />
+      </MemoryRouter>,
+    );
+
+    // Decorative GlowingDot elements have border-radius: 50%
+    const decorativeDots = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        "div[style*='border-radius: 50%']",
+      ),
+    );
+    expect(decorativeDots.length).toBeGreaterThanOrEqual(2);
+
+    for (const dot of decorativeDots) {
+      // 1. Purely decorative elements are hidden from the accessibility tree
+      expect(dot).toHaveAttribute("aria-hidden", "true");
+      expect(isInaccessible(dot)).toBe(true);
+
+      // 2. They carry no accessible name
+      expect(computeAccessibleName(dot)).toBe("");
+      expect(dot).not.toHaveAttribute("aria-label");
+      expect(dot).not.toHaveAttribute("aria-labelledby");
+    }
+
+    // 3. Elements conveying state and page structure are NOT hidden
+    expect(
+      screen.getByRole("heading", { name: "Connect your wallet" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Wallet onboarding checklist" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("asserts accessibility tree contents: decorative indicators are absent while state alerts are present", () => {
+    render(
+      <MemoryRouter>
+        <ConnectWallet initialError="rejected" />
+      </MemoryRouter>,
+    );
+
+    // Error banner conveys state and must be present in the accessibility tree
+    const alert = screen.getByRole("alert");
+    expect(alert).toBeInTheDocument();
+    expect(isInaccessible(alert)).toBe(false);
+    expect(screen.getByText("Connection Request Rejected")).toBeInTheDocument();
+
+    // Decorative indicators remain absent from the accessibility tree
+    const decorativeDots = document.querySelectorAll<HTMLElement>(
+      "[aria-hidden='true']",
+    );
+    expect(decorativeDots.length).toBeGreaterThan(0);
+    for (const dot of decorativeDots) {
+      expect(isInaccessible(dot)).toBe(true);
+    }
   });
 });

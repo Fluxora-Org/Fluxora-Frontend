@@ -78,6 +78,10 @@ export const InputField: React.FC<InputFieldProps> = ({
     id,
     'aria-invalid': hasError ? 'true' : 'false',
     ...(required ? { 'aria-required': 'true' } : {}),
+    // The error is exposed through the dedicated aria-errormessage relationship
+    // (mirroring Input.tsx) as well as aria-describedby, which remains the
+    // broadly supported fallback for hint and error text.
+    ...(hasError ? { 'aria-errormessage': `${id}-error` } : {}),
     ...(messageId ? { 'aria-describedby': messageId } : {}),
     'data-composing': compositionAware && isComposing ? 'true' : undefined,
     onChange: (event: React.ChangeEvent<HTMLElement>) => {

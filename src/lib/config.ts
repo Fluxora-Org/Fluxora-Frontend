@@ -4,6 +4,15 @@ import {
   type StellarNetwork,
 } from "./stellarNetwork";
 
+/**
+ * True when the application is running in local development / test mode.
+ *
+ * Exposed here so components and pages can branch on the build mode without
+ * reading `import.meta.env` directly — every environment read lives in this
+ * module (see issue #1722).
+ */
+export const IS_DEV = !!import.meta.env.DEV;
+
 const NETWORK_LABELS: Record<StellarNetwork, string> = {
   PUBLIC: "Public Network (Mainnet)",
   TESTNET: "Testnet",
@@ -116,6 +125,70 @@ function optionalContractId(
 
 export function parseBooleanFlag(value: string | undefined): boolean {
   return value === "true" || value === "1";
+}
+
+/**
+ * Reads the treasury demo-mode flag from the environment.
+ *
+ * This is the only supported way for components/hooks to learn whether demo
+ * mode is configured: it keeps the raw `import.meta.env` read inside the
+ * config module so the value can be validated and stubbed in one place.
+ */
+export function readDemoModeFlag(
+  env: ImportMetaEnv = import.meta.env,
+): boolean {
+  return parseBooleanFlag(env.VITE_DEMO_MODE);
+}
+
+/**
+ * True when the bundle was produced by a production build.
+ *
+ * Demo fixtures must never be served in production, so consumers combine this
+ * with {@link readDemoModeFlag} instead of reading `import.meta.env.PROD`.
+ */
+export function isProductionBuild(
+  env: ImportMetaEnv = import.meta.env,
+): boolean {
+  return !!env.PROD;
+}
+
+/** Default polling interval for the Freighter account watcher (ms). */
+export const WALLET_WATCH_DEFAULT_INTERVAL_MS = 2000;
+
+/**
+ * Minimum allowed polling interval (ms) for the Freighter account watcher.
+ *
+ * Values below this floor would hammer the wallet extension and the RPC
+ * endpoint it queries, so any configured or default value is clamped up.
+ */
+export const WALLET_WATCH_MIN_INTERVAL_MS = 500;
+
+/**
+ * Resolves a raw `VITE_WALLET_WATCH_INTERVAL_MS` value into a safe interval.
+ *
+ * Invalid (empty, zero, negative, non-numeric) values fall back to
+ * {@link WALLET_WATCH_DEFAULT_INTERVAL_MS}, and every result is clamped to at
+ * least {@link WALLET_WATCH_MIN_INTERVAL_MS}.
+ */
+export function resolveWalletWatchIntervalMs(raw: string | undefined): number {
+  const parsed = raw !== undefined && raw !== "" ? Number(raw) : NaN;
+  const resolved =
+    Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : WALLET_WATCH_DEFAULT_INTERVAL_MS;
+  return Math.max(resolved, WALLET_WATCH_MIN_INTERVAL_MS);
+}
+
+/**
+ * Reads the wallet-watch polling interval from the environment.
+ *
+ * Keeps the `import.meta.env` read inside the config module; the wallet
+ * provider only consumes the resolved number.
+ */
+export function getWalletWatchIntervalMs(
+  env: ImportMetaEnv = import.meta.env,
+): number {
+  return resolveWalletWatchIntervalMs(env.VITE_WALLET_WATCH_INTERVAL_MS);
 }
 
 function validateBooleanFlag(field: string, value: string | undefined): ConfigError | null {

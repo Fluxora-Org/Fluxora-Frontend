@@ -16,6 +16,27 @@
  *   import './styles/accessibility.css'
  */
 
+/*
+ * Keep the 44px touch-target floor in the shared accessibility layer so
+ * component stylesheet changes cannot silently shrink interactive controls.
+ * Exceptions must provide both data attributes; the Playwright audit checks
+ * that every exception has a reason.
+ */
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [role='link'],
+  [role='menuitem'],
+  [role='tab']
+):not([data-touch-target-exception]) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    UNIVERSAL FOCUS-VISIBLE STYLING
    ─────────────────────────────────────────────────────────────────────────
@@ -357,7 +378,18 @@ textarea:disabled:focus-visible {
    (1) truncated-default   – chip opacity 0, translateX(-4px)
    (2) hover-revealed      – parent:hover .chip → opacity 1, translateX(0)
    (3) focus-revealed      – parent:focus-within .chip → same as hover
-   (4) sr-only-always-present – .truncateReveal__srValue painted as 1×1px clip
+   (4) state-revealed      – parent[data-revealed="true"] .chip → same as hover
+   (5) sr-only-always-present – .truncateReveal__srValue painted as 1×1px clip
+
+   Layout stability (Issue #1677)
+   ──────────────────────────────
+   .truncateReveal__chip is an absolutely positioned overlay anchored to the
+   wrapper box. Because it is out of document flow it has zero structural
+   footprint: revealing it can never change the bounding box or the vertical
+   / horizontal position of any sibling, table cell, list row or page block,
+   in a dense data table or in a standalone container alike. The wrapper
+   (the hover / focus trigger zone) keeps its exact box, so the pointer
+   stays over the trigger after disclosure completes.
 
    Usage
    ──────
@@ -379,6 +411,8 @@ textarea:disabled:focus-visible {
   --reveal-chip-transition: var(--transition-fast);
   /* Slide distance (small, respects reduced-motion override below) */
   --reveal-chip-translate: -4px;
+  /* Overlay stacking: above in-flow siblings, below modal/dialog layers */
+  --reveal-chip-z-index: 1;
 }
 
 /* ── Wrapper ── */
@@ -405,8 +439,23 @@ textarea:disabled:focus-visible {
   font-family: var(--font-family-mono, monospace);
 }
 
-/* ── Reveal chip (visual-only, aria-hidden) ── */
+/* ── Reveal chip (visual-only, aria-hidden, out-of-flow overlay) ── */
 .truncateReveal__chip {
+  /*
+   * Absolutely positioned against the position:relative wrapper.
+   * This is the structural guarantee behind Issue #1677: the chip is
+   * removed from document flow, so it cannot occupy a line box, widen a
+   * cell or grow a row when it is disclosed. Vertically it stretches to
+   * the wrapper box (inset-block: 0) and horizontally it starts at the
+   * wrapper's inline-start edge and grows to its max-content width, so
+   * it always floats over the truncated value it replaces.
+   */
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: max-content;
+  z-index: var(--reveal-chip-z-index, 1);
+
   /* Layout */
   display: inline-flex;
   align-items: center;
@@ -422,25 +471,23 @@ textarea:disabled:focus-visible {
   /* Hidden by default: invisible + shifted left */
   opacity: 0;
   transform: translateX(var(--reveal-chip-translate));
+  /* Never intercept pointer events: the trigger zone underneath must keep
+     receiving hover/click so the pointer stays anchored after disclosure */
   pointer-events: none;
 
   /* Animate in */
   transition:
     opacity var(--reveal-chip-transition),
     transform var(--reveal-chip-transition);
-
-  /* Spacing from truncated chip */
-  margin-inline-start: 4px;
 }
 
-/* ── Reveal on hover ── */
-.truncateReveal:hover .truncateReveal__chip {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* ── Reveal on keyboard focus within wrapper ── */
-.truncateReveal:focus-within .truncateReveal__chip {
+/* ── Reveal on hover / keyboard focus / explicit component state ─────────────
+ * Three equivalent entry points into the same revealed state. None of them
+ * touches layout — only opacity and transform — so the surrounding document
+ * keeps its exact geometry while the overlay is disclosed (Issue #1677). */
+.truncateReveal:hover .truncateReveal__chip,
+.truncateReveal:focus-within .truncateReveal__chip,
+.truncateReveal[data-revealed="true"] .truncateReveal__chip {
   opacity: 1;
   transform: translateX(0);
 }

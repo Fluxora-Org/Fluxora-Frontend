@@ -26,7 +26,7 @@ describe("useFreighterSign", () => {
       error: null,
       loading: false,
       connect: vi.fn(),
-      disconnect: vi.fn(),
+      disconnect: vi.fn(), accountContextVersion: 1, connectionStatus: "connected", reconnect: vi.fn(),
     });
   });
 
@@ -80,7 +80,7 @@ describe("useFreighterSign", () => {
       error: null,
       loading: false,
       connect: vi.fn(),
-      disconnect: vi.fn(),
+      disconnect: vi.fn(), accountContextVersion: 1, connectionStatus: "connected", reconnect: vi.fn(),
     });
 
     const { result } = renderHook(() => useFreighterSign());
@@ -107,7 +107,7 @@ describe("useFreighterSign", () => {
       error: null,
       loading: false,
       connect: vi.fn(),
-      disconnect: vi.fn(),
+      disconnect: vi.fn(), accountContextVersion: 1, connectionStatus: "connected", reconnect: vi.fn(),
     });
 
     const { result } = renderHook(() => useFreighterSign());

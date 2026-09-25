@@ -103,17 +103,19 @@ export function computeMonthlySummary(
     const isAccruing =
       stream.status === "Active" && streamEnd > now;
 
+    const amountStreamedRounded = Math.round(amountStreamed);
+
     perStream.push({
       id: stream.id,
       senderName: stream.treasuryName,
       monthlyRate: stream.status === "Active" ? stream.monthlyRate : 0,
-      amountStreamedInMonth: Math.round(amountStreamed),
+      amountStreamedInMonth: amountStreamedRounded,
       amountWithdrawnInMonth: timelineWithdrawals,
       isCurrentlyAccruing: isAccruing,
       status: stream.status,
     });
 
-    totalStreamed += amountStreamed;
+    totalStreamed += amountStreamedRounded;
     totalWithdrawn += timelineWithdrawals;
     withdrawableNow += stream.withdrawableAmount;
   }
@@ -131,7 +133,7 @@ export function computeMonthlySummary(
     year,
     month,
     perStream,
-    totalStreamed: Math.round(totalStreamed),
+    totalStreamed,
     totalWithdrawn,
     withdrawableNow,
     hasActivity: perStream.length > 0,

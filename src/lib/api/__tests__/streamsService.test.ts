@@ -11,6 +11,35 @@ import { streamRecords } from "../../../data/streamRecords";
 
 const VALID_RECIPIENT = `G${"A".repeat(55)}`;
 
+/**
+ * A payload that satisfies the declared {@link StreamRecord} schema. Used by
+ * tests that exercise successful responses through the live API client.
+ */
+const VALID_RECORD = {
+  id: "STR-001",
+  name: "Dev Grant",
+  recipientName: "Alice M.",
+  recipientAddress: "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P",
+  treasuryName: "Protocol Growth Treasury",
+  treasuryAddress: "GAJSINKGK5UHTCU3VS645X7QAEJCGNCFKZTXRCM2VO6M3XXPAAISFPVT",
+  asset: "USDC",
+  status: "Active",
+  monthlyRate: 5000,
+  depositAmount: 48000,
+  streamedAmount: 19250,
+  withdrawableAmount: 4200,
+  remainingAmount: 28750,
+  progress: 40,
+  startDate: "2026-01-15",
+  endDate: "2026-10-15",
+  summary: "Core grant stream.",
+  health: "Healthy",
+  healthNote: "Healthy.",
+  auditNote: "No intervention required.",
+  tags: ["Engineering"],
+  timeline: [],
+};
+
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -117,11 +146,12 @@ describe("streamsService live mode", () => {
 
   it("URL-encodes the stream id when fetching a single record", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ data: { id: "STR/1?", name: "Rogue" } }),
+      jsonResponse({ data: { ...VALID_RECORD, id: "STR/1?" } }),
     );
 
-    await getStreamById("STR/1?");
+    const record = await getStreamById("STR/1?");
 
+    expect(record?.id).toBe("STR/1?");
     expect(fetchMock.mock.calls[0]![0]).toBe(
       "https://api.example.test/streams/STR%2F1%3F",
     );
@@ -296,20 +326,27 @@ describe("streamsService live mode", () => {
     expect(requestedUrl.startsWith("http://localhost:8787")).toBe(true);
   });
 
-  it("skips malformed metric entries during normalization", async () => {
+  it("rejects malformed metric entries with a diagnosable shape error", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({
         data: [
           { label: "", value: "ignored", desc: "" },
-          { label: "Active Streams", value: "9", desc: "" },
+          { label: "Active Streams", value: 9, desc: "" },
           null,
         ],
       }),
     );
 
-    const metrics = await getTreasuryMetrics();
-    expect(metrics).toHaveLength(1);
-    expect(metrics[0]!.label).toBe("Active Streams");
+    const error = await getTreasuryMetrics().catch((err) => err);
+
+    expect(error).toBeInstanceOf(StreamsServiceError);
+    expect(error).toMatchObject({ kind: "shape" });
+    expect(error.issues).toEqual([
+      "[0].label must be a non-empty string",
+      "[1].value must be a non-empty string",
+      "[2] must be an object, received null",
+    ]);
+    expect(error.message).toContain("[1].value must be a non-empty string");
   });
 
   it("honors VITE_FETCH_MAX_RETRIES=0 with exactly zero retries", async () => {
