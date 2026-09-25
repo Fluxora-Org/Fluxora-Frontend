@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Mic, MicOff, Loader2, Check, AlertCircle, HelpCircle } from "lucide-react";
 import { useVoiceContext } from "./VoiceContext";
 import { clsx } from "clsx";
@@ -8,6 +8,33 @@ export interface VoiceMicButtonProps {
   variant?: "navbar" | "sidebar";
   showLabel?: boolean;
   className?: string;
+}
+
+/**
+ * Map each VoiceState to the human-readable string that should be announced
+ * when the state transitions. An empty string suppresses announcement.
+ */
+function getStateAnnouncement(state: string): string {
+  switch (state) {
+    case "listening":
+      return "Microphone active. Listening for voice commands.";
+    case "processing":
+      return "Processing voice command.";
+    case "command-recognized":
+      return "Voice command recognized.";
+    case "command-unrecognized":
+      return "Voice command not recognized.";
+    case "command-ambiguous":
+      return "Voice command ambiguous. Please say the full command.";
+    case "confirming-destructive":
+      return "Confirmation required. Review the action before confirming.";
+    case "permission-denied":
+      return "Microphone access blocked. Open browser settings to allow access.";
+    case "idle":
+      return "Microphone off.";
+    default:
+      return "";
+  }
 }
 
 export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
@@ -25,17 +52,44 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
   const isUnsupported = state === "unsupported-browser" || !isSupported;
   const isConfirming = state === "confirming-destructive";
 
+  // ── aria-live announcer ──────────────────────────────────────────────────
+  // We maintain a local live region in the button's DOM neighbourhood so
+  // state changes are announced even when VoiceContext's global announcer
+  // is unavailable (e.g. isolated component tests or storybook).
+  // The region is rendered outside the <button> to avoid a nested-interactive
+  // or button-name conflict, but kept close in the DOM so it is associated
+  // with the control by proximity.
+  const [liveText, setLiveText] = React.useState("");
+  const prevStateRef = useRef(state);
+
+  useEffect(() => {
+    if (state !== prevStateRef.current) {
+      const msg = getStateAnnouncement(state);
+      if (msg) {
+        // Cycle through empty → message so a repeated identical state still
+        // produces a DOM mutation and gets re-announced by screen readers.
+        setLiveText("");
+        const id = window.setTimeout(() => setLiveText(msg), 0);
+        prevStateRef.current = state;
+        return () => window.clearTimeout(id);
+      }
+      prevStateRef.current = state;
+    }
+  }, [state]);
+
+  // ── Accessible labels ────────────────────────────────────────────────────
   const getAriaLabel = () => {
     if (isUnsupported) return "Voice control unsupported by browser";
     if (isDenied) return "Microphone access blocked. Click for help";
     if (isConfirming) return "Confirmation required for voice command";
-    if (isListening) return "Voice control active (Listening). Click to turn off";
-    if (isProcessing) return "Processing voice command...";
+    if (isListening) return "Stop voice control (currently listening)";
+    if (isProcessing) return "Stop voice control (processing command)";
     if (isRecognized) return "Voice command recognized";
     if (isUnrecognized) return "Voice command not recognized";
     return "Enable Voice Commands (Voice Navigation)";
   };
 
+  // ── Icon rendering ───────────────────────────────────────────────────────
   const renderIcon = () => {
     if (isUnsupported || isDenied) {
       return <MicOff size={18} className="text-[var(--color-danger)]" aria-hidden="true" />;
@@ -64,9 +118,25 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
     );
   };
 
+  // ── Live region (shared between both variants) ───────────────────────────
+  const liveRegion = (
+    <span
+      role="status"
+      aria-live="assertive"
+      aria-atomic="true"
+      aria-relevant="text"
+      className="sr-only"
+      data-testid="voice-mic-live-region"
+    >
+      {liveText}
+    </span>
+  );
+
+  // ── Sidebar variant ──────────────────────────────────────────────────────
   if (variant === "sidebar") {
     return (
       <div className="flex flex-col gap-1 w-full">
+        {liveRegion}
         <div className="flex items-center gap-2 w-full">
           <button
             type="button"
@@ -88,12 +158,21 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
             <div className="relative flex items-center justify-center">
               {renderIcon()}
               {isListening && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" aria-hidden="true" />
               )}
             </div>
             <span className="truncate flex-1">
               {isListening ? "Voice Active" : "Voice Commands"}
             </span>
+            {/* Non-colour indicator: explicit text badge visible alongside icon */}
+            {isListening && (
+              <span
+                className="ml-auto text-[10px] font-bold uppercase tracking-wider border border-white/40 rounded px-1 py-0.5 shrink-0"
+                aria-hidden="true"
+              >
+                REC
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -110,9 +189,10 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
     );
   }
 
-  // Default 'navbar' variant
+  // ── Navbar variant (default) ─────────────────────────────────────────────
   return (
     <div className="relative flex items-center">
+      {liveRegion}
       <button
         type="button"
         onClick={toggleListening}
@@ -133,6 +213,21 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
         )}
       >
         {renderIcon()}
+
+        {/* Non-colour state indicator: sr-only text announces current state to
+            screen readers via the button's accessible name; this visually-hidden
+            span gives the listening state a shape-based indicator for users who
+            cannot distinguish colour. */}
+        {isListening && (
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-red-600 border-2 border-[var(--surface)] text-white"
+            style={{ fontSize: "7px", fontWeight: 700, lineHeight: 1 }}
+            title="Recording"
+          >
+            ●
+          </span>
+        )}
 
         {/* Pulse halo for active listening state (WCAG 3:1 non-text contrast) */}
         {isListening && (

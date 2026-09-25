@@ -92,6 +92,8 @@ export default defineConfig({
         // Issue #1656: keyboard shortcuts must not conflict with assistive technology
         "src/components/KeyboardShortcutsModal.tsx",
         "src/hooks/useKeyboardShortcuts.ts",
+        // Voice mic button — recording state must be conveyed non-visually
+        "src/components/voice/VoiceMicButton.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
