@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MemoryRouter,
   Route,
@@ -13,18 +13,26 @@ const walletState = vi.hoisted(() => ({
   loading: false,
   address: null as string | null,
   network: null as string | null,
+  error: null as { type: string } | null,
 }));
 
 vi.mock("../wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
-    error: null,
     expectedNetwork: "TESTNET",
     expectedNetworkLabel: "Testnet",
     isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
   }),
+}));
+
+vi.mock("../WalletFallback", () => ({
+  default: ({ stage }: { stage?: string }) => (
+    <div data-testid="wallet-fallback" data-stage={stage}>
+      Wallet fallback: {stage}
+    </div>
+  ),
 }));
 
 function LocationProbe() {
@@ -155,6 +163,14 @@ describe("sanitizeReturnTo", () => {
 });
 
 describe("RequireWallet", () => {
+  beforeEach(() => {
+    walletState.connected = false;
+    walletState.loading = false;
+    walletState.address = null;
+    walletState.network = null;
+    walletState.error = null;
+  });
+
   it("redirects disconnected users to connect-wallet with sanitized returnTo", () => {
     walletState.connected = false;
     walletState.loading = false;
@@ -181,9 +197,9 @@ describe("RequireWallet", () => {
 
     renderGuard("/app");
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Restoring wallet session...",
-    );
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toBeInTheDocument();
+    expect(fallback).toHaveAttribute("data-stage", "restoring");
     expect(screen.queryByText("/connect-wallet")).not.toBeInTheDocument();
   });
 
@@ -196,5 +212,18 @@ describe("RequireWallet", () => {
     expect(
       screen.getByText("/connect-wallet returnTo=/app/tx/123?view=detail#confirm"),
     ).toBeInTheDocument();
+  });
+
+  it("explains the missing wallet instead of redirecting when no extension is installed", () => {
+    walletState.connected = false;
+    walletState.loading = false;
+    walletState.error = { type: "not_installed" };
+
+    renderGuard();
+
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toHaveAttribute("data-stage", "no-wallet");
+    // No dead-end redirect to a connect flow that cannot succeed.
+    expect(screen.queryByText("/connect-wallet")).not.toBeInTheDocument();
   });
 });

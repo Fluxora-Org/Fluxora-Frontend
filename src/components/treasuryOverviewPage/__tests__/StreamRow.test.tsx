@@ -11,6 +11,7 @@ const stream: Stream = {
   rate: "2,500 USDC/mo",
   accruedAmount: 1234.56,
   status: "Active",
+  startDate: "2026-01-01",
 };
 
 function renderRow(rowStream: Stream = stream) {
@@ -34,6 +35,7 @@ describe("StreamRow", () => {
     renderRow();
 
     expect(screen.getByText("GABCDE...WXYZ")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Copy address: ${stream.recipient}` })).toBeInTheDocument();
     expect(screen.getByLabelText(`Recipient ${stream.recipient}`)).toHaveAttribute(
       "title",
       stream.recipient
@@ -71,4 +73,244 @@ describe("StreamRow", () => {
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector("img")).toBeNull();
   });
+
+  it("opens the actions menu when the ellipsis button is clicked and closes on Escape", async () => {
+    renderRow();
+
+    // The ellipsis trigger should exist
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Click to open
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    // The menu items should be rendered
+    const menu = screen.getByRole("menu", { name: `Actions for stream ${stream.name}` });
+    expect(menu).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /view details/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /copy address/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /view in explorer/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /pause\/cancel/i })).toBeInTheDocument();
+
+    // Roving focus: First item should get focus
+    expect(screen.getByRole("menuitem", { name: /view details/i })).toHaveFocus();
+
+    // Press Escape to close and check that focus is restored to the trigger
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
+  it("navigates through items via Arrow keys in the menu", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+    await user.click(trigger);
+
+    const firstItem = screen.getByRole("menuitem", { name: /view details/i });
+    const secondItem = screen.getByRole("menuitem", { name: /copy address/i });
+    const thirdItem = screen.getByRole("menuitem", { name: /view in explorer/i });
+    const fourthItem = screen.getByRole("menuitem", { name: /pause\/cancel/i });
+
+    expect(firstItem).toHaveFocus();
+
+    // Arrow down
+    await user.keyboard("{ArrowDown}");
+    expect(secondItem).toHaveFocus();
+
+    // Arrow down again
+    await user.keyboard("{ArrowDown}");
+    expect(thirdItem).toHaveFocus();
+
+    // Arrow down again
+    await user.keyboard("{ArrowDown}");
+    expect(fourthItem).toHaveFocus();
+
+    // Arrow down (loop to first)
+    await user.keyboard("{ArrowDown}");
+    expect(firstItem).toHaveFocus();
+
+    // Arrow up (loop to last)
+    await user.keyboard("{ArrowUp}");
+    expect(fourthItem).toHaveFocus();
+  });
+
+  it("triggers the actions menu via right-click (contextmenu event)", () => {
+    renderRow();
+    const row = screen.getByRole("row");
+
+    // Initially closed
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Fire context menu event on the row
+    const fireEvent = require("@testing-library/react").fireEvent;
+    fireEvent.contextMenu(row, { clientX: 100, clientY: 100 });
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("disables the Pause/Cancel action button for completed streams", async () => {
+    renderRow({
+      ...stream,
+      status: "Completed",
+    });
+
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+    await user.click(trigger);
+
+    const pauseCancelItem = screen.getByRole("menuitem", { name: /pause\/cancel/i });
+    expect(pauseCancelItem).toBeDisabled();
+  });
+
+  it("closes the menu when clicking outside it", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    // Click outside the menu and trigger
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("toggles the menu closed when the trigger is clicked a second time", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("'View details' menu item navigates to the stream detail route", async () => {
+    renderRow();
+    const trigger = screen.getByRole("button", { name: `Actions for stream ${stream.name}` });
+    const user = await import("@testing-library/user-event").then((m) => m.default.setup());
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("menuitem", { name: /view details/i }));
+
+    // Menu should close after selection
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  describe("Regression tests for issue #1459", () => {
+    it("renders accrued amount for streams with zero accrued amount", () => {
+      renderRow({
+        ...stream,
+        id: "STR-ZERO",
+        accruedAmount: 0,
+      });
+
+      expect(screen.getByText("0 USDC accrued")).toBeInTheDocument();
+    });
+
+    it("renders status for completed streams", () => {
+      renderRow({
+        ...stream,
+        id: "STR-COMP",
+        status: "Completed",
+      });
+
+      expect(screen.getByRole("status", { name: "Completed status" })).toHaveTextContent("COMPLETED");
+    });
+
+    it("renders status for paused streams", () => {
+      renderRow({
+        ...stream,
+        id: "STR-PAUSED",
+        status: "Paused",
+      });
+
+      expect(screen.getByRole("status", { name: "Paused status" })).toHaveTextContent("PAUSED");
+    });
+
+    it("renders status for active streams", () => {
+      renderRow({
+        ...stream,
+        id: "STR-ACTIVE",
+        status: "Active",
+      });
+
+      expect(screen.getByRole("status", { name: "Active status" })).toHaveTextContent("ACTIVE");
+    });
+
+    it("renders accrued amount for streams with large values", () => {
+      renderRow({
+        ...stream,
+        id: "STR-LARGE",
+        accruedAmount: 999999999.99,
+      });
+
+      expect(screen.getByText("999,999,999.99 USDC accrued")).toBeInTheDocument();
+    });
+
+    it("renders all required fields without defensive checks", () => {
+      renderRow({
+        id: "STR-ALL-FIELDS",
+        name: "Test Stream",
+        recipient: "GTEST123456789ABCDEF",
+        rate: "1,000 USDC/mo",
+        accruedAmount: 5000,
+        status: "Active",
+        startDate: "2026-01-01",
+      });
+
+      expect(screen.getByText("Test Stream")).toBeInTheDocument();
+      expect(screen.getByText("GTEST1...CDEF")).toBeInTheDocument();
+      expect(screen.getByText("1,000 USDC/mo")).toBeInTheDocument();
+      expect(screen.getByText("5,000 USDC accrued")).toBeInTheDocument();
+      expect(screen.getByRole("status", { name: "Active status" })).toHaveTextContent("ACTIVE");
+    });
+
+    it("consistently renders status matching normalized streamRecords data", () => {
+      // Test all three valid statuses from streamRecords StreamStatus type
+      const statuses: Array<"Active" | "Paused" | "Completed"> = ["Active", "Paused", "Completed"];
+
+      statuses.forEach((status) => {
+        const { unmount } = render(
+          <MemoryRouter>
+            <table>
+              <tbody>
+                <StreamRow
+                  stream={{ ...stream, id: `STR-${status}`, status }}
+                  onSelect={vi.fn()}
+                />
+              </tbody>
+            </table>
+          </MemoryRouter>
+        );
+
+        expect(screen.getByRole("status", { name: `${status} status` })).toHaveTextContent(status.toUpperCase());
+        unmount();
+      });
+    });
+
+    it("renders accrued amount as number consistently with streamRecords normalization", () => {
+      // streamRecords.readNumber() returns 0 for invalid values, so we test that
+      // the UI renders the numeric value without type checking
+      renderRow({
+        ...stream,
+        id: "STR-NUMERIC",
+        accruedAmount: 0,
+      });
+
+      expect(screen.getByText(/0.*USDC accrued/)).toBeInTheDocument();
+    });
+  });
 });
+

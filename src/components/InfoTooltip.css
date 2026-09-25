@@ -35,8 +35,9 @@
 }
 
 .info-tooltip-trigger:focus-visible {
-  outline: 2px solid var(--border-interactive);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-shadow);
   border-radius: 50%;
 }
 
@@ -52,6 +53,7 @@
   max-width: min(360px, calc(100vw - 32px));
   width: max-content;
   animation: tooltip-fade-in 0.15s ease;
+  overflow: visible;
 }
 
 @keyframes tooltip-fade-in {
@@ -69,25 +71,25 @@
 .info-tooltip-popover--bottom {
   top: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(calc(-50% + var(--tooltip-shift-x, 0px)), var(--tooltip-shift-y, 0px));
 }
 
 .info-tooltip-popover--top {
   bottom: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(calc(-50% + var(--tooltip-shift-x, 0px)), var(--tooltip-shift-y, 0px));
 }
 
 .info-tooltip-popover--left {
   right: calc(100% + 8px);
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(var(--tooltip-shift-x, 0px), calc(-50% + var(--tooltip-shift-y, 0px)));
 }
 
 .info-tooltip-popover--right {
   left: calc(100% + 8px);
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(var(--tooltip-shift-x, 0px), calc(-50% + var(--tooltip-shift-y, 0px)));
 }
 
 /* Mobile: Always bottom, full width minus margins */
@@ -97,7 +99,7 @@
     left: 50%;
     right: auto;
     bottom: auto;
-    transform: translateX(-50%);
+    transform: translate(calc(-50% + var(--tooltip-shift-x, 0px)), var(--tooltip-shift-y, 0px));
     max-width: calc(100vw - 32px);
     width: calc(100vw - 32px);
   }
@@ -145,14 +147,21 @@
 }
 
 .info-tooltip-close:focus-visible {
-  outline: 2px solid var(--border-interactive);
-  outline-offset: 1px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 /* Content */
 .info-tooltip-content {
   font: var(--font-body-sm, 400 13px/1.5 inherit);
   color: var(--tooltip-text-color, var(--text-secondary));
+}
+
+.info-tooltip-content :focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 .info-tooltip-content p {

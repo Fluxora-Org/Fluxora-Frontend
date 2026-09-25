@@ -1,0 +1,30 @@
+{
+  "vulnerabilities": {
+    "axios": {
+      "severity": "high",
+      "reason": "Transitive dependency of @stellar/stellar-sdk (>=16.0.1 pulls in a fixed axios, but that requires a stellar-sdk major bump). Not directly reachable from application code paths that accept untrusted input.",
+      "reviewBy": "2026-11-30"
+    },
+    "@remix-run/router": {
+      "severity": "moderate",
+      "reason": "Transitive dependency of react-router-dom; open-redirect advisory. Fix lands with a react-router-dom minor bump, tracked as routine dependency maintenance outside this issue's scope.",
+      "reviewBy": "2026-11-30"
+    },
+    "@stellar/stellar-sdk": {
+      "severity": "moderate",
+      "reason": "Direct dependency; the moderate finding is inherited entirely from its axios dependency (see the axios entry above).",
+      "reviewBy": "2026-11-30"
+    },
+    "react-router": {
+      "severity": "moderate",
+      "reason": "Transitive dependency of react-router-dom; open-redirect/SSR-hydration advisories that require server-side rendering to be reachable. This app is a client-rendered SPA.",
+      "reviewBy": "2026-11-30"
+    },
+    "react-router-dom": {
+      "severity": "moderate",
+      "reason": "Direct dependency; open-redirect advisory in the same family as the react-router entry above. Fix lands with a minor version bump, tracked as routine dependency maintenance outside this issue's scope.",
+      "reviewBy": "2026-11-30"
+    }
+  },
+  "licenses": {}
+}

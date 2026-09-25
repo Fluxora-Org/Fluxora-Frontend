@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type TouchEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   VIEWPORT_RESIZE_DEBOUNCE_MS,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { VoiceMicButton } from "./voice/VoiceMicButton";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,17 +26,49 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  unreadCount?: number;
+  onResetUnread?: () => void;
 }
+
+const SIDEBAR_SWIPE_DISTANCE_PX = 64;
+const SIDEBAR_SWIPE_VELOCITY_PX_PER_MS = 0.35;
 
 export default function Sidebar({
   collapsed,
   onToggleCollapse,
   mobileOpen,
   onMobileClose,
+  unreadCount = 0,
+  onResetUnread,
 }: SidebarProps) {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const mobileOpenerRef = useRef<HTMLElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
+    if (!mobileOpen || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLElement>) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || !mobileOpen) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const elapsed = Math.max(1, Date.now() - start.time);
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isFastEnough = Math.abs(deltaX) / elapsed >= SIDEBAR_SWIPE_VELOCITY_PX_PER_MS;
+
+    if (isHorizontal && deltaX < 0 && (Math.abs(deltaX) >= SIDEBAR_SWIPE_DISTANCE_PX || isFastEnough)) {
+      onMobileClose();
+    }
+  }
 
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
@@ -59,6 +92,18 @@ export default function Sidebar({
     };
   }, []);
 
+  // Toggle inert on the sidebar when the mobile drawer is closed so that
+  // focusable descendants are excluded from keyboard tab order.
+  useEffect(() => {
+    if (!sidebarRef.current) return;
+    const shouldBeInert = isMobile && !mobileOpen;
+    if (shouldBeInert) {
+      sidebarRef.current.setAttribute("inert", "");
+    } else {
+      sidebarRef.current.removeAttribute("inert");
+    }
+  }, [isMobile, mobileOpen]);
+
   // Escape key support
   useEffect(() => {
     if (!mobileOpen) return;
@@ -69,18 +114,47 @@ export default function Sidebar({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen, onMobileClose]);
 
-  // Focus trapping
+  // Move focus into the drawer on open, trap it while open, and return focus
+  // to the control that opened the drawer after it closes.
   useEffect(() => {
-    if (!mobileOpen || !sidebarRef.current) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
 
-    const focusableElements = sidebarRef.current.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstElement = focusableElements[0] as HTMLElement;
-    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const getFocusableElements = () =>
+      Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true",
+      );
+
+    if (!mobileOpen) {
+      mobileOpenerRef.current?.focus();
+      mobileOpenerRef.current = null;
+      return;
+    }
+
+    if (!sidebar.contains(document.activeElement)) {
+      mobileOpenerRef.current = document.activeElement as HTMLElement | null;
+    }
+
+    const focusableElements = getFocusableElements();
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    firstElement?.focus();
 
     const handleTab = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
+
+      if (focusableElements.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      if (!sidebar.contains(document.activeElement)) {
+        firstElement.focus();
+        e.preventDefault();
+        return;
+      }
 
       if (e.shiftKey) {
         if (document.activeElement === firstElement) {
@@ -125,6 +199,8 @@ export default function Sidebar({
       {/* Sidebar Drawer */}
       <aside
         ref={sidebarRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         id="app-sidebar"
         className={cn(
           "fixed left-0 top-0 z-50 h-screen bg-[var(--surface)] border-r border-[var(--border)] transition-all duration-300 ease-in-out flex flex-col",
@@ -137,7 +213,6 @@ export default function Sidebar({
         )}
         role="navigation"
         aria-label="Primary navigation"
-        aria-hidden={isMobile && !mobileOpen}
       >
         <div className="flex flex-col h-full py-4">
           {/* Header / Logo */}
@@ -166,10 +241,10 @@ export default function Sidebar({
             {/* Mobile Close Button */}
             <button
               onClick={onMobileClose}
-              className="md:hidden p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-md"
+              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-md"
               aria-label="Close sidebar"
             >
-              <X size={20} />
+              <X className="icon-sm" />
             </button>
           </div>
 
@@ -182,7 +257,12 @@ export default function Sidebar({
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                onClick={onMobileClose}
+                onClick={() => {
+                  onMobileClose();
+                  if (item.to === "/app/recipient") {
+                    onResetUnread?.();
+                  }
+                }}
                 aria-current="page"
                 className={({ isActive }) =>
                   cn(
@@ -203,9 +283,8 @@ export default function Sidebar({
                       )} 
                     />
                     <item.icon
-                      size={20}
                       className={cn(
-                        "flex-shrink-0 transition-colors",
+                        "icon-sm flex-shrink-0 transition-colors",
                         isActive ? "text-[var(--accent)]" : "group-hover:text-[var(--text)]"
                       )}
                     />
@@ -217,6 +296,18 @@ export default function Sidebar({
                     >
                       {item.label}
                     </span>
+                    {item.to === "/app/recipient" && unreadCount > 0 && (
+                      <span
+                        data-testid="in-page-unread-badge"
+                        className={cn(
+                          "ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--color-danger)] text-white text-[11px] font-bold leading-none shadow-sm transition-opacity duration-200",
+                          collapsed ? "md:hidden" : "opacity-100"
+                        )}
+                        aria-label={`${unreadCount > 9 ? "More than 9" : unreadCount} unread events`}
+                      >
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
                   </>
                 )}
               </NavLink>
@@ -234,7 +325,7 @@ export default function Sidebar({
                 {...(item.external && { target: "_blank", rel: "noopener noreferrer" })}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
-                <item.icon size={20} className="flex-shrink-0 group-hover:text-[var(--text)]" />
+                <item.icon className="icon-sm flex-shrink-0 group-hover:text-[var(--text)]" />
                 <span
                   className={cn(
                     "transition-opacity duration-300 whitespace-nowrap",
@@ -246,16 +337,23 @@ export default function Sidebar({
               </a>
             ))}
 
+            {/* Voice Control Motor Accessibility Button */}
+            <div className="pt-2">
+              <VoiceMicButton variant="sidebar" />
+            </div>
+
             {/* Desktop Collapse Toggle */}
             <button
+              type="button"
               onClick={onToggleCollapse}
-              className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
+              className="hidden md:flex w-full items-center gap-3 px-3 py-3 mt-2 min-h-[44px] min-w-[44px] text-[var(--muted)] hover:text-[var(--accent)] transition-all group outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-lg"
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              aria-controls="app-sidebar"
             >
               <ChevronLeft
-                size={20}
                 className={cn(
-                  "transition-transform duration-300",
+                  "icon-sm transition-transform duration-300",
                   collapsed ? "rotate-180" : "rotate-0"
                 )}
               />

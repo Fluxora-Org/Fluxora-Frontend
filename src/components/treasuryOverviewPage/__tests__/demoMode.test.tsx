@@ -6,6 +6,26 @@ import { isTreasuryDemoMode } from "../useTreasuryOverviewData";
 
 const useTreasuryMock = vi.fn();
 
+// TreasuryPage now reads wallet connection state to thread into RecentStreams.
+// In live (non-demo) mode we assume a connected session so the test exercises the
+// `connected -> empty -> "No streams yet"` copy. The disconnected variant is
+// covered in the component-level RecentStreams tests.
+const walletState = vi.hoisted(() => ({ connected: true }));
+vi.mock("../../../components/wallet-connect/Walletcontext", () => ({
+  useWallet: () => ({
+    connected: walletState.connected,
+    address: null,
+    network: null,
+    loading: false,
+    error: null,
+    expectedNetwork: "TESTNET",
+    expectedNetworkLabel: "Testnet",
+    isNetworkMismatch: false,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
+
 vi.mock("../useTreasury", () => ({
   useTreasury: () => useTreasuryMock(),
   useRecipientStreams: () => ({
@@ -52,14 +72,89 @@ describe("treasury overview demo mode", () => {
     expect(isTreasuryDemoMode(undefined)).toBe(false);
   });
 
-  it("renders fixture data only when VITE_DEMO_MODE is enabled", () => {
+  it("renders fixture data only when VITE_DEMO_MODE is enabled", async () => {
     vi.stubEnv("VITE_DEMO_MODE", "true");
 
     renderTreasuryPage();
 
     expect(screen.getByText("Demo state:")).toBeInTheDocument();
     expect(screen.getByText("Active Streams")).toBeInTheDocument();
-    expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
+    });
+  });
+
+  it("explicitly pairs DemoBanner with fixture data — never sample data without banner", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+
+    renderTreasuryPage();
+
+    // Invariant: DemoBanner must always be visible whenever fixture data is rendered
+    expect(screen.getByText("Demo state:")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Dev Grant - Alice")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Active Streams")).toBeInTheDocument();
+
+    // In demo mode with loaded fixture data, loaded badge must be highlighted exclusively
+    expect(screen.getByTestId("badge-loaded")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("badge-empty")).toHaveAttribute("data-active", "false");
+    expect(screen.getByTestId("badge-loading")).toHaveAttribute("data-active", "false");
+  });
+
+  it("renders DemoDataBadge on every figure-bearing view in demo mode", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+
+    renderTreasuryPage();
+
+    await waitFor(() => {
+      const badges = screen.getAllByTestId("demo-data-badge");
+      expect(badges.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  it("sets data-demo-mode attribute on the page container in demo mode", () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+
+    renderTreasuryPage();
+
+    const containers = screen.getAllByText("Demo state:").map((el) => el.closest("[data-demo-mode]"));
+    expect(containers.length).toBeGreaterThan(0);
+    containers.forEach((container) => {
+      expect(container).toHaveAttribute("data-demo-mode", "true");
+    });
+  });
+
+  it("does not render DemoDataBadge or data-demo-mode in live mode", async () => {
+    useTreasuryMock.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = renderTreasuryPage();
+
+    useTreasuryMock.mockReturnValue({
+      metrics: [],
+      streams: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    rerender(
+      <MemoryRouter>
+        <TreasuryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("demo-data-badge")).toBeNull();
+      const pageContainer = screen.getByText("No treasury metrics available.").closest("[data-demo-mode]");
+      expect(pageContainer).toBeNull();
+    });
   });
 
   it("defaults to live data and does not render fixture streams", async () => {
@@ -99,6 +194,8 @@ describe("treasury overview demo mode", () => {
     });
 
     expect(screen.queryByText("Dev Grant - Alice")).not.toBeInTheDocument();
-    expect(screen.getByText("No recent streams available.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("No streams yet")).toBeInTheDocument();
+    });
   });
 });

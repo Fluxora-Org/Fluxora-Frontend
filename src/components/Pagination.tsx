@@ -1,4 +1,5 @@
 import React from 'react';
+import './Pagination.css';
 
 interface PaginationProps {
   totalItems: number;
@@ -31,6 +32,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   itemsPerPage,
   currentPage,
   onPageChange,
+  onItemsPerPageChange,
 }) => {
   const { totalPages, currentPage: normalizedPage } = normalizePagination(
     totalItems,
@@ -46,25 +48,88 @@ export const Pagination: React.FC<PaginationProps> = ({
     );
   }
 
+  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (onItemsPerPageChange) {
+      const newLimit = Number(e.target.value);
+      if (!isNaN(newLimit) && newLimit > 0) {
+        onItemsPerPageChange(newLimit);
+      }
+    }
+  };
+
+  const perPageOptions = [10, 20, 50];
+  const safeItemsPerPage = itemsPerPage > 0 ? itemsPerPage : 10;
+  if (!perPageOptions.includes(safeItemsPerPage)) {
+    perPageOptions.push(safeItemsPerPage);
+    perPageOptions.sort((a, b) => a - b);
+  }
+
   return (
-    <nav data-testid="pagination-container" className="pagination-container">
-      <button
-        onClick={() => onPageChange(normalizedPage - 1)}
-        disabled={normalizedPage <= 1}
+      <nav
+        data-testid="pagination-container"
+        className="pagination-container fluxora-pagination"
+        aria-label="Pagination"
       >
-        Previous
-      </button>
+      <div className="page-buttons">
+        <button
+          onClick={() => onPageChange(normalizedPage - 1)}
+          disabled={normalizedPage <= 1}
+          aria-disabled={normalizedPage <= 1}
+          className="page-nav-btn"
+          aria-label="Go to previous page"
+        >
+          Previous
+        </button>
 
-      <span data-testid="pagination-info">
-        Page {normalizedPage} of {totalPages}
-      </span>
+        <span data-testid="pagination-info" className="pagination-info" aria-live="polite" aria-atomic="true">
+          Page {normalizedPage} of {totalPages}
+        </span>
 
-      <button
-        onClick={() => onPageChange(normalizedPage + 1)}
-        disabled={normalizedPage >= totalPages}
-      >
-        Next
-      </button>
+        <div className="page-number-list" aria-label="Pages">
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={`page-num-btn${page === normalizedPage ? ' is-active' : ''}`}
+              aria-current={page === normalizedPage ? 'page' : undefined}
+              aria-label={page === normalizedPage ? `Page ${page}` : `Go to page ${page}`}
+              onClick={() => onPageChange(page)}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(normalizedPage + 1)}
+          disabled={normalizedPage >= totalPages}
+          aria-disabled={normalizedPage >= totalPages}
+          className="page-nav-btn"
+          aria-label="Go to next page"
+        >
+          Next
+        </button>
+      </div>
+
+      {onItemsPerPageChange && (
+        <div className="limit-selector" data-testid="items-per-page-container">
+          <label htmlFor="items-per-page-select">Items per page:</label>
+          <select
+            id="items-per-page-select"
+            aria-label="Items per page"
+            data-testid="items-per-page-select"
+            value={safeItemsPerPage}
+            onChange={handleItemsPerPageChange}
+          >
+            {perPageOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </nav>
   );
 };

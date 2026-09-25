@@ -1,0 +1,210 @@
+/* ========================================
+   TreasuryFlowSankey Component Styles
+   ======================================== */
+
+.treasury-flow-sankey-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-default, #ffffff);
+  border: 1px solid var(--color-border-default, var(--color-border, #e2e8f0));
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-xl, 24px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  margin-bottom: var(--space-xl, 24px);
+}
+
+.sankey-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md, 12px);
+}
+
+.sankey-title {
+  margin: 0;
+  font: var(--font-heading-4, 600 16px/24px inherit);
+  color: var(--color-text-primary);
+}
+
+.sankey-empty {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ─── Live region (visually hidden, announces the active flow) ─── */
+.sankey-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Diagram ─── */
+.sankey-diagram-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sankey-svg {
+  display: block;
+  min-width: 480px;
+}
+
+.sankey-node {
+  fill: var(--color-accent-secondary, #00d4aa);
+  transition: opacity var(--transition-fast, 150ms) ease;
+}
+
+.sankey-node--source {
+  fill: var(--color-accent-primary, #00b8d4);
+  cursor: default;
+}
+
+.sankey-node--others {
+  fill: var(--color-text-secondary, #64748b);
+}
+
+.sankey-node:focus-visible,
+.sankey-flow-group:focus-visible {
+  outline: 2px solid var(--color-focus, var(--focus-ring-color, #00b8d4));
+  outline-offset: 2px;
+}
+
+.sankey-node-label {
+  fill: var(--color-text-primary);
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.sankey-link {
+  fill: color-mix(in srgb, var(--color-accent-secondary, #00d4aa) 65%, transparent);
+  transition: fill var(--transition-fast, 150ms) ease, opacity var(--transition-fast, 150ms) ease;
+}
+
+.sankey-link--others {
+  fill: color-mix(in srgb, var(--color-text-secondary, #64748b) 55%, transparent);
+}
+
+.sankey-flow-group {
+  cursor: pointer;
+}
+
+.sankey-flow-group.is-active .sankey-link {
+  fill: var(--color-accent-primary, #00b8d4);
+}
+
+.sankey-flow-group.is-active .sankey-node--target {
+  fill: var(--color-accent-primary, #00b8d4);
+}
+
+.sankey-flow-group.is-dimmed {
+  opacity: 0.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sankey-node,
+  .sankey-link,
+  .sankey-flow-group {
+    transition: none;
+  }
+}
+
+/* ─── Skeleton (loading state) ─── */
+.sankey-skeleton {
+  display: flex;
+  gap: var(--space-md, 12px);
+  align-items: stretch;
+  min-height: 160px;
+}
+
+.sankey-skeleton-source {
+  width: 14px;
+  border-radius: 4px;
+}
+
+.sankey-skeleton-links {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sankey-skeleton-row {
+  height: 12px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.sankey-skeleton-pulse {
+  animation: sankey-skeleton-pulse-keyframes 1.5s ease-in-out infinite;
+  background-color: var(--color-surface-2, #f1f5f9);
+}
+
+@keyframes sankey-skeleton-pulse-keyframes {
+  0%, 100% {
+    background-color: var(--color-surface-2, #f1f5f9);
+  }
+  50% {
+    background-color: var(--color-surface-elevated, #e2e8f0);
+  }
+}
+
+/* ─── Table alternative view ─── */
+.sankey-table-wrapper {
+  overflow-x: auto;
+  margin-top: var(--space-sm, 8px);
+}
+
+.sankey-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.sankey-table th {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 2px solid var(--color-border-default, #e2e8f0);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.sankey-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border-default, #e2e8f0);
+  color: var(--color-text-primary);
+}
+
+.sankey-table tbody tr:hover {
+  background-color: var(--color-bg-secondary, #f8fafc);
+}
+
+.sankey-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sankey-sort-button:hover {
+  text-decoration: underline;
+}
+
+/* ─── Responsive: table is forced below --breakpoint-md ─── */
+@media (max-width: 767px) {
+  .sankey-diagram-wrapper {
+    display: none;
+  }
+}

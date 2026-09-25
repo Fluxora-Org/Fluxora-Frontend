@@ -8,6 +8,9 @@
     "build": "tsc -b && vite build",
     "build:report": "vite build && node scripts/bundle-size-report.mjs",
     "size-check": "npm run build && node scripts/bundle-size-report.mjs --fail",
+    "audit:vulnerabilities": "node scripts/vulnerability-audit.mjs",
+    "audit:licenses": "node scripts/license-audit.mjs",
+    "audit:supply-chain": "npm run audit:vulnerabilities && npm run audit:licenses",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -17,17 +20,21 @@
     "test:e2e": "playwright test --project=chromium --project=firefox",
     "test:e2e:full": "PLAYWRIGHT_WEBKIT=1 playwright test",
     "test:a11y": "playwright test accessibility",
+    "test:a11y:unit": "vitest run src/pages/__tests__/a11y.test.tsx",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"
   },
   "dependencies": {
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",
-    "@tailwindcss/vite": "^4.2.0",
+    "@testing-library/dom": "^10.4.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
+    "react-i18next": "^17.0.15",
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.22.0",
     "tailwind-merge": "^3.5.0"
@@ -35,11 +42,11 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.9.1",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.61.0",
     "@tailwindcss/vite": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@playwright/test": "1.61.0",
     "@types/node": "^25.6.0",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
@@ -50,7 +57,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "fast-check": "^4.8.0",
-    "jsdom": "^29.0.2",
+    "happy-dom": "^17.1.0",
+    "jsdom": "^26.0.0",
     "prettier": "^3.8.4",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.3.3",
@@ -58,5 +66,9 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.5",
     "vitest-axe": "^0.1.0"
-  }
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true
+  },
+  "packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
 }

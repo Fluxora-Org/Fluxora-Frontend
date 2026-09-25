@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createDemoTransactionStatusSource,
   useTransactionStatus,
+  type PolledTxStatus,
   type TransactionStatusSource,
 } from "../useTransactionStatus";
 
@@ -118,6 +119,90 @@ describe("useTransactionStatus", () => {
     });
 
     expect(getStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("unmounts mid-poll without state updates or leaked timers", async () => {
+    let resolveDeferred: (value: PolledTxStatus) => void;
+    const deferred = new Promise<PolledTxStatus>((resolve) => {
+      resolveDeferred = resolve;
+    });
+
+    const getStatus = vi
+      .fn<TransactionStatusSource>()
+      .mockReturnValue(deferred);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { unmount } = renderHook(() =>
+      useTransactionStatus("tx-mid-unmount", {
+        getStatus,
+        pollIntervalMs: 100,
+        maxAttempts: 5,
+        backoffFactor: 1,
+      }),
+    );
+
+    expect(getStatus).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    await act(async () => {
+      resolveDeferred("pending");
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(10000);
+      await Promise.resolve();
+    });
+
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it("prevents duplicate concurrent poll loops on rapid remount", async () => {
+    const getStatus = vi
+      .fn<TransactionStatusSource>()
+      .mockResolvedValue("pending");
+
+    const { unmount } = renderHook(() =>
+      useTransactionStatus("tx-rapid", {
+        getStatus,
+        pollIntervalMs: 100,
+        maxAttempts: 10,
+        backoffFactor: 1,
+      }),
+    );
+
+    await flushPromises();
+    expect(getStatus).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    const { result: result2 } = renderHook(() =>
+      useTransactionStatus("tx-rapid", {
+        getStatus,
+        pollIntervalMs: 100,
+        maxAttempts: 10,
+        backoffFactor: 1,
+      }),
+    );
+
+    await flushPromises();
+    expect(getStatus).toHaveBeenCalledTimes(2);
+
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+        await Promise.resolve();
+      });
+    }
+
+    expect(getStatus).toHaveBeenCalledTimes(5);
+    expect(result2.current.status).toBe("pending");
+    expect(result2.current.attempts).toBe(4);
   });
 
   it("uses the demo status source without optimistic immediate success", async () => {

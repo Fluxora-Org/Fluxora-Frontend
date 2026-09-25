@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type Ref } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,8 @@ export interface EmptyStateProps {
   error?: string | null;
   onRetry?: () => void;
   onPrimaryAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   /** search-no-results: callback to clear active filters */
   onClearFilters?: () => void;
   /** error variant: optional descriptive message override */
@@ -31,6 +33,11 @@ export interface EmptyStateProps {
    * Drives distinct icon and copy vs true empty state.
    */
   zeroAccrual?: boolean;
+  /** Optional ref forwarded to the inline Retry button in the error banner.
+   *  Used by callers that need to move focus programmatically when an error
+   *  first mounts (WCAG 2.4.3 Focus Order).
+   */
+  retryButtonRef?: Ref<HTMLButtonElement>;
 }
 
 // ── Per-variant copy & icon config ───────────────────────────────────────────
@@ -205,15 +212,22 @@ export default function EmptyState({
   error = null,
   onRetry,
   onPrimaryAction,
+  secondaryActionLabel,
+  onSecondaryAction,
   onClearFilters,
   errorMessage,
   ctaDisabled = false,
   zeroAccrual = false,
+  retryButtonRef,
 }: EmptyStateProps) {
   // When zero-accrual is flagged and variant is not already zero-accrual,
   // override the icon+copy to zero-accrual semantics.
   const effectiveVariant: EmptyStateVariant =
-    zeroAccrual && variant !== "zero-accrual" ? "zero-accrual" : variant;
+    error && variant !== "error"
+      ? "error"
+      : zeroAccrual && variant !== "zero-accrual"
+      ? "zero-accrual"
+      : variant;
   const cfg = CONFIG[effectiveVariant];
   const isConnected = walletConnected;
 
@@ -234,7 +248,7 @@ export default function EmptyState({
     effectiveVariant === "search-no-results"
       ? onClearFilters ?? onPrimaryAction
       : effectiveVariant === "error"
-      ? onRetry ?? onPrimaryAction
+      ? onPrimaryAction ?? onRetry
       : onPrimaryAction;
 
   return (
@@ -257,7 +271,18 @@ export default function EmptyState({
             </svg>
             <span>{error}</span>
             {onRetry && (
-              <button onClick={onRetry} style={retryBtn} aria-label="Retry loading data">
+              <button
+                onClick={onRetry}
+                style={{
+                  ...retryBtn,
+                  opacity: ctaDisabled ? 0.5 : retryBtn.opacity,
+                  cursor: ctaDisabled ? "not-allowed" : retryBtn.cursor,
+                }}
+                disabled={ctaDisabled}
+                aria-disabled={ctaDisabled}
+                ref={retryButtonRef}
+                aria-label="Retry loading data"
+              >
                 Retry
               </button>
             )}
@@ -297,6 +322,15 @@ export default function EmptyState({
           )}
           {ctaLabel}
         </button>
+        {secondaryActionLabel && onSecondaryAction && (
+          <button
+            type="button"
+            onClick={onSecondaryAction}
+            style={secondaryCtaStyle}
+          >
+            {secondaryActionLabel}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -358,14 +392,14 @@ function iconBox(variant: EmptyStateVariant): React.CSSProperties {
 const titleStyle: React.CSSProperties = {
   fontSize: "clamp(18px, 2.5vw, 22px)",
   fontWeight: 700,
-  color: "#FFFFFF",
+  color: "var(--color-text-primary, #FFFFFF)",
   margin: "0 0 12px 0",
 };
 
 const descStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: 1.65,
-  color: "#99A1AF",
+  color: "var(--color-text-secondary, #99A1AF)",
   margin: "0 0 28px 0",
   maxWidth: 400,
 };
@@ -415,6 +449,19 @@ function ctaStyle(variant: EmptyStateVariant, connected: boolean, disabled = fal
         : "none",
   };
 }
+
+const secondaryCtaStyle: React.CSSProperties = {
+  marginTop: 12,
+  minHeight: 44,
+  padding: "10px 16px",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "transparent",
+  color: "var(--text)",
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 const errorBanner: React.CSSProperties = {
   display: "flex",

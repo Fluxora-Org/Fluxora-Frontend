@@ -40,4 +40,25 @@ describe("create stream date helpers", () => {
   it("formats invalid review values as a stable fallback", () => {
     expect(formatLocalDateTime("not-a-date")).toBe("-");
   });
+
+  it("formats a valid datetime with explicit Intl.DateTimeFormat options (not bare toLocaleString)", () => {
+    const result = formatLocalDateTime("2026-06-20T12:30");
+    // Should produce a locale-aware string with date and time components
+    expect(result).toContain("2026");
+    expect(result).toMatch(/\d/); // contains digits
+    expect(result).not.toBe("-");
+    // Must include a time component (hour:minute)
+    expect(result).toMatch(/12/);
+    // Should NOT match the raw ISO input — it must be locale-formatted
+    expect(result).not.toBe("2026-06-20T12:30");
+  });
+
+  it("uses createDateTimeFormat so the format is explicit, not implementation-defined", () => {
+    // The result should be the same regardless of browser/engine locale defaults
+    // because we pass explicit year/month/day/hour/minute options.
+    const result = formatLocalDateTime("2026-07-04T09:15");
+    expect(result).toContain("2026");
+    expect(result).toMatch(/7\/|07\.|07-/); // July in some locale format
+    expect(result).toMatch(/15/); // minutes preserved
+  });
 });

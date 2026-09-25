@@ -1,9 +1,58 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
+import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
+import { resolveRoutePageChunk } from "./src/lib/routeChunks";
 
 const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
+
+/**
+ * Vite plugin that injects the canonical security headers into every response
+ * served by the dev server (vite dev) and the preview server (vite preview).
+ *
+ * This ensures that:
+ *  - The full Content-Security-Policy (including frame-ancestors 'none') is
+ *    sent as an HTTP header, not just the <meta> fallback in index.html.
+ *  - X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+ *    Permissions-Policy, Cross-Origin-Opener-Policy, and
+ *    Cross-Origin-Resource-Policy are present on all responses.
+ *
+ * Production deployments should replicate these headers at the reverse-proxy
+ * or CDN layer and add Strict-Transport-Security (HSTS). The preview server
+ * intentionally omits HSTS because it runs over plain HTTP on localhost.
+ *
+ * See src/lib/securityHeaders.ts for design rationale and the embed-widget
+ * frame-ancestors override instructions.
+ */
+function securityHeadersPlugin(): Plugin {
+  const applyHeaders = (
+    res: { setHeader: (name: string, value: string) => void }
+  ) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      res.setHeader(name, value);
+    }
+  };
+
+  return {
+    name: "security-headers",
+    // Dev server (vite dev)
+    configureServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        applyHeaders(res);
+        next();
+      });
+    },
+    // Preview server (vite preview / vite preview --host 127.0.0.1)
+    configurePreviewServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        applyHeaders(res);
+        next();
+      });
+    },
+  };
+}
 
 function vendorChunk(id: string) {
   if (!id.includes("node_modules")) return undefined;
@@ -32,7 +81,7 @@ function vendorChunk(id: string) {
 export default defineConfig(async () => {
   const plugins = isTesting
     ? [react()]
-    : [react(), (await import("@tailwindcss/vite")).default()];
+    : [react(), (await import("@tailwindcss/vite")).default(), securityHeadersPlugin()];
 
   return {
     plugins,
@@ -44,21 +93,10 @@ export default defineConfig(async () => {
           manualChunks(id: string) {
             const normalizedId = id.replace(/\\/g, "/");
 
-            // App-page code splitting (lazy routes).
-            if (normalizedId.includes("/src/pages/Dashboard")) {
-              return "app-dashboard";
-            }
-            if (normalizedId.includes("/src/pages/Streams")) {
-              return "app-streams";
-            }
-            if (normalizedId.includes("/src/pages/Recipient")) {
-              return "app-recipient";
-            }
-            if (normalizedId.includes("/src/pages/TreasuryPage")) {
-              return "app-treasury";
-            }
-            if (normalizedId.includes("/src/pages/EmptyStateDemo")) {
-              return "app-empty-state-demo";
+            // App-page code splitting (lazy routes) — see src/lib/routeChunks.ts.
+            const routeChunk = resolveRoutePageChunk(normalizedId);
+            if (routeChunk) {
+              return routeChunk;
             }
 
             // Below-the-fold landing sections are lazy-loaded from Home and

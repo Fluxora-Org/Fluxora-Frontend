@@ -6,22 +6,35 @@ export interface InputWithUnitProps extends React.InputHTMLAttributes<HTMLInputE
   unit: string;
   /** Unique ID for accessibility */
   id: string;
-  /** Whether the field has an error */
+  /**
+   * Whether the field is currently in an invalid state.
+   *
+   * This prop is the source of truth for `aria-invalid` on the underlying
+   * `<input>`. When `true`, the field is marked `aria-invalid="true"` for
+   * assistive technologies; when `false` or omitted, the `aria-invalid`
+   * attribute is not rendered at all.
+   *
+   * A caller-supplied `aria-invalid` passed via `...inputProps` will be
+   * overridden so that `hasError` and the AT-visible state stay in sync.
+   */
   hasError?: boolean;
+  /** Optional keyboard hint label displayed as a chip next to the unit badge (e.g., "Enter ↵") */
+  keyboardHint?: string;
 }
 
 /**
  * InputWithUnit - Input field with inline unit badge
- * 
+ *
  * Displays an input field with a non-editable unit badge on the right side.
  * The badge is positioned absolutely to prevent layout shift.
- * 
+ *
  * Features:
  * - Accessible unit label (aria-describedby)
+ * - `aria-invalid` driven by the `hasError` prop (precedence over caller attributes)
  * - Proper padding to prevent text overlap
  * - Responsive font sizing
  * - Error state styling
- * 
+ *
  * Usage:
  * ```tsx
  * <InputWithUnit
@@ -37,22 +50,49 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
   unit,
   id,
   hasError,
+  keyboardHint,
   className,
+  type = 'text',
+  inputMode,
+  'aria-describedby': callerDescribedBy,
   ...inputProps
 }) => {
   const unitId = `${id}-unit`;
-  
+  const hintId = keyboardHint ? `${id}-keyboard-hint` : undefined;
+
+  // Amount fields must keep the exact decimal string the user entered. A native
+  // `type="number"` input coerces its value through a floating-point `number`,
+  // which loses precision, so it is downgraded to a text field with a decimal
+  // keypad on touch devices. Callers can still override `inputMode`.
+  const resolvedType = type === 'number' ? 'text' : type;
+  const resolvedInputMode = inputMode ?? (type === 'number' ? 'decimal' : undefined);
+
+  // Callers (e.g. the create-stream rate/duration fields) point aria-describedby
+  // at the active hint or error message. Keep those references — dropping them
+  // would disconnect the field from the text that describes its state — and
+  // append the unit badge and keyboard hint so they are announced too.
+  const describedBy =
+    [callerDescribedBy, unitId, hintId].filter(Boolean).join(' ') || undefined;
+
   return (
     <div className={`input-with-unit ${hasError ? 'input-with-unit--error' : ''}`}>
       <input
         {...inputProps}
         id={id}
+        type={resolvedType}
+        inputMode={resolvedInputMode}
         className={`input-with-unit__field ${className || ''}`.trim()}
-        aria-describedby={unitId}
+        aria-describedby={describedBy}
+        aria-invalid={hasError || undefined}
       />
       <span id={unitId} className="input-with-unit__badge" aria-label={`Unit: ${unit}`}>
         {unit}
       </span>
+      {keyboardHint && (
+        <span id={hintId} className="keyboard-hint-chip" aria-label={`Press ${keyboardHint} to continue`}>
+          {keyboardHint}
+        </span>
+      )}
     </div>
   );
 };

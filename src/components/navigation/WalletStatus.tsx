@@ -1,12 +1,29 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  LogOut,
+  Check,
+  Link2,
+  Unlink,
+} from "lucide-react";
 import {
   isStellarNetworkMismatch,
   normalizeStellarNetwork,
 } from "../../lib/stellarNetwork";
-import { maskAddress, stellarExplorerUrl } from "../../lib/stellar";
+import { stellarExplorerUrl } from "../../lib/stellar";
 import { useClipboard } from "../../hooks/useClipboard";
 import { useOptionalToast } from "../toast/ToastProvider";
+import { formatAddress } from "../common/TruncatedAddress";
+import {
+  type ShareProvider,
+  SHARE_WORKSPACES_CHANGED_EVENT,
+  connectWorkspace,
+  disconnectWorkspace,
+  getShareProviderLabel,
+  readConnectedWorkspaces,
+} from "../../lib/shareWorkspaces";
 
 interface WalletStatusProps {
   address: string;
@@ -14,6 +31,13 @@ interface WalletStatusProps {
   expectedNetwork?: string;
   isNetworkMismatch?: boolean;
   onDisconnect?: () => void;
+  /**
+   * When true (e.g. during a route transition), the wallet *action* controls
+   * are locked: the trigger is disabled, the menu cannot open, and any open
+   * menu is force-closed. The *identity* (network badge + address) stays
+   * visible so the user is not disoriented mid-navigation.
+   */
+  disabled?: boolean;
 }
 
 
@@ -23,21 +47,26 @@ export default function WalletStatus({
   expectedNetwork = "TESTNET",
   isNetworkMismatch = isStellarNetworkMismatch(network, expectedNetwork),
   onDisconnect,
+  disabled = false,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [workspaces, setWorkspaces] = useState(() => readConnectedWorkspaces());
   const { copy, status: copyStatus } = useClipboard();
   const toast = useOptionalToast();
   const copied = copyStatus === "copied";
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const focusRingClassName =
     "outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--navbar-bg)]";
 
   const networkUpper = normalizeStellarNetwork(network);
   const isWrongNetwork = isNetworkMismatch;
   const isTestnet = networkUpper === "TESTNET";
+  const slackWorkspace = workspaces.find((w) => w.provider === "slack");
+  const teamsWorkspace = workspaces.find((w) => w.provider === "teams");
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -64,12 +93,112 @@ export default function WalletStatus({
     };
   }, []);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    if (!open) {
+      if (
+        document.activeElement === triggerRef.current &&
+        (e.key === "ArrowDown" || e.key === "ArrowUp")
+      ) {
+        e.preventDefault();
+        setOpen(true);
+        // Defer focus so the menu has time to render
+        requestAnimationFrame(() => {
+          const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])");
+          if (!focusableElements || focusableElements.length === 0) return;
+          if (e.key === "ArrowUp") {
+            focusableElements[focusableElements.length - 1].focus();
+          } else {
+            focusableElements[0].focus();
+          }
+        });
+      }
+      return;
+    }
+
+    // Menu is open
+    const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>(
+      "button:not([disabled])",
+    ) || [];
+    const items = Array.from(focusableElements);
+
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+
+    if (e.key === "Tab") {
+      if (e.shiftKey && (document.activeElement === firstItem || document.activeElement === triggerRef.current)) {
+        e.preventDefault();
+        lastItem.focus();
+      } else if (!e.shiftKey && (document.activeElement === lastItem || document.activeElement === triggerRef.current)) {
+        e.preventDefault();
+        firstItem.focus();
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      items[nextIndex].focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      items[prevIndex].focus();
+    }
+  };
+
   useEffect(() => {
     // Announce connection on mount
-    setAnnouncement(`Wallet connected: ${maskAddress(address, 6, 4)}`);
+    setAnnouncement(`Wallet connected: ${formatAddress(address)}`);
     const timer = setTimeout(() => setAnnouncement(""), 1000);
     return () => clearTimeout(timer);
   }, [address]);
+
+  // Locking: when disabled (e.g. a route transition is settling), the wallet
+  // action menu must not be openable and any in-flight menu is dismissed so no
+  // action from the previous context can be invoked against the new route.
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      setConfirmingDisconnect(false);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    const syncWorkspaces = () => setWorkspaces(readConnectedWorkspaces());
+    window.addEventListener("storage", syncWorkspaces);
+    window.addEventListener("focus", syncWorkspaces);
+    window.addEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    return () => {
+      window.removeEventListener("storage", syncWorkspaces);
+      window.removeEventListener("focus", syncWorkspaces);
+      window.removeEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
+    };
+  }, []);
+
+  const handleWorkspaceConnect = (provider: ShareProvider) => {
+    const connected = connectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace connected.`,
+      "success",
+    );
+    setAnnouncement(
+      `${getShareProviderLabel(provider)} connected to ${connected.workspaceName}`,
+    );
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
+
+  const handleWorkspaceDisconnect = (provider: ShareProvider) => {
+    disconnectWorkspace(provider);
+    setWorkspaces(readConnectedWorkspaces());
+    toast?.addToast(
+      `${getShareProviderLabel(provider)} workspace disconnected.`,
+      "info",
+    );
+    setAnnouncement(`${getShareProviderLabel(provider)} workspace disconnected`);
+    setTimeout(() => setAnnouncement(""), 2000);
+  };
 
  const handleCopy = async () => {
   // Copy via the shared hook (Clipboard API + execCommand fallback).
@@ -99,7 +228,7 @@ export default function WalletStatus({
   };
 
   return (
-    <div ref={ref} className="flex items-center gap-2">
+    <div ref={ref} onKeyDown={handleKeyDown} className="flex items-center gap-2">
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -126,19 +255,46 @@ export default function WalletStatus({
         </span>
       )}
 
+      {slackWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-sky-400/15 text-sky-200 border border-sky-400/30"
+          title={`Slack connected: ${slackWorkspace.workspaceName}`}
+        >
+          Slack · {slackWorkspace.workspaceName}
+        </span>
+      )}
+      {teamsWorkspace && (
+        <span
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-indigo-400/15 text-indigo-200 border border-indigo-400/30"
+          title={`Teams connected: ${teamsWorkspace.workspaceName}`}
+        >
+          Teams · {teamsWorkspace.workspaceName}
+        </span>
+      )}
+
       {/* Wallet Button */}
       <div className="relative">
         <button
           ref={triggerRef}
           onClick={() => setOpen((o) => !o)}
+          disabled={disabled}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={`Wallet ${maskAddress(address, 6, 4)}. Open wallet options.`}
-          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
+          aria-disabled={disabled || undefined}
+          aria-label={`${
+            disabled
+              ? "Wallet controls unavailable while navigating. "
+              : ""
+          }Wallet ${formatAddress(address)}. Open wallet options.`}
+          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName} ${
+            disabled
+              ? "opacity-60 cursor-not-allowed hover:border-[var(--border)]"
+              : ""
+          }`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span className="font-mono text-xs">
-            {maskAddress(address, 6, 4)}
+            {formatAddress(address)}
           </span>
           <ChevronDown
             size={16}
@@ -150,6 +306,7 @@ export default function WalletStatus({
         {open && (
           <div
             role="menu"
+            ref={menuRef}
             aria-label="Wallet options"
             className="absolute right-0 mt-2 w-60 bg-[var(--navbar-bg)] border border-[var(--navbar-border)] rounded-xl shadow-md p-1.5 z-50"
           >
@@ -212,9 +369,57 @@ export default function WalletStatus({
 
                 <div className="my-1 h-px bg-[var(--navbar-border)]" />
 
+                {slackWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Slack
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("slack")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Slack workspace
+                  </button>
+                )}
+
+                {teamsWorkspace ? (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceDisconnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Unlink size={16} />
+                    Disconnect Teams
+                  </button>
+                ) : (
+                  <button
+                    role="menuitem"
+                    onClick={() => handleWorkspaceConnect("teams")}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+                  >
+                    <Link2 size={16} />
+                    Connect Microsoft Teams
+                  </button>
+                )}
+
+                <div className="my-1 h-px bg-[var(--navbar-border)]" />
+
                 <button
                   role="menuitem"
-                  onClick={() => setConfirmingDisconnect(true)}
+                  onClick={() => {
+                    setConfirmingDisconnect(true);
+                    requestAnimationFrame(() => {
+                      const firstButton = menuRef.current?.querySelector<HTMLElement>("button:not([disabled])");
+                      firstButton?.focus();
+                    });
+                  }}
                   className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
                 >
                   <LogOut size={16} />

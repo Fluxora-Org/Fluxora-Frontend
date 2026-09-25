@@ -1,37 +1,30 @@
 import React, { useEffect, useMemo, useState } from "react";
-import RecentStreams, { Stream } from "../components/RecentStreams";
+import type { Stream } from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
-import TreasuryOverviewLoading from "../components/TreasuryOverviewLoading";
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
 import TreasuryOnboarding from "../components/TreasuryOnboarding";
 import ConnectWalletModal from "../components/ConnectWalletModal";
 import ToastNotification, {
   type ToastVariant,
 } from "../components/ToastNotification";
+import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
-import type { StreamRecord } from "../data/streamRecords";
-import { readOnboardingDismissed } from "../lib/onboarding";
+import {
+  readOnboardingDismissed,
+  writeOnboardingDismissed,
+} from "../lib/onboarding";
+import { formatAssetAmount } from "../lib/formatters";
+import { toRecentStream } from "../lib/recentStreamMapper";
+import Button from "../components/Button";
+import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
+import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
+import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";
-
-function formatUsdc(amount: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    amount,
-  )} USDC`;
-}
-
-function toRecentStream(record: StreamRecord): Stream {
-  return {
-    name: record.name,
-    id: record.id,
-    recipient: record.recipientAddress || record.recipientName,
-    rate: `${formatUsdc(record.monthlyRate)} / mo`,
-    status: record.status,
-  };
-}
-
-
+const cardGrid: React.CSSProperties = { display: "grid", gap: "1rem" };
+const card: React.CSSProperties = { border: "1px solid var(--border)", padding: "1rem", borderRadius: "8px" };
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -41,11 +34,12 @@ export default function Dashboard() {
     variant: ToastVariant;
   } | null>(null);
   const [withdrawable, setWithdrawable] = useState<number | null>(null);
-  const { announcement, announce } = useLiveAnnouncer();
+  const { announcement, alertAnnouncement, announce, announceAlert } =
+    useLiveAnnouncer();
   const wallet = useWallet();
   const walletConnected = wallet.connected;
   const walletAddress = wallet.address;
-  const treasury = useTreasury();
+  const treasury = useTreasury(undefined, wallet.accountContextVersion);
   const { loading, error, refetch } = treasury;
   const streams = useMemo<Stream[]>(
     () => treasury.streams.map(toRecentStream),
@@ -91,13 +85,28 @@ export default function Dashboard() {
   useEffect(() => {
     if (withdrawable !== null) {
       announce(
-        `Available balance updated to ${withdrawable.toLocaleString()} USDC.`,
+        `Available balance updated to ${formatAssetAmount(withdrawable, "USDC")}.`,
       );
     }
   }, [withdrawable, announce]);
 
+  useEffect(() => {
+    if (error) {
+      const message =
+        error === "Unable to load treasury data."
+          ? "Failed to load dashboard data."
+          : `Failed to load dashboard data: ${error}`;
+      announceAlert(message);
+    }
+  }, [error, announceAlert]);
+
   const handleDismissOnboarding = () => {
     setShowOnboarding(false);
+  };
+
+  const handleOpenOnboarding = () => {
+    writeOnboardingDismissed(false);
+    setShowOnboarding(true);
   };
 
   const handleOnboardingCreateStream = () => {
@@ -105,7 +114,7 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleStreamCreated = () => {
+  const handleStreamCreated = (_data?: StreamCreatedData) => {
     setIsModalOpen(false);
     setToast({
       message:
@@ -122,15 +131,16 @@ export default function Dashboard() {
     });
   };
 
-  if (loading) return <TreasuryOverviewLoading />;
-
   const hasStreams = streams.length > 0;
   const hasError = !!error;
 
   return (
-    <div>
+    <main id="main-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
       </div>
 
       <h1 className="text-heading-1" style={{ marginTop: 0 }}>
@@ -171,94 +181,100 @@ export default function Dashboard() {
               streams.
             </span>
           </div>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
             aria-label="Connect Stellar wallet"
           >
             Connect wallet
-          </button>
+          </Button>
         </div>
       )}
 
-      <div style={cardGrid}>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Active Streams
-          </div>
-          <div className="text-heading-2">{streams.length || "--"}</div>
-        </div>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Total Streaming
-          </div>
-          <div className="text-heading-2">
-            {totalStreaming > 0 ? formatUsdc(totalStreaming) : "-- USDC"}
-          </div>
-        </div>
-        <div style={card}>
-          <div
-            className="text-label-md"
-            style={{ color: "var(--muted)", marginBottom: "0.25rem" }}
-          >
-            Withdrawable
-          </div>
-          <div className="text-heading-2">
-            {withdrawable !== null
-              ? `${withdrawable.toLocaleString()} USDC`
-              : "-- USDC"}
-          </div>
-        </div>
-      </div>
+      <WidgetErrorBoundary name="Treasury summary" onRetry={refetch}>
+        <DashboardSummaryWidget
+          streamCount={streams.length}
+          totalStreaming={totalStreaming}
+          withdrawable={withdrawable}
+          loading={loading}
+        />
+      </WidgetErrorBoundary>
 
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <button
+          <Button
             type="button"
-            className="button button--secondary"
+            variant="secondary"
             onClick={refetch}
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
-      {hasStreams ? (
+      {loading || hasError || hasStreams ? (
         <>
-          <RecentStreams streams={streams} />
-          <button
-            type="button"
-            className="button button--primary"
-            onClick={() => setIsModalOpen(true)}
-            aria-label="Create stream"
-          >
-            Create stream
-          </button>
+          <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
+            <DashboardStreamsWidget
+              streams={streams}
+              loading={loading}
+              error={error}
+              walletConnected={walletConnected}
+              onRetry={refetch}
+              onCreateStream={() => setIsModalOpen(true)}
+            />
+          </WidgetErrorBoundary>
+          <ErrorBoundary>
+            <RecentStreams
+              streams={streams}
+              loading={loading}
+              error={error}
+              onRetry={refetch}
+              walletConnected={walletConnected}
+            />
+          </ErrorBoundary>
+          {!loading && !error && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => setIsModalOpen(true)}
+              aria-label="Create stream"
+            >
+              Create stream
+            </Button>
+          )}
         </>
+
       ) : showOnboarding ? (
-        <TreasuryOnboarding
-          walletConnected={walletConnected}
-          walletAddress={walletAddress}
-          onConnectWallet={() => setIsWalletModalOpen(true)}
-          onCreateStream={handleOnboardingCreateStream}
-          onDismiss={handleDismissOnboarding}
-        />
+        <ErrorBoundary>
+          <TreasuryOnboarding
+            walletConnected={walletConnected}
+            onRetry={refetch}
+            onCreateStream={() => setIsModalOpen(true)}
+          />
+        </ErrorBoundary>
       ) : (
-        <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} />
+        <ErrorBoundary>
+          <TreasuryEmptyState
+            onCreateStream={() => setIsModalOpen(true)}
+            onOpenOnboarding={handleOpenOnboarding}
+          />
+        </ErrorBoundary>
       )}
 
       <CreateStreamModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onStreamCreated={handleStreamCreated}
+        onStreamError={refetch}
+      />
+
+      <CreateStreamFab
+        onCreateStream={() => setIsModalOpen(true)}
+        disabled={!walletConnected}
+        hidden={isModalOpen}
       />
 
       <ConnectWalletModal
@@ -278,7 +294,7 @@ export default function Dashboard() {
           onClose={() => setToast(null)}
         />
       ) : null}
-    </div>
+    </main>
   );
 }
 
@@ -296,16 +312,3 @@ const walletBannerStyle: React.CSSProperties = {
   marginBottom: "0.25rem",
 };
 
-const cardGrid: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-  gap: "1rem",
-  marginTop: "1.5rem",
-};
-
-const card: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "1.25rem",
-};

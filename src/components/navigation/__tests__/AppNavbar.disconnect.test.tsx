@@ -22,6 +22,14 @@ vi.mock("../../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+vi.mock("../../voice/VoiceMicButton", () => ({
+  VoiceMicButton: () => <div data-testid="mock-voice-mic-button" />,
+}));
+
+vi.mock("../../../hooks/useTickingNow", () => ({
+  useTickingNow: () => "2026-07-24T05:07:26.000Z",
+}));
+
 vi.mock("react-router-dom", () => ({
   Link: ({
     children,
@@ -33,6 +41,7 @@ vi.mock("react-router-dom", () => ({
     </a>
   ),
   useLocation: () => ({ pathname: "/app" }),
+  useNavigate: () => vi.fn(),
 }));
 
 function renderNavbar() {
@@ -112,9 +121,12 @@ describe("AppNavbar wallet disconnect flow", () => {
     );
     act(() => vi.runAllTimers());
 
-    const connectWallet = screen.getByRole("link", {
+    const connectLinks = screen.getAllByRole("link", {
       name: /connect your stellar wallet/i,
     });
-    expect(connectWallet).toHaveAttribute("href", "/connect-wallet");
+    expect(connectLinks.length).toBeGreaterThanOrEqual(1);
+    connectLinks.forEach((link) => {
+      expect(link).toHaveAttribute("href", "/connect-wallet");
+    });
   });
 });

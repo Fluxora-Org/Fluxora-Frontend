@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getStreamById,
   getStreams,
@@ -31,16 +31,14 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<StreamsServiceError | null>(null);
   const [tick, setTick] = useState(0);
-
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
+  const filtersKey = JSON.stringify(filters ?? {});
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    getStreams(filtersRef.current)
+    getStreams(filters, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setStreams(data);
@@ -62,8 +60,7 @@ export function useStreams(filters?: StreamsFilters): UseStreamsResult {
       });
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
+  }, [filtersKey, tick]);
 
   const refetch = useCallback(() => setTick((t) => t + 1), []);
 
@@ -89,12 +86,9 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
   const [data, setData] = useState<StreamRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<StreamsServiceError | null>(null);
-  const triggerRef = useRef(0);
+  const [tick, setTick] = useState(0);
 
-  const refetch = () => {
-    triggerRef.current += 1;
-    setLoading(true);
-  };
+  const refetch = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
     if (!address) {
@@ -104,34 +98,32 @@ export function useRecipientStreams(address: string): UseRecipientStreamsResult 
     }
 
     const controller = new AbortController();
-    let cancelled = false;
-
     setLoading(true);
     setError(null);
 
-    getRecipientStreams(address)
+    getRecipientStreams(address, { signal: controller.signal })
       .then((records) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setData(records);
-          setLoading(false);
         }
       })
       .catch((err) => {
-        if (cancelled || controller.signal.aborted) return;
-        setError(
-          err instanceof StreamsServiceError
-            ? err
-            : new StreamsServiceError(String(err), "network"),
-        );
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof StreamsServiceError
+              ? err
+              : new StreamsServiceError(String(err), "network"),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, triggerRef.current]);
+    return () => controller.abort();
+  }, [address, tick]);
 
   return { data, loading, error, refetch };
 }
@@ -180,7 +172,7 @@ export function useStreamById(id: string | null): UseStreamByIdResult {
     setLoading(true);
     setError(null);
 
-    getStreamById(id)
+    getStreamById(id, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
           setStream(data);

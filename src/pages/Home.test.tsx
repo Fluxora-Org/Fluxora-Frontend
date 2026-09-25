@@ -1,110 +1,111 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Home from "./Home";
 import { ThemeProvider } from "../theme/ThemeProvider";
+import Home from "./Home";
 
-function renderHome() {
+const CONNECT_CTA_LABEL = /connect wallet to launch/i;
+
+function renderHomeWithoutWallet() {
   return render(
-    <ThemeProvider>
-      <MemoryRouter>
+    <MemoryRouter>
+      <ThemeProvider>
         <Home />
-      </MemoryRouter>
-    </ThemeProvider>,
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 
-describe("Home canonical landing page", () => {
-  it("renders the hero immediately", () => {
-    renderHome();
-
-    expect(
-      screen.getByRole("heading", { level: 1, name: /treasury streaming/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("lazily renders the below-fold sections after the observer fires", async () => {
-    // jsdom has no IntersectionObserver, so the LazySection fallback loads
-    // immediately and resolves each dynamic import.
-    renderHome();
-
-    expect(
-      await screen.findByRole("heading", {
-        level: 2,
-        name: /treasury streaming infrastructure/i,
-      }),
-    ).toBeInTheDocument();
-    expect(await screen.findByText(/powered by stellar/i)).toBeInTheDocument();
-    expect(
-      await screen.findByRole("heading", {
-        level: 2,
-        name: /ready to start streaming/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByRole("heading", {
-        level: 2,
-        name: /stay updated on stellar ecosystem streaming/i,
-      }),
-    ).toBeInTheDocument();
-  });
-});
-
-describe("Home lazy sections with IntersectionObserver", () => {
-  const observers: Array<{
-    callback: IntersectionObserverCallback;
-    observe: ReturnType<typeof vi.fn>;
-    disconnect: ReturnType<typeof vi.fn>;
-  }> = [];
-
+describe("landing page without a wallet", () => {
   beforeEach(() => {
-    observers.length = 0;
-    class MockObserver {
-      callback: IntersectionObserverCallback;
-      observe = vi.fn();
-      disconnect = vi.fn();
-      unobserve = vi.fn();
-      takeRecords = vi.fn(() => []);
-      root = null;
-      rootMargin = "";
-      thresholds = [];
-      constructor(cb: IntersectionObserverCallback) {
-        this.callback = cb;
-        observers.push(this);
-      }
-    }
-    vi.stubGlobal("IntersectionObserver", MockObserver);
+    // jsdom provides an IntersectionObserver that never reports intersections,
+    // which would keep the lazy below-the-fold sections stuck as skeletons.
+    // Making it unavailable exercises LazySection's documented immediate-load
+    // fallback (older browsers, jsdom/SSR) so the whole page actually renders.
+    vi.stubGlobal("IntersectionObserver", undefined);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+  it("renders every landing section without requiring a wallet", async () => {
+    renderHomeWithoutWallet();
 
-  it("does not load a section until it intersects the viewport", async () => {
-    renderHome();
-
-    // Sections are deferred: their headings are absent until the observer fires.
     expect(
-      screen.queryByRole("heading", {
-        level: 2,
-        name: /treasury streaming infrastructure/i,
+      await screen.findByRole("heading", {
+        level: 1,
+        name: /the future of treasury streaming/i,
       }),
-    ).not.toBeInTheDocument();
-
-    expect(observers.length).toBeGreaterThan(0);
-    // Fire every observer as if each placeholder scrolled into view.
-    observers.forEach((obs) => {
-      obs.callback(
-        [{ isIntersecting: true } as IntersectionObserverEntry],
-        obs as unknown as IntersectionObserver,
-      );
-    });
+    ).toBeInTheDocument();
 
     expect(
       await screen.findByRole("heading", {
         level: 2,
-        name: /treasury streaming infrastructure/i,
+        name: "Treasury streaming infrastructure",
       }),
     ).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /trusted stellar treasury patterns/i,
+      }),
+    ).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("heading", { name: "Ready to start streaming?" }),
+    ).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Stay updated on Stellar ecosystem streaming",
+      }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("contentinfo")).toBeInTheDocument();
+  });
+
+  it("uses calls to action that state what connecting a wallet will do", async () => {
+    renderHomeWithoutWallet();
+
+    // The hero CTA renders eagerly and states the connecting step, and the
+    // get-started CTA states the same once its lazy chunk has resolved.
+    const ctas = await screen.findAllByRole("button", {
+      name: CONNECT_CTA_LABEL,
+    });
+    expect(ctas.length).toBeGreaterThanOrEqual(2);
+    for (const cta of ctas) {
+      expect(cta).toBeEnabled();
+    }
+  });
+
+  it("shows no wallet-restoring or connecting placeholder", async () => {
+    renderHomeWithoutWallet();
+
+    await screen.findByRole("heading", {
+      level: 1,
+      name: /the future of treasury streaming/i,
+    });
+
+    expect(
+      screen.queryByLabelText(/connecting wallet/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/loading wallet/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("exposes the primary call to action to the keyboard", async () => {
+    renderHomeWithoutWallet();
+
+    const hero = screen.getByRole("region", {
+      name: /the future of treasury streaming/i,
+    });
+    const cta = within(hero).getByRole("button", {
+      name: CONNECT_CTA_LABEL,
+    });
+    expect(cta).toBeEnabled();
+
+    cta.focus();
+    expect(document.activeElement).toBe(cta);
   });
 });

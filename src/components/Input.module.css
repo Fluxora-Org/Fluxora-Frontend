@@ -101,6 +101,31 @@
   border-color: var(--color-danger);
 }
 
+@keyframes input-error-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-3px); }
+}
+
+.errorShake {
+  animation: input-error-shake 250ms ease-in-out;
+}
+
+/* IME composition is pending text, not an invalid value. */
+.input.composing,
+.input[data-composing="true"] {
+  border-color: var(--focus-ring-color);
+  border-bottom-width: 2px;
+  padding-bottom: 9px;
+  box-shadow: none;
+}
+
+.input-container--composing {
+  border-bottom: 2px solid var(--focus-ring-color);
+  border-radius: var(--radius-sm);
+}
+
 /* ═══════════════════════════════════════════════════════════
    LABEL STYLING
    ═══════════════════════════════════════════════════════════ */
@@ -184,5 +209,9 @@
   .textarea,
   .select {
     transition: none;
+  }
+
+  .errorShake {
+    animation: none;
   }
 }

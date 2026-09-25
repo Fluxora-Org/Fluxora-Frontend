@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidStellarAddress, maskAddress, stellarExplorerUrl } from "../stellar";
+import { decodeBase32, isValidStellarAddress, maskAddress, stellarExplorerUrl } from "../stellar";
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const ED25519_PUBLIC_KEY_VERSION_BYTE = 6 << 3;
@@ -108,5 +108,71 @@ describe("stellarExplorerUrl", () => {
     expect(stellarExplorerUrl("GABC/unsafe value", "PUBLIC")).toBe(
       "https://stellar.expert/explorer/public/account/GABC%2Funsafe%20value",
     );
+  });
+});
+
+describe("decodeBase32 — non-canonical (non-zero trailing padding bits)", () => {
+  // A 7-character base32 string encodes 7 × 5 = 35 bits, which yields
+  // 4 full bytes (32 bits) with 3 leftover padding bits.  Per RFC 4648 §3.5
+  // and the Stellar StrKey spec those padding bits MUST be zero.  If they
+  // are non-zero, multiple distinct base32 strings would decode to the same
+  // 4-byte payload — a non-canonical re-encoding.
+  //
+  // "AAAAAAA"  → index sequence [0,0,0,0,0,0,0] → 35 zero bits
+  //             → 4 bytes [0,0,0,0], trailing 3 bits = 0b000 (canonical ✓)
+  // "AAAAAAB"  → last index = 1 → trailing 3 bits = 0b001 (non-zero  ✗)
+  // "AAAAAAC"  → last index = 2 → trailing 3 bits = 0b010 (non-zero  ✗)
+  //
+  // Both "AAAAAAB" and "AAAAAAC" decode to the same 4 bytes as "AAAAAAA",
+  // which is exactly the non-canonical collision that must be rejected.
+
+  it("accepts a canonical encoding whose trailing padding bits are zero", () => {
+    const result = decodeBase32("AAAAAAA");
+    expect(result).not.toBeNull();
+    expect(Array.from(result!)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("rejects a non-canonical encoding with non-zero trailing padding bits (last char B)", () => {
+    // "AAAAAAB" has trailing 3 bits = 0b001 — same 4-byte payload as "AAAAAAA"
+    expect(decodeBase32("AAAAAAB")).toBeNull();
+  });
+
+  it("rejects a non-canonical encoding with non-zero trailing padding bits (last char C)", () => {
+    // "AAAAAAC" has trailing 3 bits = 0b010 — same 4-byte payload as "AAAAAAA"
+    expect(decodeBase32("AAAAAAC")).toBeNull();
+  });
+
+  it("confirms the canonical and non-canonical strings would otherwise share a byte payload", () => {
+    // Temporarily decode without the trailing-bit check to show both strings
+    // map to identical bytes, proving we are testing a real non-canonical pair.
+    const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    function decodeIgnoringPadding(value: string): number[] {
+      let bits = 0;
+      let bitCount = 0;
+      const bytes: number[] = [];
+      for (const char of value) {
+        const index = ALPHABET.indexOf(char);
+        bits = (bits << 5) | index;
+        bitCount += 5;
+        while (bitCount >= 8) {
+          bitCount -= 8;
+          bytes.push((bits >> bitCount) & 0xff);
+        }
+      }
+      return bytes;
+    }
+
+    expect(decodeIgnoringPadding("AAAAAAA")).toEqual([0, 0, 0, 0]);
+    expect(decodeIgnoringPadding("AAAAAAB")).toEqual([0, 0, 0, 0]);
+    expect(decodeIgnoringPadding("AAAAAAC")).toEqual([0, 0, 0, 0]);
+  });
+
+  it("still accepts all valid 56-character Stellar addresses (zero remainder for 56×5=280 bits)", () => {
+    // 56 chars × 5 bits = 280 bits = 35 bytes exactly; bitCount is always 0
+    // at end, so the padding check is a no-op and valid addresses keep passing.
+    const address = createValidAddress(277);
+    expect(isValidStellarAddress(address)).toBe(true);
+    // A different seed produces a different valid address — both should pass.
+    expect(isValidStellarAddress(createValidAddress(42))).toBe(true);
   });
 });

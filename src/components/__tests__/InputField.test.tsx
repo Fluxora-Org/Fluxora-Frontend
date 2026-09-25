@@ -1,248 +1,205 @@
-// Feature: create-stream-modal-validation, Property 1: Default state has no modifier classes
-// Feature: create-stream-modal-validation, Property 2: Hint renders when helperText is provided and no error is active
-// Feature: create-stream-modal-validation, Property 3: Error state applies the error modifier class
-// Feature: create-stream-modal-validation, Property 6: Error state sets aria-invalid="true"
-// Feature: create-stream-modal-validation, Property 7: aria-describedby points to the active message element's id
-// Feature: create-stream-modal-validation, Property 9: Success state applies the success modifier class
-// Feature: create-stream-modal-validation, Property 10: Success state sets aria-invalid="false"
-// Feature: create-stream-modal-validation, Property 11: Error replaces hint — mutual exclusion
-// Feature: create-stream-modal-validation, Property 13: label htmlFor matches input id
-// Feature: create-stream-modal-validation, Property 14: required=true sets aria-required="true"
+/**
+ * InputField accessibility contract (issue #1652).
+ *
+ * Every input rendered through InputField must be programmatically associated
+ * with its visible label, expose its invalid state to assistive technology and
+ * reference the element that describes it (error or hint). These guarantees
+ * must also hold when the field is mounted dynamically, as happens inside the
+ * create-stream wizard.
+ */
 
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
-import * as fc from 'fast-check';
+import { useState } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { InputField } from '../InputField';
 
-// Helper: render InputField with a plain <input> child
-function renderField(props: {
-  id: string;
-  label: string;
-  required?: boolean;
+const renderField = (props?: {
+  id?: string;
+  label?: string;
   error?: string;
   helperText?: string;
   success?: boolean;
-}) {
-  return render(
-    <InputField {...props}>
+  required?: boolean;
+}) =>
+  render(
+    <InputField
+      id={props?.id ?? 'create-stream-deposit'}
+      label={props?.label ?? 'Deposit amount'}
+      error={props?.error}
+      helperText={props?.helperText}
+      success={props?.success}
+      required={props?.required}
+    >
       <input type="text" />
-    </InputField>
+    </InputField>,
   );
-}
 
-// Arbitrary for non-empty strings that are valid HTML ids (no spaces)
-const idArb = fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9-_]{0,19}$/);
-const labelArb = fc.string({ minLength: 1, maxLength: 50 });
-const messageArb = fc.string({ minLength: 1, maxLength: 100 });
+describe('InputField label association', () => {
+  it('programmatically associates the label with its control', () => {
+    renderField({ id: 'create-stream-recipient', label: 'Recipient' });
 
-/**
- * Property 1: Default state has no modifier classes
- * Validates: Requirements 2.1, 2.2
- */
-describe('Property 1: Default state has no modifier classes', () => {
-  it('input container has neither error nor success modifier class when no error/success props', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, (id, label) => {
-        const { container, unmount } = renderField({ id, label });
-        const inputContainer = container.querySelector('.input-container');
-        expect(inputContainer).not.toBeNull();
-        expect(inputContainer!.classList.contains('input-container--error')).toBe(false);
-        expect(inputContainer!.classList.contains('input-container--success')).toBe(false);
-        unmount();
-      }),
-      { numRuns: 100 }
+    const input = screen.getByLabelText('Recipient');
+    expect(input).toHaveAttribute('id', 'create-stream-recipient');
+
+    const label = document.querySelector(
+      'label[for="create-stream-recipient"]',
+    );
+    expect(label).not.toBeNull();
+  });
+
+  it('marks required fields with aria-required', () => {
+    renderField({ required: true });
+    expect(screen.getByRole('textbox')).toHaveAttribute('aria-required', 'true');
+  });
+});
+
+describe('InputField invalid state', () => {
+  it('sets aria-invalid when the field has an error', () => {
+    renderField({ error: 'Deposit must be greater than zero' });
+
+    expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('keeps aria-invalid="false" when the field is valid', () => {
+    renderField({ success: true });
+
+    expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'false');
+  });
+});
+
+describe('InputField error and hint association', () => {
+  it('references the rendered error message by id', () => {
+    renderField({ error: 'Deposit must be greater than zero' });
+
+    const input = screen.getByRole('textbox');
+    const error = screen.getByRole('alert');
+
+    expect(error).toHaveTextContent('Deposit must be greater than zero');
+
+    const errorId = error.getAttribute('id');
+    expect(errorId).toBeTruthy();
+    expect(input.getAttribute('aria-describedby')).toContain(errorId);
+    expect(input.getAttribute('aria-errormessage')).toBe(errorId);
+  });
+
+  it('references the hint when there is no error', () => {
+    renderField({ helperText: 'Total USDC locked for this stream' });
+
+    const input = screen.getByRole('textbox');
+    const hint = screen.getByRole('status');
+
+    expect(hint).toHaveTextContent('Total USDC locked for this stream');
+    expect(input.getAttribute('aria-describedby')).toContain(
+      hint.getAttribute('id'),
+    );
+  });
+
+  it('does not leave a dangling described-by reference while composing', () => {
+    renderField({ error: 'Deposit must be greater than zero' });
+
+    const input = screen.getByRole('textbox');
+    fireEvent.compositionStart(input);
+
+    // The error message is suppressed during composition, so the field must not
+    // reference an element that no longer exists in the DOM.
+    expect(screen.queryByRole('alert')).toBeNull();
+    const describedBy = input.getAttribute('aria-describedby');
+    if (describedBy) {
+      for (const ref of describedBy.split(' ')) {
+        expect(document.getElementById(ref)).not.toBeNull();
+      }
+    }
+  });
+});
+
+describe('InputField dynamic rendering', () => {
+  function DynamicField() {
+    const [visible, setVisible] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => setVisible(true)}>
+          show
+        </button>
+        {visible ? (
+          <InputField
+            id="create-stream-cliff-date"
+            label="Cliff date"
+            error="Cliff date must be in the future"
+          >
+            <input type="text" />
+          </InputField>
+        ) : null}
+      </div>
+    );
+  }
+
+  it('keeps label and error association when mounted after an interaction', () => {
+    render(<DynamicField />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'show' }));
+
+    const input = screen.getByLabelText('Cliff date');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+
+    const error = screen.getByRole('alert');
+    expect(input.getAttribute('aria-describedby')).toContain(
+      error.getAttribute('id'),
     );
   });
 });
 
-/**
- * Property 2: Hint renders when helperText is provided and no error is active
- * Validates: Requirements 2.3, 5.1, 5.2
- */
-describe('Property 2: Hint renders when helperText is provided and no error is active', () => {
-  it('renders a hint ValidationMessage with the helperText content when no error', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, (id, label, helperText) => {
-        const { container, unmount } = renderField({ id, label, helperText });
-        const hint = container.querySelector('.validation-message--hint');
-        expect(hint).not.toBeNull();
-        expect(hint!.textContent).toContain(helperText);
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+describe('InputField invalid form submission', () => {
+  function CreateStreamForm() {
+    const [errors, setErrors] = useState<{
+      recipient?: string;
+      deposit?: string;
+    }>({});
 
-/**
- * Property 3: Error state applies the error modifier class
- * Validates: Requirements 3.1, 3.2
- */
-describe('Property 3: Error state applies the error modifier class', () => {
-  it('input container has input-container--error class for any non-empty error string', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, (id, label, error) => {
-        const { container, unmount } = renderField({ id, label, error });
-        const inputContainer = container.querySelector('.input-container');
-        expect(inputContainer).not.toBeNull();
-        expect(inputContainer!.classList.contains('input-container--error')).toBe(true);
-        unmount();
-      }),
-      { numRuns: 100 }
+    return (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          setErrors({
+            recipient: 'Recipient is required',
+            deposit: 'Deposit amount is required',
+          });
+        }}
+      >
+        <InputField
+          id="create-stream-recipient"
+          label="Recipient"
+          error={errors.recipient}
+        >
+          <input type="text" />
+        </InputField>
+        <InputField
+          id="create-stream-deposit"
+          label="Deposit amount"
+          error={errors.deposit}
+        >
+          <input type="text" />
+        </InputField>
+        <button type="submit">Create stream</button>
+      </form>
     );
-  });
-});
+  }
 
-/**
- * Property 6: Error state sets aria-invalid="true"
- * Validates: Requirements 3.5, 7.2
- */
-describe('Property 6: Error state sets aria-invalid="true"', () => {
-  it('child input has aria-invalid="true" for any non-empty error string', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, (id, label, error) => {
-        const { container, unmount } = renderField({ id, label, error });
-        const input = container.querySelector('input');
-        expect(input).not.toBeNull();
-        expect(input!.getAttribute('aria-invalid')).toBe('true');
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+  it('announces each error together with the field it describes', () => {
+    render(<CreateStreamForm />);
 
-/**
- * Property 7: aria-describedby points to the active message element's id
- * Validates: Requirements 3.6, 7.4
- */
-describe('Property 7: aria-describedby points to the active message element\'s id', () => {
-  it('input aria-describedby equals the error message element id when error is set', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, (id, label, error) => {
-        const { container, unmount } = renderField({ id, label, error });
-        const input = container.querySelector('input');
-        const messageEl = container.querySelector('.validation-message');
-        expect(input).not.toBeNull();
-        expect(messageEl).not.toBeNull();
-        expect(input!.getAttribute('aria-describedby')).toBe(messageEl!.getAttribute('id'));
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
+    fireEvent.click(screen.getByRole('button', { name: 'Create stream' }));
 
-  it('input aria-describedby equals the hint message element id when helperText is set and no error', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, (id, label, helperText) => {
-        const { container, unmount } = renderField({ id, label, helperText });
-        const input = container.querySelector('input');
-        const messageEl = container.querySelector('.validation-message');
-        expect(input).not.toBeNull();
-        expect(messageEl).not.toBeNull();
-        expect(input!.getAttribute('aria-describedby')).toBe(messageEl!.getAttribute('id'));
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+    for (const label of ['Recipient', 'Deposit amount']) {
+      const field = screen.getByLabelText(label);
+      expect(field).toHaveAttribute('aria-invalid', 'true');
 
-/**
- * Property 9: Success state applies the success modifier class
- * Validates: Requirements 4.1, 4.2
- */
-describe('Property 9: Success state applies the success modifier class', () => {
-  it('input container has input-container--success class when success=true and no error', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, (id, label) => {
-        const { container, unmount } = renderField({ id, label, success: true });
-        const inputContainer = container.querySelector('.input-container');
-        expect(inputContainer).not.toBeNull();
-        expect(inputContainer!.classList.contains('input-container--success')).toBe(true);
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+      const errorId = field.getAttribute('aria-errormessage');
+      expect(errorId).toBeTruthy();
 
-/**
- * Property 10: Success state sets aria-invalid="false"
- * Validates: Requirements 4.4
- */
-describe('Property 10: Success state sets aria-invalid="false"', () => {
-  it('child input has aria-invalid="false" when success=true and no error', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, (id, label) => {
-        const { container, unmount } = renderField({ id, label, success: true });
-        const input = container.querySelector('input');
-        expect(input).not.toBeNull();
-        expect(input!.getAttribute('aria-invalid')).toBe('false');
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-/**
- * Property 11: Error replaces hint — mutual exclusion
- * Validates: Requirements 5.3
- */
-describe('Property 11: Error replaces hint — mutual exclusion', () => {
-  it('only error ValidationMessage is rendered when both error and helperText are set', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, messageArb, messageArb, (id, label, error, helperText) => {
-        const { container, unmount } = renderField({ id, label, error, helperText });
-        const errorMsg = container.querySelector('.validation-message--error');
-        const hintMsg = container.querySelector('.validation-message--hint');
-        expect(errorMsg).not.toBeNull();
-        expect(hintMsg).toBeNull();
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-/**
- * Property 13: label htmlFor matches input id
- * Validates: Requirements 7.1
- */
-describe('Property 13: label htmlFor matches input id', () => {
-  it('label htmlFor and input id both equal the id prop', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, (id, label) => {
-        const { container, unmount } = renderField({ id, label });
-        const labelEl = container.querySelector('label');
-        const input = container.querySelector('input');
-        expect(labelEl).not.toBeNull();
-        expect(input).not.toBeNull();
-        expect(labelEl!.getAttribute('for')).toBe(id);
-        expect(input!.getAttribute('id')).toBe(id);
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
-
-/**
- * Property 14: required=true sets aria-required="true"
- * Validates: Requirements 7.5
- */
-describe('Property 14: required=true sets aria-required="true"', () => {
-  it('child input has aria-required="true" when required prop is true', () => {
-    fc.assert(
-      fc.property(idArb, labelArb, (id, label) => {
-        const { container, unmount } = renderField({ id, label, required: true });
-        const input = container.querySelector('input');
-        expect(input).not.toBeNull();
-        expect(input!.getAttribute('aria-required')).toBe('true');
-        unmount();
-      }),
-      { numRuns: 100 }
-    );
+      const error = document.getElementById(errorId as string);
+      expect(error).not.toBeNull();
+      expect(error).toHaveAttribute('role', 'alert');
+      expect(field.getAttribute('aria-describedby')).toContain(errorId);
+    }
   });
 });

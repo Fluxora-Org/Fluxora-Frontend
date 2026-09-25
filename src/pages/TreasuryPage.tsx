@@ -1,8 +1,20 @@
-import DemoBanner from "../components/treasuryOverviewPage/DemoBanner";
-import Header from "../components/treasuryOverviewPage/Header"
+import { useState } from "react";
+import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
+import Header, { type TreasuryPeriod } from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
-import RecentStreams from "../components/treasuryOverviewPage/RecentStreams";
+import { lazy, Suspense } from "react";
+import ErrorBoundary from "../components/ErrorBoundary";
+const ActivityHeatmap = lazy(() => import("../components/treasuryOverviewPage/ActivityHeatmap"));
+const TreasuryFlowSankey = lazy(() => import("../components/treasuryOverviewPage/TreasuryFlowSankey"));
+const RecentStreams = lazy(() => import("../components/treasuryOverviewPage/RecentStreams"));
+const ReportBuilderPanel = lazy(() => import("../components/treasuryOverviewPage/ReportBuilderPanel"));
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
+import {
+  ColorBlindSimulationProvider,
+  ColorBlindToggle,
+} from "../components/colorBlindSimulation";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { IS_DEV } from "../utils/env";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -13,37 +25,133 @@ import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useT
  * - `isDemoMode`: boolean indicating demo mode
  * - `loading`: boolean indicating loading state
  * - `error`: string | null error message
+ * - `resolvedPeriod`: period corresponding to the resolved metrics
+ * - `boundaries`: explicit date boundaries for the resolved period
  *
  * When both `metrics` and `streams` are missing while not loading or erroring,
- * a defensive empty‑state fallback is shown.
+ * a defensive empty-state fallback is shown.
+ *
+ * ## Colour-blind simulation
+ * The entire page content is wrapped in {@link ColorBlindSimulationProvider}
+ * and a {@link ColorBlindToggle} is rendered at the top of the layout. This
+ * is a **developer / design-QA affordance only** — not a shipped end-user
+ * setting. The toggle allows designers and QA engineers to verify that status
+ * indicators (StatusPill, MetricCard) remain legible under protanopia,
+ * deuteranopia, and tritanopia simulations.
  */
 export default function TreasuryPage() {
-  const { metrics, streams, isDemoMode, loading, error } =
-    useTreasuryOverviewData();
+  const [selectedPeriod, setSelectedPeriod] = useState<TreasuryPeriod>("30d");
+  const { metrics, streams, isDemoMode, loading, error, refetch, resolvedPeriod, boundaries } =
+    useTreasuryOverviewData(selectedPeriod);
+  const { connected: walletConnected } = useWallet();
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+
+  const demoState: DemoState = loading
+    ? "loading"
+    : (metrics && metrics.length > 0) || (streams && streams.length > 0)
+    ? "loaded"
+    : "empty";
+
+  if (loading) {
+    return (
+      <ColorBlindSimulationProvider>
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+          {isDemoMode && <DemoBanner state={demoState} />}
+          {/* Design-QA: colour-blind simulation toggle */}
+          {IS_DEV && <ColorBlindToggle />}
+          <Header
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            loading={true}
+            resolvedPeriod={resolvedPeriod}
+            boundaries={boundaries}
+          />
+          <div role="status" className="text-sm text-gray-500">
+            Loading treasury overview...
+          </div>
+        </div>
+      </ColorBlindSimulationProvider>
+    );
+  }
+
+  if (error) {
+    return (
+      <ColorBlindSimulationProvider>
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+          {isDemoMode && <DemoBanner state={demoState} />}
+          {/* Design-QA: colour-blind simulation toggle */}
+          {IS_DEV && <ColorBlindToggle />}
+          <Header
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            loading={false}
+            resolvedPeriod={resolvedPeriod}
+            boundaries={boundaries}
+          />
+          <div role="alert" className="text-sm text-red-600">
+            {error}
+          </div>
+        </div>
+      </ColorBlindSimulationProvider>
+    );
+  }
 
   return (
-    <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
-      {isDemoMode && <DemoBanner />}
-      <Header />
-      {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      )}
-      {loading ? (
-        <p role="status" className="text-sm text-gray-500">
-          Loading treasury overview...
-        </p>
-      ) : error ? null : (!metrics || !streams) ? (
-        <p role="status" className="text-sm text-gray-500">
-          No treasury data available.
-        </p>
-      ) : (
-        <>
-          <Metrics metrics={metrics} loading={loading} error={error} />
-          <RecentStreams streams={streams} />
-        </>
-      )}
-    </div>
+    <ColorBlindSimulationProvider>
+      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+        {isDemoMode && <DemoBanner state={demoState} />}
+
+        {/* Design-QA: colour-blind simulation toggle — placed above page content
+            so the entire Metrics and RecentStreams area is filtered.
+            This component is not rendered in production end-user UI; it is
+            intended for design review and QA sessions only. */}
+        {IS_DEV && <ColorBlindToggle />}
+
+        <Header
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          loading={loading}
+          resolvedPeriod={resolvedPeriod}
+          boundaries={boundaries}
+          onExportClick={() => setShowReportBuilder(true)}
+          onRefresh={refetch}
+        />
+        {showReportBuilder && (
+          <ErrorBoundary>
+            <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
+              <ReportBuilderPanel
+                streams={streams || []}
+                onClose={() => setShowReportBuilder(false)}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+        <ErrorBoundary>
+          <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
+            <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
+            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+          </Suspense>
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
+            <RecentStreams
+              streams={streams || []}
+              loading={loading}
+              error={error}
+              onRetry={refetch}
+              walletConnected={walletConnected}
+              isDemoMode={isDemoMode}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+    </ColorBlindSimulationProvider>
   );
 }

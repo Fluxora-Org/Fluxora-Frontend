@@ -1,0 +1,59 @@
+/* ── Metrics grid 400%-zoom reflow ───────────────────
+ * WCAG 1.4.10 Reflow: at an effective 320px CSS-pixel
+ * viewport (400% zoom on 1280px), the metrics grid must
+ * remain single-column with no horizontal scroll.
+ *
+ * Strategy: container queries (@container) on the grid
+ * wrapper respond to the component's own width, which
+ * shrinks when zoom increases, regardless of device width.
+ *
+ * Breakpoint: 640px — mirrors the Tailwind `sm` breakpoint
+ * that already drives the grid-cols-1 layout, but applied
+ * via container query so it works at any device width.
+ * ─────────────────────────────────────────────────────────── */
+
+.metrics-grid-container {
+  container-type: inline-size;
+}
+
+/* Ensure grid items cannot cause horizontal overflow */
+.metrics-grid-container .grid {
+  min-width: 0;
+}
+
+.metrics-grid-container .grid > div {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* At narrow container widths, tighten spacing and ensure
+ * single-column layout even if the viewport is wider */
+@container (max-width: 640px) {
+  .metrics-grid-container .grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .metrics-grid-container .grid > div[col-span] {
+    grid-column: span 1 / span 1;
+  }
+}
+
+/* Prevent long token amounts from causing horizontal scroll */
+.metrics-grid-container .metric-card-wrapper {
+  min-width: 0;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.metrics-grid-container .metric-card-wrapper > div {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .metrics-grid-container .grid > div {
+    transition: none;
+  }
+}

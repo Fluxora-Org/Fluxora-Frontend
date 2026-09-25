@@ -59,6 +59,20 @@
   line-height: 1.6;
 }
 
+/* ── Correlation reference ── */
+.error-reference {
+  font: var(--font-label-sm);
+  color: var(--text-muted);
+  margin: 0;
+  word-break: break-all;
+}
+
+.error-reference code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+}
+
 /* ── Recovery steps ── */
 .error-recovery {
   width: 100%;

@@ -11,13 +11,30 @@ describe('InfoTooltip accessibility focus behavior', () => {
     ariaLabel: 'Info tooltip',
   } as const;
 
-  test('focus moves to close button when opened via keyboard', async () => {
+  test('opens from keyboard focus and announces its title and content', async () => {
+    const user = userEvent.setup();
     render(<InfoTooltip {...props} />);
     const trigger = screen.getByRole('button', { name: /info tooltip/i });
-    // Ensure trigger is focusable
-    trigger.focus();
-    await userEvent.click(trigger);
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter}');
     const closeButton = await screen.findByRole('button', { name: /close tooltip/i });
     expect(document.activeElement).toBe(closeButton);
+
+    const dialog = screen.getByRole('dialog', { name: 'Test Title' });
+    expect(dialog).toHaveAttribute('aria-describedby', 'test-tooltip-content');
+    expect(screen.getByText('Test content')).toBeInTheDocument();
+  });
+
+  test('closes with Escape and returns focus to the trigger', async () => {
+    const user = userEvent.setup();
+    render(<InfoTooltip {...props} />);
+    const trigger = screen.getByRole('button', { name: /info tooltip/i });
+
+    await user.click(trigger);
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });

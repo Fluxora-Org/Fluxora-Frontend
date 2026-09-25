@@ -202,3 +202,25 @@ describe("StreamTimeline reduced-motion path", () => {
     expect(bar.getAttribute("data-reduced-motion")).toBe("false");
   });
 });
+
+// ── large-amount formatting ──────────────────────────────────────────────────
+
+describe("StreamTimeline large-amount formatting", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("formats MAX_SAFE_INTEGER amounts without precision loss in screen-reader summary", () => {
+    mockMatchMedia(false);
+    render(
+      <StreamTimeline
+        {...BASE}
+        withdrawableAmount={Number.MAX_SAFE_INTEGER}
+        totalAmount={Number.MAX_SAFE_INTEGER}
+        cliffDate={null}
+        currentDate="2024-02-20T00:00:00Z"
+      />,
+    );
+
+    const srSummary = document.querySelector(".stream-timeline__sr-summary");
+    expect(srSummary?.textContent).toContain("9,007,199,254,740,991");
+  });
+});

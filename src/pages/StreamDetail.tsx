@@ -1,11 +1,95 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
+import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
+import { formatAssetAmount } from "../lib/formatters";
 import Breadcrumb from "../components/navigation/Breadcrumb";
 import { Skeleton } from "../components/Skeleton";
 import StreamTimeline from "../components/StreamTimeline";
+import StreamComparePane from "../components/StreamComparePane";
 import { useTickingNow } from "../hooks/useTickingNow";
+import { MetaTags } from "../components/MetaTags";
+import { usePresenceViewers } from "../hooks/usePresenceViewers";
+import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
+import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
+import { Share2 } from "lucide-react";
+
+/**
+ * Stream status presentation
+ * ──────────────────────────
+ * Every status the detail view can encounter resolves to an explicit, visible
+ * presentation (label + description + colour). Statuses the view does not
+ * recognise fall back to a clearly labelled "unknown" presentation instead of
+ * rendering a blank region, so the user can always tell whether a stream is
+ * unusual or the page is broken.
+ */
+export interface StreamStatusPresentation {
+  /** Human-readable label rendered in the status pill. */
+  label: string;
+  /** One-line explanation of what the status means for the viewer. */
+  description: string;
+  /** Colour used for the status dot and label. */
+  color: string;
+  /** False when the raw status is not one the view explicitly knows about. */
+  recognized: boolean;
+}
+
+const KNOWN_STREAM_STATUS_PRESENTATIONS: Record<
+  string,
+  Omit<StreamStatusPresentation, "recognized">
+> = {
+  active: {
+    label: "Active",
+    description: "The stream is live and accrues funds on schedule.",
+    color: "var(--color-success, #16a34a)",
+  },
+  paused: {
+    label: "Paused",
+    description:
+      "Accrual is paused. The balance already streamed stays available to the recipient.",
+    color: "var(--color-warning, #d97706)",
+  },
+  completed: {
+    label: "Completed",
+    description: "The stream finished and its full schedule was delivered.",
+    color: "var(--color-text-secondary, #6b7280)",
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "The stream was cancelled before its scheduled end date and no longer accrues.",
+    color: "var(--color-error, #b91c1c)",
+  },
+  matured: {
+    label: "Matured",
+    description: "The stream reached maturity and no longer accrues funds.",
+    color: "var(--color-text-secondary, #6b7280)",
+  },
+};
+
+/**
+ * Resolve the presentation for any status string. Always returns a defined
+ * presentation; unknown values get an explicit fallback (never blank).
+ */
+export function getStreamStatusPresentation(
+  status: string | null | undefined,
+): StreamStatusPresentation {
+  const key = typeof status === "string" ? status.trim().toLowerCase() : "";
+  const known = key ? KNOWN_STREAM_STATUS_PRESENTATIONS[key] : undefined;
+  if (known) {
+    return { ...known, recognized: true };
+  }
+  const label = key ? key.charAt(0).toUpperCase() + key.slice(1) : "Unknown";
+  return {
+    label,
+    description:
+      "This status is not recognised by the stream detail view. Confirm the stream state in the treasury console before acting on it.",
+    color: "var(--color-text-secondary, #6b7280)",
+    recognized: false,
+  };
+}
 
 /**
  * StreamDetail page
@@ -15,44 +99,88 @@ import { useTickingNow } from "../hooks/useTickingNow";
  * detail view including the {@link StreamTimeline}, health indicators, and
  * key financial metrics.
  *
- * The `streamId` parameter is URL-decoded before being passed to
- * `getStreamById`, which in turn applies `encodeURIComponent` when building
- * the API path — preventing double-encoding while still sanitising the value.
+ * Compare mode
+ * ────────────
+ * When the URL contains `?compare=<otherStreamId>` the page renders a
+ * two-pane {@link StreamComparePane} instead of the single-stream layout.
+ * The StreamsTable drives this by calling its `onCompare` prop which
+ * navigates to `/app/streams/:leftId?compare=<rightId>`.
  *
  * States:
- * - **loading** – skeleton shimmer while the request is in-flight
+ * - **loading**   – skeleton shimmer while the request is in-flight
  * - **not found** – friendly empty state with a link back to the list
- * - **error** – error message with a retry button
- * - **success** – full stream detail layout
+ * - **error**     – error message with a "Try again" button and a back link.
+ *                   The retry button re-issues the fetch without a full page
+ *                   navigation, keeping loading → error → loading transitions
+ *                   deterministic across refreshes and re-renders.
+ * - **compare**   – two-pane split view
+ * - **success**   – full single stream detail layout
  */
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { address: accountId } = useWallet();
+  const { viewers, isPresenceEnabled, updateCursor, isLoading } =
+    usePresenceViewers(streamId, undefined, accountId ?? undefined);
 
+  // Compare mode: ?compare=<otherStreamId>
+  const compareWithId = searchParams.get("compare");
+  const isCompareMode = Boolean(compareWithId && streamId);
+
+  const [isOgModalOpen, setIsOgModalOpen] = useState(false);
+  const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
+
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
+
+  // Tracks the cancel function of whichever fetch (initial load or a
+  // manual retry) is currently in flight, so a newer fetch can cancel a
+  // still-pending older one before it has a chance to resolve and
+  // overwrite state.
+  const activeCancelRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    // In compare mode the individual panes manage their own fetches
+    if (isCompareMode) {
+      setLoading(false);
+      return;
+    }
+
     if (!streamId) {
       setStream(null);
       setLoading(false);
       return;
     }
 
+    // Cancel any still-pending fetch from a previous route/retry before
+    // starting this one.
+    activeCancelRef.current?.();
+
     let cancelled = false;
     const controller = new AbortController();
+    const cancelThisFetch = () => {
+      cancelled = true;
+      controller.abort();
+    };
+    activeCancelRef.current = cancelThisFetch;
 
     setLoading(true);
     setError(null);
 
-    getStreamById(decodeURIComponent(streamId))
+    getStreamById(decodeURIComponent(streamId), controller.signal)
       .then((result) => {
         if (!cancelled) {
           setStream(result);
           setLoading(false);
+        }
+        if (activeCancelRef.current === cancelThisFetch) {
+          activeCancelRef.current = null;
         }
       })
       .catch((err: unknown) => {
@@ -62,14 +190,66 @@ export default function StreamDetail() {
           );
           setLoading(false);
         }
+        if (activeCancelRef.current === cancelThisFetch) {
+          activeCancelRef.current = null;
+        }
       });
 
     return () => {
-      cancelled = true;
-      controller.abort();
+      cancelThisFetch();
+      if (activeCancelRef.current === cancelThisFetch) {
+        activeCancelRef.current = null;
+      }
     };
-  }, [streamId]);
+  }, [streamId, isCompareMode]);
 
+  // Track local scroll position to broadcast cursorY
+  useEffect(() => {
+    if (!isPresenceEnabled) return;
+    const handleScroll = () => {
+      const scrollY = window.scrollY + window.innerHeight / 2;
+      const docHeight = Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+      );
+      updateCursor(docHeight > 0 ? scrollY / docHeight : 0);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [isPresenceEnabled, updateCursor]);
+
+  // ── Compare mode ──────────────────────────────────────────────────────────
+  if (isCompareMode && streamId && compareWithId) {
+    return (
+      <div data-testid="stream-detail-page">
+        {/* Breadcrumb still visible above the compare shell */}
+        <div style={{ padding: "0.75rem 1.5rem 0" }}>
+          <Breadcrumb
+            items={[
+              { label: "Streams", to: "/app/streams" },
+              { label: "Compare" },
+            ]}
+          />
+        </div>
+
+        <StreamComparePane
+          leftId={decodeURIComponent(streamId)}
+          rightId={decodeURIComponent(compareWithId)}
+          onExit={() => {
+            // Remove compare param — return to single-stream view
+            setSearchParams({});
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
     { label: "Streams", to: "/app/streams" },
     { label: stream?.name ?? streamId ?? "Stream" },
@@ -94,6 +274,49 @@ export default function StreamDetail() {
   }
 
   if (error) {
+    const handleRetry = () => {
+      if (!streamId) return;
+
+      // Same guard as the effect above: cancel any still-pending fetch
+      // before starting a new one, so a slow earlier retry (or a route
+      // change that happens before this retry resolves) can never
+      // overwrite the view with stale data.
+      activeCancelRef.current?.();
+
+      let cancelled = false;
+      const controller = new AbortController();
+      const cancelThisFetch = () => {
+        cancelled = true;
+        controller.abort();
+      };
+      activeCancelRef.current = cancelThisFetch;
+
+      setLoading(true);
+      setError(null);
+
+      getStreamById(decodeURIComponent(streamId), controller.signal)
+        .then((result) => {
+          if (!cancelled) {
+            setStream(result);
+            setLoading(false);
+          }
+          if (activeCancelRef.current === cancelThisFetch) {
+            activeCancelRef.current = null;
+          }
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            setError(
+              err instanceof Error ? err.message : "Failed to load stream.",
+            );
+            setLoading(false);
+          }
+          if (activeCancelRef.current === cancelThisFetch) {
+            activeCancelRef.current = null;
+          }
+        });
+    };
+
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
         <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
@@ -109,12 +332,33 @@ export default function StreamDetail() {
         >
           <strong>Error loading stream:</strong> {error}
         </div>
-        <Link
-          to="/app/streams"
-          style={{ display: "inline-block", marginTop: "1rem" }}
-        >
-          ← Back to streams
-        </Link>
+        <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
+          <button
+            onClick={handleRetry}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Try again
+          </button>
+          <Link
+            to="/app/streams"
+            style={{
+              display: "inline-block",
+              padding: "0.5rem 1rem",
+              textDecoration: "none",
+              color: "var(--color-text-secondary, #6b7280)",
+            }}
+          >
+            ← Back to streams
+          </Link>
+        </div>
       </div>
     );
   }
@@ -130,7 +374,13 @@ export default function StreamDetail() {
             color: "var(--color-text-secondary, #6b7280)",
           }}
         >
-          <p style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <p
+            style={{
+              fontSize: "1.25rem",
+              fontWeight: 600,
+              marginBottom: "0.5rem",
+            }}
+          >
             Stream not found
           </p>
           <p style={{ marginBottom: "1.5rem" }}>
@@ -166,26 +416,78 @@ export default function StreamDetail() {
     Settled: "var(--color-text-secondary, #6b7280)",
   };
 
+  const statusPresentation = getStreamStatusPresentation(stream.status);
+
+  // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
       <Breadcrumb items={breadcrumbItems} />
+      <MetaTags stream={stream} />
 
       {/* Header */}
-      <div style={{ marginTop: "1.5rem", marginBottom: "1.5rem" }}>
-        <h1
+      <div
+        style={{
+          marginTop: "1.5rem",
+          marginBottom: "1.5rem",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: 700,
+              margin: 0,
+              marginBottom: "0.25rem",
+            }}
+          >
+            {stream.name}
+          </h1>
+          <p
+            style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}
+          >
+            {stream.summary}
+          </p>
+        </div>
+
+        {/* Share & Social Preview Card Trigger */}
+        <button
+          ref={shareTriggerRef}
+          onClick={() => setIsOgModalOpen(true)}
+          data-testid="share-og-preview-btn"
+          aria-label={`Share ${stream.name} and preview social card`}
           style={{
-            fontSize: "1.75rem",
-            fontWeight: 700,
-            margin: 0,
-            marginBottom: "0.25rem",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid var(--color-border, #e5e7eb)",
+            background: "var(--color-surface-1, #fff)",
+            color: "var(--color-text-primary, #111827)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
           }}
         >
-          {stream.name}
-        </h1>
-        <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
-          {stream.summary}
-        </p>
+          <Share2 size={16} />
+          <span>Share / Preview Card</span>
+        </button>
       </div>
+
+      {/* Presence Badge Container */}
+      {isPresenceEnabled && (
+        <div style={{ position: "relative", zIndex: 30 }}>
+          <div style={{ position: "absolute", right: 0, top: "-54px" }}>
+            <PresenceBadge viewers={viewers} isLoading={isLoading} />
+          </div>
+        </div>
+      )}
 
       {/* Health badge */}
       <div style={{ marginBottom: "1.5rem" }}>
@@ -208,6 +510,102 @@ export default function StreamDetail() {
         </span>
       </div>
 
+      {/* Top-Up Flow */}
+      <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <input
+            type="number"
+            aria-label="Top up amount"
+            placeholder="Amount"
+            value={topUpAmount}
+            onChange={(e) => setTopUpAmount(e.target.value)}
+            disabled={topUpStatus === "pending"}
+            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border, #e5e7eb)" }}
+          />
+          <button
+            onClick={() => {
+              setTopUpStatus("pending");
+              setTimeout(() => {
+                if (Number(topUpAmount) <= 0) {
+                  setTopUpStatus("rejected");
+                } else {
+                  setTopUpStatus("confirmed");
+                }
+              }, 500);
+            }}
+            disabled={topUpStatus === "pending" || !topUpAmount}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "4px",
+              background: "var(--color-text-primary, #111827)",
+              color: "var(--color-surface-1, #fff)",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Submit Top Up
+          </button>
+        </div>
+        {topUpStatus !== "idle" && (
+          <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
+            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+          </div>
+        )}
+      </div>
+      {/* Status presentation — always renders a defined state, even for
+          statuses this view does not recognise, so the region is never blank. */}
+      <section
+        aria-labelledby="stream-status-heading"
+        data-testid="stream-status"
+        data-status={String(stream.status).toLowerCase()}
+        data-status-recognized={statusPresentation.recognized ? "true" : "false"}
+        style={{ marginBottom: "1.5rem" }}
+      >
+        <h2 id="stream-status-heading" className="sr-only">
+          Stream status
+        </h2>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.375rem",
+            padding: "0.25rem 0.75rem",
+            borderRadius: "9999px",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            background: "var(--color-surface-2, #f3f4f6)",
+            color: statusPresentation.color,
+          }}
+        >
+          <span aria-hidden="true">●</span>
+          {statusPresentation.label}
+        </span>
+        <p
+          data-testid="stream-status-description"
+          style={{
+            margin: "0.5rem 0 0",
+            fontSize: "0.875rem",
+            color: "var(--color-text-secondary, #6b7280)",
+          }}
+        >
+          {statusPresentation.description}
+        </p>
+        {!statusPresentation.recognized && (
+          <p
+            data-testid="stream-status-fallback"
+            style={{
+              margin: "0.25rem 0 0",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              color: "var(--color-warning, #d97706)",
+            }}
+          >
+            Unrecognised stream status: <code>{String(stream.status)}</code>
+          </p>
+        )}
+      </section>
+
       {/* Metrics grid */}
       <dl
         style={{
@@ -221,19 +619,19 @@ export default function StreamDetail() {
           { label: "Status", value: stream.status },
           {
             label: "Deposit",
-            value: `${stream.depositAmount.toLocaleString()} ${stream.asset}`,
+            value: formatAssetAmount(stream.depositAmount, stream.asset),
           },
           {
             label: "Streamed",
-            value: `${stream.streamedAmount.toLocaleString()} ${stream.asset}`,
+            value: formatAssetAmount(stream.streamedAmount, stream.asset),
           },
           {
             label: "Withdrawable",
-            value: `${stream.withdrawableAmount.toLocaleString()} ${stream.asset}`,
+            value: formatAssetAmount(stream.withdrawableAmount, stream.asset),
           },
           {
             label: "Remaining",
-            value: `${stream.remainingAmount.toLocaleString()} ${stream.asset}`,
+            value: formatAssetAmount(stream.remainingAmount, stream.asset),
           },
           { label: "Progress", value: `${stream.progress.toFixed(1)}%` },
         ].map(({ label, value }) => (
@@ -266,7 +664,11 @@ export default function StreamDetail() {
       <section aria-labelledby="stream-timeline-heading">
         <h2
           id="stream-timeline-heading"
-          style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}
+          style={{
+            fontSize: "1rem",
+            fontWeight: 600,
+            marginBottom: "0.75rem",
+          }}
         >
           Timeline
         </h2>
@@ -279,10 +681,7 @@ export default function StreamDetail() {
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -314,6 +713,17 @@ export default function StreamDetail() {
           </p>
         </section>
       )}
+
+      {/* Cursor indicator overlays */}
+      {isPresenceEnabled && <PresenceCursorOverlay viewers={viewers} />}
+
+      {/* Open Graph Social Preview Modal */}
+      <StreamOGPreviewModal
+        stream={stream}
+        isOpen={isOgModalOpen}
+        onClose={() => setIsOgModalOpen(false)}
+        triggerRef={shareTriggerRef}
+      />
     </div>
   );
 }

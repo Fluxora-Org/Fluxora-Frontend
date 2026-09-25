@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useI18n } from '../i18n';
 
 export type StreamStatus = 'Active' | 'Paused' | 'Completed';
 
@@ -12,24 +13,129 @@ export interface Stream {
   detailUrl?: string;
 }
 
+import StreamsLoading from './StreamsLoading';
+import EmptyState from './EmptyState';
+import { isSafeUrl } from '../utils/security';
+import {
+  getSafeExternalUrl,
+  SAFE_EXTERNAL_LINK_ATTRIBUTES,
+} from '../lib/safeExternalUrl';
+
 interface RecentStreamsProps {
   streams: Stream[];
   viewAllUrl?: string;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  /**
+   * Whether a Stellar wallet is connected. Drives the empty/error copy:
+   * connected users see "Create stream", disconnected users see
+   * "Connect your wallet". Defaults to `false` so unconnected consumers
+   * never see misleading "Create stream" call-to-action copy.
+   */
+  walletConnected?: boolean;
 }
 
-export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: RecentStreamsProps) {
+export default function RecentStreams({
+  streams,
+  viewAllUrl = '/app/streams',
+  loading = false,
+  error = null,
+  onRetry,
+  walletConnected = false
+}: RecentStreamsProps) {
+  const { t } = useI18n();
   const [announcement, setAnnouncement] = useState('');
+  const safeStreams = streams.filter((stream): stream is Stream => {
+    if (!stream || typeof stream !== 'object') {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    const candidate = stream as Partial<Stream>;
+    const isValidStatus =
+      candidate.status === 'Active' ||
+      candidate.status === 'Paused' ||
+      candidate.status === 'Completed';
+
+    if (
+      typeof candidate.id !== 'string' ||
+      candidate.id.trim() === '' ||
+      typeof candidate.name !== 'string' ||
+      candidate.name.trim() === '' ||
+      typeof candidate.recipient !== 'string' ||
+      candidate.recipient.trim() === '' ||
+      typeof candidate.rate !== 'string' ||
+      candidate.rate.trim() === '' ||
+      !isValidStatus
+    ) {
+      console.error('Skipping malformed RecentStreams entry:', stream);
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
-    if (streams.length > 0) {
-      setAnnouncement(`Found ${streams.length} matching streams.`);
+    if (safeStreams.length > 0) {
+      setAnnouncement(t('recentStreams.foundMatchingStreams', { count: safeStreams.length }));
     } else {
-      setAnnouncement('No matching streams found.');
+      setAnnouncement(t('recentStreams.noMatchingStreams'));
     }
     
     const timer = setTimeout(() => setAnnouncement(''), 1000);
     return () => clearTimeout(timer);
-  }, [streams.length]);
+  }, [safeStreams.length, t]);
+
+  if (loading) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <StreamsLoading />
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="error"
+          errorMessage={error}
+          onRetry={onRetry}
+          walletConnected={walletConnected}
+        />
+      </section>
+    );
+  }
+
+  if (safeStreams.length === 0) {
+    return (
+      <section style={sectionContainer}>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
+        <div style={header}>
+          <h2 style={title}>Recent streams</h2>
+        </div>
+        <EmptyState
+          variant="streams"
+          walletConnected={walletConnected}
+        />
+      </section>
+    );
+  }
 
   return (
     <section style={sectionContainer}>
@@ -55,7 +161,15 @@ export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: 
             </tr>
           </thead>
           <tbody>
-            {streams.map((stream, index) => (
+            {safeStreams.map((stream, index) => {
+              const safeExternalDetailUrl = getSafeExternalUrl(stream.detailUrl);
+              const detailUrl =
+                safeExternalDetailUrl ??
+                (stream.detailUrl && isSafeUrl(stream.detailUrl)
+                  ? stream.detailUrl
+                  : `/app/streams/${stream.id}`);
+
+              return (
               <tr key={stream.id} style={index % 2 === 0 ? rowEven : rowOdd}>
                 <td style={td}>
                   <div style={streamName}>{stream.name}</div>
@@ -71,8 +185,11 @@ export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: 
                   <StatusPill status={stream.status} />
                 </td>
                 <td style={td}>
-                  <Link 
-                    to={stream.detailUrl || `/app/streams/${stream.id}`} 
+                  <Link
+                    to={detailUrl}
+                    {...(safeExternalDetailUrl
+                      ? SAFE_EXTERNAL_LINK_ATTRIBUTES
+                      : {})}
                     style={viewLink}
                     aria-label={`View details for ${stream.name}`}
                   >
@@ -96,7 +213,8 @@ export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: 
                   </Link>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -107,8 +225,8 @@ export default function RecentStreams({ streams, viewAllUrl = '/app/streams' }: 
 function StatusPill({ status }: { status: StreamStatus }) {
   const config = {
     Active: {
-      bg: '#d1f4e8',
-      color: '#00875a',
+      bg: 'var(--status-success-bg)',
+      color: 'var(--status-success)',
       icon: (
         <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">
           <circle cx="4" cy="4" r="4" />
@@ -117,8 +235,8 @@ function StatusPill({ status }: { status: StreamStatus }) {
       label: 'Active'
     },
     Paused: {
-      bg: '#fff4cc',
-      color: '#cc8800',
+      bg: 'var(--status-warning-bg)',
+      color: 'var(--status-warning)',
       icon: (
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <rect x="2" y="1" width="2" height="8" />
@@ -128,8 +246,8 @@ function StatusPill({ status }: { status: StreamStatus }) {
       label: 'Paused'
     },
     Completed: {
-      bg: '#d4e7ff',
-      color: '#0065cc',
+      bg: 'var(--status-info-bg)',
+      color: 'var(--status-info)',
       icon: (
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M2 6l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -173,7 +291,7 @@ const title: React.CSSProperties = {
 };
 
 const viewAllLink: React.CSSProperties = {
-  color: '#00d4aa',
+  color: 'var(--color-accent-secondary)',
   fontSize: '0.9375rem',
   textDecoration: 'none',
   display: 'flex',
@@ -267,7 +385,7 @@ const pillIcon: React.CSSProperties = {
 };
 
 const viewLink: React.CSSProperties = {
-  color: '#00d4aa',
+  color: 'var(--color-accent-secondary)',
   textDecoration: 'none',
   display: 'inline-flex',
   alignItems: 'center',

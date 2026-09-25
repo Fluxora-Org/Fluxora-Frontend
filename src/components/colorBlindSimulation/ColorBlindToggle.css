@@ -1,0 +1,40 @@
+/**
+ * ColorBlindToggle.css
+ * ─────────────────────
+ * Focus-within ring for the colour-blind simulation toggle radio pills.
+ *
+ * We visually hide the radio input but route keyboard focus to the label
+ * via :focus-within so the design-token focus ring appears on the visible
+ * pill when it is navigated by keyboard.
+ *
+ * The :focus-visible selector ensures the ring only appears for keyboard
+ * users, not mouse clicks (WCAG 2.4.7 — Focus Visible).
+ */
+
+/* Focus ring applied to the pill label when its hidden radio is focused */
+[data-testid="colorblind-toggle"] fieldset label:focus-within {
+  outline: var(--focus-ring-width, 2px) solid var(--focus-ring-color, #0ea5e9);
+  outline-offset: var(--focus-ring-offset, 2px);
+  box-shadow: var(--focus-ring-shadow, 0 0 0 2px var(--color-bg-primary, #fff),
+    0 0 0 4px var(--focus-ring-color, #0ea5e9));
+}
+
+/* Respect reduced-motion preference for transition animations on the pills */
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="colorblind-toggle"] fieldset label {
+    transition: none;
+  }
+}
+
+/* Responsive: on narrow screens, stack the toggle control vertically and
+   allow pills to wrap naturally */
+@media (max-width: 640px) {
+  [data-testid="colorblind-toggle"] {
+    width: 100%;
+  }
+
+  [data-testid="colorblind-toggle"] fieldset {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

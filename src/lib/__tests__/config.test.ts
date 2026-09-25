@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createConfig,
+  getNetworkExplorerPath,
   getNetworkLabel,
   getNetworkPassphrase,
   parseBooleanFlag,
@@ -9,7 +10,11 @@ import {
 } from "../config";
 
 function env(overrides: Partial<ImportMetaEnv> = {}): ImportMetaEnv {
-  return overrides as ImportMetaEnv;
+  return {
+    VITE_NETWORK: "TESTNET",
+    VITE_USE_MOCKS: "true",
+    ...overrides,
+  } as ImportMetaEnv;
 }
 
 describe("config", () => {
@@ -40,11 +45,10 @@ describe("config", () => {
     expect(config.useMocks).toBe(true);
   });
 
-  it("fails closed to TESTNET for unsupported networks", () => {
-    const config = createConfig(env({ VITE_NETWORK: "futurenet" }));
-
-    expect(config.network).toBe("TESTNET");
-    expect(config.networkLabel).toBe("Testnet");
+  it("rejects unsupported networks", () => {
+    expect(() => createConfig(env({ VITE_NETWORK: "futurenet" }))).toThrow(
+      /VITE_NETWORK/,
+    );
   });
 
   it("normalizes labels, passphrases, and boolean flags", () => {
@@ -52,6 +56,8 @@ describe("config", () => {
     expect(getNetworkPassphrase("PUBLIC")).toBe(
       "Public Global Stellar Network ; September 2015",
     );
+    expect(getNetworkExplorerPath("PUBLIC")).toBe("public");
+    expect(getNetworkExplorerPath("TESTNET")).toBe("testnet");
     expect(parseBooleanFlag("1")).toBe(true);
     expect(parseBooleanFlag("false")).toBe(false);
   });
@@ -242,6 +248,37 @@ describe("createConfig contract ID validation", () => {
   it("leaves streamContractId null when unset", () => {
     const config = createConfig(env());
     expect(config.streamContractId).toBeNull();
+  });
+
+  describe("strict live configuration", () => {
+    it("rejects missing live RPC and contract settings", () => {
+      expect(() =>
+        createConfig({ VITE_NETWORK: "PUBLIC", VITE_USE_MOCKS: "false" } as ImportMetaEnv),
+      ).toThrow(/VITE_RPC_URL.*VITE_STREAM_CONTRACT_ID|VITE_STREAM_CONTRACT_ID.*VITE_RPC_URL/);
+    });
+
+    it("allows demo mode without wallet or network settings", () => {
+      const config = createConfig({ VITE_DEMO_MODE: "true" } as ImportMetaEnv);
+      expect(config.demoMode).toBe(true);
+      expect(config.network).toBe("TESTNET");
+    });
+
+    it("rejects conflicting RPC and network settings", () => {
+      expect(() =>
+        createConfig({
+          VITE_NETWORK: "PUBLIC",
+          VITE_RPC_URL: "https://soroban-testnet.stellar.org",
+          VITE_STREAM_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          VITE_USE_MOCKS: "false",
+        } as ImportMetaEnv),
+      ).toThrow(/different Stellar network/);
+    });
+
+    it("rejects malformed boolean flags", () => {
+      expect(() =>
+        createConfig(env({ VITE_DEMO_MODE: "yes" })),
+      ).toThrow(/VITE_DEMO_MODE/);
+    });
   });
 
   it("accepts a valid contract ID", () => {

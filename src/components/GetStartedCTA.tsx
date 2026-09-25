@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LuSparkles } from "react-icons/lu";
+import { useWallet } from "./wallet-connect/Walletcontext";
 
 const GetStartedCTA: React.FC = () => {
   const navigate = useNavigate();
+  const { connected } = useWallet();
   const [isPrimaryHovered, setIsPrimaryHovered] = useState(false);
   const [isSecondaryHovered, setIsSecondaryHovered] = useState(false);
 
@@ -35,9 +37,10 @@ const GetStartedCTA: React.FC = () => {
           }}
           onMouseEnter={() => setIsPrimaryHovered(true)}
           onMouseLeave={() => setIsPrimaryHovered(false)}
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(connected ? "/dashboard" : "/connect-wallet")}
+          aria-label={connected ? "Launch dashboard" : "Connect wallet to launch dashboard"}
         >
-          Launch dashboard
+          {connected ? "Launch dashboard" : "Connect wallet to launch"}
           <span style={styles.arrow}>→</span>
         </button>
         <button
@@ -57,12 +60,12 @@ const GetStartedCTA: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   card: {
-    backgroundColor: "var(--surface-base)",
-    border: "0.69px solid var(--border-neutral)",
+    backgroundColor: "var(--color-bg-primary)",
+    border: "0.69px solid var(--color-border-default)",
     borderRadius: "24px",
     padding: "48px 32px",
-    textAlign: "center", 
-    boxShadow: "#1018281A",
+    textAlign: "center",
+    boxShadow: "var(--shadow-lg)",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -80,30 +83,31 @@ const styles: Record<string, React.CSSProperties> = {
   iconBox: {
     width: "64px",
     height: "64px",
-    background: "linear-gradient(90deg, #00B8D4 0%, #0097A7 100%)",
+    background:
+      "linear-gradient(90deg, var(--color-accent-primary) 0%, var(--color-accent-primary-dark) 100%)",
     borderRadius: "12px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0px 10px 12px #00B8D466",
+    boxShadow: "var(--shadow-cta-primary)",
     position: "relative",
     zIndex: 1,
   },
   sparkle: {
     width: "32px",
     height: "32px",
-    color: "#FFFFFF",
+    color: "var(--color-cta-primary-text)",
   },
   headline: {
     fontSize: "44px",
     font: "Plus Jakarta Sans",
     fontWeight: 700,
-    color: "#101828",
+    color: "var(--color-text-primary)",
     margin: "0 0 16px 0",
   },
   description: {
     fontSize: "18px",
-    color: "#4A5565",
+    color: "var(--color-text-secondary)",
     lineHeight: "25px",
     margin: "0 0 32px 0",
     maxWidth: "400px",
@@ -116,8 +120,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   primaryButton: {
     padding: "12px 24px",
-    background: "linear-gradient(90deg, #00B8D4 0%, #0097A7 100%)",
-    color: "#FFFFFF",
+    background:
+      "linear-gradient(90deg, var(--color-accent-primary) 0%, var(--color-accent-primary-dark) 100%)",
+    color: "var(--color-cta-primary-text)",
     border: "none",
     borderRadius: "6px",
     fontSize: "15px",
@@ -126,19 +131,19 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "8px",
-    boxShadow: "0px 10px 12px #00B8D466",
+    boxShadow: "var(--shadow-cta-primary)",
     transition: "all 0.2s ease",
   },
   primaryButtonHover: {
     filter: "brightness(1.05)",
     transform: "translateY(-1px)",
-    boxShadow: "0px 10px 8px #00B8D466",
+    boxShadow: "var(--shadow-cta-primary-hover)",
   },
   secondaryButton: {
     padding: "12px 24px",
     backgroundColor: "transparent",
-    color: "#1A202C",
-    border: "1px solid #D1D5DC",
+    color: "var(--color-cta-secondary-text)",
+    border: "1px solid var(--color-cta-secondary-border)",
     borderRadius: "6px",
     fontSize: "15px",
     fontWeight: 600,
@@ -146,8 +151,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: "all 0.2s ease",
   },
   secondaryButtonHover: {
-    backgroundColor: "#F7FAFC",
-    borderColor: "#A0AEC0",
+    backgroundColor: "var(--color-surface-raised)",
+    borderColor: "var(--color-border-secondary)",
   },
   arrow: {
     fontSize: "18px",

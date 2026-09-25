@@ -6,6 +6,7 @@ import {
   validateCliffBeforeEnd,
 } from '../../lib/createStreamDates';
 import CreateStreamModal from '../CreateStreamModal';
+import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 
 
 // ─── Unit tests: computeStreamEndDate ───────────────────────────────────────
@@ -16,7 +17,9 @@ describe('computeStreamEndDate', () => {
   });
 
   it('returns null for non-Date input', () => {
-    // @ts-expect-error intentional bad input
+    // @ts-expect-error — guardrail test: proves the validation branch rejects
+    // non-Date input. The parameter must go on accepting only Date; once the
+    // runtime guard is removed from createStreamDates.ts, drop this case.
     expect(computeStreamEndDate('2025-01-01', 1)).toBeNull();
   });
 
@@ -135,7 +138,9 @@ const CLIFF_TEST_ADDRESS =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function renderModal() {
-  return render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  const result = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  selectSingleStreamInContainer(result.container);
+  return result;
 }
 
 function advanceToStep2(container: HTMLElement) {
@@ -266,6 +271,7 @@ const VALID_STELLAR =
 
 function renderStep2() {
   const view = render(<CreateStreamModal isOpen={true} onClose={() => {}} />);
+  selectSingleStreamInContainer(view.container);
 
   fireEvent.change(
     view.container.querySelector("#create-stream-recipient") as HTMLInputElement,

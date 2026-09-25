@@ -1,0 +1,165 @@
+/* ══════════════════════════════════
+   Session Recovery Banner
+   See docs/STREAMS_SESSION_RECOVERY_SPEC.md
+   ══════════════════════════════════ */
+
+.session-recovery-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-xl);
+  position: relative;
+  overflow: hidden;
+  transition: opacity var(--transition-base);
+}
+
+.session-recovery-banner::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent-secondary);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.session-recovery-banner__icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-accent-secondary) 12%, transparent);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 24%, transparent);
+  color: var(--color-accent-secondary);
+}
+
+.session-recovery-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-recovery-banner__title {
+  font: var(--font-heading-4);
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.session-recovery-banner__title--compact {
+  font: var(--font-label-lg);
+  margin: 0;
+}
+
+.session-recovery-banner__title:focus-visible {
+  outline: none;
+}
+
+.session-recovery-banner__description {
+  font: var(--font-body-md);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.session-recovery-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.session-recovery-banner__action {
+  min-height: 36px;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font: var(--font-label-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.session-recovery-banner__action--primary {
+  border: none;
+  background: var(--color-cta-primary-bg);
+  color: var(--color-cta-primary-text);
+}
+
+.session-recovery-banner__action--primary:hover {
+  background: var(--color-cta-primary-bg-hover);
+}
+
+.session-recovery-banner__action--secondary {
+  border: 1px solid var(--color-cta-secondary-border);
+  background: var(--color-cta-secondary-bg);
+  color: var(--color-cta-secondary-text);
+}
+
+.session-recovery-banner__action--secondary:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+}
+
+.session-recovery-banner__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.session-recovery-banner__dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.session-recovery-banner__dismiss:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+}
+
+.session-recovery-banner__dismiss:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 640px) {
+  .session-recovery-banner {
+    flex-wrap: wrap;
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .session-recovery-banner__body {
+    flex-basis: 100%;
+  }
+
+  .session-recovery-banner__actions {
+    flex-direction: column;
+  }
+
+  .session-recovery-banner__action {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-recovery-banner {
+    transition: none;
+  }
+}

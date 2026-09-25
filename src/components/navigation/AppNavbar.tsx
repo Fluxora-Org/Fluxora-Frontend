@@ -1,11 +1,22 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Moon, Sun } from "lucide-react";
+import { Menu, X, Type, Search, Command, AlertTriangle } from "lucide-react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
+import { useTickingNow } from "../../hooks/useTickingNow";
+import {
+  formatNavbarTime,
+  formatLocalISOWithOffset,
+  getBrowserTimezone,
+  getFormattedUTCOffset,
+} from "../../lib/timePresentation";
+
+import { VoiceMicButton } from "../voice/VoiceMicButton";
+import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -23,9 +34,14 @@ const ANON_LINKS = [
  * Hoisted to module scope so it is never rebuilt per render.
  */
 const BREADCRUMB_LABEL_MAP: Record<string, string> = {
+  app: "Dashboard",
+  dashboard: "Dashboard",
   streams: "Streams",
   recipient: "Recipient",
   treasury: "Treasury",
+  treasurypage: "Treasury",
+  "empty-state-demo": "Empty State Demo",
+  "component-gallery": "Component Gallery",
 };
 
 /** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
@@ -58,38 +74,106 @@ function FluxoraLogo({ connected }: { connected: boolean }) {
       aria-label="Fluxora home"
       className="flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-md"
     >
-      <svg width="34" height="34" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+      <svg
+        width="34"
+        height="34"
+        viewBox="0 0 46 46"
+        fill="none"
+        aria-hidden="true"
+      >
         <defs>
-          <filter id="nav_f" x="0" y="0" width="45.9936" height="45.9936" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <filter
+            id="nav_f"
+            x="0"
+            y="0"
+            width="45.9936"
+            height="45.9936"
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
             <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feMorphology radius="2" operator="erode" in="SourceAlpha" result="e1" />
-            <feOffset dy="2" /><feGaussianBlur stdDeviation="2" /><feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0" />
+            <feColorMatrix
+              in="SourceAlpha"
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+              result="hardAlpha"
+            />
+            <feMorphology
+              radius="2"
+              operator="erode"
+              in="SourceAlpha"
+              result="e1"
+            />
+            <feOffset dy="2" />
+            <feGaussianBlur stdDeviation="2" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0"
+            />
             <feBlend mode="normal" in2="BackgroundImageFix" result="e1" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feMorphology radius="1" operator="erode" in="SourceAlpha" result="e2" />
-            <feOffset dy="4" /><feGaussianBlur stdDeviation="3" /><feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0" />
+            <feColorMatrix
+              in="SourceAlpha"
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+              result="hardAlpha"
+            />
+            <feMorphology
+              radius="1"
+              operator="erode"
+              in="SourceAlpha"
+              result="e2"
+            />
+            <feOffset dy="4" />
+            <feGaussianBlur stdDeviation="3" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0"
+            />
             <feBlend mode="normal" in2="e1" result="e2" />
             <feBlend mode="normal" in="SourceGraphic" in2="e2" result="shape" />
           </filter>
-          <linearGradient id="nav_g" x1="22.9968" y1="1" x2="22.9968" y2="36.9936" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#00B8D4" /><stop offset="1" stopColor="#0097A7" />
+          <linearGradient
+            id="nav_g"
+            x1="22.9968"
+            y1="1"
+            x2="22.9968"
+            y2="36.9936"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#00B8D4" />
+            <stop offset="1" stopColor="#0097A7" />
           </linearGradient>
           <clipPath id="nav_c">
-            <rect width="19.9952" height="19.9952" fill="white" transform="translate(12.9938 8.99917)" />
+            <rect
+              width="19.9952"
+              height="19.9952"
+              fill="white"
+              transform="translate(12.9938 8.99917)"
+            />
           </clipPath>
         </defs>
         <g filter="url(#nav_f)">
-          <path d="M5 9C5 4.58173 8.58172 1 13 1H32.9936C37.4119 1 40.9936 4.58172 40.9936 9V28.9936C40.9936 33.4119 37.4119 36.9936 32.9936 36.9936H13C8.58173 36.9936 5 33.4119 5 28.9936V9Z" fill="url(#nav_g)" shapeRendering="crispEdges" />
+          <path
+            d="M5 9C5 4.58173 8.58172 1 13 1H32.9936C37.4119 1 40.9936 4.58172 40.9936 9V28.9936C40.9936 33.4119 37.4119 36.9936 32.9936 36.9936H13C8.58173 36.9936 5 33.4119 5 28.9936V9Z"
+            fill="url(#nav_g)"
+            shapeRendering="crispEdges"
+          />
           <g clipPath="url(#nav_c)">
             {[
               "M14.6601 13.998C15.16 14.4145 15.6598 14.8311 16.7429 14.8311C18.8258 14.8311 18.8258 13.1648 20.9086 13.1648C23.0748 13.1648 22.9081 14.8311 25.0743 14.8311C27.1571 14.8311 27.1571 13.1648 29.24 13.1648C30.323 13.1648 30.8229 13.5814 31.3228 13.998",
               "M14.6601 18.9968C15.16 19.4134 15.6598 19.8299 16.7429 19.8299C18.8258 19.8299 18.8258 18.1637 20.9086 18.1637C23.0748 18.1637 22.9081 19.8299 25.0743 19.8299C27.1571 19.8299 27.1571 18.1637 29.24 18.1637C30.323 18.1637 30.8229 18.5802 31.3228 18.9968",
               "M14.6601 23.9956C15.16 24.4122 15.6598 24.8287 16.7429 24.8287C18.8258 24.8287 18.8258 23.1625 20.9086 23.1625C23.0748 23.1625 22.9081 24.8287 25.0743 24.8287C27.1571 24.8287 27.1571 23.1625 29.24 23.1625C30.323 23.1625 30.8229 23.579 31.3228 23.9956",
             ].map((d, i) => (
-              <path key={i} d={d} stroke="white" strokeWidth="2.08284" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                key={i}
+                d={d}
+                stroke="white"
+                strokeWidth="2.08284"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             ))}
           </g>
         </g>
@@ -103,7 +187,11 @@ function FluxoraLogo({ connected }: { connected: boolean }) {
 
 function ConnectingSkeleton() {
   return (
-    <div className="flex items-center gap-2" aria-label="Connecting wallet…" role="status">
+    <div
+      className="flex items-center gap-2"
+      aria-label="Connecting wallet…"
+      role="status"
+    >
       <div className="h-8 w-20 rounded-full bg-[var(--surface)] animate-pulse" />
       <div className="h-9 w-32 rounded-full bg-[var(--surface)] animate-pulse" />
     </div>
@@ -111,27 +199,81 @@ function ConnectingSkeleton() {
 }
 
 /**
- * Build breadcrumb items from the current pathname.
- * e.g. /app/streams/STR-001 → [Streams, STR-001]
+ * Build breadcrumb items from the actual app route hierarchy.
+ *
+ * The app router exposes a nested route tree under /app. Breadcrumbs should
+ * mirror that structure instead of inferring hierarchy from raw path segments,
+ * so deep routes such as /app/streams/STR-123 render as:
+ * Dashboard → Streams → STR-123
+ * while page routes such as /app/treasurypage render as:
+ * Dashboard → Treasury
  */
 function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
-  // Memoized so the label map lookups and per-segment address checks only
-  // re-run when the pathname actually changes, not on every navbar render.
   return useMemo(() => {
-    if (!pathname.startsWith("/app")) return [];
+    const normalizedPath = decodeURIComponent(pathname).split("?")[0];
+    if (!normalizedPath.startsWith("/app") || normalizedPath === "/app")
+      return [];
 
-    const segments = pathname.replace("/app", "").split("/").filter(Boolean);
-    if (segments.length === 0) return [];
-
-    const items: BreadcrumbItem[] = [];
+    const segments = normalizedPath
+      .replace(/^\/app\/?/, "")
+      .split("/")
+      .filter(Boolean);
+    const items: BreadcrumbItem[] = [{ label: "Dashboard", to: "/app" }];
     let accumulatedPath = "/app";
 
     segments.forEach((segment, index) => {
       accumulatedPath += `/${segment}`;
       const isLast = index === segments.length - 1;
+
+      if (segment === "streams" && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Streams",
+        });
+        return;
+      }
+
+      if (segment === "recipient" && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Recipient",
+        });
+        return;
+      }
+
+      if ((segment === "treasurypage" || segment === "treasury") && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Treasury",
+        });
+        return;
+      }
+
+      if (segment === "streams" && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Streams",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
+      if (segment === "recipient" && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Recipient",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
+      if ((segment === "treasurypage" || segment === "treasury") && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Treasury",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
       const label = isStellarAddressSegment(segment)
         ? maskAddressSegment(segment)
-        : BREADCRUMB_LABEL_MAP[segment] ?? segment;
+        : (BREADCRUMB_LABEL_MAP[segment] ?? decodeURIComponent(segment));
+
       items.push({
         label,
         to: isLast ? undefined : accumulatedPath,
@@ -142,11 +284,140 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   }, [pathname]);
 }
 
+function NavbarTimeIndicator() {
+  const [manualTime, setManualTime] = useState<Date | null>(null);
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  const tickingNow = useTickingNow({ precision: "minute" });
+
+  useEffect(() => {
+    setManualTime(null);
+  }, [tickingNow]);
+
+  const displayTimeDate = manualTime || new Date(tickingNow);
+  const tz = getBrowserTimezone();
+  const isUTCFallback = tz === "UTC";
+
+  const desktopText = isUTCFallback
+    ? `UTC: ${formatNavbarTime(displayTimeDate, { compact: true, timezone: "UTC" })}`
+    : `Local: ${formatNavbarTime(displayTimeDate, { compact: false, timezone: tz })}`;
+
+  const mobileText = formatNavbarTime(displayTimeDate, {
+    compact: true,
+    timezone: tz,
+  });
+
+  const handleFocus = () => {
+    setManualTime(new Date());
+    setIsTooltipOpen(true);
+  };
+
+  const handleBlur = () => {
+    setIsTooltipOpen(false);
+    setManualTime(null);
+  };
+
+  const handleMouseEnter = () => {
+    setIsTooltipOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsTooltipOpen(false);
+  };
+
+  const handleClick = () => {
+    setManualTime(new Date());
+    setIsTooltipOpen((p) => !p);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsTooltipOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        aria-label={`Current time: ${desktopText}. Click or focus for details.`}
+        aria-expanded={isTooltipOpen}
+        aria-describedby="navbar-time-tooltip"
+        className="px-3 min-h-[44px] rounded-full border border-[var(--navbar-icon-border)] hover:border-[var(--accent)]/50 text-[var(--color-text-secondary)] hover:text-[var(--accent)] bg-transparent hover:bg-[var(--surface-elevated)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center justify-center cursor-pointer select-none"
+      >
+        <span
+          aria-live="off"
+          className="hidden md:inline font-sans text-xs font-semibold"
+        >
+          {desktopText}
+        </span>
+        <span
+          aria-live="off"
+          className="md:hidden font-sans text-xs font-semibold"
+        >
+          {mobileText}
+        </span>
+      </button>
+
+      {isTooltipOpen && (
+        <div
+          id="navbar-time-tooltip"
+          role="tooltip"
+          className="absolute right-0 mt-2 p-4 w-72 rounded-xl bg-[var(--tooltip-bg,var(--surface-elevated))] border border-[var(--tooltip-border,var(--border-neutral))] shadow-[var(--tooltip-shadow)] text-[var(--tooltip-text-color,var(--text-secondary))] font-mono text-xs z-[1100] flex flex-col gap-2.5 pointer-events-none"
+        >
+          <div className="font-semibold text-[var(--tooltip-title-color,var(--text-vivid))] border-b border-[var(--navbar-border)] pb-1.5 flex items-center justify-between">
+            <span>Time Details</span>
+            {isUTCFallback && (
+              <span className="text-[10px] text-amber-400 font-sans px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
+                Fallback
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                ISO Timestamp
+              </span>
+              <span className="text-[var(--text-vivid)] select-all break-all">
+                {formatLocalISOWithOffset(displayTimeDate)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                Resolved Timezone
+              </span>
+              <span className="text-[var(--text-vivid)]">{tz}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
+                UTC Offset
+              </span>
+              <span className="text-[var(--text-vivid)]">
+                {getFormattedUTCOffset(displayTimeDate, tz)}
+              </span>
+            </div>
+            {isUTCFallback && (
+              <div className="mt-1 pt-1.5 border-t border-[var(--navbar-border)] text-[10px] text-amber-400 font-sans italic">
+                Timezone detection unavailable. Using UTC fallback.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AppNavbar({
   onSidebarToggle,
   isSidebarOpen = false,
 }: AppNavbarProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { easyReadFont, toggleEasyReadFont } = useTheme();
   const {
     connected,
     address,
@@ -154,39 +425,88 @@ export default function AppNavbar({
     expectedNetwork,
     isNetworkMismatch,
     disconnect,
+    loading,
   } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
 
-  // Simulate a brief "connecting" state on first mount when wallet restores session
+  /**
+   * Route-transition lock.
+   *
+   * Design decision: a route change settles asynchronously (data fetches,
+   * lazy routes, pending renders). Until it settles we mark the navbar as
+   * `routeTransitioning` for a short window. While transitioning:
+   *   - Wallet/account *action* controls (disconnect, copy address, explorer,
+   *     workspace links) are locked so an action bound to the previous route's
+   *     context cannot be invoked against the new one.
+   *   - Wallet *identity* (network badge + address, including a wrong-network
+   *     badge) stays visible so the user keeps orientation.
+   *   - Global controls (theme, easy-read font, search, voice) remain available.
+   *
+   * The timer is re-armed on every pathname change, so rapid navigation keeps
+   * the lock active until the last transition settles, and browser
+   * back/forward re-arms it for the restored route.
+   */
+  const location = useLocation();
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    setConnecting(true);
-    const t = setTimeout(() => setConnecting(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+    setRouteTransitioning(true);
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = setTimeout(
+      () => setRouteTransitioning(false),
+      250,
+    );
+    return () => {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
+  }, [location.pathname]);
 
-const location = useLocation();
   const isAppView = connected && location.pathname.startsWith("/app");
   const breadcrumbs = useBreadcrumbs(location.pathname);
   const showBreadcrumb = isAppView && breadcrumbs.length > 1;
   const links = connected ? APP_PRIMARY_LINKS : ANON_LINKS;
 
-  const handleMobileToggle = () => {
-    if (isAppView && onSidebarToggle) {
-      onSidebarToggle();
-    } else {
-      setMobileMenuOpen((o) => !o);
+  // Anon hamburger — kept as a ref so focus can be deterministically returned
+  // to it whenever the mobile menu closes via keyboard (Escape) or link
+  // activation, instead of being silently dropped to <body>.
+  const hamburgerButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeMobile = useCallback((options?: { restoreFocus?: boolean }) => {
+    setMobileMenuOpen(false);
+    if (options?.restoreFocus) {
+      hamburgerButtonRef.current?.focus();
+    }
+  }, []);
+
+  // Safety net: any route change closes the mobile menu, regardless of
+  // whether it was triggered by clicking a link inside it (browser
+  // back/forward, programmatic navigation, etc. bypass that handler).
+  // This keeps menu state deterministic across rerenders instead of being
+  // contingent on which specific interaction caused the navigation.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && mobileMenuOpen) {
+      closeMobile({ restoreFocus: true });
     }
   };
-
-  const closeMobile = () => setMobileMenuOpen(false);
 
   return (
     <header
       role="banner"
       aria-label="Global navigation"
+      onKeyDown={handleHeaderKeyDown}
       className="sticky top-0 z-50 w-full border-b border-[var(--navbar-border)] bg-[var(--navbar-bg)]/80 backdrop-blur-md"
     >
+      {/* Skip link — visually hidden until focused, lets keyboard users jump past the navbar */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-[var(--navbar-bg)] focus:text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-focus)] focus:text-sm focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Left: Logo */}
         <div className="flex items-center gap-4">
@@ -195,11 +515,19 @@ const location = useLocation();
             <button
               className="md:hidden flex items-center justify-center w-11 h-11 -ml-2 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               onClick={onSidebarToggle}
-              aria-label={isSidebarOpen ? "Close navigation sidebar" : "Open navigation sidebar"}
+              aria-label={
+                isSidebarOpen
+                  ? "Close navigation sidebar"
+                  : "Open navigation sidebar"
+              }
               aria-expanded={isSidebarOpen}
               aria-controls="app-sidebar"
             >
-              {isSidebarOpen ? <X size={26} aria-hidden="true" /> : <Menu size={26} aria-hidden="true" />}
+              {isSidebarOpen ? (
+                <X className="icon-md" aria-hidden="true" />
+              ) : (
+                <Menu className="icon-md" aria-hidden="true" />
+              )}
             </button>
           )}
           <FluxoraLogo connected={connected} />
@@ -207,105 +535,164 @@ const location = useLocation();
 
         {/* Center: Nav links (desktop) */}
         <nav
-  aria-label={connected ? "App navigation" : "Marketing navigation"}
-  className="hidden md:flex items-center gap-1"
->
-  {/* Primary destinations — full visual weight */}
-  {(connected ? APP_PRIMARY_LINKS : ANON_LINKS).map((link) => (
-    <NavLink key={link.to} to={link.to} label={link.label} />
-  ))}
+          aria-label={connected ? "App navigation" : "Marketing navigation"}
+          className="hidden md:flex items-center gap-1"
+        >
+          {/* Primary destinations — full visual weight */}
+          {(connected ? APP_PRIMARY_LINKS : ANON_LINKS).map((link) => (
+            <NavLink key={link.to} to={link.to} label={link.label} />
+          ))}
 
-  {/* Secondary/utility — reduced visual weight, separated */}
-  {connected && APP_SECONDARY_LINKS.length > 0 && (
-    <>
-      <span
-        aria-hidden="true"
-        style={{
-          width: "1px",
-          height: "20px",
-          background: "var(--navbar-border)",
-          margin: "0 var(--space-sm)",
-        }}
-      />
-      {APP_SECONDARY_LINKS.map((link) => (
-        <NavLink
-          key={link.to}
-          to={link.to}
-          label={link.label}
-          variant="secondary"
-        />
-      ))}
-    </>
-  )}
-</nav>
+          {/* Secondary/utility — reduced visual weight, separated */}
+          {connected && APP_SECONDARY_LINKS.length > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: "1px",
+                  height: "20px",
+                  background: "var(--navbar-border)",
+                  margin: "0 var(--space-sm)",
+                }}
+              />
+              {APP_SECONDARY_LINKS.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  label={link.label}
+                  variant="secondary"
+                />
+              ))}
+            </>
+          )}
+        </nav>
 
-        {/* Right: Actions (desktop) */}
-        <div className="hidden md:flex items-center gap-3">
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
-            {theme === "light" ? (
-              <Moon size={16} aria-hidden="true" />
-            ) : (
-              <Sun size={16} aria-hidden="true" />
-            )}
-          </button>
+        {/* Right Actions & Time Indicator */}
+        <div className="flex items-center gap-3">
+          <NavbarTimeIndicator />
 
-          {/* Wallet area */}
-          {connecting ? (
-            <ConnectingSkeleton />
-          ) : connected && address ? (
-            <WalletStatus
-              address={address}
-              network={network ?? "TESTNET"}
-              expectedNetwork={expectedNetwork}
-              isNetworkMismatch={isNetworkMismatch}
-              onDisconnect={disconnect}
-            />
-          ) : (
-            <Link
-              to="/connect-wallet"
-              aria-label="Connect your Stellar wallet"
-              className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+          {/* Right: Actions (desktop) */}
+          <div className="hidden md:flex items-center gap-3">
+            {/* Command Palette / Search Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("open-command-palette"));
+              }}
+              aria-label="Open command palette and help search (Cmd+K)"
+              className="flex items-center gap-2.5 px-3.5 py-1.5 h-10 rounded-full border border-[var(--navbar-icon-border)] bg-[var(--surface-sunken)] hover:border-[var(--accent)]/50 text-[var(--text-muted)] hover:text-[var(--text)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-xs font-medium"
             >
-              Connect Wallet
-            </Link>
+              <Search size={15} aria-hidden="true" />
+              <span className="hidden lg:inline">
+                Search commands & help...
+              </span>
+              <span className="lg:hidden">Search...</span>
+              <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[10px] font-mono font-semibold text-[var(--text-muted)]">
+                <Command size={10} />K
+              </kbd>
+            </button>
+
+            {/* Voice Control Mic Activation */}
+            <VoiceMicButton variant="navbar" />
+
+            {/* Easy-read font toggle */}
+            <button
+              onClick={toggleEasyReadFont}
+              aria-label="Toggle easy-read font"
+              aria-pressed={easyReadFont}
+              title={
+                easyReadFont
+                  ? "Disable easy-read font"
+                  : "Enable easy-read font"
+              }
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                easyReadFont
+                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
+                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
+              }`}
+            >
+              <Type size={16} aria-hidden="true" />
+            </button>
+
+            {/* Theme toggle */}
+            <ThemeSegmentedControl />
+
+            {/* Wallet area - State precedence: loading > disconnected > wrong network > connected */}
+            {loading ? (
+              <ConnectingSkeleton />
+            ) : !connected ? (
+              <Link
+                to="/connect-wallet"
+                aria-label="Connect your Stellar wallet"
+                className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+              >
+                Connect Wallet
+              </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
+              <WalletStatus
+                address={address ?? ""}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={disconnect}
+                disabled={routeTransitioning}
+              />
+            )}
+          </div>
+
+          {/* Mobile hamburger — anon (marketing) view only.
+               In app view the sidebar toggle above the logo handles mobile nav. */}
+          {!isAppView && (
+            <button
+              ref={hamburgerButtonRef}
+              type="button"
+              className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={
+                mobileMenuOpen
+                  ? "Close navigation menu"
+                  : "Open navigation menu"
+              }
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
+            >
+              {mobileMenuOpen ? (
+                <X size={22} aria-hidden="true" />
+              ) : (
+                <Menu size={22} aria-hidden="true" />
+              )}
+            </button>
           )}
         </div>
-
-        {/* Mobile: hamburger (only in Marketing View or if not using sidebar) */}
-        {!isAppView && (
-          <button
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-md text-[var(--navbar-icon-color)] hover:text-[var(--text)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-            onClick={handleMobileToggle}
-            aria-label={
-              mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
-            }
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-nav"
-          >
-            {mobileMenuOpen ? (
-              <X size={22} aria-hidden="true" />
-            ) : (
-              <Menu size={22} aria-hidden="true" />
-            )}
-          </button>
-        )}
       </div>
       {/* Breadcrumb — shown on deep pages (e.g. Streams / STR-001) */}
-{showBreadcrumb && (
-  <div
-    className="w-full border-t border-[var(--navbar-border)] bg-[var(--navbar-bg)] px-4 sm:px-6"
-    style={{ paddingTop: "var(--space-sm)", paddingBottom: "var(--space-sm)" }}
-  >
-    <div className="mx-auto max-w-7xl">
-      <Breadcrumb items={breadcrumbs} />
-    </div>
-  </div>
-)}
+      {showBreadcrumb && (
+        <div
+          className="w-full border-t border-[var(--navbar-border)] bg-[var(--navbar-bg)] px-4 sm:px-6"
+          style={{
+            paddingTop: "var(--space-sm)",
+            paddingBottom: "var(--space-sm)",
+          }}
+        >
+          <div className="mx-auto max-w-7xl">
+            <Breadcrumb items={breadcrumbs} />
+          </div>
+        </div>
+      )}
 
       {/* Mobile menu (Dropdown for marketing site) */}
       {mobileMenuOpen && !isAppView && (
@@ -320,49 +707,75 @@ const location = useLocation();
               key={link.to}
               to={link.to}
               label={link.label}
-              onClick={closeMobile}
+              onClick={() => closeMobile({ restoreFocus: true })}
             />
           ))}
 
           <div className="mt-3 pt-3 border-t border-[var(--navbar-border)] flex items-center gap-3 flex-wrap">
+            {/* Easy-read font toggle */}
             <button
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full border border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={toggleEasyReadFont}
+              aria-label="Toggle easy-read font"
+              aria-pressed={easyReadFont}
+              title={
+                easyReadFont
+                  ? "Disable easy-read font"
+                  : "Enable easy-read font"
+              }
+              className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                easyReadFont
+                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
+                  : "border-[var(--navbar-icon-border)] text-[var(--navbar-icon-color)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
+              }`}
             >
-              {theme === "light" ? (
-                <Moon size={16} aria-hidden="true" />
-              ) : (
-                <Sun size={16} aria-hidden="true" />
-              )}
+              <Type size={16} aria-hidden="true" />
             </button>
 
-            {connecting ? (
+            {loading ? (
               <ConnectingSkeleton />
-            ) : connected && address ? (
-              <WalletStatus
-                address={address}
-                network={network ?? "TESTNET"}
-                expectedNetwork={expectedNetwork}
-                isNetworkMismatch={isNetworkMismatch}
-                onDisconnect={() => {
-                  disconnect();
-                  closeMobile();
-                }}
-              />
-            ) : (
+            ) : !connected ? (
               <Link
                 to="/connect-wallet"
-                onClick={closeMobile}
+                onClick={() => closeMobile({ restoreFocus: true })}
                 aria-label="Connect your Stellar wallet"
                 className="px-5 h-[44px] rounded-full bg-[var(--cta-bg)] text-white text-sm font-semibold shadow-[var(--cta-shadow)] hover:opacity-90 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
               >
                 Connect Wallet
               </Link>
+            ) : isNetworkMismatch ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
+                  <AlertTriangle size={14} />
+                  Expected {expectedNetwork}
+                </span>
+                <Link
+                  to="/connect-wallet"
+                  onClick={() => closeMobile({ restoreFocus: true })}
+                  aria-label="Switch to correct network"
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 ease-in-out cursor-pointer bg-[var(--cta-bg)] shadow-[var(--cta-shadow)] hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center"
+                >
+                  Switch Network
+                </Link>
+              </div>
+            ) : (
+              <WalletStatus
+                address={address ?? ""}
+                network={network ?? "TESTNET"}
+                expectedNetwork={expectedNetwork}
+                isNetworkMismatch={isNetworkMismatch}
+                onDisconnect={() => {
+                  disconnect();
+                  closeMobile({ restoreFocus: true });
+                }}
+                disabled={routeTransitioning}
+              />
             )}
           </div>
         </div>
       )}
+
+      {/* Command Palette — rendered inside header but uses fixed positioning */}
+      <KeyboardShortcutsModal />
     </header>
   );
 }

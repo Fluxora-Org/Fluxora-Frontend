@@ -25,9 +25,10 @@ const getNetwork = vi.fn();
  * WatchWalletChanges mock — captures every instantiation so tests can assert
  * which interval was passed, and that start/stop are called correctly.
  */
-const MockWatchWalletChanges = vi.fn().mockImplementation(function (
-  this: { watch: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> },
-) {
+const MockWatchWalletChanges = vi.fn().mockImplementation(function (this: {
+  watch: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+}) {
   this.watch = vi.fn();
   this.stop = vi.fn();
 });
@@ -65,6 +66,9 @@ function WalletHarness({
     </div>
   );
 }
+
+const TEST_WALLET_ADDRESS =
+  "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -138,9 +142,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
     getNetwork.mockReset();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("constructs WatchWalletChanges with the default interval (2000) on connect", async () => {
+  it("constructs WatchWalletChanges with the default interval (2000) on connect", async () => {
     const { WalletProvider, useWallet, WALLET_WATCH_INTERVAL_MS } =
       await import("../Walletcontext");
 
@@ -148,7 +150,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -165,13 +167,13 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
     });
 
     expect(MockWatchWalletChanges).toHaveBeenCalledTimes(1);
-    expect(MockWatchWalletChanges).toHaveBeenCalledWith(WALLET_WATCH_INTERVAL_MS);
+    expect(MockWatchWalletChanges).toHaveBeenCalledWith(
+      WALLET_WATCH_INTERVAL_MS,
+    );
     expect(MockWatchWalletChanges).toHaveBeenCalledWith(2000);
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("does NOT construct WatchWalletChanges with the bare literal 2000 independently of the constant", async () => {
+  it("does NOT construct WatchWalletChanges with the bare literal 2000 independently of the constant", async () => {
     /**
      * This test exists to catch any future regression where someone hardcodes
      * the literal again. It verifies the argument IS the exported constant, not
@@ -193,7 +195,7 @@ describe("WalletProvider uses WALLET_WATCH_INTERVAL_MS when constructing the wat
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -226,16 +228,14 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     getNetwork.mockReset();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("starts the watcher on connect and stops it on disconnect", async () => {
+  it("starts the watcher on connect and stops it on disconnect", async () => {
     const { WalletProvider, useWallet } = await import("../Walletcontext");
 
     function Harness() {
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -265,16 +265,14 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     expect(instance.stop).toHaveBeenCalledTimes(1);
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("stops the watcher on unmount", async () => {
+  it("stops the watcher on unmount", async () => {
     const { WalletProvider, useWallet } = await import("../Walletcontext");
 
     function Harness() {
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -306,9 +304,7 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
 
     function Harness() {
       const { disconnect } = useWallet();
-      return (
-        <WalletHarness connect={() => {}} disconnect={disconnect} />
-      );
+      return <WalletHarness connect={() => {}} disconnect={disconnect} />;
     }
 
     render(
@@ -323,14 +319,16 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     expect(MockWatchWalletChanges).not.toHaveBeenCalled();
   });
 
-  // Skipped: pre-existing mock-wiring failure unrelated to CI setup.
-  // Tracked as pre-existing test debt.
-  it.skip("clamps a below-minimum configured interval and still constructs the watcher", async () => {
+  it("clamps a below-minimum configured interval and still constructs the watcher", async () => {
     vi.stubEnv("VITE_WALLET_WATCH_INTERVAL_MS", "50");
     vi.resetModules();
 
-    const { WalletProvider, useWallet, WALLET_WATCH_INTERVAL_MS, WALLET_WATCH_MIN_INTERVAL_MS } =
-      await import("../Walletcontext");
+    const {
+      WalletProvider,
+      useWallet,
+      WALLET_WATCH_INTERVAL_MS,
+      WALLET_WATCH_MIN_INTERVAL_MS,
+    } = await import("../Walletcontext");
 
     // Clamping must have taken effect
     expect(WALLET_WATCH_INTERVAL_MS).toBe(WALLET_WATCH_MIN_INTERVAL_MS);
@@ -339,7 +337,7 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
       const { connect, disconnect } = useWallet();
       return (
         <WalletHarness
-          connect={() => connect("GUSER", "TESTNET")}
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
           disconnect={disconnect}
         />
       );
@@ -355,7 +353,9 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
       fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     });
 
-    expect(MockWatchWalletChanges).toHaveBeenCalledWith(WALLET_WATCH_MIN_INTERVAL_MS);
+    expect(MockWatchWalletChanges).toHaveBeenCalledWith(
+      WALLET_WATCH_MIN_INTERVAL_MS,
+    );
     expect(MockWatchWalletChanges).toHaveBeenCalledWith(500);
     // Should NOT be called with the unclamped tiny value
     expect(MockWatchWalletChanges).not.toHaveBeenCalledWith(50);
@@ -363,4 +363,285 @@ describe("WalletProvider watcher start/stop semantics (unchanged by refactor)", 
     vi.unstubAllEnvs();
     vi.resetModules();
   });
+
+  it("stops the active watcher exactly once when the wallet disconnects", async () => {
+    const { WalletProvider, useWallet } = await import("../Walletcontext");
+
+    function Harness() {
+      const { connect, disconnect } = useWallet();
+
+      return (
+        <WalletHarness
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
+          disconnect={disconnect}
+        />
+      );
+    }
+
+    render(
+      <WalletProvider>
+        <Harness />
+      </WalletProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    expect(MockWatchWalletChanges).toHaveBeenCalledTimes(1);
+
+    const watcher = MockWatchWalletChanges.mock.instances[0] as {
+      stop: ReturnType<typeof vi.fn>;
+    };
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    });
+
+    expect(watcher.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the old watcher once before creating a watcher for a reconnect", async () => {
+    const { WalletProvider, useWallet } = await import("../Walletcontext");
+
+    function Harness() {
+      const { connect, disconnect } = useWallet();
+
+      return (
+        <WalletHarness
+          connect={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
+          disconnect={disconnect}
+        />
+      );
+    }
+
+    render(
+      <WalletProvider>
+        <Harness />
+      </WalletProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    const firstWatcher = MockWatchWalletChanges.mock.instances[0] as {
+      stop: ReturnType<typeof vi.fn>;
+    };
+
+    expect(MockWatchWalletChanges).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    });
+
+    expect(firstWatcher.stop).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    });
+
+    expect(MockWatchWalletChanges).toHaveBeenCalledTimes(2);
+
+    const secondWatcher = MockWatchWalletChanges.mock.instances[1] as {
+      stop: ReturnType<typeof vi.fn>;
+    };
+
+    expect(secondWatcher.stop).not.toHaveBeenCalled();
+  });
+
+  it("updates to the new account without allowing the old account to overwrite it", async () => {
+  const { WalletProvider, useWallet } = await import("../Walletcontext");
+
+  const SECOND_WALLET_ADDRESS =
+    "GBNR6YQ2QY5Q5KJ4L2VQ5MZ3VQ6XQ4Y6Q3Y2VQ7Q5Y6Q4Y3Q2Y5Y6Y7";
+
+  function Probe() {
+    const { address, connect } = useWallet();
+
+    return (
+      <>
+        <output data-testid="wallet-address">
+          {address ?? ""}
+        </output>
+
+        <button
+          type="button"
+          onClick={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
+        >
+          Connect A
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            connect(SECOND_WALLET_ADDRESS, "TESTNET")
+          }
+        >
+          Connect B
+        </button>
+      </>
+    );
+  }
+
+  render(
+    <WalletProvider>
+      <Probe />
+    </WalletProvider>,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Connect A" }));
+  });
+
+  expect(screen.getByTestId("wallet-address")).toHaveTextContent(
+    TEST_WALLET_ADDRESS,
+  );
+
+  const firstWatcher = MockWatchWalletChanges.mock.instances[0] as {
+    watch: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+  };
+
+  const firstCallback = firstWatcher.watch.mock.calls[0][0] as (
+    value: { address: string; network: string },
+  ) => void;
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Connect B" }));
+  });
+
+  // A stale callback from the previous account must not restore account A.
+  await act(async () => {
+    firstCallback({
+      address: TEST_WALLET_ADDRESS,
+      network: "TESTNET",
+    });
+  });
+
+  expect(screen.getByTestId("wallet-address")).toHaveTextContent(
+    TEST_WALLET_ADDRESS,
+  );
+});
+
+it("ignores a stale watcher callback after disconnect", async () => {
+  const { WalletProvider, useWallet } = await import("../Walletcontext");
+
+  function Probe() {
+    const { address, connected, connect, disconnect } = useWallet();
+
+    return (
+      <>
+        <output data-testid="wallet-state">
+          {JSON.stringify({ address, connected })}
+        </output>
+
+        <button
+          type="button"
+          onClick={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
+        >
+          Connect
+        </button>
+
+        <button
+          type="button"
+          onClick={disconnect}
+        >
+          Disconnect
+        </button>
+      </>
+    );
+  }
+
+  render(
+    <WalletProvider>
+      <Probe />
+    </WalletProvider>,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+  });
+
+  const watcher = MockWatchWalletChanges.mock.instances[0] as {
+    watch: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+  };
+
+  const callback = watcher.watch.mock.calls[0][0] as (
+    value: { address: string; network: string },
+  ) => void;
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+  });
+
+  expect(screen.getByTestId("wallet-state")).toHaveTextContent(
+    `"connected":false`,
+  );
+
+  // Simulate a callback that was already queued by the wallet watcher.
+  await act(async () => {
+    callback({
+      address: TEST_WALLET_ADDRESS,
+      network: "TESTNET",
+    });
+  });
+
+  expect(screen.getByTestId("wallet-state")).toHaveTextContent(
+    `"connected":false`,
+  );
+
+  expect(watcher.stop).toHaveBeenCalledTimes(1);
+});
+
+it("ignores watcher callbacks after the provider unmounts", async () => {
+  const { WalletProvider, useWallet } = await import("../Walletcontext");
+
+  function Harness() {
+    const { connect } = useWallet();
+
+    return (
+      <button
+        type="button"
+        onClick={() => connect(TEST_WALLET_ADDRESS, "TESTNET")}
+      >
+        Connect
+      </button>
+    );
+  }
+
+  const { unmount } = render(
+    <WalletProvider>
+      <Harness />
+    </WalletProvider>,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+  });
+
+  const watcher = MockWatchWalletChanges.mock.instances[0] as {
+    watch: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+  };
+
+  const callback = watcher.watch.mock.calls[0][0] as (
+    value: { address: string; network: string },
+  ) => void;
+
+  unmount();
+
+  expect(watcher.stop).toHaveBeenCalledTimes(1);
+
+  // A queued callback must be harmless after unmount.
+  expect(() => {
+    callback({
+      address: TEST_WALLET_ADDRESS,
+      network: "TESTNET",
+    });
+  }).not.toThrow();
+
+  expect(watcher.stop).toHaveBeenCalledTimes(1);
+});
 });

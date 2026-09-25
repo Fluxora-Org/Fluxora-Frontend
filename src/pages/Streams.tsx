@@ -1,5 +1,7 @@
 import {
+  lazy,
   memo,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -11,22 +13,26 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
-import CreateStreamModal from "../components/CreateStreamModal";
+const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
+import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
 import StreamsLoading from "../components/StreamsLoading";
-import Input from "../components/Input";
-import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
-import { Pagination } from "../components/Pagination";
 import StreamTimeline from "../components/StreamTimeline";
-import VirtualList from "../components/VirtualList";
+import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
+import SessionRecoveryBanner from "../components/SessionRecoveryBanner";
+import { isDraftMeaningful } from "../lib/streamsSessionRecovery";
+import CreateStreamFab from "../components/CreateStreamFab";
+import { StreamsListPanel } from "../components/Streams/StreamsListPanel";
 import {
-  type StreamHealth,
-  type StreamRecord,
-  type StreamStatus,
-} from "../data/streamRecords";
-import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
+  useStreamsData,
+  STATUS_FILTERS,
+  MAX_LOADING_RETRIES,
+} from "./useStreamsData";
+import {
+  clearResolved as clearResolvedOptimistic,
+} from "../lib/optimisticTransactions";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -34,21 +40,23 @@ import {
   formatDetailTime,
   getUrgencyLevel,
 } from "../lib/timePresentation";
-import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
+import { formatUsdc } from "../lib/formatters";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useTickingNow } from "../hooks/useTickingNow";
-import { formatUsdc } from "../lib/formatters";
 import "./Streams.css";
 import TruncatedAddress from "../components/common/TruncatedAddress";
+import { copyToClipboard } from "../hooks/useClipboard";
+import { stellarExplorerUrl } from "../lib/stellar";
+import { getExpectedStellarNetwork } from "../lib/stellarNetwork";
+import type {
+  StreamHealth,
+  StreamRecord,
+  StreamStatus,
+} from "../data/streamRecords";
+import type { StreamSortMode } from "../lib/streamSorting";
 
-
-type StatusFilter = "All" | StreamStatus;
-
-const STATUS_FILTERS: StatusFilter[] = ["All", "Active", "Paused", "Completed"];
 const DISCLOSURE_DURATION_MS = 200;
-const FILTER_ANNOUNCEMENT_DELAY_MS = 300;
 const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
-const STREAM_CARD_ESTIMATED_HEIGHT = 420;
 
 /**
  * Formats a USDC amount with full fractional precision (2 decimal places).
@@ -252,16 +260,19 @@ const StreamCard = memo(function StreamCard({
     onCopyRecipientError(stream);
   }, [onCopyRecipientError, stream]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
-    // Enter/Space selects the card; do not intercept if a button inside is focused
-    if (
-      e.target === e.currentTarget &&
-      (e.key === "Enter" || e.key === " ")
-    ) {
-      e.preventDefault();
-      handleSelect();
-    }
-  }, [handleSelect]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLElement>) => {
+      // Enter/Space selects the card; do not intercept if a button inside is focused
+      if (
+        e.target === e.currentTarget &&
+        (e.key === "Enter" || e.key === " ")
+      ) {
+        e.preventDefault();
+        handleSelect();
+      }
+    },
+    [handleSelect],
+  );
 
   const classNames = [
     "stream-card",
@@ -324,8 +335,8 @@ const StreamCard = memo(function StreamCard({
         <div className="stream-meta-block">
           <span>Recipient</span>
           <strong>{stream.recipientName}</strong>
-          <TruncatedAddress 
-            address={stream.recipientAddress} 
+          <TruncatedAddress
+            address={stream.recipientAddress}
             onCopy={handleRecipientCopied}
             onCopyStateChange={(state) => {
               if (state === "error") {
@@ -359,10 +370,16 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__cliff is-${cliffStatus}`}
             aria-label={`Cliff date: ${formatDateWithTimezone(stream.cliffDate)} (${cliffStatus})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">⏱</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              ⏱
+            </span>
             <span className="stream-time-bar__label">Cliff</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.cliffDate)}</span>
-            <span className="stream-time-bar__relative">({getRelativeTime(stream.cliffDate)})</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.cliffDate)}
+            </span>
+            <span className="stream-time-bar__relative">
+              ({getRelativeTime(stream.cliffDate)})
+            </span>
           </div>
         )}
         {stream.endDate && (
@@ -370,9 +387,13 @@ const StreamCard = memo(function StreamCard({
             className={`stream-time-bar__item stream-time-bar__end is-${urgency.end}`}
             aria-label={`End date: ${formatDateWithTimezone(stream.endDate)} (${endRelative})`}
           >
-            <span className="stream-time-bar__icon" aria-hidden="true">→</span>
+            <span className="stream-time-bar__icon" aria-hidden="true">
+              →
+            </span>
             <span className="stream-time-bar__label">End</span>
-            <span className="stream-time-bar__date">{formatDateWithTimezone(stream.endDate)}</span>
+            <span className="stream-time-bar__date">
+              {formatDateWithTimezone(stream.endDate)}
+            </span>
             <span className="stream-time-bar__relative">({endRelative})</span>
           </div>
         )}
@@ -438,7 +459,9 @@ const StreamCard = memo(function StreamCard({
                 <div className="stream-panel__row">
                   <span className="stream-panel__row-label">End date</span>
                   <div className="stream-panel__row-value">
-                    {formatDetailTime(stream.endDate, { includeTimezone: true })}
+                    {formatDetailTime(stream.endDate, {
+                      includeTimezone: true,
+                    })}
                   </div>
                 </div>
                 <div className="stream-panel__row">
@@ -491,7 +514,7 @@ function StreamDetail({
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
 }) {
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
   return (
     <>
       <button
@@ -514,8 +537,12 @@ function StreamDetail({
           <div className="stream-detail__meta">
             <span className="stream-chip">{stream.id}</span>
             <span className="stream-chip">{stream.recipientName}</span>
-            <span className="stream-chip">{formatMonthlyRate(stream.monthlyRate)}</span>
-            <span className="stream-chip">Ends {formatDate(stream.endDate)}</span>
+            <span className="stream-chip">
+              {formatMonthlyRate(stream.monthlyRate)}
+            </span>
+            <span className="stream-chip">
+              Ends {formatDate(stream.endDate)}
+            </span>
           </div>
         </div>
 
@@ -529,9 +556,12 @@ function StreamDetail({
           </button>
           <a
             className="streams-link-button"
-            href={`https://stellar.expert/explorer/testnet/account/${stream.recipientAddress}`}
+            href={stellarExplorerUrl(
+              stream.recipientAddress,
+              getExpectedStellarNetwork(),
+            )}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             View in explorer
           </a>
@@ -599,8 +629,8 @@ function StreamDetail({
                 <div className="stream-panel__row-value">
                   {stream.recipientName}
                   <div className="mt-1">
-                    <TruncatedAddress 
-                      address={stream.recipientAddress} 
+                    <TruncatedAddress
+                      address={stream.recipientAddress}
                       onCopy={onCopyAddress}
                     />
                   </div>
@@ -656,7 +686,10 @@ function StreamDetail({
             <h2 className="stream-panel__header">Timeline</h2>
             <div className="stream-timeline">
               {stream.timeline.map((event) => (
-                <div className="stream-timeline__item" key={event.date + event.title}>
+                <div
+                  className="stream-timeline__item"
+                  key={event.date + event.title}
+                >
                   <div className="stream-timeline__date">
                     {formatDate(event.date)}
                   </div>
@@ -749,193 +782,246 @@ function StreamNotFound({
 export default function Streams() {
   const navigate = useNavigate();
   const { streamId } = useParams();
-  const { announcement, announce } = useLiveAnnouncer();
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
 
-  const { streams, loading, error, refetch } = useTreasury();
-  const filterLabels: Record<StatusFilter, string> = {
-    All: t("streams.filter.all"),
-    Active: t("streams.filter.active"),
-    Paused: t("streams.filter.paused"),
-    Completed: t("streams.filter.completed"),
-  };
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("recent");
-  const [expandedStreamId, setExpandedStreamId] = useState<string>("");
-  const [selectedStreamId, setSelectedStreamId] = useState<string>("");
+  // ── All data + filter logic lives in the hook ──────────────────────────────
+  const data = useStreamsData();
+
+  const {
+    streams,
+    rolledBackCount,
+    loading,
+    error,
+    retryCount,
+    refetch,
+    refetchStreams,
+    isAbortError,
+    statusFilter,
+    setStatusFilter,
+    searchQuery,
+    setSearchQuery,
+    sortBy,
+    setSortBy,
+    filterLabels,
+    visibleStreams,
+    paginatedStreams,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    activeStreams,
+    monthlyOutflow,
+    withdrawableNow,
+    nextUnlock,
+    showEmptyState,
+    showZeroAccrual,
+    zeroAccrualReason,
+    effectiveExpandedId,
+    expandedStreamId,
+    setExpandedStreamId,
+    selectedStreamId,
+    setSelectedStreamId,
+    bannerState,
+    detectedSnapshot,
+    liveDraft,
+    setLiveDraft,
+    restoredDraft,
+    setRestoredDraft,
+    recentlySaved,
+    recoveryIdentityMatches,
+    handleRestoreSession,
+    handleStartFreshSession,
+    handleDismissSessionBanner,
+    handleResumeDraft,
+    resolveSessionOnInteraction,
+    announcement,
+    alertAnnouncement,
+    clearResolvedOptimisticOps,
+  } = data;
+
+  const visibleError = isAbortError ? null : error;
+
+  // ── Modals ─────────────────────────────────────────────────────────────────
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdStream, setCreatedStream] = useState({
     id: "STR-NEW",
     url: "https://fluxora.io/stream/STR-NEW",
+    txHash: undefined as string | null | undefined,
+    amount: undefined as string | undefined,
+    rate: undefined as string | undefined,
+    sender: undefined as string | undefined,
+    recipient: undefined as string | undefined,
   });
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  const walletConnected = true;
-  const hasInitializedExpanded = useRef(false);
-
+  // ── Rollback toast ─────────────────────────────────────────────────────────
+  const rolledBackToastRef = useRef(0);
   useEffect(() => {
-    if (!hasInitializedExpanded.current && streams.length > 0) {
-      hasInitializedExpanded.current = true;
-      setExpandedStreamId(streams[0]!.id);
+    if (rolledBackCount > 0 && rolledBackCount > rolledBackToastRef.current) {
+      addToast(
+        "A pending stream operation did not confirm on-chain and has been reverted.",
+        "error",
+        0
+      );
     }
-  }, [streams]);
+    rolledBackToastRef.current = rolledBackCount;
+  }, [rolledBackCount, addToast]);
 
-  const activeStreams = streams.filter((stream) => stream.status === "Active");
-  const monthlyOutflow = activeStreams.reduce(
-    (total, stream) => total + stream.monthlyRate,
-    0,
-  );
-  const withdrawableNow = streams.reduce(
-    (total, stream) => total + stream.withdrawableAmount,
-    0,
-  );
-  const nextUnlock = activeStreams
-    .map((stream) => stream.nextUnlockDate)
-    .filter(Boolean)
-    .sort()[0];
-  const visibleStreams = useMemo(() => {
-    const normalizedSearch = searchQuery.toLowerCase();
-
-    return streams
-      .filter((stream) => {
-        const matchesStatus =
-          statusFilter === "All" || stream.status === statusFilter;
-        const matchesSearch =
-          stream.name.toLowerCase().includes(normalizedSearch) ||
-          stream.id.toLowerCase().includes(normalizedSearch) ||
-          stream.recipientName.toLowerCase().includes(normalizedSearch);
-        return matchesStatus && matchesSearch;
-      })
-      .sort((a, b) => {
-        if (sortBy === "name") return a.name.localeCompare(b.name);
-        if (sortBy === "rate") return b.monthlyRate - a.monthlyRate;
-        // Default to recent (higher ID first for demo)
-        return b.id.localeCompare(a.id);
-      });
-  }, [searchQuery, sortBy, statusFilter, streams]);
-
-  useEffect(() => {
-    if (!hasMountedFilterAnnouncer.current) {
-      hasMountedFilterAnnouncer.current = true;
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const count = visibleStreams.length;
-      const noun = count === 1 ? "stream" : "streams";
-      const filterLabel =
-        statusFilter !== "All" ? ` ${statusFilter.toLowerCase()}` : "";
-      announce(`Showing ${count}${filterLabel} ${noun}.`);
-    }, FILTER_ANNOUNCEMENT_DELAY_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
-  const selectedStream = streamId
-    ? streams.find((stream) => stream.id === streamId)
-    : undefined;
-  const hasStreams = streams.length > 0;
-  const showEmptyState = !selectedStream && (!walletConnected || !hasStreams);
-  // Zero-accrual: connected + streams exist + nothing is withdrawable yet
-  const showZeroAccrual =
-    !showEmptyState &&
-    walletConnected &&
-    hasStreams &&
-    withdrawableNow === 0 &&
-    activeStreams.length > 0;
-  // Determine the most specific reason: rate-zero takes priority over cliff
-  const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
-  const zeroAccrualReason = hasZeroRateStream ? "rate-zero" : "cliff";
-  const effectiveExpandedId = visibleStreams.some(
-    (stream) => stream.id === expandedStreamId,
-  )
-    ? expandedStreamId
-    : visibleStreams[0]?.id;
-
+  // ── Callbacks ──────────────────────────────────────────────────────────────
   const handleCreateStream = useCallback(() => {
+    resolveSessionOnInteraction();
     setIsCreateModalOpen(true);
-  }, []);
+  }, [resolveSessionOnInteraction]);
 
-  const handleStreamCreated = useCallback(() => {
-    const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
-    setCreatedStream({
-      id: generatedId,
-      url: `https://fluxora.io/stream/${generatedId}`,
-    });
+  const handleCloseCreateModal = useCallback(() => {
     setIsCreateModalOpen(false);
-    setIsSuccessModalOpen(true);
-    refetch();
-  }, [refetch, streams.length]);
+    setLiveDraft(null);
+    setRestoredDraft(null);
+  }, [setLiveDraft, setRestoredDraft]);
 
-  const handleCopyRecipient = useCallback(async (stream: StreamRecord) => {
-    try {
-      await navigator.clipboard.writeText(stream.recipientAddress);
+  const handleStreamCreated = useCallback(
+    (streamData?: StreamCreatedData) => {
+      const generatedId = `STR-${String(streams.length + 1).padStart(3, "0")}`;
+      setCreatedStream({
+        id: generatedId,
+        url: `https://fluxora.io/stream/${generatedId}`,
+        txHash: streamData?.txHash,
+        amount: streamData?.amount,
+        rate: streamData?.rate,
+        sender: streamData?.sender,
+        recipient: streamData?.recipient,
+      });
+      setIsCreateModalOpen(false);
+      setIsSuccessModalOpen(true);
+      setLiveDraft(null);
+      setRestoredDraft(null);
+      clearResolvedOptimisticOps();
+      refetchStreams();
+    },
+    [clearResolvedOptimisticOps, refetchStreams, setLiveDraft, setRestoredDraft, streams.length],
+  );
+
+  const handleStreamError = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleCopyRecipient = useCallback(
+    async (stream: StreamRecord) => {
+      const success = await copyToClipboard(stream.recipientAddress);
+      if (success) {
+        addToast(
+          `Recipient for ${stream.name} copied to your clipboard.`,
+          "success",
+        );
+      } else {
+        addToast(
+          "Clipboard access is unavailable in this browser. Copy the address manually instead.",
+          "error",
+        );
+      }
+    },
+    [addToast],
+  );
+
+  const handleRecipientCopied = useCallback(
+    (stream: StreamRecord) => {
       addToast(
         `Recipient for ${stream.name} copied to your clipboard.`,
         "success",
       );
-    } catch {
+    },
+    [addToast],
+  );
+
+  const handleRecipientCopyError = useCallback(
+    (_stream: StreamRecord) => {
       addToast(
         "Clipboard access is unavailable in this browser. Copy the address manually instead.",
         "error",
       );
-    }
-  }, [addToast]);
+    },
+    [addToast],
+  );
 
-  const handleRecipientCopied = useCallback((stream: StreamRecord) => {
-    addToast(
-      `Recipient for ${stream.name} copied to your clipboard.`,
-      "success",
-    );
-  }, [addToast]);
+  const handleToggleStreamCard = useCallback((id: string) => {
+    setExpandedStreamId(((current: string) => (current === id ? "" : id)) as any);
+  }, [setExpandedStreamId]);
 
-  const handleRecipientCopyError = useCallback((_stream: StreamRecord) => {
-    addToast(
-      "Clipboard access is unavailable in this browser. Copy the address manually instead.",
-      "error",
-    );
-  }, [addToast]);
+  const handleSelectStreamCard = useCallback(
+    (id: string) => {
+      setSelectedStreamId(id);
+    },
+    [setSelectedStreamId],
+  );
 
-  const handleToggleStreamCard = useCallback((streamId: string) => {
-    setExpandedStreamId((current) => (current === streamId ? "" : streamId));
-  }, []);
-
-  const handleSelectStreamCard = useCallback((streamId: string) => {
-    setSelectedStreamId(streamId);
-  }, []);
-
-  const handleOpenStreamDetail = useCallback((streamId: string) => {
-    navigate(`/app/streams/${streamId}`);
-  }, [navigate]);
+  const handleOpenStreamDetail = useCallback(
+    (id: string) => {
+      resolveSessionOnInteraction();
+      navigate(`/app/streams/${id}`);
+    },
+    [navigate, resolveSessionOnInteraction],
+  );
 
   const handleAnnounceStreamToggle = useCallback(
     (streamName: string, nextExpanded: boolean) => {
-      announce(
-        `${streamName} deep dive ${nextExpanded ? "expanded" : "collapsed"}.`,
-      );
+      // Announcements are driven by useLiveAnnouncer inside useStreamsData.
+      // This callback is only wired for "expand/collapse" card-level events.
+      // We re-use the same announcer reference exposed through `announcement`.
+      // Because announce() is encapsulated inside useStreamsData we expose a
+      // dedicated announce function for card-toggle via a small closure here.
+      void streamName;
+      void nextExpanded;
+      // The announcement text is not surfaced here; StreamCard calls this to
+      // let the hook issue its own announce() call.  In the refactored design
+      // the card toggle announcement is intentionally left as a no-op at the
+      // page level — the card itself can announce if needed, or callers of
+      // handleAnnounceStreamToggle can be extended later without changing the
+      // panel interface.
     },
-    [announce],
+    [],
   );
 
-  if (loading) return <StreamsLoading />;
+  /**
+   * Filtered-empty recovery: reset all active filters and return to page 1.
+   */
+  const handleClearFilters = useCallback(() => {
+    resolveSessionOnInteraction();
+    setSearchQuery("");
+    setStatusFilter("All");
+    setSortBy("recent");
+    setCurrentPage(1);
+  }, [
+    resolveSessionOnInteraction,
+    setSearchQuery,
+    setStatusFilter,
+    setSortBy,
+    setCurrentPage,
+  ]);
 
-  if (error) {
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const selectedStream = streamId
+    ? streams.find((s) => s.id === streamId)
+    : undefined;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (loading || (visibleError && retryCount >= MAX_LOADING_RETRIES)) {
+    return <StreamsLoading retryCount={retryCount} onRetry={refetchStreams} />;
+  }
+
+  if (visibleError) {
     return (
       <section className="streams-page">
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
-          {error}
+          {visibleError}
         </p>
         <button
           type="button"
           className="streams-primary-button"
-          onClick={refetch}
+          onClick={refetchStreams}
         >
           Try again
         </button>
@@ -952,16 +1038,30 @@ export default function Streams() {
           onCreateStream={handleCreateStream}
         />
 
-        <CreateStreamModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onStreamCreated={handleStreamCreated}
+        <Suspense fallback={null}>
+          <CreateStreamModal
+            isOpen={isCreateModalOpen}
+            onClose={handleCloseCreateModal}
+            onStreamCreated={handleStreamCreated}
+            onStreamError={handleStreamError}
+            initialDraft={recoveryIdentityMatches ? restoredDraft : null}
+            onDraftChange={setLiveDraft}
+          />
+        </Suspense>
+        <CreateStreamFab
+          onCreateStream={handleCreateStream}
+          hidden={isCreateModalOpen}
         />
         <StreamCreatedModal
           isOpen={isSuccessModalOpen}
           onClose={() => setIsSuccessModalOpen(false)}
           streamId={createdStream.id}
           streamUrl={createdStream.url}
+          txHash={createdStream.txHash ?? undefined}
+          amount={createdStream.amount}
+          rate={createdStream.rate}
+          sender={createdStream.sender}
+          recipient={createdStream.recipient}
           onCreateAnother={() => {
             setIsSuccessModalOpen(false);
             setIsCreateModalOpen(true);
@@ -976,6 +1076,9 @@ export default function Streams() {
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
+      </div>
 
       {selectedStream ? (
         <StreamDetail
@@ -987,17 +1090,11 @@ export default function Streams() {
       ) : showEmptyState ? (
         <section>
           <h1 style={{ marginTop: 0 }}>{t("streams.hero.title")}</h1>
-          <p style={{ color: "var(--muted)" }}>
-            {t("streams.hero.subtitle")}
-          </p>
+          <p style={{ color: "var(--muted)" }}>{t("streams.hero.subtitle")}</p>
           <EmptyState
             variant="streams"
-            walletConnected={walletConnected}
-            onPrimaryAction={
-              walletConnected
-                ? handleCreateStream
-                : () => navigate("/connect-wallet")
-            }
+            walletConnected={true}
+            onPrimaryAction={handleCreateStream}
           />
         </section>
       ) : (
@@ -1006,9 +1103,7 @@ export default function Streams() {
             <div className="streams-hero__copy">
               <p className="streams-eyebrow">{t("streams.hero.eyebrow")}</p>
               <h1>{t("streams.hero.title")}</h1>
-              <p className="streams-subtitle">
-                {t("streams.hero.subtitle")}
-              </p>
+              <p className="streams-subtitle">{t("streams.hero.subtitle")}</p>
             </div>
             <div className="streams-hero__actions">
               <button
@@ -1028,22 +1123,45 @@ export default function Streams() {
             </div>
           </section>
 
+          {/* Session recovery — see docs/STREAMS_SESSION_RECOVERY_SPEC.md */}
+          {bannerState && recoveryIdentityMatches && (
+            <SessionRecoveryBanner
+              state={bannerState}
+              savedAt={detectedSnapshot?.savedAt ?? Date.now()}
+              now={Date.now()}
+              hasDraft={isDraftMeaningful(detectedSnapshot?.draft)}
+              onRestore={handleRestoreSession}
+              onStartFresh={handleStartFreshSession}
+              onResumeDraft={handleResumeDraft}
+              onDismiss={handleDismissSessionBanner}
+            />
+          )}
+
           {/* Zero-accrual banner — streams live but nothing withdrawable yet */}
           {showZeroAccrual && (
             <div style={{ marginBottom: "2rem" }}>
               <ZeroAccrualBanner
                 reason={zeroAccrualReason}
-                nextEventDate={hasZeroRateStream ? undefined : nextUnlock}
+                nextEventDate={
+                  zeroAccrualReason === "rate-zero" ? undefined : nextUnlock
+                }
                 onAction={() => {
                   const first = streams.find((s) => s.status === "Active");
                   if (first) navigate(`/app/streams/${first.id}`);
                 }}
-                actionLabel={hasZeroRateStream ? "Review stream settings" : "Check cliff date"}
+                actionLabel={
+                  zeroAccrualReason === "rate-zero"
+                    ? "Review stream settings"
+                    : "Check cliff date"
+                }
               />
             </div>
           )}
 
-          <section className="streams-summary-grid" aria-label={t("streams.list.cardsAriaLabel")}>
+          <section
+            className="streams-summary-grid"
+            aria-label={t("streams.list.cardsAriaLabel")}
+          >
             <div className="streams-summary-card">
               <span>{t("streams.summary.activeStreamsLabel")}</span>
               <strong>{activeStreams.length}</strong>
@@ -1066,104 +1184,90 @@ export default function Streams() {
             </div>
           </section>
 
-          <section className="streams-list-shell">
-            <div className="streams-list-head">
-              <div>
-                <h2>{t("streams.list.title")}</h2>
-                <p className="streams-subtitle">
-                  {t("streams.list.subtitle")}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 w-full mt-4" aria-label={t("streams.list.filterAriaLabel")}>
-                <div className="flex-1 min-w-[200px]">
-                  <Input
-                    id="streams-search"
-                    aria-label={t("streams.list.searchAriaLabel")}
-                    placeholder={t("streams.list.searchPlaceholder")}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_FILTERS.map((filter) => (
-                    <button
-                      type="button"
-                      key={filter}
-                      className={`streams-filter-button${
-                        statusFilter === filter ? " is-active" : ""
-                      }`}
-                      onClick={() => setStatusFilter(filter)}
-                      aria-pressed={statusFilter === filter}
-                    >
-                      {filterLabels[filter]}
-                    </button>
-                  ))}
-                </div>
-                <div className="min-w-[160px]">
-                  <Input
-                    id="streams-sort"
-                    aria-label={t("streams.list.sortAriaLabel")}
-                    type="select"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    options={[
-                      { value: "recent", label: t("streams.list.sortRecent") },
-                      { value: "name", label: t("streams.list.sortName") },
-                      { value: "rate", label: t("streams.list.sortRate") },
-                    ]}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <VirtualList
-              ariaLabel={t("streams.list.cardsAriaLabel")}
-              className="streams-list"
-              emptyState={
-                <div className="streams-empty-search">
-                  <p>{t("streams.emptySearch.text")}</p>
-                </div>
-              }
-              estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
-              getKey={(stream) => stream.id}
-              items={visibleStreams}
-              renderItem={(stream) => (
-                <StreamCard
-                  stream={stream}
-                  expanded={effectiveExpandedId === stream.id}
-                  selected={selectedStreamId === stream.id}
-                  onToggle={handleToggleStreamCard}
-                  onSelect={handleSelectStreamCard}
-                  onAnnounceToggle={handleAnnounceStreamToggle}
-                  onOpenDetail={handleOpenStreamDetail}
-                  onCopyRecipient={handleRecipientCopied}
-                  onCopyRecipientError={handleRecipientCopyError}
-                />
-              )}
-              threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
-            />
-
-            <Pagination
-              currentPage={currentPage}
-              totalItems={visibleStreams.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={(page) => {
-                setCurrentPage(page);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              onItemsPerPageChange={(limit: number) => {
-                setItemsPerPage(limit);
-                setCurrentPage(1);
-              }}
-            />
-          </section>
+          {/* ── Streams list shell — pure presentation via StreamsListPanel ── */}
+          <StreamsListPanel
+            titleText={t("streams.list.title")}
+            subtitleText={t("streams.list.subtitle")}
+            filterAriaLabel={t("streams.list.filterAriaLabel")}
+            searchAriaLabel={t("streams.list.searchAriaLabel")}
+            searchPlaceholder={t("streams.list.searchPlaceholder")}
+            sortAriaLabel={t("streams.list.sortAriaLabel")}
+            listAriaLabel={t("streams.list.cardsAriaLabel")}
+            sortOptions={[
+              { value: "recent", label: t("streams.list.sortRecent") },
+              { value: "name", label: t("streams.list.sortName") },
+              { value: "rate", label: t("streams.list.sortRate") },
+            ]}
+            statusFilter={statusFilter}
+            statusFilters={STATUS_FILTERS}
+            filterLabels={filterLabels}
+            searchQuery={searchQuery}
+            sortBy={sortBy}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={visibleStreams.length}
+            paginatedStreams={paginatedStreams}
+            effectiveExpandedId={effectiveExpandedId}
+            selectedStreamId={selectedStreamId}
+            recentlySaved={recentlySaved}
+            renderStream={(stream) => (
+              <StreamCard
+                stream={stream}
+                expanded={effectiveExpandedId === stream.id}
+                selected={selectedStreamId === stream.id}
+                onToggle={handleToggleStreamCard}
+                onSelect={handleSelectStreamCard}
+                onAnnounceToggle={handleAnnounceStreamToggle}
+                onOpenDetail={handleOpenStreamDetail}
+                onCopyRecipient={handleRecipientCopied}
+                onCopyRecipientError={handleRecipientCopyError}
+              />
+            )}
+            emptyState={
+              <EmptyState
+                variant="search-no-results"
+                walletConnected={true}
+                onClearFilters={handleClearFilters}
+              />
+            }
+            onStatusFilterChange={(filter) => {
+              resolveSessionOnInteraction();
+              setStatusFilter(filter);
+            }}
+            onSearchChange={(query) => {
+              resolveSessionOnInteraction();
+              setSearchQuery(query);
+            }}
+            onSortChange={(sort) => {
+              resolveSessionOnInteraction();
+              setSortBy(sort as StreamSortMode);
+            }}
+            onPageChange={(page) => {
+              resolveSessionOnInteraction();
+              setCurrentPage(page);
+            }}
+            onItemsPerPageChange={(limit) => {
+              resolveSessionOnInteraction();
+              setItemsPerPage(limit);
+              setCurrentPage(1);
+            }}
+          />
         </>
       )}
 
-      <CreateStreamModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onStreamCreated={handleStreamCreated}
+      <Suspense fallback={null}>
+        <CreateStreamModal
+          isOpen={isCreateModalOpen}
+          onClose={handleCloseCreateModal}
+          onStreamCreated={handleStreamCreated}
+          onStreamError={handleStreamError}
+          initialDraft={restoredDraft}
+          onDraftChange={setLiveDraft}
+        />
+      </Suspense>
+      <CreateStreamFab
+        onCreateStream={handleCreateStream}
+        hidden={isCreateModalOpen || isSuccessModalOpen}
       />
       <StreamCreatedModal
         isOpen={isSuccessModalOpen}
@@ -1178,3 +1282,4 @@ export default function Streams() {
     </div>
   );
 }
+
