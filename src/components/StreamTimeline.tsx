@@ -1,7 +1,6 @@
 import React from "react";
 import "./StreamTimeline.css";
 import { useI18n } from "../i18n";
-import "./StreamTimeline.module.css";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { createDateTimeFormat, formatNumber } from "../lib/formatters";
 

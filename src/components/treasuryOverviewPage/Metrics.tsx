@@ -4,12 +4,14 @@ import { Metric } from "./Metric";
 import { useWidgetLayout, slugify } from "./useWidgetLayout";
 import WidgetTray from "./WidgetTray";
 import { WidgetConfig } from "./widgetLayout";
+import { DemoDataBadge } from "./DemoBanner";
 import "./Metrics.css";
 
 interface MetricsProps {
   metrics: Metric[];
   loading?: boolean;
   error?: string | null;
+  isDemoMode?: boolean;
 }
 
 // Inline useMediaQuery hook for md breakpoint detection (768px)
@@ -38,7 +40,7 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-export default function Metrics({ metrics, loading, error }: MetricsProps) {
+export default function Metrics({ metrics, loading, error, isDemoMode }: MetricsProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const {
     layout,
@@ -284,6 +286,9 @@ export default function Metrics({ metrics, loading, error }: MetricsProps) {
         className="metrics-grid-container"
         aria-label="Treasury metrics"
       >
+        <div className="flex items-center gap-3 mb-4">
+          {isDemoMode && <DemoDataBadge />}
+        </div>
         <div
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 items-stretch"
         >

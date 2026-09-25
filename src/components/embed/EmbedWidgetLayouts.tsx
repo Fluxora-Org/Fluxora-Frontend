@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import StreamTimeline from "../StreamTimeline";
 import { StreamRecord, StreamStatus } from "../../data/streamRecords";
 import { ThemeConfig } from "../../lib/embedThemeParser";
@@ -107,14 +108,127 @@ export function validateEmbedMessage(message: unknown): message is EmbedMessage 
   }
 }
 
-interface EmbedWidgetLayoutProps {
+export interface EmbedLayoutMinDimensions {
+  minWidth: number;
+  minHeight: number;
+}
+
+/**
+ * Documented minimum supported sizes per layout preset.
+ * Below these dimensions, layouts degrade deliberately to prevent
+ * unreadable text or clipped/overlapping content.
+ */
+export const EMBED_LAYOUT_MIN_DIMENSIONS: Record<
+  "card" | "banner" | "compact",
+  EmbedLayoutMinDimensions
+> = {
+  card: { minWidth: 300, minHeight: 250 },
+  banner: { minWidth: 500, minHeight: 80 },
+  compact: { minWidth: 200, minHeight: 50 },
+};
+
+export interface EmbedWidgetLayoutProps {
   stream: StreamRecord;
   currentDate: string;
   themeConfig: ThemeConfig;
+  width?: number;
+  height?: number;
+}
+
+function useMinDimensions(
+  ref: React.RefObject<HTMLDivElement | null>,
+  minWidth: number,
+  minHeight: number,
+  overrideWidth?: number,
+  overrideHeight?: number
+) {
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
+    width: overrideWidth ?? 0,
+    height: overrideHeight ?? 0,
+  });
+
+  useEffect(() => {
+    if (overrideWidth !== undefined || overrideHeight !== undefined) {
+      setDimensions({
+        width: overrideWidth ?? 0,
+        height: overrideHeight ?? 0,
+      });
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+
+    const updateSize = () => {
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || el.offsetWidth || 0;
+      const h = rect.height || el.offsetHeight || 0;
+      if (w > 0 || h > 0) {
+        setDimensions({ width: w, height: h });
+      }
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const rect = entry.contentRect;
+          const w = rect.width || entry.borderBoxSize?.[0]?.inlineSize || 0;
+          const h = rect.height || entry.borderBoxSize?.[0]?.blockSize || 0;
+          if (w > 0 || h > 0) {
+            setDimensions({ width: w, height: h });
+          }
+        }
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+  }, [ref, overrideWidth, overrideHeight]);
+
+  const isBelowMin =
+    (dimensions.width > 0 && dimensions.width < minWidth) ||
+    (dimensions.height > 0 && dimensions.height < minHeight);
+
+  return { dimensions, isBelowMin };
+}
+
+interface EmbedWidgetDegradedSizeProps {
+  layoutName: "card" | "banner" | "compact";
+  stream: StreamRecord;
+  dimensions: { width: number; height: number };
+  minDimensions: EmbedLayoutMinDimensions;
+}
+
+function EmbedWidgetDegradedSize({
+  layoutName,
+  stream,
+  dimensions,
+  minDimensions,
+}: EmbedWidgetDegradedSizeProps) {
+  return (
+    <div
+      className="embed-widget-degraded-size"
+      role="article"
+      aria-label={`Stream widget: ${stream.name} (undersized)`}
+      data-testid="embed-widget-degraded-size"
+      data-layout={layoutName}
+    >
+      <div className="embed-widget-degraded-size__header">
+        <span className="embed-widget-degraded-size__title">{stream.name}</span>
+        <StatusBadge status={stream.status} compact />
+      </div>
+      <p className="embed-widget-degraded-size__notice">
+        Widget size too small ({dimensions.width}×{dimensions.height}px). Minimum supported size for {layoutName} layout is {minDimensions.minWidth}×{minDimensions.minHeight}px.
+      </p>
+    </div>
+  );
 }
 
 /**
  * Card Layout - Designed for narrow sidebars (300px-420px)
+ * 
+ * Minimum supported size: 300px × 250px
  * 
  * Features:
  * - Stream title and status badge
@@ -125,9 +239,46 @@ interface EmbedWidgetLayoutProps {
  */
 export function EmbedWidgetLayoutCard({ 
   stream, 
-  currentDate 
+  currentDate,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.card;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-card embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="card"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
+  
+  return (
+    <div 
+      ref={containerRef}
+      className="embed-widget-card"
+      role="article"
+      aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
+    >
   
   return (
     <div 
@@ -227,6 +378,8 @@ export function EmbedWidgetLayoutCard({
 /**
  * Banner Layout - Horizontal layout optimized for 600px+ widths
  * 
+ * Minimum supported size: 500px × 80px
+ * 
  * Features:
  * - Title and status
  * - Timeline visualization
@@ -236,15 +389,45 @@ export function EmbedWidgetLayoutCard({
  */
 export function EmbedWidgetLayoutBanner({ 
   stream, 
-  currentDate 
+  currentDate,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.banner;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-banner embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="banner"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
   
   return (
     <div 
+      ref={containerRef}
       className="embed-widget-banner"
       role="article"
       aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
     >
       {/* Left section: Title and status */}
       <div className="embed-widget-banner__info">
@@ -303,6 +486,8 @@ export function EmbedWidgetLayoutBanner({
 /**
  * Compact Layout - Minimal layout optimized for 200-300px widths
  * 
+ * Minimum supported size: 200px × 50px
+ * 
  * Features:
  * - Status badge
  * - Progress percentage
@@ -310,13 +495,43 @@ export function EmbedWidgetLayoutBanner({
  * - Attribution
  */
 export function EmbedWidgetLayoutCompact({ 
-  stream 
+  stream,
+  width,
+  height,
 }: EmbedWidgetLayoutProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const minDimensions = EMBED_LAYOUT_MIN_DIMENSIONS.compact;
+  const { dimensions, isBelowMin } = useMinDimensions(
+    containerRef,
+    minDimensions.minWidth,
+    minDimensions.minHeight,
+    width,
+    height
+  );
+
+  if (isBelowMin) {
+    return (
+      <div ref={containerRef} className="embed-widget-compact embed-widget-container-wrap">
+        <EmbedWidgetDegradedSize
+          layoutName="compact"
+          stream={stream}
+          dimensions={dimensions}
+          minDimensions={minDimensions}
+        />
+      </div>
+    );
+  }
+
   return (
     <div 
+      ref={containerRef}
       className="embed-widget-compact"
       role="article"
       aria-label={`Stream widget: ${stream.name}`}
+      style={{
+        ...(width ? { width: `${width}px` } : {}),
+        ...(height ? { height: `${height}px` } : {}),
+      }}
     >
       {/* Status and progress in a single row */}
       <div className="embed-widget-compact__main">

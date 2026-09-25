@@ -36,7 +36,7 @@ describe("HeroSection and TrustSection responsive layout", () => {
       expect(heroHeading).toBeInTheDocument();
 
       const ctaButton = screen.getByRole("button", {
-        name: /launch app/i,
+        name: /connect wallet to launch/i,
       });
       expect(ctaButton).toBeInTheDocument();
       expect(ctaButton).not.toBeDisabled();

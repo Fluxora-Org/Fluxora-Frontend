@@ -1,25 +1,45 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { lazy, useState, useEffect, type ComponentType, type ReactElement } from "react";
 import Layout from "./components/Layout";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router-dom";
+import {
+  lazy,
+  type ComponentType,
+  type ReactElement,
+  useEffect,
+  useState,
+} from "react";
+import ApiVersionGuard from "./components/ApiVersionGuard";
+
+import Layout from "./components/Layout";
 import AppNavbar from "./components/navigation/AppNavbar";
+import ErrorBoundary from "./components/ErrorBoundary";
+import Layout from "./components/Layout";
+import RequireWallet from "./components/RequireWallet";
+import RequireWalletAction from "./components/RequireWalletAction";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./theme/ThemeProvider";
-import { WalletProvider } from "./components/wallet-connect/Walletcontext";
-import WalletConnectionNotice from "./components/wallet-connect/WalletConnectionNotice";
 import { ToastProvider } from "./components/toast/ToastProvider";
-import { I18nProvider } from "./i18n";
-import ErrorBoundary from "./components/ErrorBoundary";
-import RequireWallet from "./components/RequireWallet";
-import Home from "./pages/Home";
-import ConnectWallet from "./pages/ConnectWallet";
-import ErrorPage from "./pages/ErrorPage";
-import NotFound from "./pages/NotFound";
-import { VoiceProvider } from "./components/voice/VoiceContext";
 import { VoiceCommandPanel } from "./components/voice/VoiceCommandPanel";
 import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
+import { VoiceProvider } from "./components/voice/VoiceContext";
+import { WalletProvider } from "./components/wallet-connect/Walletcontext";
+import WalletConnectionNotice from "./components/wallet-connect/WalletConnectionNotice";
+import { I18nProvider } from "./i18n";
+import { configError } from "./lib/config";
+import ConnectWallet from "./pages/ConnectWallet";
+import ErrorPage from "./pages/ErrorPage";
+import Home from "./pages/Home";
+import NotFound from "./pages/NotFound";
 import { getRecipientRouteKey } from "./pages/recipientRouteKey";
-import RequireWalletAction from "./components/RequireWalletAction";
-import ApiVersionGuard from "./components/ApiVersionGuard";
+import { IS_DEV } from "./utils/env";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Streams = lazy(() => import("./pages/Streams"));
@@ -27,8 +47,6 @@ const StreamDetail = lazy(() => import("./pages/StreamDetail"));
 const Recipient = lazy(() => import("./pages/Recipient"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage"));
 const EmbedStreamWidget = lazy(() => import("./pages/EmbedStreamWidget"));
-import { IS_DEV } from "./utils/env";
-import { configError } from "./lib/config";
 
 const EmptyStateDemo = IS_DEV
   ? lazy(() => import("./pages/EmptyStateDemo"))
@@ -65,6 +83,29 @@ function lazyAppRoute(
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // A deploy that replaces hashed route chunks invalidates the asset URLs the
+  // browser may try to preload for the next navigation. If that request fails,
+  // the route would otherwise render nothing (blank page). Vite surfaces the
+  // miss as a `vite:preloadError` window event, so prompt the user to reload
+  // and fetch the new asset URLs instead of leaving them stranded.
+  useEffect(() => {
+    const handlePreloadError = (e: Event) => {
+      e.preventDefault();
+      if (
+        window.confirm(
+          "A new version of the application is available. Reload to update?",
+        )
+      ) {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener("vite:preloadError", handlePreloadError);
+    return () => {
+      window.removeEventListener("vite:preloadError", handlePreloadError);
+    };
+  }, []);
+
   if (configError) {
     return (
       <ErrorPage
@@ -79,24 +120,6 @@ export default function App() {
   const handleSidebarToggle = () => {
     setIsSidebarOpen((prev) => !prev);
   };
-
-  useEffect(() => {
-    const handlePreloadError = (e: Event) => {
-      e.preventDefault();
-      if (
-        window.confirm(
-          "A new version of the application is available. Reload to update?"
-        )
-      ) {
-        window.location.reload();
-      }
-    };
-
-    window.addEventListener("vite:preloadError", handlePreloadError);
-    return () => {
-      window.removeEventListener("vite:preloadError", handlePreloadError);
-    };
-  }, []);
 
   return (
     <ThemeProvider>
@@ -117,7 +140,14 @@ export default function App() {
 
                 <ErrorBoundary>
                   <Routes>
-                    <Route path="/" element={<Home />} />
+                    <Route
+                      path="/"
+                      element={
+                        <ErrorBoundary>
+                          <Home />
+                        </ErrorBoundary>
+                      }
+                    />
                     <Route
                       path="/dashboard"
                       element={<Navigate to="/app" replace />}
@@ -135,18 +165,6 @@ export default function App() {
                       element={<Navigate to="/" replace />}
                     />
                     <Route
-                      path="/"
-                      element={
-                        <ErrorBoundary>
-                          <Home />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route path="/dashboard" element={<Navigate to="/app" replace />} />
-                    <Route path="/streams" element={<Navigate to="/app/streams" replace />} />
-                    <Route path="/streams/:streamId" element={<LegacyStreamRedirect />} />
-                    <Route path="/landing" element={<Navigate to="/" replace />} />
-                    <Route
                       path="/app"
                       element={
                         <RequireWallet>
@@ -154,11 +172,6 @@ export default function App() {
                         </RequireWallet>
                       }
                     >
-                      <Route index element={lazyAppRoute(<Dashboard />, () => import("./pages/Dashboard"))} />
-                      <Route path="streams" element={<RequireWalletAction>{lazyAppRoute(<Streams />, () => import("./pages/Streams"))}</RequireWalletAction>} />
-                      <Route path="streams/:streamId" element={<RequireWalletAction>{lazyAppRoute(<StreamDetail />, () => import("./pages/StreamDetail"))}</RequireWalletAction>} />
-                      <Route path="recipient" element={<RequireWalletAction>{lazyAppRoute(<RecipientRoute />, () => import("./pages/Recipient"))}</RequireWalletAction>} />
-                      <Route path="treasurypage" element={lazyAppRoute(<TreasuryPage />, () => import("./pages/TreasuryPage"))} />
                       <Route
                         index
                         element={lazyAppRoute(
@@ -226,12 +239,6 @@ export default function App() {
                           instead of an empty Layout Outlet (blank page). */}
                       <Route path="*" element={<NotFound />} />
                     </Route>
-                    <Route path="/connect-wallet" element={<ConnectWallet />} />
-                    <Route
-                      path="/embed/streams/:streamId"
-                      element={<EmbedStreamWidget />}
-                    />
-                    <Route path="*" element={<NotFound />} />
                     <Route
                       path="/connect-wallet"
                       element={

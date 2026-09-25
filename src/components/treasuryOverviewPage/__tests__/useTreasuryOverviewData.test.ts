@@ -148,5 +148,39 @@ describe("useTreasuryOverviewData", () => {
       expect(result.current.loading).toBe(true);
       expect(result.current.error).toBeNull();
     });
+
+    it("marks demo data as distinguishable from live data via isDemoMode", () => {
+      vi.stubEnv("VITE_DEMO_MODE", "true");
+      vi.stubEnv("PROD", false);
+      useTreasuryMock.mockReturnValue({
+        metrics: [],
+        streams: [],
+        loading: false,
+        error: null,
+      });
+
+      const { result } = renderHook(() => useTreasuryOverviewData());
+      expect(result.current.isDemoMode).toBe(true);
+      expect(result.current.metrics).toEqual(treasuryDemoMetrics);
+      expect(result.current.streams).toEqual(treasuryDemoStreams);
+    });
+
+    it("returns fixture data with distinct structure from live data", () => {
+      vi.stubEnv("VITE_DEMO_MODE", "true");
+      vi.stubEnv("PROD", false);
+      useTreasuryMock.mockReturnValue({
+        metrics: [],
+        streams: [],
+        loading: false,
+        error: null,
+      });
+
+      const { result } = renderHook(() => useTreasuryOverviewData());
+      expect(result.current.isDemoMode).toBe(true);
+      expect(result.current.metrics.length).toBeGreaterThan(0);
+      expect(result.current.streams.length).toBeGreaterThan(0);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
   });
 });

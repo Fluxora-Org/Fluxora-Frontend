@@ -52,7 +52,7 @@ export default function TreasuryPage() {
   if (loading) {
     return (
       <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           {IS_DEV && <ColorBlindToggle />}
@@ -68,7 +68,7 @@ export default function TreasuryPage() {
   if (error) {
     return (
       <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           {IS_DEV && <ColorBlindToggle />}
@@ -83,7 +83,7 @@ export default function TreasuryPage() {
 
   return (
     <ColorBlindSimulationProvider>
-      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
         {isDemoMode && <DemoBanner state={demoState} />}
 
         {/* Design-QA: colour-blind simulation toggle — placed above page content
@@ -107,7 +107,7 @@ export default function TreasuryPage() {
           </ErrorBoundary>
         )}
         <ErrorBoundary>
-          <Metrics metrics={metrics || []} loading={loading} error={error} />
+          <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
         </ErrorBoundary>
         <ErrorBoundary>
           <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
@@ -116,7 +116,7 @@ export default function TreasuryPage() {
         </ErrorBoundary>
         <ErrorBoundary>
           <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
-            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} />
+            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
           </Suspense>
         </ErrorBoundary>
         <ErrorBoundary>
@@ -127,6 +127,7 @@ export default function TreasuryPage() {
               error={error}
               onRetry={refetch}
               walletConnected={walletConnected}
+              isDemoMode={isDemoMode}
             />
           </Suspense>
         </ErrorBoundary>

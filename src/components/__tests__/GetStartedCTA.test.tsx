@@ -37,7 +37,7 @@ describe("GetStartedCTA", () => {
       screen.getByRole("heading", { name: "Ready to start streaming?" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /launch dashboard/i }),
+      screen.getByRole("button", { name: /connect wallet to launch/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /view documentation/i }),
@@ -73,7 +73,7 @@ describe("GetStartedCTA", () => {
     render(<GetStartedCTA />);
 
     const primaryButton = screen.getByRole("button", {
-      name: /launch dashboard/i,
+      name: /connect wallet to launch/i,
     });
     const secondaryButton = screen.getByRole("button", {
       name: /view documentation/i,
@@ -104,14 +104,16 @@ describe("GetStartedCTA", () => {
     expect(secondaryButton.style.borderColor).toBe("");
   });
 
-  it("navigates to the dashboard from the primary action", async () => {
+  it("navigates to the connect-wallet entry point from the primary action when no wallet is connected", async () => {
     const user = userEvent.setup();
     render(<GetStartedCTA />);
 
-    await user.click(screen.getByRole("button", { name: /launch dashboard/i }));
+    await user.click(
+      screen.getByRole("button", { name: /connect wallet to launch/i }),
+    );
 
     expect(mockNavigate).toHaveBeenCalledOnce();
-    expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+    expect(mockNavigate).toHaveBeenCalledWith("/connect-wallet");
   });
 
   it("prompts a first-time visitor to connect their wallet and states consequence", () => {

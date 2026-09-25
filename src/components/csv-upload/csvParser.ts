@@ -10,9 +10,11 @@ import type {
   CanonicalHeader,
   ColumnMapping,
   CsvRow,
+  CsvParseError,
   ParseResult,
 } from './types';
 import { CANONICAL_HEADERS } from './types';
+import { formatCsvParseError, collectCsvParseErrors } from './csvParseErrors';
 
 export const MAX_CSV_ROWS = 500;
 
@@ -265,6 +267,7 @@ export interface PreparedCsvParse {
   effectiveMapping: Partial<ColumnMapping>;
   headersMatch: boolean;
   parseError?: string;
+  parseErrors?: CsvParseError[];
 }
 
 export function prepareCsvParse(
@@ -328,33 +331,46 @@ export function prepareCsvParse(
     };
   }
 
-  // Bound per-row complexity before any row is parsed: refuse files whose
+   // Bound per-row complexity before any row is parsed: refuse files whose
   // rows exceed the column or cell-length limits before parsing begins, so
-  // pathological input can never reach the row-parsing loops.
+  // pathological input can never reach the row-parsing loops. Every
+  // violating row is collected — not just the first — so all offending
+  // rows are reported together (#1746).
+  const boundErrors: CsvParseError[] = [];
   for (let i = 0; i < dataLines.length; i++) {
     const cells = splitCsvLine(dataLines[i]);
+    const rowNumber = i + 1;
     if (cells.length > MAX_CSV_COLUMNS) {
-      return {
-        detectedHeaders,
-        dataLines,
-        autoMapping: {},
-        effectiveMapping: {},
-        headersMatch: false,
-        parseError: `Row ${i + 1} has ${cells.length} columns. Maximum is ${MAX_CSV_COLUMNS}.`,
-      };
+      boundErrors.push({
+        row: rowNumber,
+        message: `expected at most ${MAX_CSV_COLUMNS} columns, got ${cells.length}`,
+      });
+      continue;
     }
     for (const cell of cells) {
       if (cell.length > MAX_CSV_CELL_LENGTH) {
-        return {
-          detectedHeaders,
-          dataLines,
-          autoMapping: {},
-          effectiveMapping: {},
-          headersMatch: false,
-          parseError: `Row ${i + 1} contains a value longer than ${MAX_CSV_CELL_LENGTH} characters.`,
-        };
+        boundErrors.push({
+          row: rowNumber,
+          message: `expected at most ${MAX_CSV_CELL_LENGTH} characters in a cell, got ${cell.length}`,
+        });
+        break;
       }
     }
+  }
+
+  if (boundErrors.length > 0) {
+    return {
+      detectedHeaders,
+      dataLines,
+      autoMapping: {},
+      effectiveMapping: {},
+      headersMatch: false,
+      parseError:
+        boundErrors.length === 1
+          ? formatCsvParseError(boundErrors[0])
+          : `${boundErrors.length} rows exceed size limits: ${boundErrors.map(formatCsvParseError).join('; ')}`,
+      parseErrors: boundErrors,
+    };
   }
 
   // Build auto mapping from detected headers

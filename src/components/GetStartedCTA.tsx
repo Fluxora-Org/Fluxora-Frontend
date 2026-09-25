@@ -41,6 +41,9 @@ const GetStartedCTA: React.FC = () => {
           aria-label={connected ? "Launch dashboard" : "Connect wallet to launch dashboard"}
         >
           {connected ? "Launch dashboard" : "Connect wallet"}
+          onClick={() => navigate(connected ? "/dashboard" : "/connect-wallet")}
+        >
+          {connected ? "Launch dashboard" : "Connect wallet to launch"}
           <span style={styles.arrow}>→</span>
         </button>
         <button

@@ -26,7 +26,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 1",
       recipient: "addr1",
       rate: "10/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-24", // 1 event (Level 1)
     },
     {
@@ -34,7 +34,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 2",
       recipient: "addr2",
       rate: "20/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-23", // Part of 2 events on 23rd
     },
     {
@@ -42,7 +42,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 3",
       recipient: "addr3",
       rate: "30/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-23", // Part of 2 events on 23rd (Level 2)
     },
     {
@@ -50,7 +50,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 4",
       recipient: "addr4",
       rate: "40/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -58,7 +58,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 5",
       recipient: "addr5",
       rate: "50/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -66,7 +66,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 6",
       recipient: "addr6",
       rate: "60/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -74,7 +74,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 7",
       recipient: "addr7",
       rate: "70/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22", // Part of 4 events on 22nd (Level 3)
     },
     {
@@ -82,7 +82,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 8",
       recipient: "addr8",
       rate: "80/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -90,7 +90,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 9",
       recipient: "addr9",
       rate: "90/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -98,7 +98,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 10",
       recipient: "addr10",
       rate: "100/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -106,7 +106,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 11",
       recipient: "addr11",
       rate: "110/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -114,7 +114,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 12",
       recipient: "addr12",
       rate: "120/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -122,7 +122,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 13",
       recipient: "addr13",
       rate: "130/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -130,7 +130,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 14",
       recipient: "addr14",
       rate: "140/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -138,7 +138,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 15",
       recipient: "addr15",
       rate: "150/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21", // Part of 8 events on 21st (Level 4)
     },
   ];
@@ -528,7 +528,7 @@ describe("ActivityHeatmap", () => {
           name: "No start stream",
           recipient: "addr",
           rate: "0",
-          status: "Active",
+          status: "Active", accruedAmount: 0, startDate: "2026-01-01",
           startDate: undefined,
         },
       ];
@@ -566,7 +566,7 @@ describe("ActivityHeatmap", () => {
             name: `Dense ${i}-${e}`,
             recipient: "addr",
             rate: "1",
-            status: "Active",
+            status: "Active", accruedAmount: 0, startDate: "2026-01-01",
             startDate: `2026-07-${day}`,
           });
         }
@@ -652,7 +652,7 @@ describe("ActivityHeatmap", () => {
           name: "Single",
           recipient: "a",
           rate: "1",
-          status: "Active",
+          status: "Active", accruedAmount: 0, startDate: "2026-01-01",
           startDate: "2026-07-24",
         },
       ];
