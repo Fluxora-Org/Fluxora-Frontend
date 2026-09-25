@@ -279,13 +279,6 @@ export function EmbedWidgetLayoutCard({
         ...(height ? { height: `${height}px` } : {}),
       }}
     >
-  
-  return (
-    <div 
-      className="embed-widget-card"
-      role="article"
-      aria-label={`Stream widget: ${stream.name}`}
-    >
       {/* Header with title and status */}
       <div className="embed-widget-card__header">
         <h1 className="embed-widget-card__title" id="stream-title">

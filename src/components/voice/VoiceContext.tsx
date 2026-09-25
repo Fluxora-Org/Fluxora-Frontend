@@ -23,6 +23,55 @@ import {
  * phrase is documented without maintaining a second test-only dictionary.
  */
 export const DEFAULT_COMMANDS: VoiceCommandDef[] = [
+  {
+    id: "nav-dashboard",
+    phrase: "Go to dashboard",
+    aliases: ["open dashboard", "dashboard", "home", "show dashboard"],
+    category: "Navigation",
+    description: "Navigate to the main capital streaming dashboard",
+  },
+  {
+    id: "nav-streams",
+    phrase: "Go to streams",
+    aliases: ["open streams", "streams", "view streams", "stream list"],
+    category: "Navigation",
+    description: "Navigate to active and archived treasury streams",
+  },
+  {
+    id: "nav-recipient",
+    phrase: "Go to recipient",
+    aliases: [
+      "open recipient",
+      "recipient",
+      "view recipient",
+      "recipient claims",
+    ],
+    category: "Navigation",
+    description: "Navigate to recipient claim and withdrawal view",
+  },
+  {
+    id: "action-create-stream",
+    phrase: "Create stream",
+    aliases: ["new stream", "start stream", "add stream"],
+    category: "Action",
+    description: "Open the new stream creation modal",
+  },
+  {
+    id: "action-withdraw",
+    phrase: "Withdraw",
+    aliases: ["withdraw funds", "claim funds", "withdraw capital"],
+    category: "Action",
+    description: "Initiate available capital withdrawal",
+  },
+  {
+    id: "destructive-cancel-stream",
+    phrase: "Cancel stream",
+    aliases: ["delete stream", "stop stream", "terminate stream"],
+    category: "Destructive",
+    description: "Cancel an active streaming contract (Requires confirmation)",
+    requiresConfirmation: true,
+  },
+];
 interface SpeechRecognitionResultLike {
   isFinal: boolean;
   0: { transcript: string };
@@ -428,13 +477,11 @@ const processSpokenPhrase = useCallback(
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event) => {
         if (
           event.error === "not-allowed" ||
           event.error === "permission-denied"
         ) {
-      recognition.onerror = (event) => {
-        if (event.error === "not-allowed" || event.error === "permission-denied") {
           setState("permission-denied");
           announce(
             "Microphone permission denied. Enable microphone access in browser settings.",
