@@ -212,5 +212,6 @@ function serializeFilters(filters?: StreamsFilters): string {
     filters.status ?? "",
     filters.recipient ?? "",
     filters.treasury ?? "",
+    filters.period ?? "",
   ].join("|");
 }

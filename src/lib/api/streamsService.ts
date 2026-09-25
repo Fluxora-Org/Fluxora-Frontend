@@ -21,6 +21,8 @@ interface ServiceEnv {
   useMocks: boolean;
 }
 
+import type { TreasuryPeriod } from "../../components/treasuryOverviewPage/Header";
+
 /**
  * Filters accepted by {@link getStreams}. `status` of `"All"` is treated as
  * no filter so callers can forward the same value they already render in the
@@ -30,6 +32,7 @@ export interface StreamsFilters {
   status?: StreamStatus | "All";
   recipient?: string;
   treasury?: string;
+  period?: TreasuryPeriod;
 }
 
 /**
