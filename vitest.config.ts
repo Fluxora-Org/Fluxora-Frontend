@@ -13,7 +13,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     // Playwright owns the e2e/ specs; keep them out of the vitest run.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    // .kilo/.kiro are benchmark-tooling worktree/spec artifacts, never tests.
+    exclude: [
+      ...configDefaults.exclude,
+      "e2e/**",
+      ".kilo/**",
+      ".kiro/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

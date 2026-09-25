@@ -286,7 +286,9 @@ describe("walletMachineReducer — illegal transitions (guard)", () => {
   });
 
   it("unknown event type returns context unchanged", () => {
-    // @ts-expect-error — testing runtime safety
+    // @ts-expect-error — runtime-safety guardrail: the reducer must ignore
+    // events outside the WalletMachineEvent union. Remove this suppression only
+    // when "UNKNOWN_EVENT" is a legitimate member of that union.
     const next = reduce(idle, { type: "UNKNOWN_EVENT" });
     expect(next).toStrictEqual(idle);
   });

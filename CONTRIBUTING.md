@@ -278,6 +278,7 @@ Several design and accessibility specs live at the repo root and in `docs/`. Ref
 | File | Topic |
 |---|---|
 | [docs/COMPONENT_GUIDELINES.md](docs/COMPONENT_GUIDELINES.md) | **Component conventions — where components belong, testing, accessibility, and i18n obligations** |
+| [docs/STATE_MANAGEMENT.md](docs/STATE_MANAGEMENT.md) | **State management approach and where each kind of state lives** |
 | [DESIGN_SPEC.md](DESIGN_SPEC.md) | Visual design system |
 | [DESIGN_TOKENS_QUICK_REFERENCE.md](DESIGN_TOKENS_QUICK_REFERENCE.md) | Token reference |
 | [DARK_THEME_SPEC.md](DARK_THEME_SPEC.md) | Dark mode behaviour |

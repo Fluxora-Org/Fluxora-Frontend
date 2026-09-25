@@ -55,7 +55,16 @@ describe("RouteErrorBoundary", () => {
 
   it("re-attempts the failed dynamic import when Try Again is clicked without reloading the document", async () => {
     const user = userEvent.setup();
-    const reloadSpy = vi.spyOn(window.location, "reload").mockImplementation(() => {});
+    // jsdom 26 exposes `window.location.reload` as a non-configurable
+    // property, so vitest cannot spy on it directly (same workaround as
+    // src/App.test.tsx): swap in a stub location whose reload we can observe,
+    // then restore the original afterwards.
+    const reloadSpy = vi.fn();
+    const originalLocation = window.location;
+    // @ts-expect-error jsdom's location is replaceable on the window object
+    delete window.location;
+    window.location = { ...originalLocation, reload: reloadSpy };
+
     let calls = 0;
     const loader = vi.fn(async () => {
       calls += 1;
@@ -85,7 +94,7 @@ describe("RouteErrorBoundary", () => {
 
     window.removeEventListener("error", preventExpectedError);
     consoleErrorSpy.mockRestore();
-    reloadSpy.mockRestore();
+    window.location = originalLocation;
   });
 
   it("preserves application state outside the failed route across recovery", async () => {

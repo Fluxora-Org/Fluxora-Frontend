@@ -527,7 +527,7 @@ export function useStreamsData(): StreamsDataResult {
   }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
 
   // ── Abort-error guard ──────────────────────────────────────────────────────
-  const isAbortError = error instanceof Error && error.name === "AbortError";
+  const isAbortError = Boolean(error && (error as any) instanceof Error && (error as any).name === "AbortError");
 
   // ── Loading/error boundary helpers that Streams.tsx uses ──────────────────
   // Expose retryCount so Streams.tsx can check >= MAX_LOADING_RETRIES.

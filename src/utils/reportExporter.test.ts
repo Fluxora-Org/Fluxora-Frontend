@@ -17,7 +17,7 @@ function makeStream(overrides: Partial<Stream>): Stream {
     name: "Test Stream",
     recipient: "GRECIPIENT",
     rate: "10 USDC",
-    status: "Active",
+    status: "Active", accruedAmount: 0, startDate: "2026-01-01",
     ...overrides,
   };
 }
@@ -63,9 +63,9 @@ describe("filterStreamsByDateRange", () => {
 
 describe("groupStreams", () => {
   const streams: Stream[] = [
-    makeStream({ id: "1", recipient: "A", status: "Active" }),
-    makeStream({ id: "2", recipient: "B", status: "Paused" }),
-    makeStream({ id: "3", recipient: "A", status: "Completed" }),
+    makeStream({ id: "1", recipient: "A", status: "Active", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "2", recipient: "B", status: "Paused", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "3", recipient: "A", status: "Completed", accruedAmount: 0, startDate: "2026-01-01" }),
   ];
 
   it("returns a single ungrouped bucket for None", () => {
@@ -88,8 +88,8 @@ describe("groupStreams", () => {
 
 describe("buildReportCSV", () => {
   const streams: Stream[] = [
-    makeStream({ id: "1", name: "Stream One", recipient: "A", status: "Active" }),
-    makeStream({ id: "2", name: "Stream Two", recipient: "B", status: "Paused" }),
+    makeStream({ id: "1", name: "Stream One", recipient: "A", status: "Active", accruedAmount: 0, startDate: "2026-01-01" }),
+    makeStream({ id: "2", name: "Stream Two", recipient: "B", status: "Paused", accruedAmount: 0, startDate: "2026-01-01" }),
   ];
 
   it("includes a header row and one row per stream", () => {
@@ -145,7 +145,7 @@ describe("downloadReportCSV", () => {
     vi.spyOn(document.body, "removeChild").mockImplementation((node) => node);
 
     downloadReportCSV(
-      [makeStream({ name: "Alpha", status: "Active" })],
+      [makeStream({ name: "Alpha", status: "Active", accruedAmount: 0, startDate: "2026-01-01" })],
       ["name", "status"],
       "None",
       "Test-Report",
@@ -183,7 +183,7 @@ describe("printReportAsPDF", () => {
     vi.spyOn(window, "open").mockReturnValue(printWindow as unknown as Window);
 
     printReportAsPDF(
-      [makeStream({ name: "Alpha", status: "Active" })],
+      [makeStream({ name: "Alpha", status: "Active", accruedAmount: 0, startDate: "2026-01-01" })],
       ["name", "status"],
       "None",
     );

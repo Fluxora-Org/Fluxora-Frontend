@@ -88,9 +88,9 @@ describe("StreamsTable", () => {
   it("preserves relative order for equal-key rows (sort stability)", async () => {
     const user = userEvent.setup();
     const testStreams: Stream[] = [
-      { id: "S1", name: "Stream Beta", recipient: "0x1111", rate: "10", accruedAmount: 100, status: "Active" },
-      { id: "S2", name: "Stream Alpha", recipient: "0x2222", rate: "20", accruedAmount: 100, status: "Active" },
-      { id: "S3", name: "Stream Gamma", recipient: "0x3333", rate: "30", accruedAmount: 100, status: "Active" },
+      { id: "S1", name: "Stream Beta", recipient: "0x1111", rate: "10", accruedAmount: 100, status: "Active", accruedAmount: 0, startDate: "2026-01-01" },
+      { id: "S2", name: "Stream Alpha", recipient: "0x2222", rate: "20", accruedAmount: 100, status: "Active", accruedAmount: 0, startDate: "2026-01-01" },
+      { id: "S3", name: "Stream Gamma", recipient: "0x3333", rate: "30", accruedAmount: 100, status: "Active", accruedAmount: 0, startDate: "2026-01-01" },
     ];
 
     renderTable(<StreamsTable streams={testStreams} />);
@@ -117,8 +117,8 @@ describe("StreamsTable", () => {
   it("supports sorting by rate and status columns", async () => {
     const user = userEvent.setup();
     const testStreams: Stream[] = [
-      { id: "S1", name: "Stream A", recipient: "0x1", rate: "10 USDC", status: "Paused" },
-      { id: "S2", name: "Stream B", recipient: "0x2", rate: "5 USDC", status: "Active" },
+      { id: "S1", name: "Stream A", recipient: "0x1", rate: "10 USDC", status: "Paused", accruedAmount: 0, startDate: "2026-01-01" },
+      { id: "S2", name: "Stream B", recipient: "0x2", rate: "5 USDC", status: "Active", accruedAmount: 0, startDate: "2026-01-01" },
     ];
 
     renderTable(<StreamsTable streams={testStreams} />);

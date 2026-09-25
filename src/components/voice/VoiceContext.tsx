@@ -72,6 +72,28 @@ export const DEFAULT_COMMANDS: VoiceCommandDef[] = [
     requiresConfirmation: true,
   },
 ];
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: { results: SpeechRecognitionResultLike[] }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type WindowWithSpeechRecognition = typeof window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
 
 /** Only explicitly delimited details are accepted; a stray substring cannot trigger cancellation. */
 function parseConfirmationIntent(
@@ -140,14 +162,14 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<VoiceCommandDef | null>(null);
   const [panelOpen, setPanelOpen] = useState<boolean>(false);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   // Feature detection
   useEffect(() => {
     if (typeof window === "undefined") return;
     const SpeechRecognitionClass =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      (window as WindowWithSpeechRecognition).SpeechRecognition ??
+      (window as WindowWithSpeechRecognition).webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       setIsSupported(false);
       setState("unsupported-browser");
@@ -254,6 +276,67 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     [navigate, announce]
   );
 
+  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
+const processSpokenPhrase = useCallback(
+  (phrase: string): boolean => {
+    setTranscript(phrase);
+    setState("processing");
+
+    // Handle active confirmation step
+    if (pendingDestructiveCommand) {
+      const clean = phrase.trim().toLowerCase();
+
+      if (clean === "confirm" || clean === "yes") {
+        confirmDestructiveAction();
+        return true;
+      }
+
+      if (clean === "cancel" || clean === "no" || clean === "abort") {
+        cancelDestructiveAction();
+        return true;
+      }
+
+      // Do not process other commands while confirmation is pending
+      setState("confirming-destructive");
+      return false;
+    }
+
+    const matched = matchCommand(phrase);
+
+    if (matched === "ambiguous") {
+      setState("command-ambiguous");
+      announce(
+        `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+      );
+      setTimeout(() => {
+        setState((prev) =>
+          prev === "command-ambiguous" ? "listening" : prev,
+        );
+      }, 3000);
+      return false;
+    }
+
+    if (matched) {
+      executeCommand(matched, phrase);
+      return true;
+    }
+
+    setState("command-unrecognized");
+    announce(
+      `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+    );
+
+    setTimeout(() => {
+      setState((prev) =>
+        prev === "command-unrecognized" ? "listening" : prev
+      );
+    }, 3000);
+
+    return false;
+  },
+  [matchCommand, executeCommand, pendingDestructiveCommand, announce]
+);
+
   // Destructive confirmations
   const confirmDestructiveAction = useCallback(() => {
     if (!pendingDestructiveCommand) return;
@@ -353,8 +436,8 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const SpeechRecognitionClass =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      (window as WindowWithSpeechRecognition).SpeechRecognition ??
+      (window as WindowWithSpeechRecognition).webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
       setIsSupported(false);
@@ -381,7 +464,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
         announce("Voice navigation active. Listening for commands.");
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const lastIndex = event.results.length - 1;
         const result = event.results[lastIndex];
         const spokenText = result[0].transcript;
@@ -394,7 +477,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event) => {
         if (
           event.error === "not-allowed" ||
           event.error === "permission-denied"

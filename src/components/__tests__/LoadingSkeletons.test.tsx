@@ -121,7 +121,7 @@ describe("StreamsLoading (treasury variant)", () => {
       recipient: "GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789WXYZ",
       rate: "2,500 USDC/mo",
       accruedAmount: 1234.56,
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
     };
 
     const { container: loadingContainer } = render(<StreamsLoading variant="treasury" />);

@@ -54,13 +54,11 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
   className,
   type = 'text',
   inputMode,
-  'aria-describedby': describedBy,
   'aria-describedby': callerDescribedBy,
   ...inputProps
 }) => {
   const unitId = `${id}-unit`;
   const hintId = keyboardHint ? `${id}-keyboard-hint` : undefined;
-  const descriptionIds = [describedBy, unitId, hintId].filter(Boolean).join(' ');
 
   // Amount fields must keep the exact decimal string the user entered. A native
   // `type="number"` input coerces its value through a floating-point `number`,
@@ -84,7 +82,6 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
         type={resolvedType}
         inputMode={resolvedInputMode}
         className={`input-with-unit__field ${className || ''}`.trim()}
-        aria-describedby={descriptionIds}
         aria-describedby={describedBy}
         aria-invalid={hasError || undefined}
       />

@@ -113,13 +113,64 @@ const getIntensityLevel = (count: number): number => {
   return 4;
 };
 
-const INTENSITY_LABELS: Record<number, string> = {
-  0: "no activity",
-  1: "low",
-  2: "medium",
-  3: "high",
-  4: "highest",
-};
+/**
+ * Canonical intensity scale — the single source of truth for both the legend
+ * copy and the sr-only data-table labels.
+ *
+ * Each level carries:
+ *  - `countRange`: the stream-event range the level covers, rendered as visible
+ *    text in the legend so the scale is stated in numbers, not colour.
+ *  - `description`: the short label mirrored into the sr-only data table.
+ *
+ * The **number of pips** drawn inside a cell / legend swatch equals `level`.
+ * That is the colour-independent channel: 0–4 unique markers keep intensity
+ * readable in greyscale and under every colour-blind simulation (WCAG 1.4.1).
+ */
+export const HEATMAP_INTENSITY_SCALE = [
+  { level: 0, countRange: "0", description: "no activity" },
+  { level: 1, countRange: "1", description: "low" },
+  { level: 2, countRange: "2–3", description: "medium" },
+  { level: 3, countRange: "4–6", description: "high" },
+  { level: 4, countRange: "7+", description: "highest" },
+] as const;
+
+export type HeatmapIntensityLevel = (typeof HEATMAP_INTENSITY_SCALE)[number]["level"];
+
+const INTENSITY_LABELS: Record<number, string> = Object.fromEntries(
+  HEATMAP_INTENSITY_SCALE.map(({ level, description }) => [level, description]),
+);
+
+/**
+ * Colour-independent marker count for an intensity level. Clamped to the
+ * 0–4 range so an out-of-range value can never break the pip rendering.
+ */
+export function getIntensityPipCount(level: number): number {
+  if (!Number.isFinite(level)) return 0;
+  return Math.min(4, Math.max(0, Math.trunc(level)));
+}
+
+/**
+ * Renders the colour-independent density marker (`level` pips) used inside
+ * every cell and legend swatch.
+ *
+ * Decorative only: the numeric value is already exposed textually through the
+ * cell's `aria-label` and the always-present sr-only data table, so the marker
+ * is hidden from assistive technology to keep the accessible name intact.
+ */
+function IntensityPips({ level }: { level: number }) {
+  const count = getIntensityPipCount(level);
+  return (
+    <span
+      className="heatmap-cell-pips"
+      data-pip-count={count}
+      aria-hidden="true"
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <span key={i} className="heatmap-cell-pip" />
+      ))}
+    </span>
+  );
+}
 
 const getCellLabel = (dateStr: string, count: number): string => {
   if (count === 0) {
@@ -198,12 +249,15 @@ export const HeatmapCell = React.memo(function HeatmapCell({
     <button
       type="button"
       className={`heatmap-cell heatmap-cell--level-${level}`}
+      data-intensity-level={level}
       aria-label={label}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onFocus={onFocus}
       onBlur={onBlur}
-    />
+    >
+      <IntensityPips level={level} />
+    </button>
   );
 });
 
@@ -250,16 +304,19 @@ const Legend: React.FC<LegendProps> = ({ skeleton = false }) => (
     aria-label={
       skeleton
         ? "Activity intensity legend (loading)"
-        : "Activity intensity legend, from less to more: 5 levels of stream-event count"
+        : "Activity intensity legend, from less to more: 0 events, 1 event, 2 to 3 events, 4 to 6 events, 7 or more events. Each square is marked with 0 to 4 dots so intensity is readable without colour discrimination."
     }
   >
     <span className="legend-label">Less</span>
     <div className="legend-cells" aria-hidden="true">
-      <div className="legend-cell heatmap-cell--level-0" />
-      <div className="legend-cell heatmap-cell--level-1" />
-      <div className="legend-cell heatmap-cell--level-2" />
-      <div className="legend-cell heatmap-cell--level-3" />
-      <div className="legend-cell heatmap-cell--level-4" />
+      {HEATMAP_INTENSITY_SCALE.map(({ level, countRange }) => (
+        <div key={level} className="legend-item">
+          <div className={`legend-cell heatmap-cell--level-${level}`}>
+            <IntensityPips level={level} />
+          </div>
+          <span className="legend-range">{countRange}</span>
+        </div>
+      ))}
     </div>
     <span className="legend-label">More</span>
   </div>
@@ -516,3 +573,4 @@ export default function ActivityHeatmap({ streams, loading, error, onRetry }: Ac
     </div>
   );
 }
+

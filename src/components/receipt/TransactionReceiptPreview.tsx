@@ -163,7 +163,7 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
             <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-[var(--color-accent-primary)] truncate">
               <span className="truncate">{data.txHash}</span>
               <a
-                href={buildReceiptExplorerUrl(data.txHash, data.network)}
+                href={buildReceiptExplorerUrl(data.txHash || "", data.network as string)}
                 {...SAFE_EXTERNAL_LINK_ATTRIBUTES}
                 className="inline-flex items-center gap-1 hover:underline flex-shrink-0 text-xs font-sans"
               >

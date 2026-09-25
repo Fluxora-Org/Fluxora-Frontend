@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import StreamRow from "./StreamRow";
 import { Stream } from "./Stream";
+import { DemoDataBadge } from "./DemoBanner";
 import "./StreamsTable.css";
 
 export type SortColumn = "stream" | "recipient" | "rate" | "status";
@@ -13,9 +14,10 @@ interface Props {
    * Receives the two selected stream IDs in left-pane / right-pane order.
    */
   onCompare?: (leftId: string, rightId: string) => void;
+  isDemoMode?: boolean;
 }
 
-export default function StreamsTable({ streams, onCompare }: Props) {
+export default function StreamsTable({ streams, onCompare, isDemoMode }: Props) {
   /** IDs selected for comparison. Capped at 2. */
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -242,6 +244,9 @@ export default function StreamsTable({ streams, onCompare }: Props) {
       )}
 
       <div className="streams-table-scroll-shell">
+      <div className="flex items-center gap-3 mb-2">
+        {isDemoMode && <DemoDataBadge />}
+      </div>
       <div
         ref={scrollContainerRef}
         onScroll={() => setShowTrailingFade(

@@ -166,11 +166,13 @@ describe("App route code splitting", () => {
   it("prompts for reload on vite:preloadError and reloads when accepted", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const reloadSpy = vi.fn();
-    
+
     const originalLocation = window.location;
-    // @ts-ignore
-    delete window.location;
-    window.location = { ...originalLocation, reload: reloadSpy };
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: { ...originalLocation, reload: reloadSpy },
+    });
 
     render(<App />);
 
@@ -181,8 +183,12 @@ describe("App route code splitting", () => {
       expect.stringMatching(/reload/i)
     );
     expect(reloadSpy).toHaveBeenCalled();
-    
-    window.location = originalLocation;
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: originalLocation,
+    });
   });
 });
 

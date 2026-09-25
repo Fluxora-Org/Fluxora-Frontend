@@ -37,10 +37,10 @@ const GetStartedCTA: React.FC = () => {
           }}
           onMouseEnter={() => setIsPrimaryHovered(true)}
           onMouseLeave={() => setIsPrimaryHovered(false)}
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(connected ? "/dashboard" : "/connect-wallet")}
           aria-label={connected ? "Launch dashboard" : "Connect wallet to launch dashboard"}
         >
-          {connected ? "Launch dashboard" : "Connect wallet"}
+          {connected ? "Launch dashboard" : "Connect wallet to launch"}
           <span style={styles.arrow}>→</span>
         </button>
         <button

@@ -330,8 +330,8 @@ export default function CreateStreamModal({
   const optimisticOpIdRef = useRef<string | null>(null);
 
   const txSubmission = useTransactionSubmission({
-    timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
-    cancelOnUnmount: true,
+    // timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
+    // cancelOnUnmount: true,
     submit: async (idempotencyKey) => {
       const sender = wallet.address!;
       const parsedAmount = parseStreamNumber(depositAmount) || 0;

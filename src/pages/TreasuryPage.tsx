@@ -1,6 +1,6 @@
 import { useState } from "react";
 import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
-import Header from "../components/treasuryOverviewPage/Header";
+import Header, { type TreasuryPeriod } from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import { lazy, Suspense } from "react";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -25,6 +25,8 @@ import { IS_DEV } from "../utils/env";
  * - `isDemoMode`: boolean indicating demo mode
  * - `loading`: boolean indicating loading state
  * - `error`: string | null error message
+ * - `resolvedPeriod`: period corresponding to the resolved metrics
+ * - `boundaries`: explicit date boundaries for the resolved period
  *
  * When both `metrics` and `streams` are missing while not loading or erroring,
  * a defensive empty-state fallback is shown.
@@ -38,8 +40,9 @@ import { IS_DEV } from "../utils/env";
  * deuteranopia, and tritanopia simulations.
  */
 export default function TreasuryPage() {
-  const { metrics, streams, isDemoMode, loading, error, refetch } =
-    useTreasuryOverviewData();
+  const [selectedPeriod, setSelectedPeriod] = useState<TreasuryPeriod>("30d");
+  const { metrics, streams, isDemoMode, loading, error, refetch, resolvedPeriod, boundaries } =
+    useTreasuryOverviewData(selectedPeriod);
   const { connected: walletConnected } = useWallet();
   const [showReportBuilder, setShowReportBuilder] = useState(false);
 
@@ -52,11 +55,17 @@ export default function TreasuryPage() {
   if (loading) {
     return (
       <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           {IS_DEV && <ColorBlindToggle />}
-          <Header />
+          <Header
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            loading={true}
+            resolvedPeriod={resolvedPeriod}
+            boundaries={boundaries}
+          />
           <div role="status" className="text-sm text-gray-500">
             Loading treasury overview...
           </div>
@@ -68,11 +77,17 @@ export default function TreasuryPage() {
   if (error) {
     return (
       <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
           {isDemoMode && <DemoBanner state={demoState} />}
           {/* Design-QA: colour-blind simulation toggle */}
           {IS_DEV && <ColorBlindToggle />}
-          <Header />
+          <Header
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            loading={false}
+            resolvedPeriod={resolvedPeriod}
+            boundaries={boundaries}
+          />
           <div role="alert" className="text-sm text-red-600">
             {error}
           </div>
@@ -83,7 +98,7 @@ export default function TreasuryPage() {
 
   return (
     <ColorBlindSimulationProvider>
-      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
         {isDemoMode && <DemoBanner state={demoState} />}
 
         {/* Design-QA: colour-blind simulation toggle — placed above page content
@@ -93,6 +108,11 @@ export default function TreasuryPage() {
         {IS_DEV && <ColorBlindToggle />}
 
         <Header
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          loading={loading}
+          resolvedPeriod={resolvedPeriod}
+          boundaries={boundaries}
           onExportClick={() => setShowReportBuilder(true)}
           onRefresh={refetch}
         />
@@ -107,7 +127,7 @@ export default function TreasuryPage() {
           </ErrorBoundary>
         )}
         <ErrorBoundary>
-          <Metrics metrics={metrics || []} loading={loading} error={error} />
+          <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
         </ErrorBoundary>
         <ErrorBoundary>
           <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
@@ -116,7 +136,7 @@ export default function TreasuryPage() {
         </ErrorBoundary>
         <ErrorBoundary>
           <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
-            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} />
+            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
           </Suspense>
         </ErrorBoundary>
         <ErrorBoundary>
@@ -127,6 +147,7 @@ export default function TreasuryPage() {
               error={error}
               onRetry={refetch}
               walletConnected={walletConnected}
+              isDemoMode={isDemoMode}
             />
           </Suspense>
         </ErrorBoundary>

@@ -13,3 +13,6 @@ playwright-report/
 test-results/
 /blob-report/
 /playwright/.cache/
+
+# Local pull-request draft; intentionally excluded from commits.
+/pr.txt

@@ -62,7 +62,7 @@ function normalizeOrigin(value: string): string | null {
  * means "no framing allowed": framed embeds fail closed and must degrade.
  */
 export function getConfiguredEmbedOrigins(
-  env: FramingEnv = import.meta.env
+  env: FramingEnv = import.meta.env as any
 ): Set<string> {
   const origins = new Set<string>();
   const raw = env.VITE_EMBED_ALLOWED_ORIGINS;

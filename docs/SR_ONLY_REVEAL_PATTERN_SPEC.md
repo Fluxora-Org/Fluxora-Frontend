@@ -46,13 +46,22 @@ delay. The reveal chip addresses this via CSS progressive enhancement.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  GABCD...WXYZ   GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234  📋     │
+│ GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234  [copy]                │
 └──────────────────────────────────────────────────────────────────┘
-    ↑ truncated chip    ↑ reveal chip slides in (opacity 1, translateX 0)
+ ↑ reveal chip floats OVER the truncated chip (opacity 1, translateX 0)
+ ↑ wrapper box, truncated chip and every surrounding row: unchanged
 ```
 
-- Triggered by `:hover` or `:focus-within` on `.truncateReveal`.
-- The reveal chip (`aria-hidden="true"`) slides in from the left (`translateX(-4px) → 0`).
+- Triggered by `:hover`, `:focus-within` or `data-revealed="true"` on
+  `.truncateReveal`.
+- The reveal chip (`aria-hidden="true"`) slides in from the left
+  (`translateX(-4px) → 0`).
+- **The chip is an absolutely positioned overlay** anchored to the wrapper
+  box. It is out of document flow, so disclosing it cannot move any
+  neighbouring element vertically or horizontally — in a dense table row or
+  in a standalone block container alike (Issue #1677).
+- The wrapper (the hover/focus trigger zone) keeps its exact bounding box,
+  so the pointer stays on the trigger after disclosure completes.
 - The sr-only span is unaffected — it remains in the DOM and AT tree.
 - There is no tooltip delay. No ARIA role change.
 
@@ -67,7 +76,7 @@ read the full value.
 ## 3. Markup pattern
 
 ```html
-<span class="truncateReveal">
+<span class="truncateReveal" data-revealed="false">
   <!-- ① Truncated visual — provided by the consumer component -->
   <code class="…">GABCD…WXYZ</code>
 
@@ -76,7 +85,7 @@ read the full value.
     GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234
   </span>
 
-  <!-- ③ Visual reveal chip — aria-hidden, progressive enhancement only -->
+  <!-- ③ Visual reveal chip — aria-hidden, absolutely positioned overlay -->
   <span class="truncateReveal__chip truncateReveal__chip--mono" aria-hidden="true">
     GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234
   </span>
@@ -88,6 +97,10 @@ read the full value.
 - `②` MUST use `.srOnly` (from `accessibility.css`) for reliable clip behaviour.
 - `①` is owned by the consumer; TruncatedReveal does not prescribe its markup.
 - The wrapper MUST NOT have an ARIA role — it inherits from its children.
+- `data-revealed` mirrors the component's reveal state (`"false"` → `"true"`
+  on pointer enter / focus). Toggling it only flips an attribute; it MUST
+  never mount, unmount or reorder nodes, so the surrounding layout cannot
+  move (Issue #1677).
 
 ---
 
@@ -104,6 +117,7 @@ they override correctly in both light and dark themes.
 | `--reveal-chip-radius` | `var(--radius-sm)` → `4px` | same | Border radius |
 | `--reveal-chip-transition` | `var(--transition-fast)` → `150ms ease-in-out` | same | Animation timing |
 | `--reveal-chip-translate` | `-4px` | same | Slide start offset |
+| `--reveal-chip-z-index` | `1` | same | Overlay stacking (above in-flow siblings) |
 
 ### Contrast ratios (WCAG 1.4.3, min 4.5:1 for normal text)
 
@@ -123,10 +137,18 @@ Defined in `src/styles/accessibility.css`.
 ```
 .truncateReveal            — wrapper, position:relative, display:inline-flex
 .truncateReveal__srValue   — identity hook (inherits .srOnly rules)
-.truncateReveal__chip      — reveal chip, opacity 0 by default
+.truncateReveal__chip      — out-of-flow overlay, position:absolute,
+                             inset-block:0 / inset-inline-start:0,
+                             width:max-content, opacity 0 by default
 .truncateReveal:hover .truncateReveal__chip    — reveals chip on mouse hover
 .truncateReveal:focus-within .truncateReveal__chip — reveals on keyboard focus
+.truncateReveal[data-revealed="true"] .truncateReveal__chip
+                           — reveals chip from the component's own state
 ```
+
+Because `.truncateReveal__chip` is absolutely positioned, none of these
+selectors can alter the geometry of the wrapper or of anything around it:
+the only animated properties are `opacity` and `transform`.
 
 ### Motion and contrast overrides
 
@@ -259,20 +281,30 @@ narrow layouts:
  ──────────────────────────────
  ┌──────────────┐
  │ GABCD…WXYZ   │   ← .truncateReveal__chip  opacity:0, translateX(-4px)
- └──────────────┘
+ └──────────────┘     (already in the DOM, absolutely positioned, invisible)
  [GABCDEFG...hidden sr-only]  ← .truncateReveal__srValue  always in DOM
 
- Hover / focus-within state
+ Hover / focus-within / data-revealed state
  ──────────────────────────────────────────────────────────────
- ┌──────────────┐  ┌──────────────────────────────────────┐
- │ GABCD…WXYZ   │  │ GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789  │  ← chip opacity:1
- └──────────────┘  └──────────────────────────────────────┘
-  4px margin-inline-start ──┘      border-radius: 4px (--radius-sm)
-                                   bg: --surface-raised
-                                   border: 1px solid --color-border-default
-                                   color: --color-text-primary
-                                   padding: 1px 6px
-                                   font-family: monospace
+ ┌──────────────────────────────────────────────┐
+ │ GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789         │  ← chip opacity:1
+ └──────────────────────────────────────────────┘
+  ▲ overlays the truncated chip, anchored to the same wrapper box
+  border-radius: 4px (--radius-sm)
+  bg: --surface-raised
+  border: 1px solid --color-border-default
+  color: --color-text-primary
+  padding: 1px 6px
+  font-family: monospace
+  position: absolute; inset-block: 0; inset-inline-start: 0;
+  width: max-content; z-index: var(--reveal-chip-z-index)
+  pointer-events: none  ← the trigger zone below keeps the cursor
+
+ Layout footprint (Issue #1677)
+ ──────────────────────────────────────────────────────────────
+ before reveal == after reveal for every surrounding node:
+   wrapper box, truncated chip, copy control, sibling rows and any
+   block below the component keep identical bounding client rects.
 ```
 
 ---
@@ -284,6 +316,12 @@ narrow layouts:
 - [ ] reveal chip is not in accessibility tree (query by role returns null)
 - [ ] hover triggers chip visibility (`opacity` style change)
 - [ ] focus-within triggers same chip visibility
+- [ ] reveal chip is `position: absolute` (out of document flow)
+- [ ] revealing does not change the bounding client rect of any surrounding
+      node, in a dense row list and in a standalone block container
+      (Issue #1677)
+- [ ] the trigger zone keeps its exact box after disclosure, so the pointer
+      stays anchored on it
 - [ ] axe / automated accessibility scan: zero violations
 - [ ] contrast passes 4.5:1 in light and dark themes
 - [ ] prefers-reduced-motion: no `translateX` animation fires
