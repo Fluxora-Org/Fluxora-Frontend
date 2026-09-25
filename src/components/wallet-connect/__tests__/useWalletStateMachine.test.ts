@@ -1,12 +1,17 @@
 /**
- * useWalletStateMachine — focused regression tests
+ * useWalletStateMachine — focused regression and exhaustive transition tests
  *
  * Test strategy:
- *  1. Pure reducer unit tests: cover every state × event combination,
- *     including guards, illegal transitions, and all error paths.
- *  2. Hook integration tests: mount the hook inside a minimal component
- *     to assert React-level behaviour (guard prevents double-dispatch,
- *     setRequestInFlight updates the flag, send is stable).
+ *  1. Pure reducer unit tests: cover every single legal transition (all 49 edges),
+ *     guards, and context mutations.
+ *  2. Assertion and legality helper tests: assertTransition throws IllegalTransitionError
+ *     on disallowed transitions; isLegalTransition matches LEGAL_TRANSITIONS.
+ *  3. Exhaustive matrix tests: test all 14 states × all event combinations to ensure
+ *     illegal transitions are rejected (reducer returns unchanged context).
+ *  4. Validation sequences: drive every transition in sequence and assert no illegal
+ *     state is reachable at each step.
+ *  5. Hook integration tests: mount the hook to assert React-level behaviour (in-flight
+ *     ref guard, setRequestInFlight, stable send callback).
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,8 +19,15 @@ import { renderHook, act } from "@testing-library/react";
 import {
   walletMachineReducer,
   useWalletStateMachine,
+  isLegalTransition,
+  assertTransition,
+  IllegalTransitionError,
+  WALLET_STATES,
+  LEGAL_TRANSITIONS,
+  INITIAL_WALLET_CONTEXT,
   type WalletMachineContext,
   type WalletMachineEvent,
+  type WalletMachineState,
 } from "../useWalletStateMachine";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -30,7 +42,7 @@ function reduce(
   return walletMachineReducer(ctx, event);
 }
 
-// ─── 1. Pure reducer tests ───────────────────────────────────────────────────
+// ─── 1. Pure reducer tests: Happy Path ──────────────────────────────────────
 
 describe("walletMachineReducer — happy path", () => {
   it("idle + SELECT_FREIGHTER → connecting", () => {
@@ -72,6 +84,8 @@ describe("walletMachineReducer — happy path", () => {
   });
 });
 
+// ─── 2. Error transitions ───────────────────────────────────────────────────
+
 describe("walletMachineReducer — error transitions", () => {
   const freighterErrors = [
     "not_installed",
@@ -84,7 +98,6 @@ describe("walletMachineReducer — error transitions", () => {
     it(`connecting + ERROR(${err}) → ${err}`, () => {
       const next = reduce(connecting, { type: "ERROR", error: err });
       expect(next.state).toBe(err);
-      // Freighter errors do not set a hardwareRetryTarget
       expect(next.hardwareRetryTarget).toBeNull();
     });
   }
@@ -114,6 +127,8 @@ describe("walletMachineReducer — error transitions", () => {
     });
   }
 });
+
+// ─── 3. RETRY transitions ───────────────────────────────────────────────────
 
 describe("walletMachineReducer — RETRY transitions", () => {
   it("rejected + RETRY → connecting", () => {
@@ -171,6 +186,8 @@ describe("walletMachineReducer — RETRY transitions", () => {
   });
 });
 
+// ─── 4. BACK transitions ────────────────────────────────────────────────────
+
 describe("walletMachineReducer — BACK transitions", () => {
   const nonIdleStates: WalletMachineContext["state"][] = [
     "connecting",
@@ -196,7 +213,7 @@ describe("walletMachineReducer — BACK transitions", () => {
     });
   }
 
-  it("idle + BACK → idle (no change)", () => {
+  it("idle + BACK → idle (no change / rejected)", () => {
     expect(reduce(idle, { type: "BACK" }).state).toBe("idle");
   });
 
@@ -206,25 +223,10 @@ describe("walletMachineReducer — BACK transitions", () => {
   });
 });
 
-describe("walletMachineReducer — RESET", () => {
-  const allStates: WalletMachineContext["state"][] = [
-    "idle",
-    "connecting",
-    "not_installed",
-    "rejected",
-    "network_mismatch",
-    "network_timeout",
-    "device_searching",
-    "device_found_selecting",
-    "awaiting_device_confirmation",
-    "device_locked_error",
-    "wrong_app_error",
-    "unplugged_error",
-    "mobile_unsupported",
-    "connected",
-  ];
+// ─── 5. RESET transitions ───────────────────────────────────────────────────
 
-  for (const state of allStates) {
+describe("walletMachineReducer — RESET", () => {
+  for (const state of WALLET_STATES) {
     it(`${state} + RESET → idle`, () => {
       const ctx: WalletMachineContext = {
         state,
@@ -237,195 +239,251 @@ describe("walletMachineReducer — RESET", () => {
   }
 });
 
-describe("walletMachineReducer — illegal transitions (guard)", () => {
-  it("SELECT_FREIGHTER from non-idle states is ignored", () => {
-    const nonIdle: WalletMachineContext["state"][] = [
-      "connecting",
-      "not_installed",
-      "rejected",
-      "device_searching",
-      "connected",
-    ];
-    for (const state of nonIdle) {
-      const ctx: WalletMachineContext = { state, hardwareRetryTarget: null };
-      expect(reduce(ctx, { type: "SELECT_FREIGHTER" }).state).toBe(state);
+// ─── 6. Legality and assertTransition tests ─────────────────────────────────
+
+describe("assertTransition and isLegalTransition", () => {
+  it("assertTransition succeeds on all documented legal transitions", () => {
+    for (const edge of LEGAL_TRANSITIONS) {
+      let event: WalletMachineEvent;
+      if (edge.event === "ERROR") {
+        event = { type: "ERROR", error: edge.error! };
+      } else {
+        event = { type: edge.event } as WalletMachineEvent;
+      }
+
+      expect(isLegalTransition(edge.from, event)).toBe(true);
+
+      const ctx: WalletMachineContext = {
+        state: edge.from,
+        hardwareRetryTarget: edge.from.includes("error") ? "device_searching" : null,
+      };
+
+      const next = assertTransition(ctx, event);
+      expect(next.state).toBe(edge.to);
     }
   });
 
-  it("SELECT_HARDWARE from non-idle states is ignored", () => {
-    const ctx: WalletMachineContext = { state: "connecting", hardwareRetryTarget: null };
-    expect(reduce(ctx, { type: "SELECT_HARDWARE" }).state).toBe("connecting");
+  it("assertTransition throws IllegalTransitionError on illegal transitions", () => {
+    expect(() =>
+      assertTransition(idle, { type: "CONNECTION_SUCCESS" }),
+    ).toThrow(IllegalTransitionError);
+
+    expect(() =>
+      assertTransition(connecting, { type: "SELECT_FREIGHTER" }),
+    ).toThrow(IllegalTransitionError);
+
+    const connectedCtx: WalletMachineContext = { state: "connected", hardwareRetryTarget: null };
+    expect(() =>
+      assertTransition(connectedCtx, { type: "BACK" }),
+    ).toThrow(IllegalTransitionError);
   });
 
-  it("DEVICE_FOUND from non-searching state is ignored", () => {
-    const ctx: WalletMachineContext = { state: "device_found_selecting", hardwareRetryTarget: null };
-    expect(reduce(ctx, { type: "DEVICE_FOUND" }).state).toBe("device_found_selecting");
+  it("IllegalTransitionError contains accurate metadata", () => {
+    try {
+      assertTransition(idle, { type: "DEVICE_FOUND" });
+      expect.unreachable("should have thrown IllegalTransitionError");
+    } catch (err) {
+      expect(err).toBeInstanceOf(IllegalTransitionError);
+      const transitionErr = err as IllegalTransitionError;
+      expect(transitionErr.state).toBe("idle");
+      expect(transitionErr.event.type).toBe("DEVICE_FOUND");
+      expect(transitionErr.message).toContain("Illegal state transition");
+    }
   });
+});
 
-  it("DEVICE_CONFIRMED from non-selecting state is ignored", () => {
-    const ctx: WalletMachineContext = { state: "device_searching", hardwareRetryTarget: null };
-    expect(reduce(ctx, { type: "DEVICE_CONFIRMED" }).state).toBe("device_searching");
-  });
+// ─── 7. Exhaustive illegal transition matrix ────────────────────────────────
 
-  it("CONNECTION_SUCCESS from idle is ignored", () => {
-    expect(reduce(idle, { type: "CONNECTION_SUCCESS" }).state).toBe("idle");
-  });
+describe("walletMachineReducer — exhaustive illegal transitions matrix", () => {
+  const sampleEvents: WalletMachineEvent[] = [
+    { type: "SELECT_FREIGHTER" },
+    { type: "SELECT_HARDWARE" },
+    { type: "SELECT_HARDWARE_MOBILE" },
+    { type: "DEVICE_FOUND" },
+    { type: "DEVICE_CONFIRMED" },
+    { type: "CONNECTION_SUCCESS" },
+    { type: "RETRY" },
+    { type: "BACK" },
+    { type: "RESET" },
+    { type: "ERROR", error: "not_installed" },
+    { type: "ERROR", error: "rejected" },
+    { type: "ERROR", error: "network_mismatch" },
+    { type: "ERROR", error: "network_timeout" },
+    { type: "ERROR", error: "device_locked_error" },
+    { type: "ERROR", error: "wrong_app_error" },
+    { type: "ERROR", error: "unplugged_error" },
+  ];
 
-  it("hardware ERROR from connecting is ignored", () => {
-    const next = reduce(connecting, {
-      type: "ERROR",
-      error: "device_locked_error",
-    });
-    expect(next.state).toBe("connecting");
-  });
+  for (const state of WALLET_STATES) {
+    for (const event of sampleEvents) {
+      const legal = isLegalTransition(state, event);
+      const eventLabel =
+        event.type === "ERROR" ? `ERROR(${event.error})` : event.type;
 
-  it("freighter ERROR from device_searching is ignored", () => {
-    const ctx: WalletMachineContext = { state: "device_searching", hardwareRetryTarget: null };
-    const next = reduce(ctx, { type: "ERROR", error: "rejected" });
-    expect(next.state).toBe("device_searching");
-  });
+      if (!legal) {
+        it(`rejects illegal transition: ${state} + ${eventLabel}`, () => {
+          const ctx: WalletMachineContext = { state, hardwareRetryTarget: null };
+          const result = reduce(ctx, event);
+          // Reducer must return the identical context reference without state modification
+          expect(result.state).toBe(state);
+          expect(result).toBe(ctx);
+
+          // assertTransition must throw
+          expect(() => assertTransition(ctx, event)).toThrow(IllegalTransitionError);
+        });
+      }
+    }
+  }
 
   it("unknown event type returns context unchanged", () => {
-    // @ts-expect-error — runtime-safety guardrail: the reducer must ignore
-    // events outside the WalletMachineEvent union. Remove this suppression only
-    // when "UNKNOWN_EVENT" is a legitimate member of that union.
+    // @ts-expect-error — runtime-safety guardrail: the reducer must ignore events outside the WalletMachineEvent union.
     const next = reduce(idle, { type: "UNKNOWN_EVENT" });
     expect(next).toStrictEqual(idle);
   });
 });
 
-// ─── 2. Full flow integration tests (reducer chaining) ──────────────────────
+// ─── 8. Validation: Sequential Multi-Step Driving ───────────────────────────
 
-describe("walletMachineReducer — full flows", () => {
-  it("happy-path Freighter: idle → connecting → connected", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_FREIGHTER" });
+describe("Validation: Drive every transition in sequence and assert no illegal state is reachable", () => {
+  it("Drive Freighter full journey: Idle → Connecting → Rejected → Retry → Success", () => {
+    let ctx = INITIAL_WALLET_CONTEXT;
+    expect(ctx.state).toBe("idle");
+
+    // Attempt illegal transitions in idle
+    expect(reduce(ctx, { type: "DEVICE_FOUND" })).toBe(ctx);
+    expect(reduce(ctx, { type: "CONNECTION_SUCCESS" })).toBe(ctx);
+
+    // Step 1: Select Freighter
+    ctx = assertTransition(ctx, { type: "SELECT_FREIGHTER" });
     expect(ctx.state).toBe("connecting");
-    ctx = reduce(ctx, { type: "CONNECTION_SUCCESS" });
-    expect(ctx.state).toBe("connected");
-  });
 
-  it("rejection flow: idle → connecting → rejected → connecting → connected", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_FREIGHTER" });
-    ctx = reduce(ctx, { type: "ERROR", error: "rejected" });
+    // Attempt illegal transitions while connecting
+    expect(reduce(ctx, { type: "SELECT_HARDWARE" })).toBe(ctx);
+    expect(reduce(ctx, { type: "DEVICE_CONFIRMED" })).toBe(ctx);
+    expect(reduce(ctx, { type: "ERROR", error: "device_locked_error" })).toBe(ctx);
+
+    // Step 2: User rejects
+    ctx = assertTransition(ctx, { type: "ERROR", error: "rejected" });
     expect(ctx.state).toBe("rejected");
 
-    ctx = reduce(ctx, { type: "RETRY" });
+    // Attempt illegal transitions in rejected
+    expect(reduce(ctx, { type: "SELECT_FREIGHTER" })).toBe(ctx);
+    expect(reduce(ctx, { type: "DEVICE_FOUND" })).toBe(ctx);
+
+    // Step 3: Retry
+    ctx = assertTransition(ctx, { type: "RETRY" });
     expect(ctx.state).toBe("connecting");
 
-    ctx = reduce(ctx, { type: "CONNECTION_SUCCESS" });
+    // Step 4: Connection success
+    ctx = assertTransition(ctx, { type: "CONNECTION_SUCCESS" });
     expect(ctx.state).toBe("connected");
-  });
 
-  it("network_mismatch flow: connecting → mismatch → retry → connected", () => {
-    let ctx: WalletMachineContext = { state: "connecting", hardwareRetryTarget: null };
-    ctx = reduce(ctx, { type: "ERROR", error: "network_mismatch" });
-    expect(ctx.state).toBe("network_mismatch");
+    // Step 5: Assert connected is terminal for BACK
+    expect(reduce(ctx, { type: "BACK" })).toBe(ctx);
+    expect(() => assertTransition(ctx, { type: "BACK" })).toThrow(IllegalTransitionError);
 
-    ctx = reduce(ctx, { type: "RETRY" });
-    expect(ctx.state).toBe("connecting");
-
-    ctx = reduce(ctx, { type: "CONNECTION_SUCCESS" });
-    expect(ctx.state).toBe("connected");
-  });
-
-  it("network_timeout flow: connecting → timeout → retry → connected", () => {
-    let ctx: WalletMachineContext = { state: "connecting", hardwareRetryTarget: null };
-    ctx = reduce(ctx, { type: "ERROR", error: "network_timeout" });
-    ctx = reduce(ctx, { type: "RETRY" });
-    expect(ctx.state).toBe("connecting");
-    ctx = reduce(ctx, { type: "CONNECTION_SUCCESS" });
-    expect(ctx.state).toBe("connected");
-  });
-
-  it("not_installed + BACK resets to idle (user installs, restarts)", () => {
-    let ctx: WalletMachineContext = { state: "connecting", hardwareRetryTarget: null };
-    ctx = reduce(ctx, { type: "ERROR", error: "not_installed" });
-    expect(ctx.state).toBe("not_installed");
-    ctx = reduce(ctx, { type: "BACK" });
+    // Step 6: Reset back to idle
+    ctx = assertTransition(ctx, { type: "RESET" });
     expect(ctx.state).toBe("idle");
   });
 
-  it("full hardware happy-path: idle → searching → selecting → confirming → connected", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE" });
+  it("Drive Hardware full journey with multiple error recoveries: Idle → Searching → Locked → Retry → Found → Confirmed → Wrong App → Retry → Confirmed → Connected", () => {
+    let ctx = INITIAL_WALLET_CONTEXT;
+
+    // Step 1: Select Hardware
+    ctx = assertTransition(ctx, { type: "SELECT_HARDWARE" });
     expect(ctx.state).toBe("device_searching");
 
-    ctx = reduce(ctx, { type: "DEVICE_FOUND" });
-    expect(ctx.state).toBe("device_found_selecting");
+    // Illegal event while searching
+    expect(reduce(ctx, { type: "SELECT_FREIGHTER" })).toBe(ctx);
+    expect(reduce(ctx, { type: "CONNECTION_SUCCESS" })).toBe(ctx);
 
-    ctx = reduce(ctx, { type: "DEVICE_CONFIRMED" });
-    expect(ctx.state).toBe("awaiting_device_confirmation");
-
-    ctx = reduce(ctx, { type: "CONNECTION_SUCCESS" });
-    expect(ctx.state).toBe("connected");
-  });
-
-  it("hardware locked → retry → searching", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE" });
-    ctx = reduce(ctx, { type: "ERROR", error: "device_locked_error" });
+    // Step 2: Device locked error
+    ctx = assertTransition(ctx, { type: "ERROR", error: "device_locked_error" });
     expect(ctx.state).toBe("device_locked_error");
     expect(ctx.hardwareRetryTarget).toBe("device_searching");
 
-    ctx = reduce(ctx, { type: "RETRY" });
+    // Step 3: Retry device search
+    ctx = assertTransition(ctx, { type: "RETRY" });
     expect(ctx.state).toBe("device_searching");
     expect(ctx.hardwareRetryTarget).toBeNull();
-  });
 
-  it("hardware wrong app → retry → searching", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE" });
-    ctx = reduce(ctx, { type: "ERROR", error: "wrong_app_error" });
+    // Step 4: Device found
+    ctx = assertTransition(ctx, { type: "DEVICE_FOUND" });
+    expect(ctx.state).toBe("device_found_selecting");
 
-    ctx = reduce(ctx, { type: "RETRY" });
-    expect(ctx.state).toBe("device_searching");
-  });
+    // Illegal event while selecting
+    expect(reduce(ctx, { type: "CONNECTION_SUCCESS" })).toBe(ctx);
 
-  it("hardware unplugged → retry → searching", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE" });
-    ctx = reduce(ctx, { type: "ERROR", error: "unplugged_error" });
-
-    ctx = reduce(ctx, { type: "RETRY" });
-    expect(ctx.state).toBe("device_searching");
-  });
-
-  it("mobile unsupported: idle → mobile_unsupported → back → idle", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE_MOBILE" });
-    expect(ctx.state).toBe("mobile_unsupported");
-
-    ctx = reduce(ctx, { type: "BACK" });
-    expect(ctx.state).toBe("idle");
-  });
-
-  it("RESET from deep hardware flow returns to idle", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_HARDWARE" });
-    ctx = reduce(ctx, { type: "DEVICE_FOUND" });
-    ctx = reduce(ctx, { type: "DEVICE_CONFIRMED" });
+    // Step 5: Device confirmed
+    ctx = assertTransition(ctx, { type: "DEVICE_CONFIRMED" });
     expect(ctx.state).toBe("awaiting_device_confirmation");
 
-    ctx = reduce(ctx, { type: "RESET" });
+    // Step 6: Wrong app error during confirmation
+    ctx = assertTransition(ctx, { type: "ERROR", error: "wrong_app_error" });
+    expect(ctx.state).toBe("wrong_app_error");
+    expect(ctx.hardwareRetryTarget).toBe("device_searching");
+
+    // Step 7: Retry returns to device_searching
+    ctx = assertTransition(ctx, { type: "RETRY" });
+    expect(ctx.state).toBe("device_searching");
+
+    // Step 8: Re-discover and re-confirm
+    ctx = assertTransition(ctx, { type: "DEVICE_FOUND" });
+    ctx = assertTransition(ctx, { type: "DEVICE_CONFIRMED" });
+    expect(ctx.state).toBe("awaiting_device_confirmation");
+
+    // Step 9: Physical confirmation approved on device
+    ctx = assertTransition(ctx, { type: "CONNECTION_SUCCESS" });
+    expect(ctx.state).toBe("connected");
+  });
+
+  it("Drive Mobile Flow and Cancellation: Idle → Mobile Unsupported → Back → Idle", () => {
+    let ctx = INITIAL_WALLET_CONTEXT;
+    ctx = assertTransition(ctx, { type: "SELECT_HARDWARE_MOBILE" });
+    expect(ctx.state).toBe("mobile_unsupported");
+
+    // Cannot retry from mobile unsupported
+    expect(reduce(ctx, { type: "RETRY" })).toBe(ctx);
+
+    ctx = assertTransition(ctx, { type: "BACK" });
     expect(ctx.state).toBe("idle");
   });
 
-  it("SELECT_FREIGHTER is idempotent once already connecting", () => {
-    let ctx = idle;
-    ctx = reduce(ctx, { type: "SELECT_FREIGHTER" });
+  it("Drive Network Mismatch & Timeout recovery loops", () => {
+    let ctx = INITIAL_WALLET_CONTEXT;
+    ctx = assertTransition(ctx, { type: "SELECT_FREIGHTER" });
+    ctx = assertTransition(ctx, { type: "ERROR", error: "network_mismatch" });
+    expect(ctx.state).toBe("network_mismatch");
+
+    ctx = assertTransition(ctx, { type: "RETRY" });
     expect(ctx.state).toBe("connecting");
 
-    // A second SELECT_FREIGHTER while connecting must be a no-op.
-    const again = reduce(ctx, { type: "SELECT_FREIGHTER" });
-    expect(again.state).toBe("connecting");
-    // Same reference proves no allocation (strict equality).
-    expect(again).toBe(ctx);
+    ctx = assertTransition(ctx, { type: "ERROR", error: "network_timeout" });
+    expect(ctx.state).toBe("network_timeout");
+
+    ctx = assertTransition(ctx, { type: "RETRY" });
+    expect(ctx.state).toBe("connecting");
+
+    ctx = assertTransition(ctx, { type: "BACK" });
+    expect(ctx.state).toBe("idle");
+  });
+
+  it("Drive Hardware Unplugged error recovery", () => {
+    let ctx = INITIAL_WALLET_CONTEXT;
+    ctx = assertTransition(ctx, { type: "SELECT_HARDWARE" });
+    ctx = assertTransition(ctx, { type: "ERROR", error: "unplugged_error" });
+    expect(ctx.state).toBe("unplugged_error");
+
+    ctx = assertTransition(ctx, { type: "RETRY" });
+    expect(ctx.state).toBe("device_searching");
+
+    ctx = assertTransition(ctx, { type: "BACK" });
+    expect(ctx.state).toBe("idle");
   });
 });
 
-// ─── 3. Hook integration tests ───────────────────────────────────────────────
+// ─── 9. Hook Integration Tests ──────────────────────────────────────────────
 
 describe("useWalletStateMachine hook", () => {
   it("starts in idle state", () => {
@@ -453,17 +511,14 @@ describe("useWalletStateMachine hook", () => {
   it("guard: SELECT_FREIGHTER while isRequestInFlight is ignored", () => {
     const { result } = renderHook(() => useWalletStateMachine());
 
-    // Mark a request as in-flight
     act(() => {
       result.current.setRequestInFlight(true);
     });
 
-    // First transition to idle → SELECT_FREIGHTER should be blocked
     act(() => {
       result.current.send({ type: "SELECT_FREIGHTER" });
     });
 
-    // Machine must remain idle because the guard fired
     expect(result.current.machineState).toBe("idle");
   });
 
@@ -490,22 +545,17 @@ describe("useWalletStateMachine hook", () => {
   it("setRequestInFlight updates the in-flight guard (ref-level)", () => {
     const { result } = renderHook(() => useWalletStateMachine());
 
-    // Initially false
     expect(result.current.isRequestInFlight).toBe(false);
 
-    // After marking in-flight, SELECT_FREIGHTER must be blocked even though
-    // no React re-render happens (the guard reads the ref directly).
     act(() => {
       result.current.setRequestInFlight(true);
     });
 
-    // Confirm the guard is active: SELECT_FREIGHTER from idle must be a no-op.
     act(() => {
       result.current.send({ type: "SELECT_FREIGHTER" });
     });
     expect(result.current.machineState).toBe("idle");
 
-    // Clear the flag; SELECT_FREIGHTER must now be allowed.
     act(() => {
       result.current.setRequestInFlight(false);
     });
