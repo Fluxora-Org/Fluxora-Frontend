@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
+import { VITE_BUILD_TARGETS } from "./src/lib/browserSupport";
 
 const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
@@ -86,6 +87,7 @@ export default defineConfig(async () => {
     plugins,
     server: { port: 5173 },
     build: {
+      target: [...VITE_BUILD_TARGETS],
       chunkSizeWarningLimit: CHUNK_SIZE_WARNING_LIMIT_KB,
       rollupOptions: {
         output: {

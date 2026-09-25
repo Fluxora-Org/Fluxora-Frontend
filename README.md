@@ -19,6 +19,14 @@ The UI is wired for a future backend API and Stellar wallet integration.
 - Vite
 - React Router
 
+## Browser support
+
+Fluxora supports Chrome 109+, Edge 109+, Firefox 115+, and Safari 16.4+.
+Unsupported browsers receive an update message. Worker parsing, clipboard
+access, voice recognition, and presence cursors are optional capabilities with
+individual feature detection and fallbacks. See
+[docs/BROWSER_SUPPORT.md](docs/BROWSER_SUPPORT.md) for details.
+
 ## Local setup
 
 ### Prerequisites

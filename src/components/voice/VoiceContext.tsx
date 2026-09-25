@@ -207,6 +207,19 @@ const processSpokenPhrase = useCallback(
 
     const matched = matchCommand(phrase);
 
+    if (matched === "ambiguous") {
+      setState("command-ambiguous");
+      announce(
+        "That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.",
+      );
+      setTimeout(() => {
+        setState((prev) =>
+          prev === "command-ambiguous" ? "listening" : prev,
+        );
+      }, 3000);
+      return false;
+    }
+
     if (matched) {
       executeCommand(matched, phrase);
       return true;
@@ -234,38 +247,6 @@ const processSpokenPhrase = useCallback(
     announce,
   ]
 );
-
-      const matched = matchCommand(phrase);
-      if (matched === "ambiguous") {
-        setState("command-ambiguous");
-        announce(
-          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-ambiguous" ? "listening" : prev,
-          );
-        }, 3000);
-        return false;
-      }
-      if (matched) {
-        executeCommand(matched, phrase);
-        return true;
-      } else {
-        setState("command-unrecognized");
-        announce(
-          `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
-        );
-        setTimeout(() => {
-          setState((prev) =>
-            prev === "command-unrecognized" ? "listening" : prev
-          );
-        }, 3000);
-        return false;
-      }
-    },
-    [matchCommand, executeCommand, pendingDestructiveCommand, announce]
-  );
 
   // Destructive confirmations
   const confirmDestructiveAction = useCallback(() => {
