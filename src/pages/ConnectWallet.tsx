@@ -6,6 +6,7 @@ import WalletIcon from "../components/WalletIcon";
 import ConnectWalletModal from "../components/ConnectWalletModal";
 import { sanitizeReturnTo } from "../components/RequireWallet";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { MetaTags } from "../components/MetaTags";
 
 /**
  * Connnect Wallet onboarding page.
@@ -39,6 +40,7 @@ export default function ConnectWallet() {
 
   return (
     <main id="main-content" style={styles.page} aria-labelledby="connect-wallet-heading">
+      <MetaTags title="Connect Wallet" />
       <GlowingDot top="34%" right="40%" size={18} opacity={0.6} />
       <GlowingDot top="42%" left="40%" size={12} opacity={0.5} />
 

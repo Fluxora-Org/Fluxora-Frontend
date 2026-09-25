@@ -7,6 +7,7 @@ import {
   VIEWPORT_RESIZE_DEBOUNCE_MS,
 } from "../lib/breakpoints";
 import { useTheme } from "../theme/ThemeProvider";
+import { MetaTags } from "../components/MetaTags";
 
 // Below-the-fold landing sections are split into separate chunks via React.lazy
 // so first-time visitors don't pay the parse cost up front. Each section is only
@@ -156,6 +157,7 @@ export default function Home() {
         flexDirection: "column",
       }}
     >
+      <MetaTags title="Home" />
       <main
         id="main-content"
         data-mobile-layout={isMobileLayout ? "mobile" : "desktop"}

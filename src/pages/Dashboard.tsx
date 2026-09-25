@@ -15,6 +15,7 @@ import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatAssetAmount } from "../lib/formatters";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
+import { MetaTags } from "../components/MetaTags";
 import "../design-tokens.css";
 
 export default function Dashboard() {
@@ -112,6 +113,7 @@ export default function Dashboard() {
 
   return (
     <main id="main-content">
+      <MetaTags title="Dashboard" />
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>

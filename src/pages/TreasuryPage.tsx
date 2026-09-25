@@ -13,6 +13,7 @@ import {
 } from "../components/colorBlindSimulation";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { IS_DEV } from "../utils/env";
+import { MetaTags } from "../components/MetaTags";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -82,6 +83,7 @@ export default function TreasuryPage() {
   return (
     <ColorBlindSimulationProvider>
       <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen">
+        <MetaTags title="Treasury Overview" />
         {isDemoMode && <DemoBanner state={demoState} />}
 
         {/* Design-QA: colour-blind simulation toggle — placed above page content

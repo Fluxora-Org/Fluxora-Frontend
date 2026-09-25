@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
+import { MetaTags } from '../components/MetaTags';
 import './ErrorPage.css';
 
 export type ErrorType = 'network' | 'auth' | '404' | 'validation' | 'default';
@@ -95,6 +96,7 @@ export default function ErrorPage({
 
   return (
     <main className="error-page-container" role="main">
+      <MetaTags title="Error" />
       <div className="error-content flex flex-col items-center justify-center text-center">
         <div className="error-illustration-wrapper" aria-hidden="true">
           <div className="error-illustration flex items-center justify-center w-48 h-48 mb-8 bg-gray-100 rounded-full text-gray-400">
