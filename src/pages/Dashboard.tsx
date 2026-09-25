@@ -19,6 +19,7 @@ import {
 import { formatAssetAmount } from "../lib/formatters";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
+import ErrorBoundary from "../components/ErrorBoundary";
 import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
 import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
@@ -203,48 +204,13 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={refetch}
-          >
+          <Button type="button" variant="secondary" onClick={refetch}>
             Retry
           </Button>
         </div>
       )}
 
       {loading || hasError || hasStreams ? (
-        <>
-          <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
-            <DashboardStreamsWidget
-              streams={streams}
-              loading={loading}
-              error={error}
-              walletConnected={walletConnected}
-              onRetry={refetch}
-              onCreateStream={() => setIsModalOpen(true)}
-            />
-          </WidgetErrorBoundary>
-          <ErrorBoundary>
-            <RecentStreams
-              streams={streams}
-              loading={loading}
-              error={error}
-              onRetry={refetch}
-              walletConnected={walletConnected}
-            />
-          </ErrorBoundary>
-          {!loading && !error && (
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setIsModalOpen(true)}
-              aria-label="Create stream"
-            >
-              Create stream
-            </Button>
-          )}
-        </>
         <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
           <DashboardStreamsWidget
             streams={streams}
@@ -255,23 +221,16 @@ export default function Dashboard() {
             onCreateStream={() => setIsModalOpen(true)}
           />
         </WidgetErrorBoundary>
-
       ) : showOnboarding ? (
         <ErrorBoundary>
           <TreasuryOnboarding
             walletConnected={walletConnected}
-            onRetry={refetch}
-            onCreateStream={() => setIsModalOpen(true)}
+            walletAddress={walletAddress}
+            onConnectWallet={() => setIsWalletModalOpen(true)}
+            onCreateStream={handleOnboardingCreateStream}
+            onDismiss={handleDismissOnboarding}
           />
-        </WidgetErrorBoundary>
-      ) : showOnboarding ? (
-        <TreasuryOnboarding
-          walletConnected={walletConnected}
-          walletAddress={walletAddress}
-          onConnectWallet={() => setIsWalletModalOpen(true)}
-          onCreateStream={handleOnboardingCreateStream}
-          onDismiss={handleDismissOnboarding}
-        />
+        </ErrorBoundary>
       ) : (
         <ErrorBoundary>
           <TreasuryEmptyState
@@ -279,7 +238,6 @@ export default function Dashboard() {
             onOpenOnboarding={handleOpenOnboarding}
           />
         </ErrorBoundary>
-        <TreasuryEmptyState onCreateStream={() => setIsModalOpen(true)} />
       )}
 
       <CreateStreamModal
@@ -329,4 +287,3 @@ const walletBannerStyle: React.CSSProperties = {
   marginTop: "0.75rem",
   marginBottom: "0.25rem",
 };
-

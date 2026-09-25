@@ -27,6 +27,7 @@ export default defineConfig({
     // backend. Existing values from the shell env take precedence.
     env: {
       VITE_USE_MOCKS: process.env.VITE_USE_MOCKS ?? "true",
+      VITE_NETWORK: process.env.VITE_NETWORK ?? "TESTNET",
     },
   },
   projects: [

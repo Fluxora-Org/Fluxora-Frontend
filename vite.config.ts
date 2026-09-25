@@ -5,7 +5,8 @@ import type { Plugin } from "vite";
 import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
 import { resolveRoutePageChunk } from "./src/lib/routeChunks";
 
-const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const isTesting =
+  process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
 
 /**
@@ -28,26 +29,48 @@ const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
  */
 function securityHeadersPlugin(): Plugin {
   const applyHeaders = (
-    res: { setHeader: (name: string, value: string) => void }
+    res: { setHeader: (name: string, value: string) => void },
+    isDev = false,
   ) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-      res.setHeader(name, value);
+      if (isDev && name === "Content-Security-Policy") {
+        res.setHeader(
+          name,
+          value.replace(
+            "script-src 'self' 'sha256-rYHtv2kv2J9mGq+H5er2MOudnal5QmHotnNLc03Df6s='",
+            "script-src 'self' 'unsafe-inline'",
+          ),
+        );
+      } else if (isDev && name === "Permissions-Policy") {
+        res.setHeader(name, value.replace("microphone=(), ", ""));
+      } else {
+        res.setHeader(name, value);
+      }
     }
   };
 
   return {
     name: "security-headers",
+    transformIndexHtml(html, ctx) {
+      if (ctx.server) {
+        return html.replace(
+          "script-src 'self' 'sha256-rYHtv2kv2J9mGq+H5er2MOudnal5QmHotnNLc03Df6s='",
+          "script-src 'self' 'unsafe-inline'",
+        );
+      }
+      return html;
+    },
     // Dev server (vite dev)
     configureServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, true);
         next();
       });
     },
     // Preview server (vite preview / vite preview --host 127.0.0.1)
     configurePreviewServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, false);
         next();
       });
     },
@@ -81,7 +104,11 @@ function vendorChunk(id: string) {
 export default defineConfig(async () => {
   const plugins = isTesting
     ? [react()]
-    : [react(), (await import("@tailwindcss/vite")).default(), securityHeadersPlugin()];
+    : [
+        react(),
+        (await import("@tailwindcss/vite")).default(),
+        securityHeadersPlugin(),
+      ];
 
   return {
     plugins,
@@ -102,8 +129,12 @@ export default defineConfig(async () => {
             // Below-the-fold landing sections are lazy-loaded from Home and
             // share one chunk so they download together once the user scrolls.
             if (
-              normalizedId.includes("/src/components/landing-page/TrustSection") ||
-              normalizedId.includes("/src/components/ValuePropositionSection") ||
+              normalizedId.includes(
+                "/src/components/landing-page/TrustSection",
+              ) ||
+              normalizedId.includes(
+                "/src/components/ValuePropositionSection",
+              ) ||
               normalizedId.includes("/src/components/GetStartedCTA") ||
               normalizedId.includes("/src/components/NewsletterSection")
             ) {
@@ -123,7 +154,11 @@ export default defineConfig(async () => {
       coverage: {
         provider: "v8",
         reporter: ["text", "json", "html"],
-        include: ["src/components/**/*.tsx", "src/pages/**/*.tsx", "src/theme/**/*.tsx"],
+        include: [
+          "src/components/**/*.tsx",
+          "src/pages/**/*.tsx",
+          "src/theme/**/*.tsx",
+        ],
         exclude: [
           "src/components/**/*.test.tsx",
           "src/pages/**/*.test.tsx",
