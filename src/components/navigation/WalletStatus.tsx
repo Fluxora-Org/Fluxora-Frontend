@@ -5,6 +5,12 @@ interface WalletStatusProps {
   address: string;
   network: string;
   onDisconnect?: () => void;
+  /** Expected network for mismatch detection (passed by AppNavbar, unused in this implementation). */
+  expectedNetwork?: string;
+  /** Whether the wallet network differs from the expected network. */
+  isNetworkMismatch?: boolean;
+  /** When true, disables wallet action controls during route transitions. */
+  disabled?: boolean;
 }
 
 function truncate(addr: string) {
@@ -17,6 +23,12 @@ export default function WalletStatus({
   address,
   network,
   onDisconnect,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  expectedNetwork: _expectedNetwork,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isNetworkMismatch: _isNetworkMismatch,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  disabled: _disabled,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
