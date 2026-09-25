@@ -226,15 +226,6 @@ export default function Dashboard() {
               onCreateStream={() => setIsModalOpen(true)}
             />
           </WidgetErrorBoundary>
-          <ErrorBoundary>
-            <RecentStreams
-              streams={streams}
-              loading={loading}
-              error={error}
-              onRetry={refetch}
-              walletConnected={walletConnected}
-            />
-          </ErrorBoundary>
           {!loading && !error && (
             <Button
               type="button"
@@ -248,20 +239,22 @@ export default function Dashboard() {
         </>
 
       ) : showOnboarding ? (
-        <ErrorBoundary>
+        <WidgetErrorBoundary name="Treasury onboarding" onRetry={refetch}>
           <TreasuryOnboarding
             walletConnected={walletConnected}
-            onRetry={refetch}
+            walletAddress={walletAddress}
+            onConnectWallet={() => setIsWalletModalOpen(true)}
             onCreateStream={() => setIsModalOpen(true)}
+            onDismiss={handleDismissOnboarding}
           />
-        </ErrorBoundary>
+        </WidgetErrorBoundary>
       ) : (
-        <ErrorBoundary>
+        <WidgetErrorBoundary name="Treasury empty state" onRetry={refetch}>
           <TreasuryEmptyState
             onCreateStream={() => setIsModalOpen(true)}
             onOpenOnboarding={handleOpenOnboarding}
           />
-        </ErrorBoundary>
+        </WidgetErrorBoundary>
       )}
 
       <CreateStreamModal

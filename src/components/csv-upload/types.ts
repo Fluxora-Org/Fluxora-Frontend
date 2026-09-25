@@ -4,9 +4,6 @@
  * These are pure data types — no React imports needed — so the CSV parser,
  * validation logic, and components all share a single source of truth.
  */
-
-export type CanonicalHeader = (typeof CANONICAL_HEADERS)[number];
-
 /** A single located parse/validation error: which row, optionally which column, and what was expected. */
 export interface CsvParseError {
   row: number;

@@ -139,7 +139,13 @@ function readEnv(): ServiceEnv {
   const env = (import.meta.env ?? {}) as Record<string, string | undefined>;
   const rawBase = typeof env.VITE_API_URL === "string" ? env.VITE_API_URL.trim() : "";
   const baseUrl = rawBase.length > 0 ? rawBase : DEFAULT_BASE_URL;
-  const useMocks = env.VITE_USE_MOCKS === "true" || env.VITE_USE_MOCKS === "1";
+  let useMocks = env.VITE_USE_MOCKS === "true" || env.VITE_USE_MOCKS === "1";
+  if (
+    typeof window !== "undefined" &&
+    typeof (window as unknown as { __FLUXORA_USE_MOCKS__?: boolean }).__FLUXORA_USE_MOCKS__ === "boolean"
+  ) {
+    useMocks = (window as unknown as { __FLUXORA_USE_MOCKS__?: boolean }).__FLUXORA_USE_MOCKS__!;
+  }
   return { baseUrl, useMocks };
 }
 

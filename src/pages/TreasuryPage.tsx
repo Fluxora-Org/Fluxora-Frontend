@@ -87,6 +87,7 @@ export default function TreasuryPage() {
             loading={false}
             resolvedPeriod={resolvedPeriod}
             boundaries={boundaries}
+            onRefresh={refetch}
           />
           <div role="alert" className="text-sm text-red-600">
             {error}

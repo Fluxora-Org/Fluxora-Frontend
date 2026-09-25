@@ -26,6 +26,7 @@ export default defineConfig({
     // so routes like /app/streams/:streamId resolve real records without a live
     // backend. Existing values from the shell env take precedence.
     env: {
+      VITE_NETWORK: process.env.VITE_NETWORK ?? "TESTNET",
       VITE_USE_MOCKS: process.env.VITE_USE_MOCKS ?? "true",
     },
   },

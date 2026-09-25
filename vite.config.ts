@@ -28,19 +28,41 @@ const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
  */
 function securityHeadersPlugin(): Plugin {
   const applyHeaders = (
-    res: { setHeader: (name: string, value: string) => void }
+    res: { setHeader: (name: string, value: string) => void },
+    isDev = false,
   ) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-      res.setHeader(name, value);
+      if (isDev && name === "Content-Security-Policy") {
+        res.setHeader(
+          name,
+          value
+            .replace(/script-src\s+[^;]+/, "script-src 'self' 'unsafe-inline'")
+            .replace(/connect-src\s+[^;]+/, "connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws: wss:"),
+        );
+      } else {
+        res.setHeader(name, value);
+      }
     }
   };
 
   return {
     name: "security-headers",
+    // In dev server (vite dev), remove the static <meta> CSP from index.html
+    // so Vite's @react-refresh preamble inline script is not blocked.
+    // The dev server middleware provides the dev-compatible CSP header instead.
+    transformIndexHtml(html, ctx) {
+      if (ctx.server) {
+        return html.replace(
+          /<meta\s+http-equiv="Content-Security-Policy"[^>]*>/i,
+          "",
+        );
+      }
+      return html;
+    },
     // Dev server (vite dev)
     configureServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, true);
         next();
       });
     },
