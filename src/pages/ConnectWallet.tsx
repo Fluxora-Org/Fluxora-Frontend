@@ -88,7 +88,7 @@ export default function ConnectWallet({ initialError }: ConnectWalletProps = {})
     if (modalError) return modalError;
     if (
       wallet.isNetworkMismatch ||
-      (wallet.error && "type" in wallet.error && wallet.error.type === "network_mismatch")
+      (wallet.error && "type" in wallet.error && (wallet.error.type as any) === "network_mismatch")
     ) {
       return "wrong_network";
     }

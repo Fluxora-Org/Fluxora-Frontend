@@ -14,7 +14,7 @@ import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import { readOnboardingDismissed } from "../lib/onboarding";
 import { formatAssetAmount } from "../lib/formatters";
-import { toRecentStream } from "../lib/recentStreamMapper";
+
 import ErrorBoundary from "../components/ErrorBoundary";
 import { formatUsdc, toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
@@ -22,7 +22,8 @@ import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
 import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";
-
+const cardGrid: React.CSSProperties = { display: "grid", gap: "1rem" };
+const card: React.CSSProperties = { border: "1px solid var(--border)", padding: "1rem", borderRadius: "8px" };
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);

@@ -7,7 +7,7 @@ import {
   MAX_CSV_FILE_SIZE_LABEL,
   MAX_CSV_ROWS,
 } from './csvParser';
-import { buildTemplateCsv } from './csvParser';
+
 import { validateCsvFile } from './csvFileValidation';
 import { CsvParseCancelledError, parseCsvAsync } from './csvParseClient';
 import type { CsvParseTask, CsvProgressPayload } from './csvParseClient';

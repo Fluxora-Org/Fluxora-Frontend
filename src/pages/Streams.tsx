@@ -946,7 +946,7 @@ export default function Streams() {
   );
 
   const handleToggleStreamCard = useCallback((id: string) => {
-    setExpandedStreamId((current) => (current === id ? "" : id));
+    setExpandedStreamId(((current: string) => (current === id ? "" : id)) as any);
   }, [setExpandedStreamId]);
 
   const handleSelectStreamCard = useCallback(

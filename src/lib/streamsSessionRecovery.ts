@@ -277,12 +277,12 @@ export function readStreamsSession(
         storageKey,
       },
     );
-    removeBrowserStorage(storageKey, storage);
+    removeBrowserStorage(storageKey, storage as any);
     return null;
   }
 
   if (snapshot.accountAddress !== normalizedAccountAddress) {
-    removeBrowserStorage(storageKey, storage);
+    removeBrowserStorage(storageKey, storage as any);
     return null;
   }
   if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;

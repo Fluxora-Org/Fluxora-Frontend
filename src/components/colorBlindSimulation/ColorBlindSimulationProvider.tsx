@@ -286,7 +286,7 @@ export function ColorBlindSimulationProvider({
       {/* SVG filter definitions — rendered off-screen, not interactive */}
       <ColorBlindSvgFilters />
 
-      {isSimulating && simulation !== "none" && (
+      {isSimulating && (simulation as string) !== "none" && (
         <ColorBlindActiveBanner
           mode={simulation}
           onDisable={() => setSimulation("none")}

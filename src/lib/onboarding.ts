@@ -54,9 +54,9 @@ export function writeOnboardingDismissed(
     writeBrowserStorage(
       ONBOARDING_DISMISSED_STORAGE_KEY,
       ONBOARDING_DISMISSED_VALUE,
-      storage,
+      storage as any,
     );
   } else {
-    removeBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage);
+    removeBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage as any);
   }
 }
