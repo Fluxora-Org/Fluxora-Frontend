@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useWallet } from "../wallet-connect/Walletcontext";
 import "../../design-tokens.css";
 
 export type HeroMetric = {
@@ -25,6 +26,7 @@ interface HeroSectionProps {
 export default function HeroSection({ theme = "light" }: HeroSectionProps) {
   const isDark = theme === "dark";
   const [mounted, setMounted] = useState(false);
+  const { connected } = useWallet();
 
   useEffect(() => {
     setMounted(true);
@@ -116,10 +118,12 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
             <div className="flex flex-wrap items-center gap-5 mt-4">
               <button
                 className="ui-primary-cta group relative overflow-hidden rounded-2xl px-8 py-4 text-lg font-bold shadow-[0_10px_30px_-10px_rgba(6,182,212,0.5)] transition-all duration-300 hover:scale-[1.02] active:scale-95"
-                onClick={() => (window.location.href = "/connect-wallet")}
+                onClick={() =>
+                  (window.location.href = connected ? "/app" : "/connect-wallet")
+                }
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  Launch App
+                  {connected ? "Launch App" : "Connect wallet to launch"}
                   <svg
                     aria-hidden="true"
                     xmlns="http://www.w3.org/2000/svg"
@@ -189,6 +193,8 @@ export default function HeroSection({ theme = "light" }: HeroSectionProps) {
               alt="Fluxora dashboard showing active treasury streams and analytics"
               loading="eager"
               fetchPriority="high"
+              width={1024}
+              height={768}
               className="absolute -right-10 top-0 max-w-[600px] w-full rounded-2xl shadow-2xl hidden lg:block opacity-40 mix-blend-overlay"
             />
 

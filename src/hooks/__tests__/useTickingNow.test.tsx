@@ -27,8 +27,8 @@ describe("useTickingNow", () => {
     expect(result.current).toBe(FIXED_ISO);
   });
 
-  it("updates the timestamp after the default 30 second tick", () => {
-    const { result } = renderHook(() => useTickingNow());
+  it("updates the timestamp after the default 30 second tick when crossing minute boundary", () => {
+    const { result } = renderHook(() => useTickingNow({ precision: "second", intervalMs: 5_000 }));
     const initial = result.current;
 
     act(() => {
@@ -40,11 +40,11 @@ describe("useTickingNow", () => {
   });
 
   it("does not fire before the tick interval elapses", () => {
-    const { result } = renderHook(() => useTickingNow());
+    const { result } = renderHook(() => useTickingNow({ precision: "second", intervalMs: 5_000 }));
     const initial = result.current;
 
     act(() => {
-      vi.advanceTimersByTime(29_000);
+      vi.advanceTimersByTime(4_000);
     });
 
     expect(result.current).toBe(initial);
@@ -71,7 +71,7 @@ describe("useTickingNow", () => {
 
   it("honors caller-provided interval overrides", () => {
     const { result } = renderHook(() =>
-      useTickingNow({ intervalMs: 5_000, reducedMotionIntervalMs: 5_000 }),
+      useTickingNow({ intervalMs: 5_000, reducedMotionIntervalMs: 5_000, precision: "second" }),
     );
     const initial = result.current;
 
@@ -205,5 +205,199 @@ describe("useTickingNow", () => {
       60_000,
     );
     unmountReduced();
+  });
+
+  // --- PRECISION TESTS ---
+
+  it("with default minute precision, only updates when minute boundary crosses", () => {
+    const { result } = renderHook(() => useTickingNow());
+    const initial = result.current;
+
+    // Advance 30 seconds - still same minute, should not update
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(result.current).toBe(initial);
+
+    // Advance another 30 seconds - crosses minute boundary, should update
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(result.current).toBe("2026-06-26T10:01:00.000Z");
+  });
+
+  it("with second precision, updates every second", () => {
+    const { result } = renderHook(() => useTickingNow({ precision: "second", intervalMs: 1_000 }));
+    const initial = result.current;
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(result.current).not.toBe(initial);
+    expect(result.current).toBe("2026-06-26T10:00:01.000Z");
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(result.current).toBe("2026-06-26T10:00:02.000Z");
+  });
+
+  it("with hour precision, only updates when hour boundary crosses", () => {
+    const { result } = renderHook(() => useTickingNow({ precision: "hour", intervalMs: 60_000 }));
+    const initial = result.current;
+
+    // Advance 30 minutes - still same hour
+    act(() => {
+      vi.advanceTimersByTime(30 * 60_000);
+    });
+    expect(result.current).toBe(initial);
+
+    // Advance another 30 minutes - crosses hour boundary
+    act(() => {
+      vi.advanceTimersByTime(30 * 60_000);
+    });
+    expect(result.current).toBe("2026-06-26T11:00:00.000Z");
+  });
+
+  it("with day precision, only updates when day boundary crosses", () => {
+    const { result } = renderHook(() => useTickingNow({ precision: "day", intervalMs: 3_600_000 }));
+    const initial = result.current;
+
+    // Advance 12 hours - still same day (10:00 -> 22:00 same day)
+    act(() => {
+      vi.advanceTimersByTime(12 * 3_600_000);
+    });
+    expect(result.current).toBe(initial);
+
+    // Advance another 2 hours - crosses day boundary at midnight (22:00 -> 00:00 next day)
+    act(() => {
+      vi.advanceTimersByTime(2 * 3_600_000);
+    });
+    expect(result.current).toBe("2026-06-27T00:00:00.000Z");
+  });
+
+  // --- PAGE VISIBILITY TESTS ---
+
+  it("pauses interval when document becomes hidden", () => {
+    const { result } = renderHook(() => useTickingNow({ intervalMs: 5_000, precision: "minute" }));
+    const initial = result.current;
+
+    // Simulate document becoming hidden
+    act(() => {
+      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    // Advance time while hidden (30 seconds, still same minute)
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Value should not have changed
+    expect(result.current).toBe(initial);
+
+    // Simulate document becoming visible again
+    act(() => {
+      Object.defineProperty(document, "hidden", { value: false, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    // Now advance time past minute boundary (from 10:00:30 to 10:01:00)
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(result.current).not.toBe(initial);
+    expect(result.current).toBe("2026-06-26T10:01:00.000Z");
+  });
+
+  it("does not leak visibility event listener on unmount", () => {
+    const addEventListenerSpy = vi.spyOn(document, "addEventListener");
+    const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
+
+    const { unmount } = renderHook(() => useTickingNow());
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+  });
+
+  // --- RENDER COUNT TESTS ---
+
+  it("asserts render count stays minimal with minute precision (does not re-render on every tick)", () => {
+    const renderCounts: number[] = [];
+    const { result, rerender } = renderHook(
+      ({ precision }) => {
+        renderCounts.push(1);
+        return useTickingNow({ precision, intervalMs: 5_000 });
+      },
+      { initialProps: { precision: "minute" as const } },
+    );
+
+    const initialRenderCount = renderCounts.length;
+
+    // Advance by 30 seconds (6 ticks at 5s interval) - all within same minute
+    for (let i = 0; i < 6; i++) {
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+    }
+
+    // Should only have initial render + 1 re-render when minute boundary crosses
+    // (at 60 seconds from start)
+    expect(renderCounts.length).toBeLessThanOrEqual(initialRenderCount + 2);
+
+    // Advance to cross minute boundary
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Should have one more render for the minute boundary
+    expect(renderCounts.length).toBeLessThanOrEqual(initialRenderCount + 3);
+  });
+
+  it("asserts render count increases appropriately with second precision", () => {
+    const renderCounts: number[] = [];
+    const { result } = renderHook(() => {
+      renderCounts.push(1);
+      return useTickingNow({ precision: "second", intervalMs: 1_000 });
+    });
+
+    const initialRenderCount = renderCounts.length;
+
+    // Advance by 5 seconds (5 ticks)
+    for (let i = 0; i < 5; i++) {
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+    }
+
+    // Should have initial render + 5 re-renders (one per second)
+    expect(renderCounts.length).toBe(initialRenderCount + 5);
+  });
+
+  it("asserts precision change triggers timer restart", () => {
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    const clearIntervalSpy = vi.spyOn(window, "clearInterval");
+
+    const { rerender, unmount } = renderHook(
+      ({ precision }: { precision: import("../useTickingNow").TickingPrecision }) => 
+        useTickingNow({ precision, intervalMs: 5_000 }),
+      { initialProps: { precision: "minute" } },
+    );
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    const firstTimerId = setIntervalSpy.mock.results[0].value;
+
+    // Change precision
+    rerender({ precision: "second" });
+
+    // Previous timer should be cleared, new one started
+    expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenLastCalledWith(firstTimerId);
+    expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+
+    unmount();
   });
 });

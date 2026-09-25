@@ -31,29 +31,28 @@ describe("useTreasuryOverviewData", () => {
       expect(isTreasuryDemoMode(undefined, true)).toBe(false);
     });
 
-    // Skipped: pre-existing failure unrelated to CI setup — Vite statically
-    // inlines `import.meta.env.*` reads at transform time, so vi.stubEnv()
-    // doesn't affect this default-parameter read at runtime. Tracked as
-    // pre-existing test debt.
-    it.skip("respects the environment variables correctly by default", () => {
+    // The default arguments read through `src/lib/config.ts`, which is the only
+    // module that touches import.meta.env, so vi.stubEnv() drives them.
+    it("respects the environment variables correctly by default", () => {
       vi.stubEnv("VITE_DEMO_MODE", "true");
-      // @ts-expect-error PROD is boolean in vite types but we need a falsy string here
-      vi.stubEnv("PROD", "false");
+      vi.stubEnv("PROD", false);
       expect(isTreasuryDemoMode()).toBe(true);
 
       vi.stubEnv("VITE_DEMO_MODE", "false");
       expect(isTreasuryDemoMode()).toBe(false);
     });
+
+    it("disables demo mode by default for production builds", () => {
+      vi.stubEnv("VITE_DEMO_MODE", "true");
+      vi.stubEnv("PROD", true);
+      expect(isTreasuryDemoMode()).toBe(false);
+    });
   });
 
   describe("useTreasuryOverviewData hook", () => {
-    // Skipped: pre-existing failure unrelated to CI setup (same root cause as
-    // above — vi.stubEnv doesn't affect statically-inlined import.meta.env
-    // reads). Tracked as pre-existing test debt.
-    it.skip("returns mock data immediately when demo mode is active", () => {
+    it("returns mock data immediately when demo mode is active", () => {
       vi.stubEnv("VITE_DEMO_MODE", "true");
-      // @ts-expect-error PROD is boolean in vite types but we need a falsy string here
-      vi.stubEnv("PROD", "false");
+      vi.stubEnv("PROD", false);
       useTreasuryMock.mockReturnValue({
         metrics: [],
         streams: [],
@@ -147,6 +146,40 @@ describe("useTreasuryOverviewData", () => {
 
       expect(result.current.isDemoMode).toBe(false);
       expect(result.current.loading).toBe(true);
+      expect(result.current.error).toBeNull();
+    });
+
+    it("marks demo data as distinguishable from live data via isDemoMode", () => {
+      vi.stubEnv("VITE_DEMO_MODE", "true");
+      vi.stubEnv("PROD", false);
+      useTreasuryMock.mockReturnValue({
+        metrics: [],
+        streams: [],
+        loading: false,
+        error: null,
+      });
+
+      const { result } = renderHook(() => useTreasuryOverviewData());
+      expect(result.current.isDemoMode).toBe(true);
+      expect(result.current.metrics).toEqual(treasuryDemoMetrics);
+      expect(result.current.streams).toEqual(treasuryDemoStreams);
+    });
+
+    it("returns fixture data with distinct structure from live data", () => {
+      vi.stubEnv("VITE_DEMO_MODE", "true");
+      vi.stubEnv("PROD", false);
+      useTreasuryMock.mockReturnValue({
+        metrics: [],
+        streams: [],
+        loading: false,
+        error: null,
+      });
+
+      const { result } = renderHook(() => useTreasuryOverviewData());
+      expect(result.current.isDemoMode).toBe(true);
+      expect(result.current.metrics.length).toBeGreaterThan(0);
+      expect(result.current.streams.length).toBeGreaterThan(0);
+      expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
     });
   });

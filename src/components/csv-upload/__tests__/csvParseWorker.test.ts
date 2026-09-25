@@ -146,12 +146,14 @@ describe('createCsvParseWorkerHandler (worker boundary)', () => {
 
     await handler(makeParseEvent('req-1', csv));
 
-    expect(posts).toHaveLength(1);
-    expect(posts[0].type).toBe('result');
-    if (posts[0].type !== 'result') return;
-    expect(posts[0].requestId).toBe('req-1');
-    expect(posts[0].result.rows).toHaveLength(1);
-    expect(posts[0].result.rows[0].status).toBe('valid');
+    // Progress messages are expected during parsing; the final post must be
+    // the result for this request.
+    const resultPost = posts.find((p) => p.type === 'result');
+    expect(posts[posts.length - 1].type).toBe('result');
+    if (!resultPost || resultPost.type !== 'result') return;
+    expect(resultPost.requestId).toBe('req-1');
+    expect(resultPost.result.rows).toHaveLength(1);
+    expect(resultPost.result.rows[0].status).toBe('valid');
   });
 
   it('posts a cancelled ack and no result when cancel arrives mid-parse', async () => {
@@ -230,11 +232,11 @@ describe('error-row determinism across parses', () => {
     await handlerA(makeParseEvent('a', csv));
     await handlerB(makeParseEvent('b', csv));
 
-    const resultA = postsA[0];
-    const resultB = postsB[0];
-    expect(resultA.type).toBe('result');
-    expect(resultB.type).toBe('result');
-    if (resultA.type !== 'result' || resultB.type !== 'result') return;
+    const resultA = postsA.find((p) => p.type === 'result');
+    const resultB = postsB.find((p) => p.type === 'result');
+    expect(resultA?.type).toBe('result');
+    expect(resultB?.type).toBe('result');
+    if (resultA?.type !== 'result' || resultB?.type !== 'result') return;
 
     // Same error rows in the same order, regardless of the random row ids.
     expect(normalizeRows(resultA.result.rows)).toEqual(
@@ -261,8 +263,9 @@ describe('error-row determinism across parses', () => {
     await handler(makeParseEvent('det', csv));
 
     const direct: ParseResult = parseAndValidateCsv(csv);
-    expect(posts[0].type).toBe('result');
-    if (posts[0].type !== 'result') return;
-    expect(normalizeRows(posts[0].result.rows)).toEqual(normalizeRows(direct.rows));
+    const resultPost = posts.find((p) => p.type === 'result');
+    expect(resultPost?.type).toBe('result');
+    if (!resultPost || resultPost.type !== 'result') return;
+    expect(normalizeRows(resultPost.result.rows)).toEqual(normalizeRows(direct.rows));
   });
 });

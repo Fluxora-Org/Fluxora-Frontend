@@ -1,0 +1,27 @@
+[
+  {
+    "_comment": "Baseline entries cap the number of known pre-existing axe violations per rule per flow.",
+    "_usage": [
+      "Each object: { rule, flow, maxCount }",
+      "rule     — axe rule ID (e.g. 'nested-interactive')",
+      "flow     — must match the label used in a11y.test.tsx getFlowRender()",
+      "maxCount — maximum allowed occurrences; a new violation causes CI to fail",
+      "",
+      "Steps to add a deferred violation:",
+      "  1. Run `npm run test:a11y:unit` locally and note the axe rule ID and node count.",
+      "  2. Add an entry below with the current count as maxCount.",
+      "  3. Open a tracking GitHub issue and add its number in a comment.",
+      "  4. When the violation is fixed, REMOVE the entry (not lower maxCount).",
+      "",
+      "Steps when a fix reduces the count:",
+      "  1. Lower maxCount to the new count (or remove if 0).",
+      "  2. Reference the fix PR in the tracking issue."
+    ]
+  },
+  {
+    "rule": "nested-interactive",
+    "flow": "Treasury Overview (/app/treasurypage)",
+    "maxCount": 1,
+    "_tracking": "ActivityHeatmap renders HeatmapCell (<button>) inside a <div role='img'> container. WCAG 4.1.2 requires that interactive elements are not nested inside landmark/landmark-like roles. Fix: remove role='img' from the wrapper div and rely on the sr-only data table (aria-describedby) for the text alternative instead, or move interactive cells outside the img container."
+  }
+]

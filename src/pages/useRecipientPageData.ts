@@ -8,6 +8,7 @@ const MIN_LOADING_MS = 300;
 interface RecipientPageIdentity {
   address: string | null | undefined;
   connected: boolean;
+  accountContextVersion?: number;
 }
 
 export interface RecipientPageData {
@@ -38,8 +39,9 @@ const DEMO_TOTAL_WITHDRAWN = 20650.0;
 export function useRecipientPageData({
   address,
   connected,
+  accountContextVersion = 0,
 }: RecipientPageIdentity): RecipientPageData {
-  const recipientStreams = useRecipientStreams(address);
+  const recipientStreams = useRecipientStreams(address, accountContextVersion);
   const [minLoadingElapsed, setMinLoadingElapsed] = useState(false);
   const [pageRefetchState, setPageRefetchState] = useState<"idle" | "retrying">("idle");
   const prevStreamsErrorRef = useRef<string | null>(null);

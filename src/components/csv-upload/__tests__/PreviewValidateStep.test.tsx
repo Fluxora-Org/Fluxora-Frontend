@@ -481,7 +481,11 @@ describe("PreviewValidateStep — duplicate handling, validation, and actions", 
       />,
     );
 
-    expect(screen.getByText("Reviewing 1 stream")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) => element?.textContent === "Reviewing 1 stream",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders plural stream count for multiple rows", () => {
@@ -499,6 +503,10 @@ describe("PreviewValidateStep — duplicate handling, validation, and actions", 
       />,
     );
 
-    expect(screen.getByText("Reviewing 2 streams")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) => element?.textContent === "Reviewing 2 streams",
+      ),
+    ).toBeInTheDocument();
   });
 });

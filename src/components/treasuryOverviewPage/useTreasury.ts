@@ -143,7 +143,10 @@ export function useTreasury(
  * not see treasury-wide data. An empty `address` short-circuits to an empty
  * result without contacting the network.
  */
-export function useRecipientStreams(address: string | null | undefined): {
+export function useRecipientStreams(
+  address: string | null | undefined,
+  accountContextVersion = 0,
+): {
   streams: StreamRecord[];
   loading: boolean;
   error: string | null;
@@ -155,8 +158,17 @@ export function useRecipientStreams(address: string | null | undefined): {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const accountContextVersionRef = useRef(accountContextVersion);
 
   useEffect(() => {
+    const accountChanged = accountContextVersionRef.current !== accountContextVersion;
+    accountContextVersionRef.current = accountContextVersion;
+
+    if (accountChanged) {
+      setStreams([]);
+      setError(null);
+    }
+
     if (!address) {
       setStreams([]);
       setLoading(false);
@@ -172,7 +184,7 @@ export function useRecipientStreams(address: string | null | undefined): {
     getRecipientStreams(address, { signal: controller.signal })
       .then((next) => {
         if (controller.signal.aborted) return;
-        setStreams(next);
+        setStreams(next.filter((stream) => stream.recipientAddress === address));
         setError(null);
         setRetryCount(0);
         setLoading(false);
@@ -185,7 +197,7 @@ export function useRecipientStreams(address: string | null | undefined): {
       });
 
     return () => controller.abort();
-  }, [address, reloadToken]);
+  }, [accountContextVersion, address, reloadToken]);
 
   const refetch = useCallback(() => {
     setReloadToken((token) => token + 1);

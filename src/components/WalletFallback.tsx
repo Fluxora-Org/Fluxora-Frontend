@@ -6,15 +6,62 @@ import { Skeleton, SkeletonCard } from "./Skeleton";
  * - `restoring`: The provider is silently restoring a prior wallet session.
  * - `loading-data`: The wallet is connected but Suspense resources (page
  *   skeleton, data hooks) are still resolving.
- * - `rejected`: The wallet connection was declined or the extension is not
- *   installed.
+ * - `rejected`: The wallet connection was declined by the user.
  * - `network-mismatch`: The wallet is connected to the wrong Stellar network.
+ * - `no-wallet`: No Stellar wallet extension is installed in this browser.
  */
 export type WalletStage =
   | "restoring"
   | "loading-data"
   | "rejected"
-  | "network-mismatch";
+  | "network-mismatch"
+  | "no-wallet";
+
+/** Where a visitor without a wallet extension can install one. */
+export const STELLAR_WALLET_INSTALL_URL = "https://www.freighter.app/";
+
+/**
+ * Actionable copy for every stage that can leave a visitor stuck.
+ *
+ * `message` names the problem in plain language; `nextStep` tells the visitor
+ * exactly how to recover, so the fallback never presents a dead end.
+ */
+interface StageGuidance {
+  message: string;
+  nextStep: string;
+  installUrl?: string;
+}
+
+const STAGE_GUIDANCE: Partial<Record<WalletStage, StageGuidance>> = {
+  "no-wallet": {
+    message: "No Stellar wallet extension was detected in this browser.",
+    nextStep:
+      "Install Freighter, or another Stellar wallet extension, then reload this page and try again.",
+    installUrl: STELLAR_WALLET_INSTALL_URL,
+  },
+  rejected: {
+    message: "Wallet connection was not approved.",
+    nextStep:
+      "Open your wallet extension and approve the connection request, then reload this page to try again.",
+  },
+  "network-mismatch": {
+    message: "Your wallet is on the wrong network.",
+    nextStep:
+      "Switch your wallet to the Stellar network Fluxora expects, then reload this page to try again.",
+  },
+};
+
+const STAGE_ACCENT: Partial<Record<WalletStage, string>> = {
+  "no-wallet": "rgba(239, 68, 68, 0.25)",
+  rejected: "rgba(239, 68, 68, 0.25)",
+  "network-mismatch": "rgba(245, 158, 11, 0.25)",
+};
+
+const STAGE_ACCENT_BACKGROUND: Partial<Record<WalletStage, string>> = {
+  "no-wallet": "rgba(239, 68, 68, 0.06)",
+  rejected: "rgba(239, 68, 68, 0.06)",
+  "network-mismatch": "rgba(245, 158, 11, 0.06)",
+};
 
 /**
  * Deterministic, stable fallback for wallet-dependent screens.
@@ -28,12 +75,16 @@ export type WalletStage =
  *    from skeleton to content is seamless.
  * 2. **Distinguishable stages** – each `WalletStage` renders a visually
  *    distinct skeleton that signals *what* is happening (restoring session,
- *    loading data, rejected, wrong network) so users are never left
- *    guessing.
- * 3. **A11y** – announces the current stage to assistive technology via
+ *    loading data, rejected, wrong network, or no wallet installed) so users
+ *    are never left guessing.
+ * 3. **Actionable failures** – the stages a visitor cannot recover from by
+ *    waiting (`rejected`, `network-mismatch`, `no-wallet`) name what is
+ *    missing and offer a concrete next step instead of a dead end.
+ * 4. **A11y** – announces the current stage to assistive technology via
  *    `aria-busy`, `aria-live`, and `role="status"`.
  *
  * @see https://github.com/Fluxora-Org/Fluxora-Frontend/issues/1544
+ * @see https://github.com/Fluxora-Org/Fluxora-Frontend/issues/1666
  */
 export default function WalletFallback({
   stage = "loading-data",
@@ -41,6 +92,7 @@ export default function WalletFallback({
   stage?: WalletStage;
 }) {
   const label = stageLabel(stage);
+  const guidance = STAGE_GUIDANCE[stage];
 
   return (
     <main
@@ -63,26 +115,60 @@ export default function WalletFallback({
         <Skeleton width={340} height={14} />
       </div>
 
-      {/* Stage-specific visual indicator */}
-      {stage === "rejected" || stage === "network-mismatch" ? (
+      {/* Stage-specific guidance: names the problem and the recovery step */}
+      {guidance ? (
         <div
           style={{
             marginBottom: "1rem",
             padding: "0.75rem 1rem",
             borderRadius: 10,
-            border: stage === "rejected"
-              ? "1px solid rgba(239, 68, 68, 0.25)"
-              : "1px solid rgba(245, 158, 11, 0.25)",
-            background: stage === "rejected"
-              ? "rgba(239, 68, 68, 0.06)"
-              : "rgba(245, 158, 11, 0.06)",
+            border: `1px solid ${STAGE_ACCENT[stage]}`,
+            background: STAGE_ACCENT_BACKGROUND[stage],
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
           }}
           role="alert"
         >
           <span style={{ fontSize: "0.875rem", color: "var(--text)" }}>
-            {stage === "rejected"
-              ? "Wallet connection was not approved."
-              : "Your wallet is on the wrong network."}
+            {guidance.message}
+          </span>
+          <span style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
+            {guidance.nextStep}
+          </span>
+          <span
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              marginTop: "0.25rem",
+            }}
+          >
+            {guidance.installUrl ? (
+              <a
+                href={guidance.installUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: "0.8125rem", color: "var(--accent, #2563eb)" }}
+              >
+                Install a Stellar wallet
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                fontSize: "0.8125rem",
+                background: "none",
+                border: 0,
+                padding: 0,
+                textDecoration: "underline",
+                cursor: "pointer",
+                color: "var(--accent, #2563eb)",
+              }}
+            >
+              Reload page
+            </button>
           </span>
         </div>
       ) : null}
@@ -173,5 +259,7 @@ function stageLabel(stage: WalletStage): string {
       return "Wallet connection was not approved.";
     case "network-mismatch":
       return "Your wallet is on the wrong network.";
+    case "no-wallet":
+      return "No Stellar wallet extension was detected.";
   }
 }

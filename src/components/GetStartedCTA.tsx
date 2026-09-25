@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LuSparkles } from "react-icons/lu";
+import { useWallet } from "./wallet-connect/Walletcontext";
 
 const GetStartedCTA: React.FC = () => {
   const navigate = useNavigate();
+  const { connected } = useWallet();
   const [isPrimaryHovered, setIsPrimaryHovered] = useState(false);
   const [isSecondaryHovered, setIsSecondaryHovered] = useState(false);
 
@@ -36,8 +38,12 @@ const GetStartedCTA: React.FC = () => {
           onMouseEnter={() => setIsPrimaryHovered(true)}
           onMouseLeave={() => setIsPrimaryHovered(false)}
           onClick={() => navigate("/dashboard")}
+          aria-label={connected ? "Launch dashboard" : "Connect wallet to launch dashboard"}
         >
-          Launch dashboard
+          {connected ? "Launch dashboard" : "Connect wallet"}
+          onClick={() => navigate(connected ? "/dashboard" : "/connect-wallet")}
+        >
+          {connected ? "Launch dashboard" : "Connect wallet to launch"}
           <span style={styles.arrow}>→</span>
         </button>
         <button

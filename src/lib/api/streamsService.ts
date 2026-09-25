@@ -7,10 +7,12 @@ import {
   normalizeStreamRecord,
   sanitizeStellarAddress,
   streamRecords as seededStreamRecords,
+  validateStreamRecord,
   type StreamRecord,
   type StreamStatus,
 } from "../../data/streamRecords";
 import { formatAssetAmount } from "../formatters";
+import { logger } from "../logger";
 
 const DEFAULT_BASE_URL = "http://localhost:8787";
 
@@ -75,17 +77,59 @@ const MAX_RETRY_DELAY_MS = 8_000;
 export class StreamsServiceError extends Error {
   readonly kind: "network" | "http" | "shape" | "timeout";
   readonly status?: number;
+  /**
+   * For `kind: "shape"` failures, the individual schema violations that were
+   * found, one entry per offending field. Retained on the error so a failure
+   * is diagnosable at the boundary instead of surfacing later as a blank or
+   * incorrect figure in a component.
+   */
+  readonly issues?: readonly string[];
 
   constructor(
     message: string,
     kind: "network" | "http" | "shape" | "timeout",
     status?: number,
+    issues?: readonly string[],
   ) {
     super(message);
     this.name = "StreamsServiceError";
     this.kind = kind;
     this.status = status;
+    this.issues = issues;
   }
+}
+
+/**
+ * Human-readable description of an unexpected value, used to make shape errors
+ * diagnosable without dumping the whole payload into the message.
+ */
+function describeValue(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  return typeof value;
+}
+
+function shapeError(
+  path: string,
+  detail: string,
+  issues: readonly string[],
+): StreamsServiceError {
+  return new StreamsServiceError(
+    `Streams service response for ${path} failed schema validation (${detail}). ` +
+      issues.map((issue) => `\n  - ${issue}`).join(""),
+    "shape",
+    undefined,
+    issues,
+  );
+}
+
+function isFiniteNumberArray(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) => typeof entry === "number" && Number.isFinite(entry),
+    )
+  );
 }
 
 function readEnv(): ServiceEnv {
@@ -330,7 +374,7 @@ async function fetchJson<T>(
         attempt++;
 
         if (import.meta.env.DEV) {
-          console.warn(
+          logger.warn(
             `[streamsService] Network error on attempt ${attempt}/${maxRetries + 1}. Retrying in ${delayMs}ms…`,
             error,
           );
@@ -445,6 +489,106 @@ function normalizeMetric(raw: unknown): Metric | null {
   };
 }
 
+/**
+ * Declared schema for the `/treasury/metrics` response elements. Mirrors the
+ * `Metric` props the dashboard renders, so a component can only ever receive a
+ * value that passed validation.
+ */
+function validateMetricEntries(raw: unknown, path: string): Metric[] {
+  if (!Array.isArray(raw)) {
+    throw shapeError(path, "expected an array", [
+      `expected an array, received ${describeValue(raw)}`,
+    ]);
+  }
+
+  const issues: string[] = [];
+  raw.forEach((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      issues.push(
+        `[${index}] must be an object, received ${describeValue(entry)}`,
+      );
+      return;
+    }
+    const source = entry as Record<string, unknown>;
+    if (typeof source.label !== "string" || source.label.trim() === "") {
+      issues.push(`[${index}].label must be a non-empty string`);
+    }
+    if (typeof source.value !== "string" || source.value.trim() === "") {
+      issues.push(`[${index}].value must be a non-empty string`);
+    }
+    if (source.desc !== undefined && typeof source.desc !== "string") {
+      issues.push(`[${index}].desc must be a string when present`);
+    }
+    if (
+      source.icon !== undefined &&
+      source.icon !== null &&
+      typeof source.icon !== "string"
+    ) {
+      issues.push(`[${index}].icon must be a string when present`);
+    }
+    if (source.trend !== undefined && !isFiniteNumberArray(source.trend)) {
+      issues.push(
+        `[${index}].trend must be an array of finite numbers when present`,
+      );
+    }
+  });
+
+  if (issues.length > 0) {
+    throw shapeError(path, `${issues.length} invalid metric field(s)`, issues);
+  }
+
+  return raw
+    .map(normalizeMetric)
+    .filter((metric): metric is Metric => metric !== null);
+}
+
+/**
+ * Declared schema for list responses of stream records. Each element is
+ * normalized onto a {@link StreamRecord} and checked against
+ * {@link validateStreamRecord}, the canonical record schema; every violation
+ * is collected so one failure reports all offending fields at once.
+ */
+function validateStreamEntries(raw: unknown, path: string): StreamRecord[] {
+  if (!Array.isArray(raw)) {
+    throw shapeError(path, "expected an array", [
+      `expected an array, received ${describeValue(raw)}`,
+    ]);
+  }
+
+  const records = raw.map(normalizeStreamRecord);
+  const issues = records.flatMap((record, index) =>
+    validateStreamRecord(record).map((issue) => `[${index}] ${issue}`),
+  );
+
+  if (issues.length > 0) {
+    throw shapeError(
+      path,
+      `${issues.length} invalid stream record field(s)`,
+      issues,
+    );
+  }
+
+  return records;
+}
+
+/** Single-record counterpart of {@link validateStreamEntries}. */
+function validateStreamEntry(raw: unknown, path: string): StreamRecord {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw shapeError(path, "expected an object", [
+      `expected an object, received ${describeValue(raw)}`,
+    ]);
+  }
+
+  const record = normalizeStreamRecord(raw);
+  const issues = validateStreamRecord(record);
+
+  if (issues.length > 0) {
+    throw shapeError(path, `${issues.length} invalid field(s)`, issues);
+  }
+
+  return record;
+}
+
 function applyStreamFilters(
   records: StreamRecord[],
   filters?: StreamsFilters,
@@ -495,16 +639,8 @@ export async function getTreasuryMetrics(
   if (isMockMode()) {
     return deriveMockMetrics(seededStreamRecords);
   }
-  const raw = await fetchJson<unknown[]>("/treasury/metrics", undefined, options);
-  if (!Array.isArray(raw)) {
-    throw new StreamsServiceError(
-      "Treasury metrics payload was not an array",
-      "shape",
-    );
-  }
-  return raw
-    .map(normalizeMetric)
-    .filter((metric): metric is Metric => metric !== null);
+  const raw = await fetchJson<unknown>("/treasury/metrics", undefined, options);
+  return validateMetricEntries(raw, "/treasury/metrics");
 }
 
 /**
@@ -524,14 +660,8 @@ export async function getStreams(
     return applyStreamFilters(seededStreamRecords, filters);
   }
   const path = `/streams${buildStreamsQuery(filters)}`;
-  const raw = await fetchJson<unknown[]>(path, undefined, options);
-  if (!Array.isArray(raw)) {
-    throw new StreamsServiceError(
-      "Streams payload was not an array",
-      "shape",
-    );
-  }
-  return raw.map(normalizeStreamRecord);
+  const raw = await fetchJson<unknown>(path, undefined, options);
+  return validateStreamEntries(raw, path);
 }
 
 /**
@@ -555,13 +685,10 @@ export async function getStreamById(
       ? { signal: signalOrOptions }
       : signalOrOptions ?? {};
 
+  const path = `/streams/${encodeURIComponent(id)}`;
   try {
-    const raw = await fetchJson<unknown>(
-      `/streams/${encodeURIComponent(id)}`,
-      undefined,
-      options,
-    );
-    return normalizeStreamRecord(raw);
+    const raw = await fetchJson<unknown>(path, undefined, options);
+    return validateStreamEntry(raw, path);
   } catch (error) {
     if (error instanceof StreamsServiceError && error.status === 404) {
       return null;
@@ -590,17 +717,8 @@ export async function getRecipientStreams(
       (record) => record.recipientAddress === safe,
     );
   }
-  const raw = await fetchJson<unknown[]>(
-    `/recipients/${encodeURIComponent(safe)}/streams`,
-    undefined,
-    options,
-  );
-  if (!Array.isArray(raw)) {
-    throw new StreamsServiceError(
-      "Recipient streams payload was not an array",
-      "shape",
-    );
-  }
-  return raw.map(normalizeStreamRecord);
+  const path = `/recipients/${encodeURIComponent(safe)}/streams`;
+  const raw = await fetchJson<unknown>(path, undefined, options);
+  return validateStreamEntries(raw, path);
 }
 

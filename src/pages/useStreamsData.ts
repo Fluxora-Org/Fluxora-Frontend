@@ -151,6 +151,7 @@ export interface StreamsDataResult {
 
   // ── ARIA / announcements ──────────────────────────────────────────────────
   announcement: string;
+  alertAnnouncement: string;
 
   // ── Cleared optimistic state ──────────────────────────────────────────────
   clearResolvedOptimisticOps: () => void;
@@ -161,7 +162,7 @@ export interface StreamsDataResult {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function useStreamsData(): StreamsDataResult {
-  const { announcement, announce } = useLiveAnnouncer();
+  const { announcement, alertAnnouncement, announce } = useLiveAnnouncer();
   const { t } = useI18n();
   const wallet = useWallet();
   const walletAddress = wallet.address?.trim() ?? "";
@@ -601,6 +602,7 @@ export function useStreamsData(): StreamsDataResult {
 
     // aria
     announcement,
+    alertAnnouncement,
 
     // helpers
     clearResolvedOptimisticOps: clearResolvedOptimistic,

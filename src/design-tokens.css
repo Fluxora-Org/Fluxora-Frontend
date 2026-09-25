@@ -1050,6 +1050,10 @@
 }
 
 /* Persistent action: stays above long lists without covering mobile navigation. */
+.create-stream-fab__spacer {
+  display: none;
+}
+
 .create-stream-fab {
   position: fixed;
   right: max(var(--fab-side-offset), env(safe-area-inset-right));
@@ -1125,6 +1129,14 @@
   .create-stream-fab {
     right: max(var(--space-lg), env(safe-area-inset-right));
     bottom: max(var(--fab-bottom-offset-mobile), env(safe-area-inset-bottom));
+  }
+
+  .create-stream-fab__spacer {
+    display: block;
+    height: calc(var(--fab-size) + var(--fab-bottom-offset-mobile, 88px));
+    width: 100%;
+    pointer-events: none;
+    flex-shrink: 0;
   }
 }
 

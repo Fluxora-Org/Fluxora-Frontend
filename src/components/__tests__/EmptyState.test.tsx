@@ -92,6 +92,38 @@ describe("EmptyState — loading state", () => {
   });
 });
 
+describe("EmptyState — empty, loading, and error states are distinct", () => {
+  it("renders different content for each state", () => {
+    const onRetry = vi.fn();
+    const { container: emptyContainer } = render(
+      <EmptyState variant="treasury" walletConnected={true} />
+    );
+    const emptyOutput = emptyContainer.textContent;
+
+    const { container: loadingContainer } = render(
+      <EmptyState variant="treasury" walletConnected={true} loading />
+    );
+    const loadingOutput = loadingContainer.textContent;
+
+    const { container: errorContainer } = render(
+      <EmptyState
+        variant="treasury"
+        walletConnected={true}
+        error="Network error"
+        onRetry={onRetry}
+      />
+    );
+    const errorOutput = errorContainer.textContent;
+
+    expect(emptyOutput).toContain("No streams yet");
+    expect(loadingOutput).toContain("Loading content, please wait");
+    expect(errorOutput).toContain("Something went wrong");
+    expect(errorOutput).toContain("Network error");
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(new Set([emptyOutput, loadingOutput, errorOutput]).size).toBe(3);
+  });
+});
+
 // ── Error banner ──────────────────────────────────────────────────────────────
 
 describe("EmptyState — error state", () => {

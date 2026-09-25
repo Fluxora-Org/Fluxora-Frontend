@@ -385,7 +385,6 @@ export default function ToastNotification({
     <div
       className={`toast-notification toast-notification--${variant}`}
       aria-atomic="true"
-      aria-label={`${label} notification`}
       data-variant={variant}
       {...semantics}
     >

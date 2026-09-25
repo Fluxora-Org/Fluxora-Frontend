@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /**
  * Persistent offline action queue for submissions captured while offline.
  *
@@ -37,7 +39,7 @@ function loadQueueFromStorage(): void {
       }
     }
   } catch (error) {
-    console.warn('Failed to load offline queue from storage:', error);
+    logger.error("Failed to load offline queue from storage", error);
     queue = [];
     sequenceCounter = 0;
   }
@@ -51,7 +53,7 @@ function saveQueueToStorage(): void {
       sequenceCounter
     }));
   } catch (error) {
-    console.warn('Failed to save offline queue to storage:', error);
+    logger.error("Failed to save offline queue to storage", error);
   }
 }
 

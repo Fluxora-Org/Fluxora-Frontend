@@ -46,8 +46,17 @@
 }
 
 /* Alias for primary variant */
-.buttonPrimary { /* reuse base button styles */
-  /* No extra styles – inherits .button */
+.buttonPrimary {
+  background-color: #006f7a;
+  color: #ffffff;
+}
+
+.buttonPrimary:not(:disabled):hover {
+  background-color: #00515c;
+}
+
+.buttonPrimary:not(:disabled):active {
+  background-color: #003d46;
 }
 
 /* Ghost variant (transparent) */
@@ -116,9 +125,9 @@
    ═══════════════════════════════════════════════════════════ */
 
 .button:disabled {
-  background-color: var(--color-text-secondary);
-  opacity: 0.6;
-  color: var(--color-text-muted);
+  background-color: var(--color-surface-raised);
+  opacity: 0.72;
+  color: var(--color-text-primary);
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -185,30 +194,32 @@
 
 /* Danger variant */
 .buttonDanger {
-  background-color: var(--color-danger);
+  background-color: #bb2124;
+  color: #ffffff;
 }
 
 .buttonDanger:not(:disabled):hover {
-  background-color: var(--color-danger-hover);
+  background-color: #8f1d1d;
   box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
 }
 
 .buttonDanger:not(:disabled):active {
-  background-color: var(--color-danger-active);
+  background-color: #6d1010;
 }
 
 /* Success variant */
 .buttonSuccess {
-  background-color: var(--color-success);
+  background-color: #047857;
+  color: #ffffff;
 }
 
 .buttonSuccess:not(:disabled):hover {
-  background-color: var(--color-success-hover);
+  background-color: #065f46;
   box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
 }
 
 .buttonSuccess:not(:disabled):active {
-  background-color: var(--color-success-active);
+  background-color: #064e3b;
 }
 
 /* ═══════════════════════════════════════════════════════════

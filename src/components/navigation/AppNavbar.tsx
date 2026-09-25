@@ -18,7 +18,6 @@ import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
 import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
 
-
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
   isSidebarOpen?: boolean;
@@ -35,9 +34,14 @@ const ANON_LINKS = [
  * Hoisted to module scope so it is never rebuilt per render.
  */
 const BREADCRUMB_LABEL_MAP: Record<string, string> = {
+  app: "Dashboard",
+  dashboard: "Dashboard",
   streams: "Streams",
   recipient: "Recipient",
   treasury: "Treasury",
+  treasurypage: "Treasury",
+  "empty-state-demo": "Empty State Demo",
+  "component-gallery": "Component Gallery",
 };
 
 /** Stellar public key: starts with G, 56 chars, base32 (no 0,1,8,9). */
@@ -70,38 +74,106 @@ function FluxoraLogo({ connected }: { connected: boolean }) {
       aria-label="Fluxora home"
       className="flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-md"
     >
-      <svg width="34" height="34" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+      <svg
+        width="34"
+        height="34"
+        viewBox="0 0 46 46"
+        fill="none"
+        aria-hidden="true"
+      >
         <defs>
-          <filter id="nav_f" x="0" y="0" width="45.9936" height="45.9936" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <filter
+            id="nav_f"
+            x="0"
+            y="0"
+            width="45.9936"
+            height="45.9936"
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
             <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feMorphology radius="2" operator="erode" in="SourceAlpha" result="e1" />
-            <feOffset dy="2" /><feGaussianBlur stdDeviation="2" /><feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0" />
+            <feColorMatrix
+              in="SourceAlpha"
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+              result="hardAlpha"
+            />
+            <feMorphology
+              radius="2"
+              operator="erode"
+              in="SourceAlpha"
+              result="e1"
+            />
+            <feOffset dy="2" />
+            <feGaussianBlur stdDeviation="2" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0"
+            />
             <feBlend mode="normal" in2="BackgroundImageFix" result="e1" />
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
-            <feMorphology radius="1" operator="erode" in="SourceAlpha" result="e2" />
-            <feOffset dy="4" /><feGaussianBlur stdDeviation="3" /><feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0" />
+            <feColorMatrix
+              in="SourceAlpha"
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+              result="hardAlpha"
+            />
+            <feMorphology
+              radius="1"
+              operator="erode"
+              in="SourceAlpha"
+              result="e2"
+            />
+            <feOffset dy="4" />
+            <feGaussianBlur stdDeviation="3" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix
+              type="matrix"
+              values="0 0 0 0 0 0 0 0 0 0.721569 0 0 0 0 0.831373 0 0 0 0.2 0"
+            />
             <feBlend mode="normal" in2="e1" result="e2" />
             <feBlend mode="normal" in="SourceGraphic" in2="e2" result="shape" />
           </filter>
-          <linearGradient id="nav_g" x1="22.9968" y1="1" x2="22.9968" y2="36.9936" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#00B8D4" /><stop offset="1" stopColor="#0097A7" />
+          <linearGradient
+            id="nav_g"
+            x1="22.9968"
+            y1="1"
+            x2="22.9968"
+            y2="36.9936"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#00B8D4" />
+            <stop offset="1" stopColor="#0097A7" />
           </linearGradient>
           <clipPath id="nav_c">
-            <rect width="19.9952" height="19.9952" fill="white" transform="translate(12.9938 8.99917)" />
+            <rect
+              width="19.9952"
+              height="19.9952"
+              fill="white"
+              transform="translate(12.9938 8.99917)"
+            />
           </clipPath>
         </defs>
         <g filter="url(#nav_f)">
-          <path d="M5 9C5 4.58173 8.58172 1 13 1H32.9936C37.4119 1 40.9936 4.58172 40.9936 9V28.9936C40.9936 33.4119 37.4119 36.9936 32.9936 36.9936H13C8.58173 36.9936 5 33.4119 5 28.9936V9Z" fill="url(#nav_g)" shapeRendering="crispEdges" />
+          <path
+            d="M5 9C5 4.58173 8.58172 1 13 1H32.9936C37.4119 1 40.9936 4.58172 40.9936 9V28.9936C40.9936 33.4119 37.4119 36.9936 32.9936 36.9936H13C8.58173 36.9936 5 33.4119 5 28.9936V9Z"
+            fill="url(#nav_g)"
+            shapeRendering="crispEdges"
+          />
           <g clipPath="url(#nav_c)">
             {[
               "M14.6601 13.998C15.16 14.4145 15.6598 14.8311 16.7429 14.8311C18.8258 14.8311 18.8258 13.1648 20.9086 13.1648C23.0748 13.1648 22.9081 14.8311 25.0743 14.8311C27.1571 14.8311 27.1571 13.1648 29.24 13.1648C30.323 13.1648 30.8229 13.5814 31.3228 13.998",
               "M14.6601 18.9968C15.16 19.4134 15.6598 19.8299 16.7429 19.8299C18.8258 19.8299 18.8258 18.1637 20.9086 18.1637C23.0748 18.1637 22.9081 19.8299 25.0743 19.8299C27.1571 19.8299 27.1571 18.1637 29.24 18.1637C30.323 18.1637 30.8229 18.5802 31.3228 18.9968",
               "M14.6601 23.9956C15.16 24.4122 15.6598 24.8287 16.7429 24.8287C18.8258 24.8287 18.8258 23.1625 20.9086 23.1625C23.0748 23.1625 22.9081 24.8287 25.0743 24.8287C27.1571 24.8287 27.1571 23.1625 29.24 23.1625C30.323 23.1625 30.8229 23.579 31.3228 23.9956",
             ].map((d, i) => (
-              <path key={i} d={d} stroke="white" strokeWidth="2.08284" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                key={i}
+                d={d}
+                stroke="white"
+                strokeWidth="2.08284"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             ))}
           </g>
         </g>
@@ -115,7 +187,11 @@ function FluxoraLogo({ connected }: { connected: boolean }) {
 
 function ConnectingSkeleton() {
   return (
-    <div className="flex items-center gap-2" aria-label="Connecting wallet…" role="status">
+    <div
+      className="flex items-center gap-2"
+      aria-label="Connecting wallet…"
+      role="status"
+    >
       <div className="h-8 w-20 rounded-full bg-[var(--surface)] animate-pulse" />
       <div className="h-9 w-32 rounded-full bg-[var(--surface)] animate-pulse" />
     </div>
@@ -123,27 +199,81 @@ function ConnectingSkeleton() {
 }
 
 /**
- * Build breadcrumb items from the current pathname.
- * e.g. /app/streams/STR-001 → [Streams, STR-001]
+ * Build breadcrumb items from the actual app route hierarchy.
+ *
+ * The app router exposes a nested route tree under /app. Breadcrumbs should
+ * mirror that structure instead of inferring hierarchy from raw path segments,
+ * so deep routes such as /app/streams/STR-123 render as:
+ * Dashboard → Streams → STR-123
+ * while page routes such as /app/treasurypage render as:
+ * Dashboard → Treasury
  */
 function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
-  // Memoized so the label map lookups and per-segment address checks only
-  // re-run when the pathname actually changes, not on every navbar render.
   return useMemo(() => {
-    if (!pathname.startsWith("/app")) return [];
+    const normalizedPath = decodeURIComponent(pathname).split("?")[0];
+    if (!normalizedPath.startsWith("/app") || normalizedPath === "/app")
+      return [];
 
-    const segments = pathname.replace("/app", "").split("/").filter(Boolean);
-    if (segments.length === 0) return [];
-
-    const items: BreadcrumbItem[] = [];
+    const segments = normalizedPath
+      .replace(/^\/app\/?/, "")
+      .split("/")
+      .filter(Boolean);
+    const items: BreadcrumbItem[] = [{ label: "Dashboard", to: "/app" }];
     let accumulatedPath = "/app";
 
     segments.forEach((segment, index) => {
       accumulatedPath += `/${segment}`;
       const isLast = index === segments.length - 1;
+
+      if (segment === "streams" && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Streams",
+        });
+        return;
+      }
+
+      if (segment === "recipient" && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Recipient",
+        });
+        return;
+      }
+
+      if ((segment === "treasurypage" || segment === "treasury") && isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Treasury",
+        });
+        return;
+      }
+
+      if (segment === "streams" && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Streams",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
+      if (segment === "recipient" && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Recipient",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
+      if ((segment === "treasurypage" || segment === "treasury") && !isLast) {
+        items.push({
+          label: BREADCRUMB_LABEL_MAP[segment] ?? "Treasury",
+          to: accumulatedPath,
+        });
+        return;
+      }
+
       const label = isStellarAddressSegment(segment)
         ? maskAddressSegment(segment)
-        : BREADCRUMB_LABEL_MAP[segment] ?? segment;
+        : (BREADCRUMB_LABEL_MAP[segment] ?? decodeURIComponent(segment));
+
       items.push({
         label,
         to: isLast ? undefined : accumulatedPath,
@@ -157,7 +287,7 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
 function NavbarTimeIndicator() {
   const [manualTime, setManualTime] = useState<Date | null>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  const tickingNow = useTickingNow();
+  const tickingNow = useTickingNow({ precision: "minute" });
 
   useEffect(() => {
     setManualTime(null);
@@ -171,7 +301,10 @@ function NavbarTimeIndicator() {
     ? `UTC: ${formatNavbarTime(displayTimeDate, { compact: true, timezone: "UTC" })}`
     : `Local: ${formatNavbarTime(displayTimeDate, { compact: false, timezone: tz })}`;
 
-  const mobileText = formatNavbarTime(displayTimeDate, { compact: true, timezone: tz });
+  const mobileText = formatNavbarTime(displayTimeDate, {
+    compact: true,
+    timezone: tz,
+  });
 
   const handleFocus = () => {
     setManualTime(new Date());
@@ -217,10 +350,16 @@ function NavbarTimeIndicator() {
         aria-describedby="navbar-time-tooltip"
         className="px-3 min-h-[44px] rounded-full border border-[var(--navbar-icon-border)] hover:border-[var(--accent)]/50 text-[var(--color-text-secondary)] hover:text-[var(--accent)] bg-transparent hover:bg-[var(--surface-elevated)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center justify-center cursor-pointer select-none"
       >
-        <span aria-live="off" className="hidden md:inline font-sans text-xs font-semibold">
+        <span
+          aria-live="off"
+          className="hidden md:inline font-sans text-xs font-semibold"
+        >
           {desktopText}
         </span>
-        <span aria-live="off" className="md:hidden font-sans text-xs font-semibold">
+        <span
+          aria-live="off"
+          className="md:hidden font-sans text-xs font-semibold"
+        >
           {mobileText}
         </span>
       </button>
@@ -313,7 +452,10 @@ export default function AppNavbar({
   useEffect(() => {
     setRouteTransitioning(true);
     if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
-    transitionTimerRef.current = setTimeout(() => setRouteTransitioning(false), 250);
+    transitionTimerRef.current = setTimeout(
+      () => setRouteTransitioning(false),
+      250,
+    );
     return () => {
       if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
     };
@@ -373,11 +515,19 @@ export default function AppNavbar({
             <button
               className="md:hidden flex items-center justify-center w-11 h-11 -ml-2 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               onClick={onSidebarToggle}
-              aria-label={isSidebarOpen ? "Close navigation sidebar" : "Open navigation sidebar"}
+              aria-label={
+                isSidebarOpen
+                  ? "Close navigation sidebar"
+                  : "Open navigation sidebar"
+              }
               aria-expanded={isSidebarOpen}
               aria-controls="app-sidebar"
             >
-              {isSidebarOpen ? <X className="icon-md" aria-hidden="true" /> : <Menu className="icon-md" aria-hidden="true" />}
+              {isSidebarOpen ? (
+                <X className="icon-md" aria-hidden="true" />
+              ) : (
+                <Menu className="icon-md" aria-hidden="true" />
+              )}
             </button>
           )}
           <FluxoraLogo connected={connected} />
@@ -385,37 +535,37 @@ export default function AppNavbar({
 
         {/* Center: Nav links (desktop) */}
         <nav
-  aria-label={connected ? "App navigation" : "Marketing navigation"}
-  className="hidden md:flex items-center gap-1"
->
-  {/* Primary destinations — full visual weight */}
-  {(connected ? APP_PRIMARY_LINKS : ANON_LINKS).map((link) => (
-    <NavLink key={link.to} to={link.to} label={link.label} />
-  ))}
+          aria-label={connected ? "App navigation" : "Marketing navigation"}
+          className="hidden md:flex items-center gap-1"
+        >
+          {/* Primary destinations — full visual weight */}
+          {(connected ? APP_PRIMARY_LINKS : ANON_LINKS).map((link) => (
+            <NavLink key={link.to} to={link.to} label={link.label} />
+          ))}
 
-  {/* Secondary/utility — reduced visual weight, separated */}
-  {connected && APP_SECONDARY_LINKS.length > 0 && (
-    <>
-      <span
-        aria-hidden="true"
-        style={{
-          width: "1px",
-          height: "20px",
-          background: "var(--navbar-border)",
-          margin: "0 var(--space-sm)",
-        }}
-      />
-      {APP_SECONDARY_LINKS.map((link) => (
-        <NavLink
-          key={link.to}
-          to={link.to}
-          label={link.label}
-          variant="secondary"
-        />
-      ))}
-    </>
-  )}
-</nav>
+          {/* Secondary/utility — reduced visual weight, separated */}
+          {connected && APP_SECONDARY_LINKS.length > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: "1px",
+                  height: "20px",
+                  background: "var(--navbar-border)",
+                  margin: "0 var(--space-sm)",
+                }}
+              />
+              {APP_SECONDARY_LINKS.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  label={link.label}
+                  variant="secondary"
+                />
+              ))}
+            </>
+          )}
+        </nav>
 
         {/* Right Actions & Time Indicator */}
         <div className="flex items-center gap-3">
@@ -433,7 +583,9 @@ export default function AppNavbar({
               className="flex items-center gap-2.5 px-3.5 py-1.5 h-10 rounded-full border border-[var(--navbar-icon-border)] bg-[var(--surface-sunken)] hover:border-[var(--accent)]/50 text-[var(--text-muted)] hover:text-[var(--text)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] text-xs font-medium"
             >
               <Search size={15} aria-hidden="true" />
-              <span className="hidden lg:inline">Search commands & help...</span>
+              <span className="hidden lg:inline">
+                Search commands & help...
+              </span>
               <span className="lg:hidden">Search...</span>
               <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[10px] font-mono font-semibold text-[var(--text-muted)]">
                 <Command size={10} />K
@@ -448,7 +600,11 @@ export default function AppNavbar({
               onClick={toggleEasyReadFont}
               aria-label="Toggle easy-read font"
               aria-pressed={easyReadFont}
-              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
+              title={
+                easyReadFont
+                  ? "Disable easy-read font"
+                  : "Enable easy-read font"
+              }
               className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"
@@ -506,7 +662,11 @@ export default function AppNavbar({
               type="button"
               className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-[var(--navbar-icon-color)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-label={
+                mobileMenuOpen
+                  ? "Close navigation menu"
+                  : "Open navigation menu"
+              }
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
             >
@@ -520,16 +680,19 @@ export default function AppNavbar({
         </div>
       </div>
       {/* Breadcrumb — shown on deep pages (e.g. Streams / STR-001) */}
-{showBreadcrumb && (
-  <div
-    className="w-full border-t border-[var(--navbar-border)] bg-[var(--navbar-bg)] px-4 sm:px-6"
-    style={{ paddingTop: "var(--space-sm)", paddingBottom: "var(--space-sm)" }}
-  >
-    <div className="mx-auto max-w-7xl">
-      <Breadcrumb items={breadcrumbs} />
-    </div>
-  </div>
-)}
+      {showBreadcrumb && (
+        <div
+          className="w-full border-t border-[var(--navbar-border)] bg-[var(--navbar-bg)] px-4 sm:px-6"
+          style={{
+            paddingTop: "var(--space-sm)",
+            paddingBottom: "var(--space-sm)",
+          }}
+        >
+          <div className="mx-auto max-w-7xl">
+            <Breadcrumb items={breadcrumbs} />
+          </div>
+        </div>
+      )}
 
       {/* Mobile menu (Dropdown for marketing site) */}
       {mobileMenuOpen && !isAppView && (
@@ -554,7 +717,11 @@ export default function AppNavbar({
               onClick={toggleEasyReadFont}
               aria-label="Toggle easy-read font"
               aria-pressed={easyReadFont}
-              title={easyReadFont ? "Disable easy-read font" : "Enable easy-read font"}
+              title={
+                easyReadFont
+                  ? "Disable easy-read font"
+                  : "Enable easy-read font"
+              }
               className={`flex items-center justify-center min-h-[44px] min-w-[44px] px-2 rounded-full border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
                 easyReadFont
                   ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--surface-elevated)]"

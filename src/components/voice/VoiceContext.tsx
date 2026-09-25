@@ -14,53 +14,83 @@ import {
   VoiceCommandDef,
   RecognizedCommand,
   VoiceContextValue,
+  VoiceConfirmationIntent,
 } from "./voiceTypes";
 
-const DEFAULT_COMMANDS: VoiceCommandDef[] = [
-  {
-    id: "nav-dashboard",
-    phrase: "Go to dashboard",
-    aliases: ["open dashboard", "dashboard", "home", "show dashboard"],
-    category: "Navigation",
-    description: "Navigate to the main capital streaming dashboard",
-  },
-  {
-    id: "nav-streams",
-    phrase: "Go to streams",
-    aliases: ["open streams", "streams", "view streams", "stream list"],
-    category: "Navigation",
-    description: "Navigate to active and archived treasury streams",
-  },
-  {
-    id: "nav-recipient",
-    phrase: "Go to recipient",
-    aliases: ["open recipient", "recipient", "view recipient", "recipient claims"],
-    category: "Navigation",
-    description: "Navigate to recipient claim and withdrawal view",
-  },
-  {
-    id: "action-create-stream",
-    phrase: "Create stream",
-    aliases: ["new stream", "start stream", "add stream"],
-    category: "Action",
-    description: "Open the new stream creation modal",
-  },
-  {
-    id: "action-withdraw",
-    phrase: "Withdraw",
-    aliases: ["withdraw funds", "claim funds", "withdraw capital"],
-    category: "Action",
-    description: "Initiate available capital withdrawal",
-  },
-  {
-    id: "destructive-cancel-stream",
-    phrase: "Cancel stream",
-    aliases: ["delete stream", "stop stream", "terminate stream"],
-    category: "Destructive",
-    description: "Cancel an active streaming contract (Requires confirmation)",
-    requiresConfirmation: true,
-  },
-];
+/**
+ * Single source of truth for both recognition and the command reference UI.
+ * Keeping this exported makes it possible to verify that every accepted
+ * phrase is documented without maintaining a second test-only dictionary.
+ */
+export const DEFAULT_COMMANDS: VoiceCommandDef[] = [
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: { results: SpeechRecognitionResultLike[] }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type WindowWithSpeechRecognition = typeof window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
+
+/** Only explicitly delimited details are accepted; a stray substring cannot trigger cancellation. */
+function parseConfirmationIntent(
+  command: VoiceCommandDef,
+  transcript: string,
+): VoiceConfirmationIntent | null {
+  const spoken = transcript.trim().replace(/\s+/g, " ");
+  const prefix = [command.phrase, ...command.aliases].find((candidate) =>
+    spoken.toLowerCase().startsWith(candidate.toLowerCase()),
+  );
+  if (!prefix) return null;
+  const remainder = spoken.slice(prefix.length);
+  if (!remainder) {
+    return {
+      action: command.phrase,
+      amount: null,
+      recipient: null,
+      stream: null,
+    };
+  }
+
+  // "Cancel stream STR-001 for Alice amount 250 USDC"
+  const streamFirst = remainder.match(
+    /^\s+(.+?)\s+for\s+(.+?)\s+amount\s+([\d,]+(?:\.\d+)?\s+[A-Za-z][\w-]*)$/i,
+  );
+  if (streamFirst) {
+    return {
+      action: command.phrase,
+      stream: streamFirst[1].trim(),
+      recipient: streamFirst[2].trim(),
+      amount: streamFirst[3].trim(),
+    };
+  }
+
+  // "Cancel stream amount 250 USDC to Alice from stream STR-001"
+  const amountFirst = remainder.match(
+    /^\s+amount\s+([\d,]+(?:\.\d+)?\s+[A-Za-z][\w-]*)\s+to\s+(.+?)\s+(?:for|from)\s+stream\s+(.+)$/i,
+  );
+  if (!amountFirst) return null;
+  return {
+    action: command.phrase,
+    amount: amountFirst[1].trim(),
+    recipient: amountFirst[2].trim(),
+    stream: amountFirst[3].trim(),
+  };
+}
 
 const VoiceContext = createContext<VoiceContextValue | null>(null);
 
@@ -83,14 +113,14 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<VoiceCommandDef | null>(null);
   const [panelOpen, setPanelOpen] = useState<boolean>(false);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   // Feature detection
   useEffect(() => {
     if (typeof window === "undefined") return;
     const SpeechRecognitionClass =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      (window as WindowWithSpeechRecognition).SpeechRecognition ??
+      (window as WindowWithSpeechRecognition).webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       setIsSupported(false);
       setState("unsupported-browser");
@@ -102,50 +132,65 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   // commands so that longer utterances that happen to contain the phrase
   // "Cancel stream" do not accidentally trigger the destructive confirmation
   // flow (Issue #938).
-  const matchCommand = useCallback((spokenText: string): VoiceCommandDef | "ambiguous" | null => {
-    const clean = spokenText.trim().toLowerCase();
-    if (!clean) return null;
+  const matchCommand = useCallback(
+    (spokenText: string): VoiceCommandDef | "ambiguous" | null => {
+      const clean = spokenText.trim().toLowerCase();
+      if (!clean) return null;
 
-    // "stream" is a shared stem for navigation, creation, and cancellation.
-    // It is never specific enough to select a safe target.
-    if (clean === "stream") return "ambiguous";
+      // "stream" is a shared stem for navigation, creation, and cancellation.
+      // It is never specific enough to select a safe target.
+      if (clean === "stream") return "ambiguous";
 
-    // Exact-match pass — check every command's phrase and aliases first.
-    for (const cmd of DEFAULT_COMMANDS) {
-      if (cmd.phrase.toLowerCase() === clean) return cmd;
-      if (cmd.aliases.some((alias) => alias.toLowerCase() === clean)) return cmd;
-    }
+      // Exact-match pass — check every command's phrase and aliases first.
+      for (const cmd of DEFAULT_COMMANDS) {
+        if (cmd.phrase.toLowerCase() === clean) return cmd;
+        if (cmd.aliases.some((alias) => alias.toLowerCase() === clean))
+          return cmd;
+      }
 
-    // Partial matches must be unique. Returning the first match made phrases
-    // such as "stream" silently choose whichever command appeared first.
-    const partialMatches = DEFAULT_COMMANDS.filter((cmd) => {
-      if (cmd.requiresConfirmation) return false;
-      return (
-        clean.includes(cmd.phrase.toLowerCase()) ||
-        cmd.aliases.some((alias) => clean.includes(alias.toLowerCase()))
+      const destructive = DEFAULT_COMMANDS.find(
+        (cmd) =>
+          cmd.requiresConfirmation &&
+          parseConfirmationIntent(cmd, spokenText)?.amount,
       );
-    });
+      if (destructive) return destructive;
 
-    if (partialMatches.length > 1) return "ambiguous";
-    if (partialMatches.length === 1) return partialMatches[0];
+      // Partial matches must be unique. Returning the first match made phrases
+      // such as "stream" silently choose whichever command appeared first.
+      const partialMatches = DEFAULT_COMMANDS.filter((cmd) => {
+        if (cmd.requiresConfirmation) return false;
+        return (
+          clean.includes(cmd.phrase.toLowerCase()) ||
+          cmd.aliases.some((alias) => clean.includes(alias.toLowerCase()))
+        );
+      });
 
-    return null;
-  }, []);
+      if (partialMatches.length > 1) return "ambiguous";
+      if (partialMatches.length === 1) return partialMatches[0];
+
+      return null;
+    },
+    [],
+  );
 
   // Execute recognized command
   const executeCommand = useCallback(
     (cmd: VoiceCommandDef, rawText: string) => {
+      const intent = cmd.requiresConfirmation
+        ? parseConfirmationIntent(cmd, rawText)
+        : undefined;
       setRecognizedCommand({
         command: cmd,
         rawTranscript: rawText,
         timestamp: Date.now(),
+        intent: intent ?? undefined,
       });
 
       if (cmd.requiresConfirmation) {
         setPendingDestructiveCommand(cmd);
         setState("confirming-destructive");
         announce(
-          `Confirmation required to ${cmd.phrase}. Say confirm or click confirm button.`
+          `Confirmation required to ${cmd.phrase}. Review the action, amount, recipient and stream before confirming.`,
         );
         return;
       }
@@ -174,7 +219,9 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setTimeout(() => {
-        setState((prev) => (prev === "command-recognized" ? "listening" : prev));
+        setState((prev) =>
+          prev === "command-recognized" ? "listening" : prev,
+        );
       }, 2000);
     },
     [navigate, announce]
@@ -238,14 +285,7 @@ const processSpokenPhrase = useCallback(
 
     return false;
   },
-  [
-    matchCommand,
-    executeCommand,
-    pendingDestructiveCommand,
-    confirmDestructiveAction,
-    cancelDestructiveAction,
-    announce,
-  ]
+  [matchCommand, executeCommand, pendingDestructiveCommand, announce]
 );
 
   // Destructive confirmations
@@ -254,7 +294,7 @@ const processSpokenPhrase = useCallback(
     const cmd = pendingDestructiveCommand;
     setPendingDestructiveCommand(null);
     setState("command-recognized");
-    announce(`Destructive action confirmed: ${cmd.phrase} executed.`);
+    announce(`${cmd.phrase} confirmed. Opening the stream cancellation flow.`);
 
     // Perform action (e.g. navigate to streams with cancel modal parameter)
     navigate("/app/streams?action=cancel");
@@ -270,6 +310,74 @@ const processSpokenPhrase = useCallback(
     announce("Destructive action cancelled.");
   }, [announce]);
 
+  // Directly process spoken or typed text phrase (useful for manual testing & speech handler)
+  const processSpokenPhrase = useCallback(
+    (phrase: string): boolean => {
+      setTranscript(phrase);
+      setState("processing");
+
+      // Handle active confirmation step
+      if (pendingDestructiveCommand) {
+        const clean = phrase.trim().toLowerCase();
+
+        if (clean === "confirm" || clean === "yes") {
+          confirmDestructiveAction();
+          return true;
+        }
+
+        if (clean === "cancel" || clean === "no" || clean === "abort") {
+          cancelDestructiveAction();
+          return true;
+        }
+
+        // Do not process other commands while confirmation is pending
+        setState("confirming-destructive");
+        return false;
+      }
+
+      const matched = matchCommand(phrase);
+
+      if (matched === "ambiguous") {
+        setState("command-ambiguous");
+        announce(
+          `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+        );
+        setTimeout(() => {
+          setState((prev) =>
+            prev === "command-ambiguous" ? "listening" : prev,
+          );
+        }, 3000);
+        return false;
+      }
+
+      if (matched) {
+        executeCommand(matched, phrase);
+        return true;
+      }
+
+      setState("command-unrecognized");
+      announce(
+        `Command not recognized for phrase: ${phrase}. Say 'Go to streams' or view command reference.`
+      );
+
+      setTimeout(() => {
+        setState((prev) =>
+          prev === "command-unrecognized" ? "listening" : prev
+        );
+      }, 3000);
+
+      return false;
+    },
+    [
+      matchCommand,
+      executeCommand,
+      pendingDestructiveCommand,
+      confirmDestructiveAction,
+      cancelDestructiveAction,
+      announce,
+    ]
+  );
+
   // Start SpeechRecognition
   const startListening = useCallback(() => {
     if (!isSupported) {
@@ -279,8 +387,8 @@ const processSpokenPhrase = useCallback(
     }
 
     const SpeechRecognitionClass =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      (window as WindowWithSpeechRecognition).SpeechRecognition ??
+      (window as WindowWithSpeechRecognition).webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
       setIsSupported(false);
@@ -307,7 +415,7 @@ const processSpokenPhrase = useCallback(
         announce("Voice navigation active. Listening for commands.");
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const lastIndex = event.results.length - 1;
         const result = event.results[lastIndex];
         const spokenText = result[0].transcript;
@@ -321,10 +429,15 @@ const processSpokenPhrase = useCallback(
       };
 
       recognition.onerror = (event: any) => {
+        if (
+          event.error === "not-allowed" ||
+          event.error === "permission-denied"
+        ) {
+      recognition.onerror = (event) => {
         if (event.error === "not-allowed" || event.error === "permission-denied") {
           setState("permission-denied");
           announce(
-            "Microphone permission denied. Enable microphone access in browser settings."
+            "Microphone permission denied. Enable microphone access in browser settings.",
           );
         } else {
           setState("idle");

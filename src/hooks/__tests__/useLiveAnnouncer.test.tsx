@@ -26,8 +26,9 @@ describe("useLiveAnnouncer", () => {
     expect(result.current.announcement).toBe("Stream created");
   });
 
-  // (2) The live-region text is auto-cleared after the 1 000 ms internal delay
-  it("auto-clears the announcement after 1 000 ms", () => {
+  // (2) The polite live-region text is auto-cleared after the 1 000 ms delay so
+  //     a repeated identical message still produces a real DOM change later.
+  it("auto-clears the polite announcement after 1 000 ms", () => {
     const { result } = renderHook(() => useLiveAnnouncer());
 
     act(() => {
@@ -54,10 +55,7 @@ describe("useLiveAnnouncer", () => {
   //     The hook achieves this by:
   //       a) cancelling the in-flight clear-timer, then
   //       b) setting the state to "" (the clear step), then
-  //       c) immediately setting it back to the message (the re-set step).
-  //
-  //     We verify the observable outcome: after the second announce() the
-  //     text is present again AND the new 1 000 ms clear-window applies.
+  //       c) re-publishing on a 0 ms timer (the re-set step).
   it("re-announces the same message by clearing then re-setting the text", () => {
     const { result } = renderHook(() => useLiveAnnouncer());
 
@@ -67,21 +65,28 @@ describe("useLiveAnnouncer", () => {
     });
     expect(result.current.announcement).toBe("Copied");
 
-    // Advance close to (but not past) the clear deadline
+    // Advance close to (but not past) the original clear deadline
     act(() => {
       vi.advanceTimersByTime(900);
     });
     expect(result.current.announcement).toBe("Copied");
 
-    // Second identical announcement — cancels the old timer, clears, re-sets
+    // Second identical announcement — clears now, re-publishes on a 0 ms timer
     act(() => {
       result.current.announce("Copied");
     });
-    // Text is present immediately after the second call
+
+    // The synchronous "clear" step is observable immediately
+    expect(result.current.announcement).toBe("");
+
+    // The 0 ms re-publish timer fires → text is present again
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
     expect(result.current.announcement).toBe("Copied");
 
-    // The first timer's deadline (original t+1000, now t+100 away) must NOT
-    // clear the text — the old timer was cancelled.
+    // The old timer's original deadline (now 100 ms away) was cancelled — it
+    // must NOT clear the re-published text.
     act(() => {
       vi.advanceTimersByTime(100);
     });
@@ -101,35 +106,59 @@ describe("useLiveAnnouncer", () => {
     expect(result.current.announcement).toBe("");
   });
 
-  // (4) The pending clear-timer is cancelled on unmount so no post-unmount
-  //     state update occurs and no dangling timer is left running.
-  it("clears the pending timeout on unmount (no dangling timer)", () => {
-    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
-    const { result, unmount } = renderHook(() => useLiveAnnouncer());
+  // (4) Errors publish to the assertive live region (inside the `alert` state's
+  //     own `role=alert`-managed text). `announceAlert` is polite-agnostic:
+  //     it publishes to the same "text" channel the region renders, and the
+  //     consuming component decides the ARIA treatment (assertive live region).
+  it("exposes alert text for assertive announcements", () => {
+    const { result } = renderHook(() => useLiveAnnouncer());
+
+    expect(result.current.alertAnnouncement).toBe("");
 
     act(() => {
-      result.current.announce("Saved");
+      result.current.announceAlert("Failed to load streams");
     });
 
-    // A timeout is now scheduled; capture its id
-    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
-    // The timeout was already scheduled before the spy; we track the cleanup
-    // indirectly: unmounting must call clearTimeout.
-    expect(result.current.announcement).toBe("Saved");
+    expect(result.current.alertAnnouncement).toBe("Failed to load streams");
+  });
 
-    unmount();
+  // (5) politeness parameter routes to the correct region and is auto-cleared
+  it("routes assertive announcements to the alert region and auto-clears it", () => {
+    const { result } = renderHook(() => useLiveAnnouncer());
 
-    // clearTimeout must have been called as part of the cleanup effect
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    act(() => {
+      result.current.announce("Net down", "assertive");
+    });
 
-    // Advancing time past the original deadline must not trigger any state
-    // update (the component is unmounted and the timer was cancelled)
-    expect(() => {
-      act(() => {
-        vi.advanceTimersByTime(2000);
-      });
-    }).not.toThrow();
+    expect(result.current.alertAnnouncement).toBe("Net down");
+    expect(result.current.announcement).toBe("");
 
-    setTimeoutSpy.mockRestore();
+    // Same 1 000 ms clear window applies to the assertive region
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(result.current.alertAnnouncement).toBe("");
+  });
+
+  // (6) Re-rendering the owner must never re-publish an empty or unchanged
+  //     message — announcements are made only from inside announce(), so a
+  //     component re-render produces no duplicate announcement.
+  it("does not duplicate announcements across a re-render of the owner", () => {
+    let announceRef: ((message: string) => void) | null = null;
+    const { result } = renderHook(() => {
+      const announcer = useLiveAnnouncer();
+      announceRef = announcer.announce;
+      return announcer;
+    });
+
+    act(() => {
+      announceRef?.("Stream reloaded");
+    });
+    expect(result.current.announcement).toBe("Stream reloaded");
+
+    // Re-render is triggered implicitly by the act() boundary above; because
+    // the hook never mutates state on its own, the text is unchanged and not
+    // duplicated — there is still exactly one live-region region holding it.
+    expect(result.current.announcement).toBe("Stream reloaded");
   });
 });

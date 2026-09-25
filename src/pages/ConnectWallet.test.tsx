@@ -10,21 +10,21 @@ import ConnectWallet from "./ConnectWallet";
 import RequireWallet from "../components/RequireWallet";
 
 // Mutable wallet state shared by the mocked context so individual tests can
-// flip `connected`/`loading` to exercise the redirect + post-connect flow.
+// flip `connected`/`loading`/`error`/`isNetworkMismatch` to exercise flows.
 const walletState = vi.hoisted(() => ({
   connected: true,
   loading: false,
-  address: "GCONNECTED",
-  network: "TESTNET",
+  address: "GCONNECTED" as string | null,
+  network: "TESTNET" as string | null,
+  error: null as any,
+  isNetworkMismatch: false,
 }));
 
 vi.mock("../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
     ...walletState,
-    error: null,
     expectedNetwork: "TESTNET",
     expectedNetworkLabel: "Testnet",
-    isNetworkMismatch: false,
     connect: vi.fn(),
     disconnect: vi.fn(),
   }),
@@ -85,6 +85,8 @@ describe("ConnectWallet return destination", () => {
   beforeEach(() => {
     walletState.connected = true;
     walletState.loading = false;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
   });
 
   afterEach(() => {
@@ -127,6 +129,8 @@ describe("ConnectWallet return destination", () => {
 describe("RequireWallet -> ConnectWallet returnTo integration", () => {
   beforeEach(() => {
     walletState.loading = false;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
   });
 
   it("encodes the original path as returnTo when redirecting an unauthenticated user", () => {
@@ -143,5 +147,86 @@ describe("RequireWallet -> ConnectWallet returnTo integration", () => {
     renderGatedRoute("/app/dashboard");
 
     expect(screen.getByText("Protected content")).toBeInTheDocument();
+  });
+});
+
+describe("ConnectWallet failure messages (#1644)", () => {
+  beforeEach(() => {
+    walletState.connected = false;
+    walletState.loading = false;
+    walletState.address = null;
+    walletState.network = null;
+    walletState.error = null;
+    walletState.isNetworkMismatch = false;
+  });
+
+  it("renders a distinct actionable message when connection request is rejected", () => {
+    render(
+      <MemoryRouter>
+        <ConnectWallet initialError="rejected" />
+      </MemoryRouter>
+    );
+
+    const alert = screen.getByTestId("wallet-error-rejected");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Connection Request Rejected")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The connection request was rejected\. Please open your wallet extension/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when wallet connection times out", () => {
+    render(
+      <MemoryRouter>
+        <ConnectWallet initialError="timeout" />
+      </MemoryRouter>
+    );
+
+    const alert = screen.getByTestId("wallet-error-timeout");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Connection Timed Out")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Wallet connection timed out\. Please check your network connection/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when connected to wrong network", () => {
+    walletState.isNetworkMismatch = true;
+    render(
+      <MemoryRouter>
+        <ConnectWallet />
+      </MemoryRouter>
+    );
+
+    const alert = screen.getByTestId("wallet-error-wrong-network");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Wrong Stellar Network")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Your wallet is connected to the wrong network\. Please switch your wallet extension network to Testnet/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("renders a distinct actionable message when extension is missing", () => {
+    walletState.error = { type: "not_installed" };
+    render(
+      <MemoryRouter>
+        <ConnectWallet />
+      </MemoryRouter>
+    );
+
+    const alert = screen.getByTestId("wallet-error-missing-extension");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("Wallet Extension Missing")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Freighter wallet extension is not installed\. Please install Freighter/i
+      )
+    ).toBeInTheDocument();
   });
 });

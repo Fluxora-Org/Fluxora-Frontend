@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import WalletFallback from "../WalletFallback";
+import WalletFallback, { STELLAR_WALLET_INSTALL_URL } from "../WalletFallback";
 
 describe("WalletFallback", () => {
   it("renders the restoring stage by default when stage is not provided", () => {
@@ -166,5 +166,75 @@ describe("WalletFallback – cold load, delayed wallet, rejected wallet states",
     // Should NOT show multiple alerts
     const alerts = container.querySelectorAll('[role="alert"]');
     expect(alerts.length).toBe(1);
+  });
+});
+
+describe("WalletFallback – no wallet present (issue #1666)", () => {
+  it("names what is missing when no wallet extension is installed", () => {
+    render(<WalletFallback stage="no-wallet" />);
+
+    // What is missing is named explicitly, not implied by a spinner.
+    expect(
+      screen.getByText(
+        "No Stellar wallet extension was detected in this browser.",
+      ),
+    ).toBeInTheDocument();
+
+    // The stage is announced to assistive technology too.
+    expect(screen.getByRole("status")).toHaveAttribute(
+      "aria-label",
+      "No Stellar wallet extension was detected.",
+    );
+  });
+
+  it("offers a concrete next step instead of presenting a dead end", () => {
+    render(<WalletFallback stage="no-wallet" />);
+
+    // The next step is spelled out...
+    expect(
+      screen.getByText(/Install Freighter, or another Stellar wallet extension/i),
+    ).toBeInTheDocument();
+
+    // ...and backed by an actionable control: an install link...
+    const installLink = screen.getByRole("link", {
+      name: "Install a Stellar wallet",
+    });
+    expect(installLink).toHaveAttribute("href", STELLAR_WALLET_INSTALL_URL);
+    expect(installLink).toHaveAttribute("target", "_blank");
+
+    // ...and a way to retry once the extension is available.
+    expect(
+      screen.getByRole("button", { name: "Reload page" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the fallback without any wallet present", () => {
+    // No provider, no wallet context, no extension — the fallback is static.
+    expect(() => render(<WalletFallback stage="no-wallet" />)).not.toThrow();
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "No Stellar wallet extension was detected in this browser.",
+    );
+  });
+
+  it("keeps the recovery affordances for rejected and network-mismatch stages", () => {
+    const { rerender } = render(<WalletFallback stage="rejected" />);
+
+    expect(
+      screen.getByText(/approve the connection request, then reload/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload page" })).toBeInTheDocument();
+
+    rerender(<WalletFallback stage="network-mismatch" />);
+
+    expect(
+      screen.getByText(/Switch your wallet to the Stellar network/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload page" })).toBeInTheDocument();
+    // No install link is offered for a wallet that is already installed.
+    expect(
+      screen.queryByRole("link", { name: "Install a Stellar wallet" }),
+    ).not.toBeInTheDocument();
   });
 });

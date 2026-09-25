@@ -9,6 +9,13 @@
  * (StatusPill, MetricCard, charts, etc.) is filtered through the chosen
  * simulation preset.
  *
+ * ## Persistence (deliberate)
+ * Simulation state lives in React memory only. It does **not** survive a
+ * full page reload, and the provider never reads or writes `localStorage` /
+ * `sessionStorage`. Enabling requires an explicit `setSimulation(...)` call
+ * (e.g. via `ColorBlindToggle`). While active, a sticky banner indicates the
+ * mode and offers a one-click disable from anywhere the filter is applied.
+ *
  * ## Supported simulations
  * - `none`         – default view, no filter applied
  * - `protanopia`   – red-blind (no L-cones)
@@ -31,6 +38,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -41,12 +49,41 @@ import {
 /** The supported simulation modes. `"none"` means no filter is applied. */
 export type SimulationMode = "none" | "protanopia" | "deuteranopia" | "tritanopia";
 
+const VALID_MODES: ReadonlySet<string> = new Set<SimulationMode>([
+  "none",
+  "protanopia",
+  "deuteranopia",
+  "tritanopia",
+]);
+
 /** Human-readable labels used in toggle UI and live-region announcements. */
 export const SIMULATION_LABELS: Record<SimulationMode, string> = {
   none: "No simulation",
   protanopia: "Protanopia (red-blind)",
   deuteranopia: "Deuteranopia (green-blind)",
   tritanopia: "Tritanopia (blue-blind)",
+};
+
+/**
+ * Keys that must never hold simulation state. Cleared on mount so a leftover
+ * from an earlier experiment cannot re-enable the filter unintentionally.
+ */
+export const COLORBLIND_STORAGE_KEYS = [
+  "fluxora:colorblind-simulation",
+  "colorBlindSimulation",
+  "colorblind-simulation",
+  "cb-simulation-mode",
+] as const;
+
+/**
+ * Documented persistence policy — in-memory only; reload always resets to off.
+ * @see docs/COLORBLIND_SIMULATION_SPEC.md § Persistence
+ */
+export const COLORBLIND_PERSISTENCE_POLICY = {
+  acrossReloads: false,
+  storage: "none" as const,
+  rationale:
+    "Simulation is a design-QA preview. Persisting it would leave the UI miscoloured with no obvious cause after reload.",
 };
 
 /**
@@ -80,6 +117,33 @@ export const SVG_FILTER_VALUES: Record<
   ].join(" "),
 };
 
+export function isSimulationMode(value: unknown): value is SimulationMode {
+  return typeof value === "string" && VALID_MODES.has(value);
+}
+
+/** Remove any accidental browser-storage leftovers for this feature. */
+export function clearColorBlindStorageArtifacts(
+  storage: Pick<Storage, "removeItem"> | null | undefined = typeof window !== "undefined"
+    ? window.localStorage
+    : null,
+  session: Pick<Storage, "removeItem"> | null | undefined = typeof window !== "undefined"
+    ? window.sessionStorage
+    : null,
+): void {
+  for (const key of COLORBLIND_STORAGE_KEYS) {
+    try {
+      storage?.removeItem(key);
+    } catch {
+      /* private mode / blocked storage */
+    }
+    try {
+      session?.removeItem(key);
+    } catch {
+      /* private mode / blocked storage */
+    }
+  }
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 export interface ColorBlindSimulationContextValue {
@@ -88,6 +152,7 @@ export interface ColorBlindSimulationContextValue {
   /**
    * Sets the active simulation mode.
    * Passing `"none"` removes the filter entirely.
+   * Invalid values are ignored so the filter cannot be enabled by accident.
    */
   setSimulation: (mode: SimulationMode) => void;
   /** `true` when any simulation is active (i.e. `simulation !== "none"`). */
@@ -97,11 +162,80 @@ export interface ColorBlindSimulationContextValue {
 const ColorBlindSimulationContext =
   createContext<ColorBlindSimulationContextValue | null>(null);
 
+// ─── Active indicator banner ──────────────────────────────────────────────────
+
+interface ColorBlindActiveBannerProps {
+  mode: Exclude<SimulationMode, "none">;
+  onDisable: () => void;
+}
+
+/**
+ * Sticky, always-visible indication that a simulation is active, with a
+ * one-click disable control reachable from anywhere the filter is applied.
+ */
+export function ColorBlindActiveBanner({
+  mode,
+  onDisable,
+}: ColorBlindActiveBannerProps) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="colorblind-active-banner"
+      data-colorblind-active={mode}
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-md, 12px)",
+        flexWrap: "wrap",
+        padding: "8px 16px",
+        background: "var(--color-accent-primary, #3b82f6)",
+        color: "var(--color-text-on-accent, #ffffff)",
+        fontSize: "13px",
+        fontWeight: 600,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+      }}
+    >
+      <span>
+        Colour-blind simulation active:{" "}
+        <strong>{SIMULATION_LABELS[mode]}</strong>
+        {" — "}
+        design QA preview only; not persisted across reloads.
+      </span>
+      <button
+        type="button"
+        data-testid="colorblind-disable-button"
+        onClick={onDisable}
+        style={{
+          cursor: "pointer",
+          border: "1px solid currentColor",
+          borderRadius: "var(--radius-full, 999px)",
+          background: "transparent",
+          color: "inherit",
+          fontSize: "12px",
+          fontWeight: 700,
+          padding: "4px 12px",
+        }}
+      >
+        Disable simulation
+      </button>
+    </div>
+  );
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 interface ColorBlindSimulationProviderProps {
   children: ReactNode;
-  /** Initial simulation mode. Defaults to `"none"`. */
+  /**
+   * Initial simulation mode for tests / story harnesses.
+   * Defaults to `"none"`. Production mounts must leave this unset so the
+   * filter cannot start enabled without a deliberate user action.
+   */
   initialMode?: SimulationMode;
 }
 
@@ -117,9 +251,22 @@ export function ColorBlindSimulationProvider({
   children,
   initialMode = "none",
 }: ColorBlindSimulationProviderProps) {
-  const [simulation, setSimulationState] = useState<SimulationMode>(initialMode);
+  const safeInitial: SimulationMode = isSimulationMode(initialMode)
+    ? initialMode
+    : "none";
+
+  const [simulation, setSimulationState] =
+    useState<SimulationMode>(safeInitial);
+
+  // Defence in depth: never let leftover storage re-enable the filter.
+  useEffect(() => {
+    clearColorBlindStorageArtifacts();
+  }, []);
 
   const setSimulation = useCallback((mode: SimulationMode) => {
+    if (!isSimulationMode(mode)) {
+      return;
+    }
     setSimulationState(mode);
   }, []);
 
@@ -138,6 +285,13 @@ export function ColorBlindSimulationProvider({
     <ColorBlindSimulationContext.Provider value={value}>
       {/* SVG filter definitions — rendered off-screen, not interactive */}
       <ColorBlindSvgFilters />
+
+      {isSimulating && simulation !== "none" && (
+        <ColorBlindActiveBanner
+          mode={simulation}
+          onDisable={() => setSimulation("none")}
+        />
+      )}
 
       {/*
        * Wrapping div carries the CSS filter when a simulation is active.

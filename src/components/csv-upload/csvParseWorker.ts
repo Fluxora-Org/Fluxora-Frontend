@@ -18,11 +18,21 @@
  * thread.
  */
 
-import { prepareCsvParse, parseRow, markDuplicates } from './csvParser';
+import {
+  prepareCsvParse,
+  parseRow,
+  markDuplicates,
+} from './csvParser';
 import type { CsvRow, ColumnMapping, ParseResult } from './types';
 
 /** Rows processed per batch; the worker yields to its event loop between batches. */
 export const PARSE_BATCH_SIZE = 50;
+
+export interface CsvProgressPayload {
+  processedRows: number;
+  totalRows: number;
+  percent: number;
+}
 
 export interface CsvParseRequest {
   type: 'parse';
@@ -41,7 +51,8 @@ export type CsvWorkerRequest = CsvParseRequest | CsvCancelRequest;
 export type CsvWorkerResponse =
   | { type: 'result'; requestId: string; result: ParseResult }
   | { type: 'error'; requestId: string; error: string }
-  | { type: 'cancelled'; requestId: string };
+  | { type: 'cancelled'; requestId: string }
+  | { type: 'progress'; requestId: string; progress: CsvProgressPayload };
 
 /** Yields to the event loop so pending messages (e.g. cancel) can be processed. */
 function yieldToEventLoop(): Promise<void> {
@@ -57,6 +68,7 @@ export async function parseCsvChunked(
   text: string,
   mapping: Partial<ColumnMapping> | undefined,
   isCancelled: () => boolean,
+  onProgress?: (progress: CsvProgressPayload) => void,
 ): Promise<ParseResult | null> {
   const prep = prepareCsvParse(text, mapping);
 
@@ -79,18 +91,28 @@ export async function parseCsvChunked(
     };
   }
 
+  // Per-row bounds (column count, cell length) were already enforced by
+  // `prepareCsvParse`, so no pathological row can reach the batch loop.
+
   const headerIndex: Record<string, number> = {};
   prep.detectedHeaders.forEach((h, i) => {
     headerIndex[h] = i;
   });
 
+  const totalRows = prep.dataLines.length;
+  if (totalRows > 0) {
+    onProgress?.({ processedRows: 0, totalRows, percent: 0 });
+  }
+
   const rows: CsvRow[] = [];
-  for (let i = 0; i < prep.dataLines.length; i += PARSE_BATCH_SIZE) {
+  for (let i = 0; i < totalRows; i += PARSE_BATCH_SIZE) {
     if (isCancelled()) return null;
-    const end = Math.min(i + PARSE_BATCH_SIZE, prep.dataLines.length);
+    const end = Math.min(i + PARSE_BATCH_SIZE, totalRows);
     for (let j = i; j < end; j += 1) {
       rows.push(parseRow(prep.dataLines[j], j, prep.effectiveMapping, headerIndex));
     }
+    const percent = Math.round((rows.length / totalRows) * 100);
+    onProgress?.({ processedRows: rows.length, totalRows, percent });
     await yieldToEventLoop();
   }
 
@@ -137,6 +159,11 @@ export function createCsvParseWorkerHandler(
         msg.text,
         msg.mapping,
         () => activeRequestId !== msg.requestId,
+        (progress) => {
+          if (activeRequestId === msg.requestId) {
+            post({ type: 'progress', requestId: msg.requestId, progress });
+          }
+        },
       );
       if (activeRequestId !== msg.requestId) {
         post({ type: 'cancelled', requestId: msg.requestId });

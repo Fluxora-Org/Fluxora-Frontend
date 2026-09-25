@@ -26,7 +26,7 @@
  *
  *   const report = checkLocale('en', en, 'es', es);
  *   if (report.errors.length) {
- *     console.error(formatReport(report));
+ *     logger.error(formatReport(report));
  *     process.exit(1);
  *   }
  */

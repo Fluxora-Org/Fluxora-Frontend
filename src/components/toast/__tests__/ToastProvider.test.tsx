@@ -2,7 +2,14 @@ vi.unmock("../ToastProvider");
 import { useState } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider, useToast } from "../ToastProvider";
+import {
+  DEFAULT_TOAST_LIFETIME_MS,
+  MAX_CONCURRENT_TOASTS,
+  MAX_TOAST_QUEUE_SIZE,
+  TOAST_VARIANT_LIFETIMES,
+  ToastProvider,
+  useToast,
+} from "../ToastProvider";
 
 // Helper: a button that adds a toast when clicked
 function AddButton({
@@ -84,6 +91,14 @@ describe("ToastProvider / useToast", () => {
 
     act(() => vi.advanceTimersByTime(4000));
     expect(screen.queryByText("Hello")).not.toBeInTheDocument();
+  });
+
+  it("does not auto-dismiss if timeout is 0", () => {
+    renderWithProvider(<AddButton timeout={0} />);
+    fireEvent.click(screen.getByRole("button", { name: /add success/i }));
+
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.getByText("Hello")).toBeInTheDocument();
   });
 
   it("respects a custom timeout", () => {
@@ -514,4 +529,157 @@ describe("ToastProvider / useToast", () => {
     expect(screen.getByText("Error 1")).toBeInTheDocument();
     expect(screen.getByText("Error 2")).toBeInTheDocument();
   });
+
+  describe("Issue #1703: Bounded concurrent toasts, lifetimes, and acknowledgement exemptions", () => {
+    it("enforces MAX_CONCURRENT_TOASTS on the visible DOM stack and queues overflow", () => {
+      function BurstAdder() {
+        const { addToast } = useToast();
+        return (
+          <button
+            onClick={() => {
+              for (let i = 1; i <= 6; i++) {
+                addToast(`Burst failure ${i}`, "error", 10000);
+              }
+            }}
+          >
+            Trigger Burst
+          </button>
+        );
+      }
+      renderWithProvider(<BurstAdder />);
+      fireEvent.click(screen.getByRole("button", { name: "Trigger Burst" }));
+
+      // Maximum simultaneous rendered toasts is bounded at MAX_CONCURRENT_TOASTS (3)
+      const visibleToasts = screen.getAllByRole("alert");
+      expect(visibleToasts).toHaveLength(MAX_CONCURRENT_TOASTS);
+
+      // Remaining 3 toasts are queued in overflow rather than stacked over the UI
+      expect(screen.getByText(/\+3 more notifications/i)).toBeInTheDocument();
+    });
+
+    it("bounds the total queue size to MAX_TOAST_QUEUE_SIZE during high-frequency failure bursts", () => {
+      function HeavyBurstAdder() {
+        const { addToast } = useToast();
+        return (
+          <button
+            onClick={() => {
+              for (let i = 1; i <= 30; i++) {
+                addToast(`High frequency error ${i}`, "error", 10000);
+              }
+            }}
+          >
+            Trigger Heavy Burst
+          </button>
+        );
+      }
+      renderWithProvider(<HeavyBurstAdder />);
+      fireEvent.click(screen.getByRole("button", { name: "Trigger Heavy Burst" }));
+
+      // Overflow indicator reflects queue capped at MAX_TOAST_QUEUE_SIZE - MAX_CONCURRENT_TOASTS (17)
+      expect(
+        screen.getByText(
+          `+${MAX_TOAST_QUEUE_SIZE - MAX_CONCURRENT_TOASTS} more notifications`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("exempts toasts requiring acknowledgement (requiresAck: true or timeout: 0) from auto-dismissal", () => {
+      function AckAdder() {
+        const { addToast } = useToast();
+        return (
+          <>
+            <button
+              onClick={() =>
+                addToast("Critical action required", "error", {
+                  requiresAck: true,
+                  timeout: 0,
+                  action: { label: "Acknowledge", onClick: () => {} },
+                })
+              }
+            >
+              Add Ack Required
+            </button>
+            <button
+              onClick={() =>
+                addToast("Standard notification", "info", 3000)
+              }
+            >
+              Add Standard
+            </button>
+          </>
+        );
+      }
+      renderWithProvider(<AckAdder />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Add Ack Required" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add Standard" }));
+
+      expect(screen.getByText("Critical action required")).toBeInTheDocument();
+      expect(screen.getByText("Standard notification")).toBeInTheDocument();
+
+      // Advance time beyond standard notification timeout (3000ms) and default lifetime (4000ms)
+      act(() => vi.advanceTimersByTime(10000));
+
+      // Standard toast auto-dismisses, but acknowledgement-required toast remains indefinitely
+      expect(screen.queryByText("Standard notification")).not.toBeInTheDocument();
+      expect(screen.getByText("Critical action required")).toBeInTheDocument();
+
+      // Explicit user acknowledgement dismisses the persistent toast
+      const dismissBtn = screen.getByRole("button", {
+        name: /dismiss error notification/i,
+      });
+      act(() => fireEvent.click(dismissBtn));
+      expect(screen.queryByText("Critical action required")).not.toBeInTheDocument();
+    });
+
+    it("respects documented variant lifetimes by default", () => {
+      function VariantLifetimeAdder() {
+        const { addToast } = useToast();
+        return (
+          <button
+            onClick={() => {
+              addToast("Warning alert", "warning"); // Documented 5000ms
+            }}
+          >
+            Add Warning
+          </button>
+        );
+      }
+      renderWithProvider(<VariantLifetimeAdder />);
+      fireEvent.click(screen.getByRole("button", { name: "Add Warning" }));
+
+      // Warning remains visible at 4000ms
+      act(() => vi.advanceTimersByTime(4000));
+      expect(screen.getByText("Warning alert")).toBeInTheDocument();
+
+      // Warning auto-dismisses at 5000ms
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByText("Warning alert")).not.toBeInTheDocument();
+    });
+
+    it("coalesces identical toasts raised in rapid succession", () => {
+      function BurstCoalesceAdder() {
+        const { addToast } = useToast();
+        return (
+          <button
+            onClick={() => {
+              for (let i = 0; i < 10; i++) {
+                addToast("Repeated failure toast", "error");
+              }
+            }}
+          >
+            Coalesce Burst
+          </button>
+        );
+      }
+      renderWithProvider(<BurstCoalesceAdder />);
+      fireEvent.click(screen.getByRole("button", { name: "Coalesce Burst" }));
+
+      // 10 rapid additions of the same message coalesce into a single rendered toast
+      const matches = screen.getAllByText("Repeated failure toast");
+      expect(matches).toHaveLength(1);
+      expect(screen.queryByText(/\+.*more notification/i)).not.toBeInTheDocument();
+    });
+  });
 });
+
