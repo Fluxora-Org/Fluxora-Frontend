@@ -36,7 +36,10 @@ function SimulationDisplay() {
       <button onClick={() => setSimulation("none")}>Reset</button>
       <button
         onClick={() =>
-          // @ts-expect-error intentional invalid mode for guardrail test
+          // @ts-expect-error — guardrail test: proves the provider rejects an
+          // out-of-union mode without crashing. The literal is intentionally
+          // not a SimulationMode; it must be added to that union before this
+          // suppression can be removed.
           setSimulation("not-a-real-mode")
         }
       >

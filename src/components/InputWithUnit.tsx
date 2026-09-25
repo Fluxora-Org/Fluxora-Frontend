@@ -59,6 +59,7 @@ export const InputWithUnit: React.FC<InputWithUnitProps> = ({
 }) => {
   const unitId = `${id}-unit`;
   const hintId = keyboardHint ? `${id}-keyboard-hint` : undefined;
+
   // Amount fields must keep the exact decimal string the user entered. A native
   // `type="number"` input coerces its value through a floating-point `number`,
   // which loses precision, so it is downgraded to a text field with a decimal

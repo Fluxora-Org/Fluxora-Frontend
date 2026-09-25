@@ -3,6 +3,23 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import amountRules from "./eslint-rules/no-float-amount-arithmetic.js";
+import suppressionRules from "./eslint-rules/require-ts-suppression-description.js";
+
+// Test files are exempt from the general src lint rules, but every
+// `@ts-ignore` / `@ts-expect-error` in them must still satisfy the suppression
+// policy, so tests get a dedicated config that switches the two recommended
+// rule sets off and enables only the suppression rule. (A config-level
+// `ignores` list is used to keep tests out of the src rules rather than `!`
+// negated globs, which ESLint flat config does not honour inside `files`.)
+const recommendedRulesOff = {};
+for (const config of [
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+]) {
+  for (const key of Object.keys(config.rules ?? {})) {
+    recommendedRulesOff[key] = "off";
+  }
+}
 
 export default tseslint.config(
   {
@@ -13,8 +30,6 @@ export default tseslint.config(
       "contracts/**",
       "*.config.js",
       "*.config.ts",
-      "src/**/*.test.ts",
-      "src/**/*.test.tsx",
       "scripts/**/*.test.mjs",
       "eslint-rules/**",
     ],
@@ -23,6 +38,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ["src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
     languageOptions: {
       ecmaVersion: 2020,
       globals: {
@@ -38,8 +54,10 @@ export default tseslint.config(
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      fluxora: suppressionRules,
     },
     rules: {
+      "fluxora/require-ts-suppression-description": "error",
       "no-eval": "error",
       "no-implied-eval": "error",
       "no-new-func": "error",
@@ -83,6 +101,7 @@ export default tseslint.config(
       "src/pages/**/*.{ts,tsx}",
       "src/hooks/**/*.{ts,tsx}",
     ],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -92,6 +111,26 @@ export default tseslint.config(
             "Read configuration through src/lib/config.ts instead of import.meta.env — components must not bypass config validation.",
         },
       ],
+    },
+  },
+  // Test files: exempt from the src lint rules above, but the TS suppression
+  // policy still applies so stale or undescribed suppressions fail the PR.
+  // `reportUnusedDisableDirectives` is off here so test-local eslint-disable
+  // comments for rules that are not active in tests stay silent.
+  {
+    files: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    languageOptions: {
+      ecmaVersion: 2020,
+    },
+    plugins: {
+      fluxora: suppressionRules,
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+    },
+    rules: {
+      ...recommendedRulesOff,
+      "fluxora/require-ts-suppression-description": "error",
     },
   },
   // Node-built scripts (e.g. bundle-size report, supply-chain audits) need Node globals.

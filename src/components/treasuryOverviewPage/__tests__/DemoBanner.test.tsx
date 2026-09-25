@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import DemoBanner from "../DemoBanner";
+import DemoBanner, { DemoDataBadge } from "../DemoBanner";
 
 describe("DemoBanner", () => {
   it("renders loaded state correctly highlighting only Loaded badge", () => {
@@ -78,5 +78,22 @@ describe("DemoBanner", () => {
 
     expect(loadingStyle).toContain("var(--color-warning)");
     expect(loadingStyle).toContain("var(--color-text-inverse)");
+  });
+});
+
+describe("DemoDataBadge", () => {
+  it("renders a compact DEMO DATA badge", () => {
+    render(<DemoDataBadge />);
+    const badge = screen.getByTestId("demo-data-badge");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent("DEMO DATA");
+  });
+
+  it("uses warning styling for visual distinction", () => {
+    render(<DemoDataBadge />);
+    const badge = screen.getByTestId("demo-data-badge");
+    const style = badge.getAttribute("style") || "";
+    expect(style).toContain("var(--color-warning-bg)");
+    expect(style).toContain("var(--color-warning)");
   });
 });
