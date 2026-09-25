@@ -5,6 +5,7 @@ import type { StreamRecord } from "../../data/streamRecords";
 
 const baseStream: StreamRecord = {
   id: "STR-TEST-1",
+  public: true,
   name: "Core Infrastructure Grant",
   recipientName: "Satoshi N.",
   recipientAddress: "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P",
@@ -78,5 +79,32 @@ describe("StreamOGImageTemplate", () => {
     expect(screen.queryByText("CLIFF MILESTONE")).toBeNull();
     expect(screen.getByText("STREAM SCHEDULE")).toBeDefined();
     expect(screen.getByText("2026-01-01 → 2026-07-01")).toBeDefined();
+  });
+
+  it("renders no private stream metadata unless the stream is explicitly public", () => {
+    const privateStream = {
+      ...baseStream,
+      public: false,
+      name: "Confidential Grant",
+      recipientName: "Private Recipient",
+      recipientAddress: "GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789WXYZ",
+      monthlyRate: 9876,
+      depositAmount: 54321,
+      startDate: "2099-01-01",
+      endDate: "2099-12-31",
+    };
+
+    render(<StreamOGImageTemplate stream={privateStream} />);
+
+    const canvas = screen.getByTestId("stream-og-image-template");
+    expect(canvas).toHaveTextContent("PRIVATE STREAM");
+    expect(canvas).not.toHaveTextContent("Confidential Grant");
+    expect(canvas).not.toHaveTextContent("Private Recipient");
+    expect(canvas).not.toHaveTextContent("GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789WXYZ");
+    expect(canvas).not.toHaveTextContent("9,876");
+    expect(canvas).not.toHaveTextContent("54,321");
+    expect(canvas).not.toHaveTextContent("2099-01-01");
+    expect(canvas).not.toHaveTextContent("2099-12-31");
+    expect(screen.queryByTestId("og-status-pill")).toBeNull();
   });
 });
