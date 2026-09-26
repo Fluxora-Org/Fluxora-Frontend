@@ -71,6 +71,17 @@ To enable WebKit on a macOS CI runner:
     PLAYWRIGHT_WEBKIT: "1"
 ```
 
+## Landing performance budget
+
+The landing route has a production-build FCP budget of 1,800 ms. The dedicated
+check uses Chromium at a fixed 1280x720 viewport with 4x CPU throttling and
+40 ms / 1.5 Mbps network emulation, so measurements remain comparable across
+releases and fail CI when the budget is exceeded:
+
+```bash
+npm run test:performance
+```
+
 ### Browser-specific notes
 
 - **Chromium**: Baseline browser; all features expected to work.

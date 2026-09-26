@@ -88,3 +88,7 @@ jobs:
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|stream-filter-sort"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|embed-widget-display"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|small-viewport-operation"
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream"
+
+      - name: Run landing FCP performance budget
+        run: npm run test:performance
