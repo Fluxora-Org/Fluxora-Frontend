@@ -345,7 +345,6 @@ const processSpokenPhrase = useCallback(
     setState("command-recognized");
     announce(`${cmd.phrase} confirmed. Opening the stream cancellation flow.`);
 
-    // Perform action (e.g. navigate to streams with cancel modal parameter)
     navigate("/app/streams?action=cancel");
 
     setTimeout(() => {

@@ -41,13 +41,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build (type-check + bundle)
-        run: npm run build
+        run: pnpm run build
 
       - name: Locale integrity check
         run: npm run check:locales
 
       - name: Test
-        run: npm run test
+        run: pnpm run test
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium firefox
@@ -96,7 +96,7 @@ jobs:
         run: pnpm exec playwright install --with-deps
 
       - name: Run accessibility tests
-        run: npm run test:a11y
+        run: pnpm run test:a11y
 
       - name: Run E2E tests (gateable)
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|reduced-motion"

@@ -48,13 +48,7 @@ export default function RequireWalletAction({
   }
 
   if (!wallet.connected) {
-    return (
-      <Navigate
-        to="/connect-wallet"
-        replace
-        state={{ returnTo }}
-      />
-    );
+    return <Navigate to="/connect-wallet" replace state={{ returnTo }} />;
   }
 
   if (wallet.isNetworkMismatch) {

@@ -31,9 +31,7 @@ import {
   STATUS_FILTERS,
   MAX_LOADING_RETRIES,
 } from "./useStreamsData";
-import {
-  clearResolved as clearResolvedOptimistic,
-} from "../lib/optimisticTransactions";
+import { clearResolved as clearResolvedOptimistic } from "../lib/optimisticTransactions";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -611,10 +609,7 @@ function StreamDetail({
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -901,7 +896,13 @@ export default function Streams() {
       clearResolvedOptimisticOps();
       refetchStreams();
     },
-    [clearResolvedOptimisticOps, refetchStreams, setLiveDraft, setRestoredDraft, streams.length],
+    [
+      clearResolvedOptimisticOps,
+      refetchStreams,
+      setLiveDraft,
+      setRestoredDraft,
+      streams.length,
+    ],
   );
 
   const handleStreamError = useCallback(() => {
