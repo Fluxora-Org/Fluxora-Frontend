@@ -98,6 +98,8 @@ export default defineConfig({
         "src/components/Input.tsx",
         // Issue #1788: focus management on route change
         "src/hooks/useRouteFocus.ts",
+        // Voice mic button — recording state must be conveyed non-visually
+        "src/components/voice/VoiceMicButton.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
