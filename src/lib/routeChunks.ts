@@ -74,6 +74,17 @@ export function resolveRoutePageChunk(
   return undefined;
 }
 
+/** Per-route gzip budget in bytes. */
+export const ROUTE_BUDGETS: Record<RouteChunkName, number> = {
+  "app-dashboard": 120 * 1024,
+  "app-streams": 150 * 1024,
+  "app-stream-detail": 100 * 1024,
+  "app-recipient": 80 * 1024,
+  "app-treasury": 100 * 1024,
+  "app-empty-state-demo": 50 * 1024,
+  "app-embed-stream": 60 * 1024,
+} as const;
+
 /** Throws when two major routes share a chunk name (merge regression). */
 export function assertDistinctRouteChunks(
   chunks: Record<string, string> = {
@@ -88,6 +99,17 @@ export function assertDistinctRouteChunks(
     ];
     throw new Error(
       `Route chunks must be distinct; merged chunk(s): ${duplicates.join(", ")}`,
+    );
+  }
+}
+
+/** Validates that every required route chunk has a budget defined. */
+export function assertRouteBudgetsComplete(): void {
+  const required = REQUIRED_PRODUCTION_ROUTE_CHUNKS;
+  const missing = required.filter((name) => !(name in ROUTE_BUDGETS));
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing route budget(s) for: ${missing.join(", ")}. Add to ROUTE_BUDGETS in routeChunks.ts.`,
     );
   }
 }

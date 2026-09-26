@@ -1,0 +1,9 @@
+{
+  "app-dashboard": 122880,
+  "app-streams": 40960,
+  "app-stream-detail": 15360,
+  "app-recipient": 20480,
+  "app-treasury": 15360,
+  "app-empty-state-demo": 5120,
+  "app-embed-stream": 10240
+}

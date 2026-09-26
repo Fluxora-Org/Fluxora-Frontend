@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { Stream } from "../components/RecentStreams";
+import RecentStreams from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
@@ -20,6 +21,7 @@ import { formatAssetAmount } from "../lib/formatters";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
 import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
+import ErrorBoundary from "../components/ErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
 import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";
@@ -248,6 +250,15 @@ export default function Dashboard() {
           onConnectWallet={() => setIsWalletModalOpen(true)}
           onDismiss={handleDismissOnboarding}
         />
+        <ErrorBoundary>
+          <TreasuryOnboarding
+            walletConnected={walletConnected}
+            onConnectWallet={() => setIsWalletModalOpen(true)}
+            onCreateStream={() => setIsModalOpen(true)}
+            onRetry={refetch}
+            onDismiss={() => setShowOnboarding(false)}
+          />
+        </ErrorBoundary>
       ) : (
         <TreasuryEmptyState
           onCreateStream={() => setIsModalOpen(true)}

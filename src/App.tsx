@@ -1,10 +1,24 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { lazy, useState, useEffect, type ComponentType, type ReactElement } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useParams,
+} from "react-router-dom";
+import {
+  lazy,
+  type ComponentType,
+  type ReactElement,
+  useEffect,
+  useState,
+} from "react";
 import ApiVersionGuard from "./components/ApiVersionGuard";
 
 import AppNavbar from "./components/navigation/AppNavbar";
 import ErrorBoundary from "./components/ErrorBoundary";
-import Layout from "./components/Layout";
 import RequireWallet from "./components/RequireWallet";
 import RequireWalletAction from "./components/RequireWalletAction";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";

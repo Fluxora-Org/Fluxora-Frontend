@@ -8,6 +8,7 @@ interface TreasuryOnboardingProps {
   walletAddress?: string | null;
   onConnectWallet: () => void;
   onCreateStream: () => void;
+  onRetry: () => void;
   onDismiss: () => void;
 }
 
@@ -31,6 +32,7 @@ export default function TreasuryOnboarding({
   walletAddress,
   onConnectWallet,
   onCreateStream,
+  onRetry,
   onDismiss,
 }: TreasuryOnboardingProps) {
   const { expectedNetwork, expectedNetworkLabel } = useWallet();

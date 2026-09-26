@@ -19,6 +19,8 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Threshold — must stay in sync with vite.config.ts `chunkSizeWarningLimit`.
@@ -26,6 +28,8 @@ import { gzipSync } from "node:zlib";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
 const CHUNK_SIZE_WARNING_LIMIT_BYTES = CHUNK_SIZE_WARNING_LIMIT_KB * 1024;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const DIST_DIR = "dist";
 const ASSET_DIR = join(DIST_DIR, "assets");
 
@@ -70,7 +74,9 @@ function isJsChunk(filename) {
  */
 function chunkName(filePath) {
   const base = filePath.split("/").pop() ?? filePath;
-  const match = base.match(/^(.+?)-[A-Za-z0-9]{8,}\.(js|css|mjs)$/);
+  // Match chunk-name-hash.js where hash can contain alphanum, underscore, dash
+  // Use greedy match for the name part to handle names with dashes (e.g., app-stream-detail)
+  const match = base.match(/^(.+)-[A-Za-z0-9_-]{8,}\.(js|css|mjs)$/);
   return match ? match[1] : base.replace(/\.[^.]+$/, "");
 }
 
@@ -87,165 +93,209 @@ async function collectFiles(dir) {
   return files.flat();
 }
 
-// ---------------------------------------------------------------------------
-// Collect and analyse assets
-// ---------------------------------------------------------------------------
-const files = await collectFiles(ASSET_DIR);
-const rows = [];
+async function main() {
+  // Load per-route budgets
+  const ROUTE_BUDGETS_JSON = await readFile(join(__dirname, "route-budgets.json"), "utf-8");
+  const ROUTE_BUDGETS = JSON.parse(ROUTE_BUDGETS_JSON);
 
-for (const file of files) {
-  const info = await stat(file);
-  const source = await readFile(file);
-  const relPath = relative(DIST_DIR, file).replaceAll("\\", "/");
-  const name = chunkName(relPath);
-  const overLimit =
-    isJsChunk(relPath) &&
-    info.size > CHUNK_SIZE_WARNING_LIMIT_BYTES &&
-    !allowedChunks.has(name);
+  // ---------------------------------------------------------------------------
+  // Collect and analyse assets
+  // ---------------------------------------------------------------------------
+  const files = await collectFiles(ASSET_DIR);
+  const rows = [];
 
-  rows.push({
-    file: relPath,
-    name,
-    raw: info.size,
-    gzip: gzipSync(source).length,
-    isJs: isJsChunk(relPath),
-    overLimit,
-    allowed: isJsChunk(relPath) && allowedChunks.has(name),
+  for (const file of files) {
+    const info = await stat(file);
+    const source = await readFile(file);
+    const relPath = relative(DIST_DIR, file).replaceAll("\\", "/");
+    const name = chunkName(relPath);
+    const overLimit =
+      isJsChunk(relPath) &&
+      info.size > CHUNK_SIZE_WARNING_LIMIT_BYTES &&
+      !allowedChunks.has(name);
+
+    rows.push({
+      file: relPath,
+      name,
+      raw: info.size,
+      gzip: gzipSync(source).length,
+      isJs: isJsChunk(relPath),
+      overLimit,
+      allowed: isJsChunk(relPath) && allowedChunks.has(name),
+    });
+  }
+
+  rows.sort((a, b) => b.raw - a.raw);
+
+  const totals = rows.reduce(
+    (sum, row) => ({ raw: sum.raw + row.raw, gzip: sum.gzip + row.gzip }),
+    { raw: 0, gzip: 0 },
+  );
+
+  const oversized = rows.filter((r) => r.overLimit);
+
+  const jsRows = rows.filter((r) => r.file.endsWith(".js"));
+  const totalJsGzip = jsRows.reduce((s, r) => s + r.gzip, 0);
+  const maxChunkGzip = jsRows.reduce((max, r) => Math.max(max, r.gzip), 0);
+
+  // ---------------------------------------------------------------------------
+  // Print report
+  // ---------------------------------------------------------------------------
+  console.log("Bundle size report");
+  console.log("==================");
+  console.log(`Assets: ${rows.length}`);
+  console.log(`Total raw:  ${formatKb(totals.raw)}`);
+  console.log(`Total gzip: ${formatKb(totals.gzip)}`);
+  console.log(`Chunk limit: ${CHUNK_SIZE_WARNING_LIMIT_KB} kB`);
+  if (allowedChunks.size > 0) {
+    console.log(`Allowed (exempt): ${[...allowedChunks].join(", ")}`);
+  }
+  console.log("");
+
+  // Table header
+  console.log("| Asset | Raw | Gzip | Status |");
+  console.log("| --- | ---: | ---: | :---: |");
+
+  for (const row of rows) {
+    let status = "";
+    if (row.isJs) {
+      if (row.allowed) {
+        status = "⚠ allowed";
+      } else if (row.overLimit) {
+        status = "✗ OVER LIMIT";
+      } else {
+        status = "✓ OK";
+      }
+    }
+    console.log(`| ${row.file} | ${formatKb(row.raw)} | ${formatKb(row.gzip)} | ${status} |`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fail-fast when --fail is set and oversized chunks exist
+  // ---------------------------------------------------------------------------
+  if (failOnOversize && oversized.length > 0) {
+    console.log("");
+    console.error(`\nERROR: ${oversized.length} chunk(s) exceed the ${CHUNK_SIZE_WARNING_LIMIT_KB} kB limit:\n`);
+    for (const row of oversized) {
+      console.error(
+        `  • ${row.name}  →  ${formatKb(row.raw)} (limit ${CHUNK_SIZE_WARNING_LIMIT_KB} kB, over by ${formatKb(row.raw - CHUNK_SIZE_WARNING_LIMIT_BYTES)})`,
+      );
+    }
+    console.error(
+      "\nReduce the chunk size or, as a temporary measure, pass --allow <chunkName> with a rationale comment.",
+    );
+    process.exit(1);
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // Route-level chunk reporting with per-route budgets
+  // ---------------------------------------------------------------------------
+  const routeChunkNames = Object.keys(ROUTE_BUDGETS);
+
+  const routeRows = routeChunkNames.map((name) => {
+    const matches = rows.filter((r) => r.isJs && r.name === name);
+    const raw = matches.reduce((s, r) => s + r.raw, 0);
+    const gzip = matches.reduce((s, r) => s + r.gzip, 0);
+    const budget = ROUTE_BUDGETS[name];
+    const overBudget = budget !== undefined && gzip > budget;
+    return { name, raw, gzip, budget, overBudget, present: matches.length > 0 };
   });
-}
 
-rows.sort((a, b) => b.raw - a.raw);
-
-const totals = rows.reduce(
-  (sum, row) => ({ raw: sum.raw + row.raw, gzip: sum.gzip + row.gzip }),
-  { raw: 0, gzip: 0 },
-);
-
-const oversized = rows.filter((r) => r.overLimit);
-
-const jsRows = rows.filter((r) => r.file.endsWith(".js"));
-const totalJsGzip = jsRows.reduce((s, r) => s + r.gzip, 0);
-const maxChunkGzip = jsRows.reduce((max, r) => Math.max(max, r.gzip), 0);
-
-// ---------------------------------------------------------------------------
-// Print report
-// ---------------------------------------------------------------------------
-console.log("Bundle size report");
-console.log("==================");
-console.log(`Assets: ${rows.length}`);
-console.log(`Total raw:  ${formatKb(totals.raw)}`);
-console.log(`Total gzip: ${formatKb(totals.gzip)}`);
-console.log(`Chunk limit: ${CHUNK_SIZE_WARNING_LIMIT_KB} kB`);
-if (allowedChunks.size > 0) {
-  console.log(`Allowed (exempt): ${[...allowedChunks].join(", ")}`);
-}
-console.log("");
-
-// Table header
-console.log("| Asset | Raw | Gzip | Status |");
-console.log("| --- | ---: | ---: | :---: |");
-
-for (const row of rows) {
-  let status = "";
-  if (row.isJs) {
-    if (row.allowed) {
-      status = "⚠ allowed";
-    } else if (row.overLimit) {
-      status = "✗ OVER LIMIT";
+  console.log("");
+  console.log("Route chunk sizes (with per-route budgets)");
+  console.log("=========================================");
+  console.log("| Chunk | Raw | Gzip | Budget | Status |");
+  console.log("| --- | ---: | ---: | ---: | :---: |");
+  const missingRouteChunks = [];
+  const overBudgetRoutes = [];
+  for (const row of routeRows) {
+    if (!row.present) {
+      missingRouteChunks.push(row.name);
+      console.log(`| ${row.name} | — | — | ${formatKb(row.budget ?? 0)} | ✗ MISSING |`);
     } else {
-      status = "✓ OK";
+      const status = row.overBudget ? "✗ OVER BUDGET" : "✓ OK";
+      if (row.overBudget) {
+        overBudgetRoutes.push(row.name);
+      }
+      console.log(`| ${row.name} | ${formatKb(row.raw)} | ${formatKb(row.gzip)} | ${formatKb(row.budget ?? 0)} | ${status} |`);
     }
   }
-  console.log(`| ${row.file} | ${formatKb(row.raw)} | ${formatKb(row.gzip)} | ${status} |`);
-}
 
-// ---------------------------------------------------------------------------
-// Fail-fast when --fail is set and oversized chunks exist
-// ---------------------------------------------------------------------------
-if (failOnOversize && oversized.length > 0) {
-  console.log("");
-  console.error(`\nERROR: ${oversized.length} chunk(s) exceed the ${CHUNK_SIZE_WARNING_LIMIT_KB} kB limit:\n`);
-  for (const row of oversized) {
+  if (failOnOversize && missingRouteChunks.length > 0) {
     console.error(
-      `  • ${row.name}  →  ${formatKb(row.raw)} (limit ${CHUNK_SIZE_WARNING_LIMIT_KB} kB, over by ${formatKb(row.raw - CHUNK_SIZE_WARNING_LIMIT_BYTES)})`,
+      `\nERROR: missing route chunk(s) (code-splitting regression): ${missingRouteChunks.join(", ")}`,
+    );
+    process.exit(1);
+  }
+
+  if (failOnOversize && overBudgetRoutes.length > 0) {
+    console.error(
+      `\nERROR: ${overBudgetRoutes.length} route chunk(s) exceed their per-route budget:\n`,
+    );
+    for (const row of routeRows) {
+      if (row.overBudget) {
+        console.error(
+          `  • ${row.name}  →  ${formatKb(row.gzip)} (budget ${formatKb(row.budget)}, over by ${formatKb(row.gzip - row.budget)})`,
+        );
+      }
+    }
+    console.error(
+      "\nReduce the route chunk size or adjust the budget in scripts/route-budgets.json with a rationale comment.",
+    );
+    process.exit(1);
+  }
+
+  // Heaviest routes summary
+  console.log("");
+  console.log("Heaviest routes (by gzip size)");
+  console.log("===============================");
+  const sortedRoutes = routeRows
+    .filter((r) => r.present)
+    .sort((a, b) => b.gzip - a.gzip);
+  console.log("| Rank | Chunk | Gzip | % of Total JS |");
+  console.log("| ---: | --- | ---: | ---: |");
+  const totalRouteJsGzip = sortedRoutes.reduce((s, r) => s + r.gzip, 0);
+  for (let i = 0; i < sortedRoutes.length; i++) {
+    const row = sortedRoutes[i];
+    const pct = totalRouteJsGzip > 0 ? ((row.gzip / totalRouteJsGzip) * 100).toFixed(1) : "0.0";
+    console.log(`| ${i + 1} | ${row.name} | ${formatKb(row.gzip)} | ${pct}% |`);
+  }
+
+  // ── Budget check ──────────────────────────────────────────────────────────────
+  console.log("");
+  console.log("Budget check");
+  console.log("============");
+
+  const violations = [];
+
+  if (maxChunkGzip > BUDGET.maxChunkGzip) {
+    violations.push(
+      `Largest JS chunk: ${formatKb(maxChunkGzip)} exceeds budget of ${formatKb(BUDGET.maxChunkGzip)}`,
     );
   }
-  console.error(
-    "\nReduce the chunk size or, as a temporary measure, pass --allow <chunkName> with a rationale comment.",
-  );
-  process.exit(1);
-}
 
+  if (totalJsGzip > BUDGET.maxTotalJsGzip) {
+    violations.push(
+      `Total JS (gzip): ${formatKb(totalJsGzip)} exceeds budget of ${formatKb(BUDGET.maxTotalJsGzip)}`,
+    );
+  }
 
-// ---------------------------------------------------------------------------
-// Route-level chunk reporting (keeps issue #1748 assertions honest after a real build)
-// ---------------------------------------------------------------------------
-const EXPECTED_ROUTE_CHUNKS = [
-  "app-dashboard",
-  "app-streams",
-  "app-stream-detail",
-  "app-recipient",
-  "app-treasury",
-  "app-embed-stream",
-];
-
-const routeRows = EXPECTED_ROUTE_CHUNKS.map((name) => {
-  const matches = rows.filter((r) => r.isJs && r.name === name);
-  const raw = matches.reduce((s, r) => s + r.raw, 0);
-  const gzip = matches.reduce((s, r) => s + r.gzip, 0);
-  return { name, raw, gzip, present: matches.length > 0 };
-});
-
-console.log("");
-console.log("Route chunk sizes");
-console.log("=================");
-console.log("| Chunk | Raw | Gzip | Status |");
-console.log("| --- | ---: | ---: | :---: |");
-const missingRouteChunks = [];
-for (const row of routeRows) {
-  if (!row.present) {
-    missingRouteChunks.push(row.name);
-    console.log(`| ${row.name} | — | — | ✗ MISSING |`);
+  if (violations.length > 0) {
+    console.error("❌ Bundle budget exceeded:");
+    for (const v of violations) {
+      console.error(`   • ${v}`);
+    }
+    process.exit(1);
   } else {
-    console.log(`| ${row.name} | ${formatKb(row.raw)} | ${formatKb(row.gzip)} | ✓ OK |`);
+    console.log(
+      `✅ Within budget — largest chunk: ${formatKb(maxChunkGzip)} / ${formatKb(BUDGET.maxChunkGzip)},` +
+      ` total JS: ${formatKb(totalJsGzip)} / ${formatKb(BUDGET.maxTotalJsGzip)}`,
+    );
   }
 }
 
-if (failOnOversize && missingRouteChunks.length > 0) {
-  console.error(
-    `\nERROR: missing route chunk(s) (code-splitting regression): ${missingRouteChunks.join(", ")}`,
-  );
+main().catch((err) => {
+  console.error(err);
   process.exit(1);
-}
-
-// ── Budget check ──────────────────────────────────────────────────────────────
-console.log("");
-console.log("Budget check");
-console.log("============");
-
-const violations = [];
-
-if (maxChunkGzip > BUDGET.maxChunkGzip) {
-  violations.push(
-    `Largest JS chunk: ${formatKb(maxChunkGzip)} exceeds budget of ${formatKb(BUDGET.maxChunkGzip)}`,
-  );
-}
-
-if (totalJsGzip > BUDGET.maxTotalJsGzip) {
-  violations.push(
-    `Total JS (gzip): ${formatKb(totalJsGzip)} exceeds budget of ${formatKb(BUDGET.maxTotalJsGzip)}`,
-  );
-}
-
-if (violations.length > 0) {
-  console.error("❌ Bundle budget exceeded:");
-  for (const v of violations) {
-    console.error(`   • ${v}`);
-  }
-  process.exit(1);
-} else {
-  console.log(
-    `✅ Within budget — largest chunk: ${formatKb(maxChunkGzip)} / ${formatKb(BUDGET.maxChunkGzip)},` +
-    ` total JS: ${formatKb(totalJsGzip)} / ${formatKb(BUDGET.maxTotalJsGzip)}`,
-  );
-}
+});
