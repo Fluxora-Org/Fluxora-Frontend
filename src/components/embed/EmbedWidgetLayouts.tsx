@@ -13,7 +13,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isBoundedString(value: unknown, maxLength: number): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+  return (
+    typeof value === "string" && value.length > 0 && value.length <= maxLength
+  );
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -27,7 +29,7 @@ function isDateString(value: unknown): value is string {
 function isThemeConfig(value: unknown): value is ThemeConfig {
   if (!isRecord(value) || Object.keys(value).length === 0) return false;
   return Object.values(value).every((entry) =>
-    isBoundedString(entry, EMBED_MESSAGE_MAX_STRING_LENGTH)
+    isBoundedString(entry, EMBED_MESSAGE_MAX_STRING_LENGTH),
   );
 }
 
@@ -36,21 +38,33 @@ function isStream(value: unknown): value is StreamRecord {
   return (
     isBoundedString(value.name, 200) &&
     isBoundedString(value.asset, 20) &&
-    (value.status === "Active" || value.status === "Paused" || value.status === "Completed") &&
+    (value.status === "Active" ||
+      value.status === "Paused" ||
+      value.status === "Completed") &&
     isDateString(value.startDate) &&
-    (value.cliffDate === null || value.cliffDate === undefined || isDateString(value.cliffDate)) &&
+    (value.cliffDate === null ||
+      value.cliffDate === undefined ||
+      isDateString(value.cliffDate)) &&
     isDateString(value.endDate) &&
-    isFiniteNumber(value.depositAmount) && value.depositAmount >= 0 &&
-    isFiniteNumber(value.monthlyRate) && value.monthlyRate >= 0 &&
-    isFiniteNumber(value.streamedAmount) && value.streamedAmount >= 0 &&
-    isFiniteNumber(value.remainingAmount) && value.remainingAmount >= 0 &&
-    isFiniteNumber(value.withdrawableAmount) && value.withdrawableAmount >= 0 &&
-    isFiniteNumber(value.progress) && value.progress >= 0 && value.progress <= 100
+    isFiniteNumber(value.depositAmount) &&
+    value.depositAmount >= 0 &&
+    isFiniteNumber(value.monthlyRate) &&
+    value.monthlyRate >= 0 &&
+    isFiniteNumber(value.streamedAmount) &&
+    value.streamedAmount >= 0 &&
+    isFiniteNumber(value.remainingAmount) &&
+    value.remainingAmount >= 0 &&
+    isFiniteNumber(value.withdrawableAmount) &&
+    value.withdrawableAmount >= 0 &&
+    isFiniteNumber(value.progress) &&
+    value.progress >= 0 &&
+    value.progress <= 100
   );
 }
 
 function isSafeUrl(value: string): boolean {
-  if (value.length === 0 || value.length > EMBED_MESSAGE_MAX_URL_LENGTH) return false;
+  if (value.length === 0 || value.length > EMBED_MESSAGE_MAX_URL_LENGTH)
+    return false;
   try {
     const parsed = new URL(value, "https://floxora.local");
     return parsed.protocol === "http:" || parsed.protocol === "https:";
@@ -77,11 +91,11 @@ export interface EmbedNavigateMessage {
 }
 
 export type EmbedMessage =
-  | EmbedThemeMessage
-  | EmbedStreamMessage
-  | EmbedNavigateMessage;
+  EmbedThemeMessage | EmbedStreamMessage | EmbedNavigateMessage;
 
-export function validateEmbedMessage(message: unknown): message is EmbedMessage {
+export function validateEmbedMessage(
+  message: unknown,
+): message is EmbedMessage {
   if (!isRecord(message) || !isBoundedString(message.type, 20)) return false;
   switch (message.type) {
     case "theme":
@@ -140,9 +154,12 @@ function useMinDimensions(
   minWidth: number,
   minHeight: number,
   overrideWidth?: number,
-  overrideHeight?: number
+  overrideHeight?: number,
 ) {
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({
     width: overrideWidth ?? 0,
     height: overrideHeight ?? 0,
   });
@@ -219,7 +236,9 @@ function EmbedWidgetDegradedSize({
         <StatusBadge status={stream.status} compact />
       </div>
       <p className="embed-widget-degraded-size__notice">
-        Widget size too small ({dimensions.width}×{dimensions.height}px). Minimum supported size for {layoutName} layout is {minDimensions.minWidth}×{minDimensions.minHeight}px.
+        Widget size too small ({dimensions.width}×{dimensions.height}px).
+        Minimum supported size for {layoutName} layout is{" "}
+        {minDimensions.minWidth}×{minDimensions.minHeight}px.
       </p>
     </div>
   );
@@ -227,9 +246,9 @@ function EmbedWidgetDegradedSize({
 
 /**
  * Card Layout - Designed for narrow sidebars (300px-420px)
- * 
+ *
  * Minimum supported size: 300px × 250px
- * 
+ *
  * Features:
  * - Stream title and status badge
  * - Progress bar and timeline
@@ -237,8 +256,8 @@ function EmbedWidgetDegradedSize({
  * - Completion percentage
  * - Powered by Fluxora footer
  */
-export function EmbedWidgetLayoutCard({ 
-  stream, 
+export function EmbedWidgetLayoutCard({
+  stream,
   currentDate,
   width,
   height,
@@ -250,12 +269,15 @@ export function EmbedWidgetLayoutCard({
     minDimensions.minWidth,
     minDimensions.minHeight,
     width,
-    height
+    height,
   );
 
   if (isBelowMin) {
     return (
-      <div ref={containerRef} className="embed-widget-card embed-widget-container-wrap">
+      <div
+        ref={containerRef}
+        className="embed-widget-card embed-widget-container-wrap"
+      >
         <EmbedWidgetDegradedSize
           layoutName="card"
           stream={stream}
@@ -266,10 +288,11 @@ export function EmbedWidgetLayoutCard({
     );
   }
 
-  const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
-  
+  const timelineStatus = stream.status.toLowerCase() as
+    "active" | "paused" | "completed";
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className="embed-widget-card"
       role="article"
@@ -286,7 +309,7 @@ export function EmbedWidgetLayoutCard({
         </h1>
         <StatusBadge status={stream.status} />
       </div>
-      
+
       {/* Main content */}
       <div className="embed-widget-card__content">
         {/* Timeline visualization */}
@@ -302,7 +325,7 @@ export function EmbedWidgetLayoutCard({
             compareMode={false}
           />
         </div>
-        
+
         {/* Key metrics grid */}
         <div className="embed-widget-card__metrics">
           <MetricItem
@@ -321,7 +344,7 @@ export function EmbedWidgetLayoutCard({
             ariaLabel={`Remaining amount: ${formatNumber(stream.remainingAmount)} ${stream.asset}`}
           />
         </div>
-        
+
         {/* Progress and completion */}
         <div className="embed-widget-card__progress">
           <div className="embed-widget-card__progress-label">
@@ -338,27 +361,27 @@ export function EmbedWidgetLayoutCard({
             aria-valuemax={100}
             aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
           >
-            <div 
+            <div
               className="embed-widget-card__progress-fill"
               style={{ width: `${stream.progress}%` }}
             />
           </div>
         </div>
       </div>
-      
+
       {/* Footer with attribution */}
       <footer className="embed-widget-card__footer">
         <div className="embed-widget-card__attribution">
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 16 16" 
-            fill="none" 
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
             aria-hidden="true"
           >
-            <path 
-              d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1.5A5.5 5.5 0 1 0 13.5 8 5.5 5.5 0 0 0 8 2.5zM8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 1.5A2.5 2.5 0 1 0 10.5 8 2.5 2.5 0 0 0 8 5.5z" 
-              fill="currentColor" 
+            <path
+              d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1.5A5.5 5.5 0 1 0 13.5 8 5.5 5.5 0 0 0 8 2.5zM8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 1.5A2.5 2.5 0 1 0 10.5 8 2.5 2.5 0 0 0 8 5.5z"
+              fill="currentColor"
             />
           </svg>
           <span>Powered by Fluxora</span>
@@ -370,9 +393,9 @@ export function EmbedWidgetLayoutCard({
 
 /**
  * Banner Layout - Horizontal layout optimized for 600px+ widths
- * 
+ *
  * Minimum supported size: 500px × 80px
- * 
+ *
  * Features:
  * - Title and status
  * - Timeline visualization
@@ -380,8 +403,8 @@ export function EmbedWidgetLayoutCard({
  * - Progress and completion
  * - Compact spacing
  */
-export function EmbedWidgetLayoutBanner({ 
-  stream, 
+export function EmbedWidgetLayoutBanner({
+  stream,
   currentDate,
   width,
   height,
@@ -393,12 +416,15 @@ export function EmbedWidgetLayoutBanner({
     minDimensions.minWidth,
     minDimensions.minHeight,
     width,
-    height
+    height,
   );
 
   if (isBelowMin) {
     return (
-      <div ref={containerRef} className="embed-widget-banner embed-widget-container-wrap">
+      <div
+        ref={containerRef}
+        className="embed-widget-banner embed-widget-container-wrap"
+      >
         <EmbedWidgetDegradedSize
           layoutName="banner"
           stream={stream}
@@ -409,10 +435,11 @@ export function EmbedWidgetLayoutBanner({
     );
   }
 
-  const timelineStatus = stream.status.toLowerCase() as "active" | "paused" | "completed";
-  
+  const timelineStatus = stream.status.toLowerCase() as
+    "active" | "paused" | "completed";
+
   return (
-    <div 
+    <div
       ref={containerRef}
       className="embed-widget-banner"
       role="article"
@@ -429,7 +456,7 @@ export function EmbedWidgetLayoutBanner({
         </h1>
         <StatusBadge status={stream.status} compact />
       </div>
-      
+
       {/* Middle section: Timeline */}
       <div className="embed-widget-banner__timeline">
         <StreamTimeline
@@ -443,7 +470,7 @@ export function EmbedWidgetLayoutBanner({
           compareMode={true} // Compact timeline for banner
         />
       </div>
-      
+
       {/* Right section: Metrics */}
       <div className="embed-widget-banner__metrics">
         <MetricItem
@@ -462,7 +489,7 @@ export function EmbedWidgetLayoutBanner({
             aria-valuemax={100}
             aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
           >
-            <div 
+            <div
               className="embed-widget-banner__progress-fill"
               style={{ width: `${stream.progress}%` }}
             />
@@ -478,16 +505,16 @@ export function EmbedWidgetLayoutBanner({
 
 /**
  * Compact Layout - Minimal layout optimized for 200-300px widths
- * 
+ *
  * Minimum supported size: 200px × 50px
- * 
+ *
  * Features:
  * - Status badge
  * - Progress percentage
  * - Progress bar
  * - Attribution
  */
-export function EmbedWidgetLayoutCompact({ 
+export function EmbedWidgetLayoutCompact({
   stream,
   width,
   height,
@@ -499,12 +526,15 @@ export function EmbedWidgetLayoutCompact({
     minDimensions.minWidth,
     minDimensions.minHeight,
     width,
-    height
+    height,
   );
 
   if (isBelowMin) {
     return (
-      <div ref={containerRef} className="embed-widget-compact embed-widget-container-wrap">
+      <div
+        ref={containerRef}
+        className="embed-widget-compact embed-widget-container-wrap"
+      >
         <EmbedWidgetDegradedSize
           layoutName="compact"
           stream={stream}
@@ -516,7 +546,7 @@ export function EmbedWidgetLayoutCompact({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="embed-widget-compact"
       role="article"
@@ -533,7 +563,7 @@ export function EmbedWidgetLayoutCompact({
           <span className="embed-widget-compact__progress-percentage">
             {stream.progress.toFixed(0)}%
           </span>
-          <div 
+          <div
             className="embed-widget-compact__progress-bar"
             role="progressbar"
             aria-valuenow={stream.progress}
@@ -541,26 +571,26 @@ export function EmbedWidgetLayoutCompact({
             aria-valuemax={100}
             aria-label={`Stream progress: ${stream.progress.toFixed(0)}%`}
           >
-            <div 
+            <div
               className="embed-widget-compact__progress-fill"
               style={{ width: `${stream.progress}%` }}
             />
           </div>
         </div>
       </div>
-      
+
       {/* Attribution */}
       <div className="embed-widget-compact__attribution">
-        <svg 
-          width="12" 
-          height="12" 
-          viewBox="0 0 12 12" 
-          fill="none" 
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
           aria-hidden="true"
         >
-          <path 
-            d="M6 1a5 5 0 1 1 0 10A5 5 0 0 1 6 1zm0 1a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" 
-            fill="currentColor" 
+          <path
+            d="M6 1a5 5 0 1 1 0 10A5 5 0 0 1 6 1zm0 1a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"
+            fill="currentColor"
           />
         </svg>
         <span>Fluxora</span>
@@ -582,18 +612,18 @@ const STATUS_CONFIG: Record<
   Active: {
     label: "Active",
     className: "embed-widget-status-badge--active",
-    ariaLabel: "Stream status: Active"
+    ariaLabel: "Stream status: Active",
   },
   Paused: {
     label: "Paused",
     className: "embed-widget-status-badge--paused",
-    ariaLabel: "Stream status: Paused"
+    ariaLabel: "Stream status: Paused",
   },
   Completed: {
     label: "Completed",
     className: "embed-widget-status-badge--completed",
-    ariaLabel: "Stream status: Completed"
-  }
+    ariaLabel: "Stream status: Completed",
+  },
 };
 
 /**
@@ -606,7 +636,7 @@ function StatusBadge({ status, compact = false }: StatusBadgeProps) {
   const config = STATUS_CONFIG[status] ?? {
     label: String(status),
     className: "embed-widget-status-badge--unknown",
-    ariaLabel: `Stream status: ${String(status)}`
+    ariaLabel: `Stream status: ${String(status)}`,
   };
 
   return (
@@ -628,10 +658,15 @@ interface MetricItemProps {
   ariaLabel?: string;
 }
 
-function MetricItem({ label, value, compact = false, ariaLabel }: MetricItemProps) {
+function MetricItem({
+  label,
+  value,
+  compact = false,
+  ariaLabel,
+}: MetricItemProps) {
   return (
-    <div 
-      className={`embed-widget-metric ${compact ? 'compact' : ''}`}
+    <div
+      className={`embed-widget-metric ${compact ? "compact" : ""}`}
       role="definition"
       aria-label={ariaLabel || `${label}: ${value}`}
     >

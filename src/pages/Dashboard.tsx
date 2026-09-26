@@ -21,6 +21,7 @@ import {
 import { formatAssetAmount } from "../lib/formatters";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
+import ErrorBoundary from "../components/ErrorBoundary";
 import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
 import ErrorBoundary from "../components/ErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
@@ -209,11 +210,7 @@ export default function Dashboard() {
       {hasError && (
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={refetch}
-          >
+          <Button type="button" variant="secondary" onClick={refetch}>
             Retry
           </Button>
         </div>
@@ -307,4 +304,3 @@ const walletBannerStyle: React.CSSProperties = {
   marginTop: "0.75rem",
   marginBottom: "0.25rem",
 };
-

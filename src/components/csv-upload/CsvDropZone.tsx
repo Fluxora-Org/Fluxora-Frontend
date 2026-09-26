@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import './CsvDropZone.css';
-import type { UploadZoneState } from './types';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import "./CsvDropZone.css";
+import type { UploadZoneState } from "./types";
 import {
   buildTemplateCsv,
   MAX_CSV_FILE_SIZE_BYTES,
@@ -19,7 +19,12 @@ export interface CsvDropZoneProps {
   onParsed: (result: ParseResult, fileName: string, rawText: string) => void;
 }
 
-const ACCEPTED_MIME = new Set(['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain']);
+const ACCEPTED_MIME = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "text/plain",
+]);
 
 /**
  * CsvDropZone — drag-and-drop / click-to-browse CSV upload zone.
@@ -32,11 +37,13 @@ const ACCEPTED_MIME = new Set(['text/csv', 'application/csv', 'application/vnd.m
  * - The drop zone itself exposes `role="button"` so AT treats it as interactive.
  */
 export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
-  const [zoneState, setZoneState] = useState<UploadZoneState>('empty');
+  const [zoneState, setZoneState] = useState<UploadZoneState>("empty");
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedFileName, setParsedFileName] = useState<string | null>(null);
   const [parsedRowCount, setParsedRowCount] = useState<number>(0);
-  const [parseProgress, setParseProgress] = useState<CsvProgressPayload | null>(null);
+  const [parseProgress, setParseProgress] = useState<CsvProgressPayload | null>(
+    null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   // Tracks the in-flight worker parse so a new file selection (or unmount)
   // can abort it cleanly instead of letting it finish and clobber state.
@@ -63,7 +70,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
    */
   const reject = useCallback(
     (message: string) => {
-      setZoneState('parse-error');
+      setZoneState("parse-error");
       setParseError(message);
       setParseProgress(null);
       restoreZoneFocus();
@@ -84,7 +91,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       // Abort any parse still in flight before starting a new one.
       inFlightParseRef.current?.cancel();
 
-      setZoneState('parsing');
+      setZoneState("parsing");
       setParseError(null);
       setParseProgress(null);
 
@@ -107,14 +114,14 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         const rowCount = result.rows.length || 0;
         setParsedFileName(file.name);
         setParsedRowCount(rowCount);
-        setZoneState('parsed');
+        setZoneState("parsed");
         onParsed(result, file.name, text);
       } catch (err) {
         // A cancelled parse is expected (new file selected / unmount); leave
         // the zone in its current state without surfacing an error.
         if (err instanceof CsvParseCancelledError) return;
-        setZoneState('parse-error');
-        setParseError('Failed to read the file. Please try again.');
+        setZoneState("parse-error");
+        setParseError("Failed to read the file. Please try again.");
       } finally {
         if (task && inFlightParseRef.current === task) {
           inFlightParseRef.current = null;
@@ -128,13 +135,13 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setZoneState('dragging-over');
+    setZoneState("dragging-over");
   }, []);
 
   const onDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setZoneState((prev) => (prev === 'dragging-over' ? 'empty' : prev));
+    setZoneState((prev) => (prev === "dragging-over" ? "empty" : prev));
   }, []);
 
   const onDrop = useCallback(
@@ -143,12 +150,12 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       e.stopPropagation();
       const files = e.dataTransfer.files;
       if (!files || files.length === 0) {
-        setZoneState('empty');
+        setZoneState("empty");
         return;
       }
       // Explicit single-file contract: reject multi-file drops.
       if (files.length > 1) {
-        reject('Only one file can be uploaded at a time.');
+        reject("Only one file can be uploaded at a time.");
         return;
       }
       void processFile(files[0]!);
@@ -160,8 +167,8 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 1) {
-        reject('Only one file can be uploaded at a time.');
-        e.target.value = '';
+        reject("Only one file can be uploaded at a time.");
+        e.target.value = "";
         return;
       }
       if (files && files.length === 1) {
@@ -171,7 +178,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         restoreZoneFocus();
       }
       // Reset so re-selecting the same file triggers onChange
-      e.target.value = '';
+      e.target.value = "";
     },
     [processFile, reject, restoreZoneFocus],
   );
@@ -179,34 +186,31 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
   // ── Template download ──────────────────────────────────────────────────────
   const handleTemplateDownload = useCallback(() => {
     const csv = buildTemplateCsv();
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'fluxora-streams-template.csv';
+    a.download = "fluxora-streams-template.csv";
     a.click();
     URL.revokeObjectURL(url);
   }, []);
 
   // ── Derived state ──────────────────────────────────────────────────────────
-  const zoneClass = [
-    'csv-drop-zone',
-    `csv-drop-zone--${zoneState}`,
-  ].join(' ');
+  const zoneClass = ["csv-drop-zone", `csv-drop-zone--${zoneState}`].join(" ");
 
   const statusMessage = (() => {
-    if (zoneState === 'parsing') {
+    if (zoneState === "parsing") {
       if (parseProgress && parseProgress.totalRows > 0) {
         return `Parsing file… ${parseProgress.processedRows} of ${parseProgress.totalRows} rows (${parseProgress.percent}%)`;
       }
-      return 'Parsing file…';
+      return "Parsing file…";
     }
-    if (zoneState === 'parse-error' && parseError) return parseError;
-    if (zoneState === 'parsed' && parsedFileName) {
-      return `${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? 's' : ''} detected`;
+    if (zoneState === "parse-error" && parseError) return parseError;
+    if (zoneState === "parsed" && parsedFileName) {
+      return `${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? "s" : ""} detected`;
     }
-    if (zoneState === 'dragging-over') return 'Drop to upload';
-    return '';
+    if (zoneState === "dragging-over") return "Drop to upload";
+    return "";
   })();
 
   return (
@@ -221,12 +225,12 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         role="button"
         tabIndex={0}
         aria-describedby={
-          zoneState === 'parse-error' && parseError
-            ? 'csv-upload-status csv-upload-error'
-            : 'csv-upload-status'
+          zoneState === "parse-error" && parseError
+            ? "csv-upload-status csv-upload-error"
+            : "csv-upload-status"
         }
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             inputRef.current?.click();
           }
@@ -237,7 +241,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       >
         {/* Upload icon */}
         <span className="csv-drop-zone__icon" aria-hidden="true">
-          {zoneState === 'parsing' ? (
+          {zoneState === "parsing" ? (
             <svg
               className="csv-drop-zone__spinner"
               width="32"
@@ -250,7 +254,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
               <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />
               <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
             </svg>
-          ) : zoneState === 'parsed' ? (
+          ) : zoneState === "parsed" ? (
             <svg
               width="32"
               height="32"
@@ -266,7 +270,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
                 d="M9 12l2 2 4-4"
               />
             </svg>
-          ) : zoneState === 'parse-error' ? (
+          ) : zoneState === "parse-error" ? (
             <svg
               width="32"
               height="32"
@@ -297,22 +301,22 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
           )}
         </span>
 
-        {zoneState !== 'parsing' && (
+        {zoneState !== "parsing" && (
           <span className="csv-drop-zone__heading">
-            {zoneState === 'dragging-over'
-              ? 'Drop to upload'
-              : zoneState === 'parsed'
-                ? 'File uploaded'
-                : 'Drag & drop your CSV here'}
+            {zoneState === "dragging-over"
+              ? "Drop to upload"
+              : zoneState === "parsed"
+                ? "File uploaded"
+                : "Drag & drop your CSV here"}
           </span>
         )}
 
-        {zoneState === 'parsing' && (
+        {zoneState === "parsing" && (
           <>
             <span className="csv-drop-zone__heading">
               {parseProgress && parseProgress.totalRows > 0
                 ? `Parsing file… ${parseProgress.percent}%`
-                : 'Parsing file…'}
+                : "Parsing file…"}
             </span>
             <div
               role="progressbar"
@@ -324,7 +328,9 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
             >
               <div
                 className="csv-drop-zone__progress-fill"
-                style={{ width: `${parseProgress ? parseProgress.percent : 0}%` }}
+                style={{
+                  width: `${parseProgress ? parseProgress.percent : 0}%`,
+                }}
               />
             </div>
             {parseProgress && parseProgress.totalRows > 0 && (
@@ -335,13 +341,16 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
           </>
         )}
 
-        {zoneState !== 'dragging-over' && zoneState !== 'parsing' && zoneState !== 'parsed' && zoneState !== 'parse-error' && (
-          <span className="csv-drop-zone__subtext">
-            or click to browse files
-          </span>
-        )}
+        {zoneState !== "dragging-over" &&
+          zoneState !== "parsing" &&
+          zoneState !== "parsed" &&
+          zoneState !== "parse-error" && (
+            <span className="csv-drop-zone__subtext">
+              or click to browse files
+            </span>
+          )}
 
-        {zoneState !== 'parsing' && zoneState !== 'dragging-over' && (
+        {zoneState !== "parsing" && zoneState !== "dragging-over" && (
           <span className="csv-drop-zone__hint">
             Accepts .csv · max {MAX_CSV_ROWS} rows · {MAX_CSV_FILE_SIZE_LABEL}
           </span>
@@ -372,7 +381,7 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       </div>
 
       {/* Error shown below the zone as a ValidationMessage */}
-      {zoneState === 'parse-error' && parseError && (
+      {zoneState === "parse-error" && parseError && (
         <ValidationMessage
           id="csv-upload-error"
           message={parseError}
@@ -381,10 +390,10 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
       )}
 
       {/* Success file info */}
-      {zoneState === 'parsed' && parsedFileName && (
+      {zoneState === "parsed" && parsedFileName && (
         <ValidationMessage
           id="csv-upload-success"
-          message={`${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? 's' : ''} detected`}
+          message={`${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? "s" : ""} detected`}
           type="success"
         />
       )}

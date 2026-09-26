@@ -72,7 +72,7 @@ function securityHeadersPlugin(): Plugin {
     // Preview server (vite preview / vite preview --host 127.0.0.1)
     configurePreviewServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, false);
         next();
       });
     },
