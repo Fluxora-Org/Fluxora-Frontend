@@ -11,6 +11,7 @@ import ToastNotification, {
 } from "../components/ToastNotification";
 import CreateStreamFab from "../components/CreateStreamFab";
 import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
+import { MetaTags } from "../components/MetaTags";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { useTreasury } from "../components/treasuryOverviewPage/useTreasury";
 import {
@@ -249,16 +250,8 @@ export default function Dashboard() {
           onCreateStream={() => setIsModalOpen(true)}
           onConnectWallet={() => setIsWalletModalOpen(true)}
           onDismiss={handleDismissOnboarding}
+          onRetry={refetch}
         />
-        <ErrorBoundary>
-          <TreasuryOnboarding
-            walletConnected={walletConnected}
-            onConnectWallet={() => setIsWalletModalOpen(true)}
-            onCreateStream={() => setIsModalOpen(true)}
-            onRetry={refetch}
-            onDismiss={() => setShowOnboarding(false)}
-          />
-        </WidgetErrorBoundary>
       ) : (
         <TreasuryEmptyState
           onCreateStream={() => setIsModalOpen(true)}
@@ -297,6 +290,7 @@ export default function Dashboard() {
         />
       ) : null}
     </div>
+    </main>
   );
 }
 

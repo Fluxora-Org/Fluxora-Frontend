@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
@@ -75,17 +75,25 @@ export function useModalAccessibility({
   initialFocusRef,
   returnFocusRef,
 }: UseModalAccessibilityOptions) {
+  // Capture the trigger once per open transition. The main effect re-runs
+  // whenever its callbacks change identity (e.g. a re-created onClose), and
+  // re-capturing there would record an element inside the modal; after close
+  // that element is unmounted, so focus would never return to the trigger.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const previouslyFocused =
-      (document.activeElement instanceof HTMLElement &&
+    previouslyFocusedRef.current =
+      document.activeElement instanceof HTMLElement &&
       document.activeElement !== document.body
         ? document.activeElement
-        : returnFocusRef?.current) ??
-      (document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null);
+        : (returnFocusRef?.current ?? null);
+  }, [isOpen, returnFocusRef]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     lockBodyScroll();
 
     const focusInitialElement = () => {
@@ -143,6 +151,7 @@ export function useModalAccessibility({
       document.removeEventListener("keydown", handleKeyDown);
       unlockBodyScroll();
 
+      const previouslyFocused = previouslyFocusedRef.current;
       const elementToFocus =
         previouslyFocused &&
         previouslyFocused.isConnected &&

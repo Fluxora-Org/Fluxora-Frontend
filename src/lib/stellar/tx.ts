@@ -375,12 +375,14 @@ async function executeInvocation(
   }
 
   // 4. Assemble transaction with simulation resource fees
-  const assembledTx = SorobanRpc.assembleTransaction(tx, sim);
+  // assembleTransaction returns a TransactionBuilder (SDK 16); build() it to
+  // get the fee-and-footprint-updated Transaction for signing.
+  const assembledTx = SorobanRpc.assembleTransaction(tx, sim).build();
 
   // 5. Sign transaction via Freighter
   let signedXdr: string;
   try {
-    const signResult = await signTransaction((assembledTx as any).toXDR(), {
+    const signResult = await signTransaction(assembledTx.toXDR(), {
       networkPassphrase: passphrase,
       address: senderAddress,
     });

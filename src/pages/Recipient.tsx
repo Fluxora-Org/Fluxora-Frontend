@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import RecipientEmptyState from "../components/RecipientEmptyState";
+import { MetaTags } from "../components/MetaTags";
 import ConnectWalletModal from "../components/ConnectWalletModal";
 import {
   RecipientStreams,

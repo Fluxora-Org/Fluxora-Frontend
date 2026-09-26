@@ -99,17 +99,19 @@ jobs:
         run: pnpm run test:a11y
 
       - name: Run E2E tests (gateable)
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|reduced-motion"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|wallet-connect"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|stream-filter-sort"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|embed-widget-display"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|small-viewport-operation"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream"
+        # One `run:` key per step — duplicate keys are invalid YAML and made
+        # every run of this workflow fail at parse time with zero jobs.
+        run: |
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|reduced-motion"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|wallet-connect"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|stream-filter-sort"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|embed-widget-display"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|small-viewport-operation"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|transaction-status-resolution"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|first-visit-without-wallet"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|session recovery"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|workspace sharing"
+          npm run test:e2e -- --grep="landing-cta|not-found|create-stream|account switching flow"
 
       - name: Run landing FCP performance budget
         run: npm run test:performance
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|transaction-status-resolution"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|first-visit-without-wallet"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|session recovery"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|workspace sharing"
-        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|account switching flow"
