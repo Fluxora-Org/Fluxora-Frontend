@@ -6,9 +6,15 @@ Run the browser smoke suite with:
 npm run test:e2e
 ```
 
-The suite starts the Vite dev server from `playwright.config.ts` and covers the
-current create-stream wizard plus the recipient withdrawal surface. These tests
-use local demo data only; they do not connect to wallets, sign transactions, or
+The suite starts the Vite dev server from `playwright.config.ts` and covers:
+- Create stream wizard
+- Recipient withdrawal surface
+- Theme customization flow
+- Wallet connection/disconnection
+- Landing page CTAs
+- Stream detail views
+
+These tests use local demo data only; they do not connect to wallets, sign transactions, or
 call deploy credentials.
 
 Set `PLAYWRIGHT_BASE_URL` to target an already-running app, or
@@ -145,3 +151,30 @@ The `webServer` option in `playwright.config.ts` starts `npm run dev` automatica
   env:
     CI: true
 ```
+
+
+## Theme Customization Tests
+
+The theme customization flow has dedicated end-to-end coverage in `theme-customization.spec.ts`.
+
+### Running theme tests only
+
+```bash
+npm run test:e2e -- theme-customization
+```
+
+### What's covered
+
+- Theme toggle (light ↔ dark)
+- Persistence across page reloads and navigation
+- Keyboard accessibility
+- Mobile menu variant
+- System preference detection
+- localStorage failure graceful degradation
+- Invalid theme value rejection (security)
+
+### Quick validation
+
+See `THEME_TEST_QUICK_REFERENCE.md` for common commands and validation steps.
+
+Full validation guide: `../THEME_E2E_TEST_VALIDATION.md`

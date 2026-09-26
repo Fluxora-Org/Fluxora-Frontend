@@ -41,6 +41,20 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+
+      # NOTE: `npm run lint` is intentionally not run here yet. The repo
+      # currently has ~68 pre-existing eslint errors (mostly
+      # @typescript-eslint/no-explicit-any) spread across ~15 files that
+      # predate this workflow. Fixing them is a real but separate cleanup
+      # effort, not something to fold into introducing CI. Once that debt
+      # is paid down, add a `run: npm run lint` step here.
   playwright:
     name: Playwright E2E
     runs-on: ubuntu-latest
