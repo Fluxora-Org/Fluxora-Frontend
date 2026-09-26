@@ -54,6 +54,9 @@ const statusPillConfig: Record<
  * Implements Fluxora typography and large-scale StatusPill visual language
  * with WCAG 2.1 AA compliant contrast ratios and graceful fallback compositions
  * for streams missing optional fields (no cliff date, no custom summary label).
+ * Public images may contain only the stream name, recipient identity, wallet
+ * address, asset amounts, status, and schedule fields when `stream.public` is
+ * explicitly true. Private streams use a payload-independent generic canvas.
  */
 export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
   stream,
@@ -62,16 +65,17 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
   scale = 1,
   "data-testid": testId = "stream-og-image-template",
 }) => {
-  const pill = statusPillConfig[stream.status] ?? statusPillConfig.Active;
-  const StatusIcon = pill.Icon;
+  const isPublic = stream.public === true;
+  const pill = isPublic ? statusPillConfig[stream.status] ?? statusPillConfig.Active : null;
+  const StatusIcon = pill?.Icon;
 
   // Format short Stellar address e.g., GAJC...3P
   const shortAddress =
-    stream.recipientAddress && stream.recipientAddress.length >= 10
+    isPublic && stream.recipientAddress && stream.recipientAddress.length >= 10
       ? `${stream.recipientAddress.slice(0, 4)}...${stream.recipientAddress.slice(-4)}`
-      : stream.recipientAddress;
+      : undefined;
 
-  const hasCliffDate = Boolean(stream.cliffDate && stream.cliffDate.trim().length > 0);
+  const hasCliffDate = isPublic && Boolean(stream.cliffDate && stream.cliffDate.trim().length > 0);
 
   return (
     <div
@@ -163,26 +167,35 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
         </div>
 
         {/* Large-scale StatusPill */}
-        <div
-          data-testid="og-status-pill"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "8px 20px",
-            borderRadius: "9999px",
-            backgroundColor: pill.bg,
-            color: pill.color,
-            border: `1.5px solid ${pill.border}`,
-            fontSize: "16px",
-            fontWeight: 700,
-            letterSpacing: "0.05em",
-            boxShadow: `0 2px 10px ${pill.bg}`,
-          }}
-        >
-          <StatusIcon size={20} />
-          <span>{pill.label}</span>
-        </div>
+        {isPublic && pill && StatusIcon ? (
+          <div
+            data-testid="og-status-pill"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "8px 20px",
+              borderRadius: "9999px",
+              backgroundColor: pill.bg,
+              color: pill.color,
+              border: `1.5px solid ${pill.border}`,
+              fontSize: "16px",
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              boxShadow: `0 2px 10px ${pill.bg}`,
+            }}
+          >
+            <StatusIcon size={20} />
+            <span>{pill.label}</span>
+          </div>
+        ) : (
+          <div
+            data-testid="og-private-label"
+            style={{ fontSize: "16px", fontWeight: 700, letterSpacing: "0.05em", color: "#94A3B8" }}
+          >
+            PRIVATE STREAM
+          </div>
+        )}
       </div>
 
       {/* ── Center Body (Stream Name + Recipient + Metrics) ────────────────── */}
@@ -211,7 +224,7 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
               textOverflow: "ellipsis",
             }}
           >
-            {stream.name}
+            {isPublic ? stream.name : "Private stream"}
           </h1>
           {/* Recipient badge */}
           <div
@@ -234,7 +247,7 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
               RECIPIENT
             </span>
             <span style={{ fontSize: "20px", fontWeight: 600, color: "#CBD5E1" }}>
-              {stream.recipientName}
+              {isPublic ? stream.recipientName : "Details hidden"}
             </span>
             {shortAddress && (
               <span
@@ -279,7 +292,7 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
               ACCRUAL RATE
             </div>
             <div style={{ fontSize: "36px", fontWeight: 800, color: "#38BDF8" }}>
-              {formatAssetAmount(stream.monthlyRate, stream.asset)} / mo
+              {isPublic ? `${formatAssetAmount(stream.monthlyRate, stream.asset)} / mo` : "-"}
             </div>
           </div>
 
@@ -306,7 +319,7 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
               TOTAL DEPOSIT
             </div>
             <div style={{ fontSize: "36px", fontWeight: 800, color: "#F8FAFC" }}>
-              {formatAssetAmount(stream.depositAmount, stream.asset)}
+              {isPublic ? formatAssetAmount(stream.depositAmount, stream.asset) : "-"}
             </div>
           </div>
         </div>
@@ -343,16 +356,16 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
                 CLIFF MILESTONE
               </span>
               <span style={{ fontSize: "16px", fontWeight: 600, color: "#F8FAFC" }}>
-                {stream.cliffDate}
+                {isPublic ? stream.cliffDate : "-"}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <span style={{ fontSize: "15px", color: "#94A3B8" }}>
-                Progress: <strong style={{ color: "#F8FAFC" }}>{stream.progress}%</strong>
+                Progress: <strong style={{ color: "#F8FAFC" }}>{isPublic ? `${stream.progress}%` : "-"}</strong>
               </span>
               <span style={{ fontSize: "15px", color: "#64748B" }}>•</span>
               <span style={{ fontSize: "15px", color: "#94A3B8" }}>
-                {stream.startDate} → {stream.endDate}
+                {isPublic ? `${stream.startDate} → ${stream.endDate}` : "Schedule hidden"}
               </span>
             </div>
           </>
@@ -378,7 +391,7 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
                   border: "1px solid rgba(56, 189, 248, 0.3)",
                 }}
               >
-                STREAM SCHEDULE
+                {isPublic ? "STREAM SCHEDULE" : "PRIVATE STREAM"}
               </span>
               {/* Visual mini progress bar */}
               <div
@@ -392,18 +405,18 @@ export const StreamOGImageTemplate: React.FC<StreamOGImageTemplateProps> = ({
               >
                 <div
                   style={{
-                    width: `${Math.min(100, Math.max(0, stream.progress))}%`,
+                    width: `${isPublic ? Math.min(100, Math.max(0, stream.progress)) : 0}%`,
                     height: "100%",
                     background: "linear-gradient(90deg, #06B6D4 0%, #34D399 100%)",
                   }}
                 />
               </div>
               <span style={{ fontSize: "15px", fontWeight: 700, color: "#F8FAFC" }}>
-                {stream.progress}%
+                {isPublic ? `${stream.progress}%` : "-"}
               </span>
             </div>
             <div style={{ fontSize: "15px", color: "#CBD5E1", fontWeight: 500 }}>
-              {stream.startDate} → {stream.endDate}
+              {isPublic ? `${stream.startDate} → ${stream.endDate}` : "Schedule hidden"}
             </div>
           </div>
         )}

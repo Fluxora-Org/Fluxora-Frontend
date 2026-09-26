@@ -16,6 +16,8 @@ export interface StreamTimelineEvent {
 export interface StreamRecord {
   /** Unique identifier, e.g., 'STR-001' */
   id: string;
+  /** Only explicitly public streams may expose stream fields in OG images. */
+  public?: boolean;
   /** Non-empty friendly name of the stream */
   name: string;
   /** Friendly name of the recipient */
