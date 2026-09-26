@@ -306,7 +306,7 @@ const processSpokenPhrase = useCallback(
     if (matched === "ambiguous") {
       setState("command-ambiguous");
       announce(
-        `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
+        "That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.",
       );
       setTimeout(() => {
         setState((prev) =>
