@@ -189,4 +189,74 @@ describe("useOptimisticStreams", () => {
     addOptimistic("create", { id: "STR-UNMOUNTED" } as unknown as Record<string, unknown>);
     // No error expected
   });
+
+  it("concurrent creates for different streams both appear and both roll back independently", () => {
+    const op1 = addOptimistic("create", { ...makeStream("STR-CONC-A") } as unknown as Record<string, unknown>, "tx-ca");
+    const op2 = addOptimistic("create", { ...makeStream("STR-CONC-B") } as unknown as Record<string, unknown>, "tx-cb");
+
+    const { result } = renderHook(() =>
+      useOptimisticStreams({ streams: [STR001] }),
+    );
+
+    // Both optimistic rows merged — deterministic: sorted by insertion order.
+    expect(result.current.streams.map((s) => s.id)).toContain("STR-CONC-A");
+    expect(result.current.streams.map((s) => s.id)).toContain("STR-CONC-B");
+    expect(result.current.pendingCount).toBe(2);
+
+    // Roll back only the first one; the second must stay visible.
+    act(() => {
+      rollbackOptimistic(op1.id, "first failed");
+    });
+
+    expect(result.current.streams.map((s) => s.id)).not.toContain("STR-CONC-A");
+    expect(result.current.streams.map((s) => s.id)).toContain("STR-CONC-B");
+    expect(result.current.pendingCount).toBe(1);
+    expect(result.current.rolledBackCount).toBe(1);
+
+    // Now roll back the second.
+    act(() => {
+      rollbackOptimistic(op2.id, "second failed");
+    });
+
+    expect(result.current.streams.map((s) => s.id)).not.toContain("STR-CONC-B");
+    expect(result.current.pendingCount).toBe(0);
+    expect(result.current.rolledBackCount).toBe(2);
+  });
+
+  it("a confirmed create is immediately removed from pending (does not persist past resolution)", () => {
+    const op = addOptimistic("create", { ...makeStream("STR-RESOLVED") } as unknown as Record<string, unknown>, "tx-res");
+
+    const { result } = renderHook(() =>
+      useOptimisticStreams({ streams: [STR001] }),
+    );
+
+    expect(result.current.pendingCount).toBe(1);
+
+    act(() => {
+      confirmOptimistic(op.id);
+    });
+
+    // Must not linger in pending after confirmation.
+    expect(result.current.pendingCount).toBe(0);
+    expect(result.current.rolledBackCount).toBe(0);
+  });
+
+  it("clearAll removes every optimistic entry, leaving only server streams", () => {
+    addOptimistic("create", { ...makeStream("STR-CLEAR-1") } as unknown as Record<string, unknown>, "tx-cl1");
+    addOptimistic("create", { ...makeStream("STR-CLEAR-2") } as unknown as Record<string, unknown>, "tx-cl2");
+
+    const { result } = renderHook(() =>
+      useOptimisticStreams({ streams: [STR001, STR002] }),
+    );
+
+    expect(result.current.streams).toHaveLength(4);
+
+    act(() => {
+      clearAll();
+    });
+
+    expect(result.current.streams).toHaveLength(2);
+    expect(result.current.pendingCount).toBe(0);
+  });
+
 });
