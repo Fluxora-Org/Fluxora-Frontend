@@ -13,6 +13,9 @@ import {
  */
 export const IS_DEV = !!import.meta.env.DEV;
 
+export const E2E_FORCE_SHARE_FAILURE =
+  IS_DEV && parseBooleanFlag(import.meta.env.VITE_E2E_FORCE_SHARE_FAILURE);
+
 const NETWORK_LABELS: Record<StellarNetwork, string> = {
   PUBLIC: "Public Network (Mainnet)",
   TESTNET: "Testnet",

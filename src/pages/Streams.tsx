@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
+import { E2E_FORCE_SHARE_FAILURE } from "../lib/config";
 const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
@@ -1064,6 +1065,10 @@ export default function Streams() {
           rate={createdStream.rate}
           sender={createdStream.sender}
           recipient={createdStream.recipient}
+          forceShareFailure={
+            E2E_FORCE_SHARE_FAILURE &&
+            window.location.search.includes("e2e-share-failure")
+          }
           onCreateAnother={() => {
             setIsSuccessModalOpen(false);
             setIsCreateModalOpen(true);
@@ -1277,6 +1282,10 @@ export default function Streams() {
         onClose={() => setIsSuccessModalOpen(false)}
         streamId={createdStream.id}
         streamUrl={createdStream.url}
+        forceShareFailure={
+          E2E_FORCE_SHARE_FAILURE &&
+          window.location.search.includes("e2e-share-failure")
+        }
         onCreateAnother={() => {
           setIsSuccessModalOpen(false);
           setIsCreateModalOpen(true);

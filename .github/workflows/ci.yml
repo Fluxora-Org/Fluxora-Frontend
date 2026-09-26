@@ -23,6 +23,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -70,6 +75,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -101,3 +111,4 @@ jobs:
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|transaction-status-resolution"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|first-visit-without-wallet"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|session recovery"
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|workspace sharing"

@@ -35,6 +35,7 @@ export default defineConfig({
       // Marks the run as end-to-end so wallet-gated routes are reachable
       // without a browser wallet extension (see RequireWallet guards).
       VITE_E2E: "true",
+      VITE_E2E_FORCE_SHARE_FAILURE: "true",
     },
   },
   projects: [
