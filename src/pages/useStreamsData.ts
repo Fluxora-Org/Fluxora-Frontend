@@ -50,6 +50,7 @@ import type { StreamRecord, StreamStatus } from "../data/streamRecords";
 import { useI18n } from "../i18n";
 import { MAX_LOADING_RETRIES } from "../components/Skeleton";
 import type { SessionRecoveryBannerState } from "../components/SessionRecoveryBanner";
+import { shouldShowZeroAccrualBanner } from "../lib/zeroAccrualBannerCondition";
 
 // ─── Constants (duplicated here so hook is self-contained) ───────────────────
 export type StatusFilter = "All" | StreamStatus;
@@ -490,16 +491,21 @@ export function useStreamsData(): StreamsDataResult {
   // walletConnected is always treated as true on this page (same as Streams.tsx).
   const walletConnected = true;
   const showEmptyState = !walletConnected || !hasStreams;
-  const showZeroAccrual =
-    !showEmptyState &&
-    walletConnected &&
-    hasStreams &&
-    withdrawableNow === 0 &&
-    activeStreams.length > 0;
-  const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
-  const zeroAccrualReason: "rate-zero" | "cliff" = hasZeroRateStream
-    ? "rate-zero"
-    : "cliff";
+
+  // Derive banner visibility from the shared pure utility so the condition
+  // matches the contract's accrual computation (issue #1669).
+  const zeroAccrualState = shouldShowZeroAccrualBanner(
+    streams.map((s) => ({
+      status: s.status,
+      monthlyRate: s.monthlyRate,
+      cliffDate: s.cliffDate,
+      withdrawableAmount: s.withdrawableAmount,
+    })),
+    walletConnected,
+  );
+  const showZeroAccrual = !showEmptyState && zeroAccrualState.show;
+  const zeroAccrualReason: "rate-zero" | "cliff" =
+    zeroAccrualState.reason === "rate-zero" ? "rate-zero" : "cliff";
 
   const effectiveExpandedId = paginatedStreams.some(
     (s) => s.id === expandedStreamId,

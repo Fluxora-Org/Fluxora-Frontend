@@ -4,6 +4,7 @@ import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { InstallPWABanner } from "./InstallPWABanner";
+import { useRouteFocus } from "../hooks/useRouteFocus";
 import "./Layout.css";
 
 /**
@@ -39,6 +40,12 @@ export default function Layout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const connectBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Move focus to the new page heading or main region on every route change
+  // so keyboard and screen-reader users are not stranded at the previous
+  // page's element after navigation. Back/forward navigations are also covered
+  // because React Router updates location.key on every history change.
+  useRouteFocus({ mainContentId: "main-content" });
 
   const showFooter = !location.pathname.includes("/treasurypage");
 
