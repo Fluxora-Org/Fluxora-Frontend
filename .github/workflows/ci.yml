@@ -93,3 +93,4 @@ jobs:
       - name: Run landing FCP performance budget
         run: npm run test:performance
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|transaction-status-resolution"
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|first-visit-without-wallet"
