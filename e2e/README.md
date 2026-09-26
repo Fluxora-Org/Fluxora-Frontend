@@ -192,3 +192,27 @@ npm run test:e2e -- theme-customization
 See `THEME_TEST_QUICK_REFERENCE.md` for common commands and validation steps.
 
 Full validation guide: `../THEME_E2E_TEST_VALIDATION.md`
+
+## Colour-blind simulation flow
+
+The colour-blind simulation preview on the treasury overview has dedicated
+end-to-end coverage in `colorblind-simulation-flow.spec.ts`.
+
+### Running the flow only
+
+```bash
+npm run test:e2e -- colorblind-simulation-flow
+```
+
+### What's covered
+
+- All three presets (protanopia, deuteranopia, tritanopia): select on the
+  treasury overview, verify the preview, then disable it from the banner.
+- The active preset's filter reference resolves to a real `feColorMatrix`
+  definition (the bridge to `contrastUtils.ts`), so a dropped filter definition
+  fails the suite instead of silently previewing unfiltered colours.
+- Keyboard-only preset selection.
+- Failure paths: spoofed/leftover browser storage cannot enable the preview, and
+  a reload returns to `Off` without persisting anything.
+- A canary test that removes the SVG filter definitions and asserts the flow
+  assertion goes red, so the success path cannot pass vacuously.
