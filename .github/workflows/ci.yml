@@ -112,3 +112,4 @@ jobs:
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|first-visit-without-wallet"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|session recovery"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|workspace sharing"
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|account switching flow"
