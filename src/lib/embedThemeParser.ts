@@ -75,23 +75,36 @@ export function isValidCssVariableValue(value: string): boolean {
     '</style',
     '<script',
     '\\u',
-    '\\x'
+    '\\x',
   ];
-  
+
   for (const pattern of dangerousPatterns) {
     if (value.toLowerCase().includes(pattern)) {
       return false;
     }
   }
-  
-  // Additional safety: reject strings that could be interpreted as code.
-  // A single CSS custom-property value never legitimately needs a `;` —
-  // it's a declaration terminator, so its presence means the value could
-  // smuggle in extra declarations when interpolated into an inline style.
+
+  // Declaration terminators cannot appear in a single custom-property value.
   if (value.includes(';') || value.includes('{') || value.includes('}')) {
     return false;
   }
-  
+
+  // CSS escape sequences can smuggle forbidden tokens past the literal
+  // blocklist above (e.g. \\000075 rl( decodes to url( ). Reject any
+  // backslash followed by a hex digit.
+  if (/\\[0-9a-fA-F]/.test(value)) {
+    return false;
+  }
+
+  // Reject any HTML tag opener, not just <script> and </style>. This helper
+  // is exported; a future caller might use it to gate HTML insertion.
+  if (/<[a-zA-Z!\\/]/.test(value)) {
+    return false;
+  }
+  if (value.includes("'") || value.includes('"')) {
+    return false;
+  }
+
   return true;
 }
 
