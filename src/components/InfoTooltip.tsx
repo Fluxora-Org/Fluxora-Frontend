@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { LAYOUT_STEPS } from '../lib/breakpoints';
 import './InfoTooltip.css';
 
 export interface InfoTooltipProps {
@@ -83,7 +84,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     }
 
     // On mobile, always default to bottom for simplicity
-    if (viewport.width < 480) {
+    if (viewport.width < LAYOUT_STEPS.compact) {
       bestPosition = 'bottom';
     }
 
@@ -93,7 +94,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     let tooltipLeft = 0;
     let tooltipTop = 0;
 
-    if (viewport.width < 480) {
+    if (viewport.width < LAYOUT_STEPS.compact) {
       tooltipLeft = trigger.left + trigger.width / 2 - (viewport.width - 32) / 2;
       tooltipTop = trigger.bottom + 8;
     } else {
@@ -114,7 +115,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
 
     // Compute shifts needed to keep the tooltip inside viewport with safety margin
     const safetyMargin = 12;
-    const currentWidth = viewport.width < 480 ? viewport.width - 32 : tooltipWidth;
+    const currentWidth = viewport.width < LAYOUT_STEPS.compact ? viewport.width - 32 : tooltipWidth;
 
     let shiftX = 0;
     if (tooltipLeft < safetyMargin) {

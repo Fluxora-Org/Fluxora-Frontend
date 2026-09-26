@@ -4,6 +4,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import amountRules from "./eslint-rules/no-float-amount-arithmetic.js";
 import suppressionRules from "./eslint-rules/require-ts-suppression-description.js";
+import breakpointRules from "./eslint-rules/no-hardcoded-breakpoints.js";
 
 // Test files are exempt from the general src lint rules, but every
 // `@ts-ignore` / `@ts-expect-error` in them must still satisfy the suppression
@@ -54,10 +55,18 @@ export default tseslint.config(
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
-      fluxora: suppressionRules,
+      // Both local plugins expose a `rules` map, so those maps are merged
+      // before the plugin objects are combined — a plain object spread would
+      // let the second plugin's `rules` key replace the first plugin's.
+      fluxora: {
+        ...suppressionRules,
+        ...breakpointRules,
+        rules: { ...suppressionRules.rules, ...breakpointRules.rules },
+      },
     },
     rules: {
       "fluxora/require-ts-suppression-description": "error",
+      "fluxora/no-hardcoded-breakpoints": "error",
       "no-eval": "error",
       "no-implied-eval": "error",
       "no-new-func": "error",

@@ -5,6 +5,11 @@ import { useWidgetLayout, slugify } from "./useWidgetLayout";
 import WidgetTray from "./WidgetTray";
 import { WidgetConfig } from "./widgetLayout";
 import { DemoDataBadge } from "./DemoBanner";
+import {
+  BREAKPOINT_LG,
+  BREAKPOINT_SM,
+  mediaDown,
+} from "../../lib/breakpoints";
 import "./Metrics.css";
 
 interface MetricsProps {
@@ -41,7 +46,7 @@ function useMediaQuery(query: string): boolean {
 }
 
 export default function Metrics({ metrics, loading, error, isDemoMode }: MetricsProps) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery(mediaDown("md"));
   const {
     layout,
     reorderWidgets,
@@ -57,14 +62,11 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
   const [announcement, setAnnouncement] = useState("");
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
 
-  // Breakpoints mirror the CSS grid: grid-cols-1 / sm:grid-cols-2 / lg:grid-cols-3
-  const GRID_BREAKPOINT_SM = 640;  // Tailwind `sm`
-  const GRID_BREAKPOINT_LG = 1024; // Tailwind `lg`
-
+  // Column count mirrors the CSS grid: grid-cols-1 / sm:grid-cols-2 / lg:grid-cols-3
   // Return column count based on viewport width
   const getGridCols = () => {
-    if (window.innerWidth >= GRID_BREAKPOINT_LG) return 3;
-    if (window.innerWidth >= GRID_BREAKPOINT_SM) return 2;
+    if (window.innerWidth >= BREAKPOINT_LG) return 3;
+    if (window.innerWidth >= BREAKPOINT_SM) return 2;
     return 1;
   };
 

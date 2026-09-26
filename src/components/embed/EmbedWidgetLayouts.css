@@ -518,7 +518,8 @@
   gap: 0.5rem;
 }
 
-@media (min-width: 641px) {
+/* `--breakpoint-sm` (640px), spelled as a token rather than sm + 1. */
+@media (min-width: 640px) {
   .embed-widget-banner-skeleton {
     flex-direction: row;
     align-items: center;

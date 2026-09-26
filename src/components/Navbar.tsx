@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import WalletButton from "./wallet-connect/Walletbutton";
 import {
   isMobileViewport,
+  mediaDown,
   VIEWPORT_RESIZE_DEBOUNCE_MS,
 } from "../lib/breakpoints";
 
@@ -720,7 +721,7 @@ if (typeof document !== "undefined") {
         opacity: 0.8;
       }
       
-      @media (max-width: 768px) {
+      @media ${mediaDown("md")} {
         nav {
           padding: 0 1rem;
         }
