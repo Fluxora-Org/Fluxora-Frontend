@@ -1014,6 +1014,7 @@ export default function Streams() {
   if (visibleError) {
     return (
       <section className="streams-page">
+        <MetaTags title="Streams" />
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
           {visibleError}
@@ -1032,6 +1033,7 @@ export default function Streams() {
   if (streamId && !selectedStream) {
     return (
       <>
+        <MetaTags title="Streams" />
         <StreamNotFound
           streamId={streamId}
           onBack={() => navigate("/app/streams")}
@@ -1073,6 +1075,7 @@ export default function Streams() {
 
   return (
     <div className="streams-page">
+      <MetaTags title="Streams" />
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>

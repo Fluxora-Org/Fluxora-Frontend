@@ -657,6 +657,7 @@ export default function Recipient() {
   if (!walletConnected || !hasStreams || serviceError) {
     return (
       <main aria-labelledby="recipient-page-title">
+        <MetaTags title="Recipient" />
         <h1
           id="recipient-page-title"
           style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}
@@ -747,6 +748,7 @@ export default function Recipient() {
 
   return (
     <main className="streams-page">
+      <MetaTags title="Recipient" />
       {/* ── Page Header (Hero) ── */}
       <section className="streams-hero">
         <div className="streams-hero__copy">

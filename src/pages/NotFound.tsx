@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
+import { MetaTags } from '../components/MetaTags';
 
 export default function NotFound() {
   const navigate = useNavigate();
 
   return (
     <main id="main-content" className="notfound-root">
+      <MetaTags title="Page Not Found" />
       <div className="notfound-shapes" aria-hidden="true">
         <div className="shape shape-left" />
         <div className="shape shape-right" />

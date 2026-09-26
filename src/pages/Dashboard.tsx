@@ -136,6 +136,7 @@ export default function Dashboard() {
 
   return (
     <main id="main-content">
+      <MetaTags title="Dashboard" />
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
