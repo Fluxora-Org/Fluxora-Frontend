@@ -96,7 +96,6 @@ export default function WalletFallback({
 
   return (
     <main
-      id="main-content"
       role="status"
       aria-busy="true"
       aria-live="polite"

@@ -14,7 +14,7 @@ import type {
   ParseResult,
 } from './types';
 import { CANONICAL_HEADERS } from './types';
-import { formatCsvParseError, collectCsvParseErrors } from './csvParseErrors';
+import { formatCsvParseError } from './csvParseErrors';
 
 export const MAX_CSV_ROWS = 500;
 

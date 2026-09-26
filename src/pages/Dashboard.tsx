@@ -137,6 +137,7 @@ export default function Dashboard() {
   return (
     <main id="main-content">
       <MetaTags title="Dashboard" />
+    <div className="dashboard-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
@@ -227,15 +228,7 @@ export default function Dashboard() {
               onCreateStream={() => setIsModalOpen(true)}
             />
           </WidgetErrorBoundary>
-          <ErrorBoundary>
-            <RecentStreams
-              streams={streams}
-              loading={loading}
-              error={error}
-              onRetry={refetch}
-              walletConnected={walletConnected}
-            />
-          </ErrorBoundary>
+
           {!loading && !error && (
             <Button
               type="button"
@@ -249,20 +242,17 @@ export default function Dashboard() {
         </>
 
       ) : showOnboarding ? (
-        <ErrorBoundary>
-          <TreasuryOnboarding
-            walletConnected={walletConnected}
-            onRetry={refetch}
-            onCreateStream={() => setIsModalOpen(true)}
-          />
-        </ErrorBoundary>
+        <TreasuryOnboarding
+          walletConnected={walletConnected}
+          onCreateStream={() => setIsModalOpen(true)}
+          onConnectWallet={() => setIsWalletModalOpen(true)}
+          onDismiss={handleDismissOnboarding}
+        />
       ) : (
-        <ErrorBoundary>
-          <TreasuryEmptyState
-            onCreateStream={() => setIsModalOpen(true)}
-            onOpenOnboarding={handleOpenOnboarding}
-          />
-        </ErrorBoundary>
+        <TreasuryEmptyState
+          onCreateStream={() => setIsModalOpen(true)}
+          onOpenOnboarding={handleOpenOnboarding}
+        />
       )}
 
       <CreateStreamModal
@@ -295,7 +285,7 @@ export default function Dashboard() {
           onClose={() => setToast(null)}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 
