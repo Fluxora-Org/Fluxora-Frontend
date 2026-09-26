@@ -15,6 +15,9 @@ The suite starts the Vite dev server from `playwright.config.ts` and covers:
 - Stream detail views
 
 These tests use local demo data only; they do not connect to wallets, sign transactions, or
+The suite starts the Vite dev server from `playwright.config.ts` and covers the
+current create-stream wizard, the recipient withdrawal surface, and the embedded stream widget display flow. These tests
+use local demo data only; they do not connect to wallets, sign transactions, or
 call deploy credentials.
 
 Set `PLAYWRIGHT_BASE_URL` to target an already-running app, or
