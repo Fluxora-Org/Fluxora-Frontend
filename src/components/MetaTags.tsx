@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import type { StreamRecord } from '../data/streamRecords';
 import { formatAssetAmount } from '../lib/formatters';
 
@@ -61,7 +61,8 @@ export const MetaTags: React.FC<MetaTagsProps> = ({ stream, title, description }
   }
 
   return (
-    <Helmet>
+    <HelmetProvider>
+      <Helmet>
       <title>{ogTitle}</title>
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content="Fluxora" />
@@ -76,6 +77,7 @@ export const MetaTags: React.FC<MetaTagsProps> = ({ stream, title, description }
       <meta name="twitter:description" content={ogDescription} />
       <meta name="twitter:image" content={ogImageUrl} />
       <meta name="twitter:image:alt" content={ogAlt} />
-    </Helmet>
+      </Helmet>
+    </HelmetProvider>
   );
 };

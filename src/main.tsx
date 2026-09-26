@@ -6,8 +6,20 @@ import './index.css'; /* Tailwind, design tokens, and global app styles */
 import './styles/accessibility.css'; /* Global focus management & a11y */
 import { HelmetProvider } from 'react-helmet-async';
 import { isSupportedBrowser } from './lib/browserSupport';
+import { config, configError } from './lib/config';
 
 const root = document.getElementById('root')!;
+
+if (configError) {
+  throw new Error(
+    `Application failed to start: Configuration invalid.\n` +
+      configError.errors.map((e: { message: string }) => `- ${e.message}`).join('\n')
+  );
+}
+
+if (import.meta.env.DEV) {
+  console.log('[Startup] Active configuration:', config);
+}
 
 if (!isSupportedBrowser(navigator.userAgent)) {
   ReactDOM.createRoot(root).render(
@@ -20,29 +32,15 @@ if (!isSupportedBrowser(navigator.userAgent)) {
     </main>,
   );
 } else {
+  // Resolve and apply the theme before React renders to prevent a flash of the
+  // wrong theme (FOUC). The ThemeProvider owns it from here on.
+  initTheme();
 
-import { config, configError } from './lib/config';
-
-if (configError) {
-  throw new Error(
-    `Application failed to start: Configuration invalid.\n` +
-      configError.errors.map((e) => `- ${e.message}`).join('\n')
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <HelmetProvider>
+        <App />
+      </HelmetProvider>
+    </React.StrictMode>
   );
-}
-
-if (import.meta.env.DEV) {
-  console.log('[Startup] Active configuration:', config);
-}
-
-// Resolve and apply the theme before React renders to prevent a flash of the
-// wrong theme (FOUC). The ThemeProvider owns it from here on.
-initTheme();
-
-ReactDOM.createRoot(root).render(
-  <React.StrictMode>
-    <HelmetProvider>
-      <App />
-    </HelmetProvider>
-  </React.StrictMode>
-);
 }

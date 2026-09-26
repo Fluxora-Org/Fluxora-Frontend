@@ -408,11 +408,18 @@ export default function CreateStreamModal({
     },
     onResolved: (outcome, resolvedTxHash) => {
       const opId = optimisticOpIdRef.current;
-      if (!opId) return;
       if (outcome === "confirmed") {
-        confirmOptimistic(opId);
+        setSubmittedTxHash(resolvedTxHash);
+        if (opId) {
+          confirmOptimistic(opId);
+        }
       } else {
-        rollbackOptimistic(opId, `Transaction ${outcome}: ${resolvedTxHash}`);
+        if (opId) {
+          rollbackOptimistic(opId, `Transaction ${outcome}: ${resolvedTxHash}`);
+        }
+        // Also record the hash on failure/timeout so the failed-status effect
+        // below can surface the error and offer a retry.
+        setSubmittedTxHash(resolvedTxHash);
       }
       optimisticOpIdRef.current = null;
     },
@@ -1017,9 +1024,6 @@ export default function CreateStreamModal({
         addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
         onStreamError?.(err);
       }
-
-      // Unchanged online path.
-      await submitPayload(payload);
     }
   };
 

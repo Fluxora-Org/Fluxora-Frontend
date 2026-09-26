@@ -17,6 +17,7 @@ import { E2E_FORCE_SHARE_FAILURE } from "../lib/config";
 const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
+import { MetaTags } from "../components/MetaTags";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
 import StreamsLoading from "../components/StreamsLoading";

@@ -8,6 +8,8 @@ import { resolveRoutePageChunk } from "./src/lib/routeChunks";
 
 const isTesting =
   process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+// Playwright drives the dev server for e2e; the e2eCspPlugin below relaxes
+// the CSP for Vite's HMR preamble in that mode.
 const isE2E = process.env.VITE_E2E === "true";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
 
