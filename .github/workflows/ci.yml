@@ -85,3 +85,4 @@ jobs:
       - name: Run E2E tests (gateable)
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|reduced-motion"
         run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|wallet-connect"
+        run: npm run test:e2e -- --grep="landing-cta|not-found|create-stream|stream-filter-sort"

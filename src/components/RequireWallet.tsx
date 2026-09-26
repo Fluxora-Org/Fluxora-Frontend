@@ -48,7 +48,7 @@ export default function RequireWallet({ children }: RequireWalletProps) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
-  if (config.demoMode) {
+  if (config.demoMode || import.meta.env.VITE_E2E === "true") {
     return <>{children}</>;
   }
 

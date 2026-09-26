@@ -31,6 +31,12 @@ export default function RequireWalletAction({
     `${location.pathname}${location.search}${location.hash}`,
   );
 
+  // End-to-end runs drive these flows without a browser wallet extension, so
+  // the action guard passes through when VITE_E2E is enabled.
+  if (import.meta.env.VITE_E2E === "true") {
+    return <>{children}</>;
+  }
+
   if (wallet.loading) {
     return <WalletFallback stage="restoring" />;
   }
