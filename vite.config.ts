@@ -48,10 +48,22 @@ function securityHeadersPlugin(): Plugin {
 
   return {
     name: "security-headers",
+    // In dev server (vite dev), remove the static <meta> CSP from index.html
+    // so Vite's @react-refresh preamble inline script is not blocked.
+    // The dev server middleware provides the dev-compatible CSP header instead.
+    transformIndexHtml(html, ctx) {
+      if (ctx.server) {
+        return html.replace(
+          /<meta\s+http-equiv="Content-Security-Policy"[^>]*>/i,
+          "",
+        );
+      }
+      return html;
+    },
     // Dev server (vite dev)
     configureServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, true);
         next();
       });
     },

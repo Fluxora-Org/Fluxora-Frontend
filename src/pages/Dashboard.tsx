@@ -258,7 +258,7 @@ export default function Dashboard() {
             onRetry={refetch}
             onDismiss={() => setShowOnboarding(false)}
           />
-        </ErrorBoundary>
+        </WidgetErrorBoundary>
       ) : (
         <TreasuryEmptyState
           onCreateStream={() => setIsModalOpen(true)}
