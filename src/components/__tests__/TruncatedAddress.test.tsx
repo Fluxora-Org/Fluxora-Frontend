@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import TruncatedAddress from "../common/TruncatedAddress";
+import TruncatedAddress, { formatAddress } from "../common/TruncatedAddress";
 import { useOptionalToast } from "../toast/ToastProvider";
 
 const ADDRESS = "GABCDEFGHIJKLMNOPQRSTUVWXYZ2345678901234567890123456789";
@@ -204,6 +204,65 @@ describe("TruncatedAddress", () => {
       "aria-label",
       expect.stringContaining("Copy address"),
     );
+  });
+
+  // ── Full value for AT and clipboard (issue #1676) ────────────────────────
+
+  it("copies the full address even when the visible value is truncated", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    // Long enough to truncate: the visible chip is "GABCDE...6789".
+    const longAddress =
+      "GABCDE1111111111111111111111111111111111111111111111111116789";
+    setClipboard(writeText);
+    expect(formatAddress(longAddress)).not.toBe(longAddress);
+
+    render(<TruncatedAddress address={longAddress} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /copy address/i }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(longAddress));
+  });
+
+  it("exposes the full address to assistive technology", () => {
+    render(<TruncatedAddress address={ADDRESS} />);
+
+    expect(screen.getByRole("button")).toHaveAccessibleName(
+      expect.stringContaining(ADDRESS),
+    );
+  });
+
+  it("marks the truncated visual as presentational", () => {
+    const { container } = render(<TruncatedAddress address={ADDRESS} />);
+
+    const codeEl = container.querySelector("code");
+    expect(codeEl).toHaveAttribute("aria-hidden", "true");
+    expect(codeEl).toHaveAttribute("role", "presentation");
+  });
+
+  it("keeps two addresses that truncate identically distinguishable", () => {
+    const first =
+      "GABCDE1111111111111111111111111111111111111111111111111116789";
+    const second =
+      "GABCDE2222222222222222222222222222222222222222222222222226789";
+    // Sanity check: both render as the same visible "GABCDE...6789" chip.
+    expect(formatAddress(first)).toBe(formatAddress(second));
+
+    const { container } = render(
+      <>
+        <TruncatedAddress address={first} />
+        <TruncatedAddress address={second} />
+      </>,
+    );
+
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0]).toHaveAccessibleName(expect.stringContaining(first));
+    expect(buttons[1]).toHaveAccessibleName(expect.stringContaining(second));
+
+    const srValues = container.querySelectorAll(
+      ".truncateReveal__srValue.srOnly",
+    );
+    expect(srValues[0]).toHaveTextContent(first);
+    expect(srValues[1]).toHaveTextContent(second);
   });
 
   // ── sr-only reveal pattern (TruncatedReveal integration) ─────────────────
