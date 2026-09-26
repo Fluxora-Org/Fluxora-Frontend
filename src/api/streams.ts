@@ -8,22 +8,41 @@ export interface StreamFilters {
 
 export interface StreamListResponse {
   streams: StreamRecord[];
+  /**
+   * Opaque cursor for the next page, or `null` when the list is exhausted.
+   *
+   * The cursor anchors on the last row of the page it was issued from
+   * (sort key + unique id), so seeking with it is stable even when rows are
+   * inserted or deleted between page reads. Single-shot callers that do not
+   * paginate receive `null` and are unaffected.
+   */
+  nextCursor: string | null;
 }
 
 export async function fetchStreams(
   filters: StreamFilters,
   signal?: AbortSignal,
+  /** Opaque cursor from a previous response's `nextCursor`; omit for page 1. */
+  cursor?: string | null,
 ): Promise<StreamListResponse> {
   const params = new URLSearchParams({
     status: filters.statusFilter,
     q: filters.searchQuery,
     sort: filters.sort,
   });
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
   const response = await fetch(`/api/streams?${params.toString()}`, { signal });
   if (!response.ok) {
     throw new Error("Failed to load streams");
   }
-  return response.json() as Promise<StreamListResponse>;
+  const payload = (await response.json()) as Partial<StreamListResponse>;
+  return {
+    streams: Array.isArray(payload.streams) ? payload.streams : [],
+    nextCursor:
+      typeof payload.nextCursor === "string" ? payload.nextCursor : null,
+  };
 }
 
 // --- Transaction receipt polling (ledger-bounded and cancellation-safe) ---
@@ -39,8 +58,10 @@ export interface PollTransactionReceiptOptions {
 
 export class PollTimeoutError extends Error {
   constructor(transactionId: string) {
-    super(`Transaction receipt polling timed out for ${transactionId}. Status is unknown.`);
-    this.name="PollTimeoutError";
+    super(
+      `Transaction receipt polling timed out for ${transactionId}. Status is unknown.`,
+    );
+    this.name = "PollTimeoutError";
   }
 }
 
