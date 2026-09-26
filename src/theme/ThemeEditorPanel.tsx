@@ -31,6 +31,7 @@ import {
 } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useModalAccessibility } from "../components/useModalAccessibility";
+import { mediaUp } from "../lib/breakpoints";
 import {
   isValidHex,
   normaliseHex,
@@ -425,10 +426,10 @@ export interface ThemeEditorPanelProps {
  *   Enter / Space    — activate focused button
  *   Escape           — cancel preview and close (if onClose provided)
  *
- * Responsive breakpoints:
- *   ≤ 767 px   — stacked: form above preview
- *   768–1279 px — two-column grid (form left, preview right)
- *   ≥ 1280 px   — same two-column, wider preview column
+ * Responsive breakpoints (declared in src/lib/breakpoints.ts):
+ *   ≤ md (768 px)   — stacked: form above preview
+ *   md–xl  (768–1279 px) — two-column grid (form left, preview right)
+ *   ≥ xl (1280 px)   — same two-column, wider preview column
  */
 export default function ThemeEditorPanel({
   onClose,
@@ -948,12 +949,12 @@ export default function ThemeEditorPanel({
         .theme-editor-layout {
           grid-template-columns: minmax(0, 1fr);
         }
-        @media (min-width: 768px) {
+        @media ${mediaUp("md")} {
           .theme-editor-layout {
             grid-template-columns: 1fr 1fr;
           }
         }
-        @media (min-width: 1280px) {
+        @media ${mediaUp("xl")} {
           .theme-editor-layout {
             grid-template-columns: 1fr 1.4fr;
           }

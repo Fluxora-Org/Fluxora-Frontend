@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Stream } from "./Stream";
 import { formatNumber } from "../../lib/formatters";
+import { mediaDown } from "../../lib/breakpoints";
 import { DemoDataBadge } from "./DemoBanner";
 import "./TreasuryFlowSankey.css";
 
@@ -35,8 +36,8 @@ const OTHERS_KEY = "__others__";
 /** Recipients beyond this rank are collapsed into a single "Others" node. */
 const MAX_VISIBLE_RECIPIENTS = 7;
 
-/** Below `--breakpoint-md` (768px) the diagram defaults to the table view. */
-const RESPONSIVE_TABLE_QUERY = "(max-width: 767px)";
+/** At and below `--breakpoint-md` the diagram defaults to the table view. */
+const RESPONSIVE_TABLE_QUERY = mediaDown("md");
 
 const CHART_PADDING_X = 96;
 const CHART_PADDING_Y = 16;

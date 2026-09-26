@@ -200,7 +200,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .recent-streams-graph-container {
     display: none;
   }
