@@ -175,8 +175,15 @@ export default function TruncatedAddress({
          * so ATs can encounter the full value without activating the button.
          */}
         <TruncatedReveal fullValue={address} mono>
+          {/*
+           * The truncated text is presentational only. ATs and the clipboard
+           * must always receive the full address (exposed by the button's
+           * aria-label and TruncatedReveal's sr-only span), never this form.
+           */}
           <code
             className="text-mono-sm truncate"
+            aria-hidden="true"
+            role="presentation"
             style={{
               background: "var(--surface-raised)",
               padding: "2px 8px",
