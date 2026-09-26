@@ -35,6 +35,9 @@ jobs:
       - name: Build (type-check + bundle)
         run: npm run build
 
+      - name: Locale integrity check
+        run: npm run check:locales
+
       - name: Test
         run: npm run test
 
