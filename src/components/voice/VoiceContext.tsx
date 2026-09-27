@@ -95,62 +95,6 @@ type WindowWithSpeechRecognition = typeof window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-/**
- * Single source of truth for both recognition and the command reference UI.
- * Keeping this exported makes it possible to verify that every accepted
- * phrase is documented without maintaining a second test-only dictionary.
- */
-export const DEFAULT_COMMANDS: VoiceCommandDef[] = [
-  {
-    id: "nav-dashboard",
-    phrase: "Go to dashboard",
-    aliases: ["open dashboard", "dashboard", "home", "show dashboard"],
-    category: "Navigation",
-    description: "Navigate to the main capital streaming dashboard",
-  },
-  {
-    id: "nav-streams",
-    phrase: "Go to streams",
-    aliases: ["open streams", "streams", "view streams", "stream list"],
-    category: "Navigation",
-    description: "Navigate to active and archived treasury streams",
-  },
-  {
-    id: "nav-recipient",
-    phrase: "Go to recipient",
-    aliases: [
-      "open recipient",
-      "recipient",
-      "view recipient",
-      "recipient claims",
-    ],
-    category: "Navigation",
-    description: "Navigate to recipient claim and withdrawal view",
-  },
-  {
-    id: "action-create-stream",
-    phrase: "Create stream",
-    aliases: ["new stream", "start stream", "add stream"],
-    category: "Action",
-    description: "Open the new stream creation modal",
-  },
-  {
-    id: "action-withdraw",
-    phrase: "Withdraw",
-    aliases: ["withdraw funds", "claim funds", "withdraw capital"],
-    category: "Action",
-    description: "Initiate available capital withdrawal",
-  },
-  {
-    id: "destructive-cancel-stream",
-    phrase: "Cancel stream",
-    aliases: ["delete stream", "stop stream", "terminate stream"],
-    category: "Destructive",
-    description: "Cancel an active streaming contract (Requires confirmation)",
-    requiresConfirmation: true,
-  },
-];
-
 /** Only explicitly delimited details are accepted; a stray substring cannot trigger cancellation. */
 function parseConfirmationIntent(
   command: VoiceCommandDef,
