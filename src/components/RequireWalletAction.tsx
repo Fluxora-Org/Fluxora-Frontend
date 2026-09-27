@@ -48,7 +48,7 @@ export default function RequireWalletAction({
   }
 
   if (!wallet.connected) {
-    return <Navigate to="/connect-wallet" replace state={{ returnTo }} />;
+    return <WalletFallback stage="not-connected" />;
   }
 
   if (wallet.isNetworkMismatch) {

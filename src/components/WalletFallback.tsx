@@ -9,13 +9,15 @@ import { Skeleton, SkeletonCard } from "./Skeleton";
  * - `rejected`: The wallet connection was declined by the user.
  * - `network-mismatch`: The wallet is connected to the wrong Stellar network.
  * - `no-wallet`: No Stellar wallet extension is installed in this browser.
+ * - `not-connected`: The wallet extension is installed but not connected.
  */
 export type WalletStage =
   | "restoring"
   | "loading-data"
   | "rejected"
   | "network-mismatch"
-  | "no-wallet";
+  | "no-wallet"
+  | "not-connected";
 
 /** Where a visitor without a wallet extension can install one. */
 export const STELLAR_WALLET_INSTALL_URL = "https://www.freighter.app/";
@@ -49,18 +51,24 @@ const STAGE_GUIDANCE: Partial<Record<WalletStage, StageGuidance>> = {
     nextStep:
       "Switch your wallet to the Stellar network Fluxora expects, then reload this page to try again.",
   },
+  "not-connected": {
+    message: "Your wallet is not connected.",
+    nextStep: "Connect your wallet to access this feature.",
+  },
 };
 
 const STAGE_ACCENT: Partial<Record<WalletStage, string>> = {
   "no-wallet": "rgba(239, 68, 68, 0.25)",
   rejected: "rgba(239, 68, 68, 0.25)",
   "network-mismatch": "rgba(245, 158, 11, 0.25)",
+  "not-connected": "rgba(59, 130, 246, 0.25)",
 };
 
 const STAGE_ACCENT_BACKGROUND: Partial<Record<WalletStage, string>> = {
   "no-wallet": "rgba(239, 68, 68, 0.06)",
   rejected: "rgba(239, 68, 68, 0.06)",
   "network-mismatch": "rgba(245, 158, 11, 0.06)",
+  "not-connected": "rgba(59, 130, 246, 0.06)",
 };
 
 /**
@@ -260,5 +268,7 @@ function stageLabel(stage: WalletStage): string {
       return "Your wallet is on the wrong network.";
     case "no-wallet":
       return "No Stellar wallet extension was detected.";
+    case "not-connected":
+      return "Your wallet is not connected.";
   }
 }

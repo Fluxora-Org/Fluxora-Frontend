@@ -95,24 +95,70 @@ describe("RequireWalletAction", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("redirects disconnected users to connect-wallet", () => {
+  it("shows explanation when wallet is not connected", () => {
     renderGuard();
 
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/connect-wallet",
-    );
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toBeInTheDocument();
+    expect(fallback).toHaveAttribute("data-stage", "not-connected");
+
+    expect(screen.queryByTestId("location")).not.toBeInTheDocument();
   });
 
-  it("preserves the intended route when redirecting disconnected users", () => {
-    renderGuard("/app/streams?status=active#row-1");
+  it("explains the precondition when wallet is not connected", () => {
+    renderGuard();
 
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/connect-wallet",
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toHaveAttribute("data-stage", "not-connected");
+  });
+
+  it("makes the explanation available to assistive technology when not connected", () => {
+    renderGuard();
+
+    const fallback = screen.getByTestId("wallet-fallback");
+    expect(fallback).toHaveAttribute("role", "status");
+    expect(fallback).toHaveAttribute("aria-live", "polite");
+    expect(fallback).toHaveAttribute("aria-label", "Your wallet is not connected.");
+  });
+
+  it("enables the control without reload when wallet connects", () => {
+    walletState.connected = false;
+    const { rerender } = renderGuard();
+
+    // Initially shows fallback
+    expect(screen.getByTestId("wallet-fallback")).toHaveAttribute(
+      "data-stage",
+      "not-connected",
     );
 
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "returnTo=/app/streams?status=active#row-1",
+    // Simulate wallet connection
+    walletState.connected = true;
+    walletState.address =
+      "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+    walletState.network = "TESTNET";
+    walletState.isNetworkMismatch = false;
+
+    rerender(
+      <MemoryRouter initialEntries={["/app/streams"]}>
+        <Routes>
+          <Route
+            path="/app/*"
+            element={
+              <RequireWalletAction>
+                <div>Protected money-moving route</div>
+              </RequireWalletAction>
+            }
+          />
+          <Route path="/connect-wallet" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
     );
+
+    // Control is now enabled without reload
+    expect(
+      screen.getByText("Protected money-moving route"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("wallet-fallback")).not.toBeInTheDocument();
   });
 
   it("blocks money-moving routes when the wallet is on the wrong network", () => {
