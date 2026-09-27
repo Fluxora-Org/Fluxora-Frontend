@@ -23,6 +23,7 @@ export const VoiceCommandPanel: React.FC = () => {
     pendingDestructiveCommand,
     availableCommands,
     panelOpen,
+    ambiguityPrompt,
     togglePanel,
     toggleListening,
     confirmDestructiveAction,
@@ -189,8 +190,8 @@ export const VoiceCommandPanel: React.FC = () => {
           <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs flex gap-2.5 items-start">
             <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
             <p>
-              I heard more than one possible command. Nothing was executed;
-              please repeat the complete command.
+              {ambiguityPrompt ??
+                "I heard more than one possible command. Nothing was executed; please repeat the complete command."}
             </p>
           </div>
         )}

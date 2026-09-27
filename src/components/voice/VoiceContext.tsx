@@ -9,6 +9,11 @@ import React, {
 import { useNavigate } from "react-router-dom";
 import { useLiveAnnouncer } from "../../hooks/useLiveAnnouncer";
 import { useI18n } from "../../i18n";
+import { getStreamRecords } from "../../data/streamRecords";
+import {
+  describeStreamAmbiguity,
+  resolveStreamIdentifier,
+} from "./streamIdentifier";
 import {
   VoiceState,
   VoiceCommandDef,
@@ -141,13 +146,26 @@ function parseConfirmationIntent(
   };
 }
 
+/**
+ * Outcome of matching a spoken phrase against the command dictionary.
+ *
+ * `refused-stream` is a refusal rather than a miss: the phrase named a
+ * destructive command *and* a stream reference, but that reference did not
+ * identify exactly one stream, so nothing may be armed until the user has
+ * picked a target.
+ */
+type CommandMatch =
+  | { kind: "command"; command: VoiceCommandDef }
+  | { kind: "ambiguous-command" }
+  | { kind: "refused-stream"; reference: string; prompt: string };
+
 const VoiceContext = createContext<VoiceContextValue | null>(null);
 
 export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const navigate = useNavigate();
-  const { announce } = useLiveAnnouncer();
+  const { announcement, alertAnnouncement, announce } = useLiveAnnouncer();
   const { locale } = useI18n();
 
   // Map i18n locale to a BCP-47 speech-recognition tag.
@@ -161,6 +179,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   const [pendingDestructiveCommand, setPendingDestructiveCommand] =
     useState<VoiceCommandDef | null>(null);
   const [panelOpen, setPanelOpen] = useState<boolean>(false);
+  const [ambiguityPrompt, setAmbiguityPrompt] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
@@ -182,27 +201,46 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
   // "Cancel stream" do not accidentally trigger the destructive confirmation
   // flow (Issue #938).
   const matchCommand = useCallback(
-    (spokenText: string): VoiceCommandDef | "ambiguous" | null => {
+    (spokenText: string): CommandMatch | null => {
       const clean = spokenText.trim().toLowerCase();
       if (!clean) return null;
 
       // "stream" is a shared stem for navigation, creation, and cancellation.
       // It is never specific enough to select a safe target.
-      if (clean === "stream") return "ambiguous";
+      if (clean === "stream") return { kind: "ambiguous-command" };
 
       // Exact-match pass — check every command's phrase and aliases first.
       for (const cmd of DEFAULT_COMMANDS) {
-        if (cmd.phrase.toLowerCase() === clean) return cmd;
+        if (cmd.phrase.toLowerCase() === clean)
+          return { kind: "command", command: cmd };
         if (cmd.aliases.some((alias) => alias.toLowerCase() === clean))
-          return cmd;
+          return { kind: "command", command: cmd };
       }
 
-      const destructive = DEFAULT_COMMANDS.find(
-        (cmd) =>
-          cmd.requiresConfirmation &&
-          parseConfirmationIntent(cmd, spokenText)?.amount,
-      );
-      if (destructive) return destructive;
+      for (const cmd of DEFAULT_COMMANDS) {
+        if (!cmd.requiresConfirmation) continue;
+        const intent = parseConfirmationIntent(cmd, spokenText);
+        if (!intent?.amount) continue;
+
+        // A spoken reference that does not identify exactly one stream must
+        // never reach the confirmation step: confirming would then act on a
+        // target the user never actually named. Refuse and ask them to
+        // disambiguate instead (Issue #1687).
+        if (intent.stream) {
+          const resolution = resolveStreamIdentifier(
+            intent.stream,
+            getStreamRecords(),
+          );
+          if (resolution.status !== "matched") {
+            return {
+              kind: "refused-stream",
+              reference: intent.stream,
+              prompt: describeStreamAmbiguity(intent.stream, resolution),
+            };
+          }
+        }
+        return { kind: "command", command: cmd };
+      }
 
       // Partial matches must be unique. Returning the first match made phrases
       // such as "stream" silently choose whichever command appeared first.
@@ -214,8 +252,9 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       });
 
-      if (partialMatches.length > 1) return "ambiguous";
-      if (partialMatches.length === 1) return partialMatches[0];
+      if (partialMatches.length > 1) return { kind: "ambiguous-command" };
+      if (partialMatches.length === 1)
+        return { kind: "command", command: partialMatches[0] };
 
       return null;
     },
@@ -302,6 +341,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
     (phrase: string): boolean => {
       setTranscript(phrase);
       setState("processing");
+      setAmbiguityPrompt(null);
 
       // Handle active confirmation step
       if (pendingDestructiveCommand) {
@@ -324,7 +364,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const matched = matchCommand(phrase);
 
-      if (matched === "ambiguous") {
+      if (matched?.kind === "ambiguous-command") {
         setState("command-ambiguous");
         announce(
           `That voice command is ambiguous. Please say the complete command, such as 'Go to streams' or 'Create stream'.`,
@@ -337,8 +377,23 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
         return false;
       }
 
+      // A spoken stream reference that could not identify exactly one stream
+      // is refused outright: nothing is armed, and the user is asked to pick a
+      // target (Issue #1687).
+      if (matched?.kind === "refused-stream") {
+        setState("command-ambiguous");
+        setAmbiguityPrompt(matched.prompt);
+        announce(matched.prompt, "assertive");
+        setTimeout(() => {
+          setState((prev) =>
+            prev === "command-ambiguous" ? "listening" : prev,
+          );
+        }, 3000);
+        return false;
+      }
+
       if (matched) {
-        executeCommand(matched, phrase);
+        executeCommand(matched.command, phrase);
         return true;
       }
 
@@ -480,6 +535,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
         pendingDestructiveCommand,
         availableCommands: DEFAULT_COMMANDS,
         panelOpen,
+        ambiguityPrompt,
         toggleListening,
         startListening,
         stopListening,
@@ -490,6 +546,14 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
       }}
     >
       {children}
+      {/* Voice control is an accessibility aid, so refusals and confirmations
+          have to reach a screen reader rather than only the sighted panel. */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
+      </div>
     </VoiceContext.Provider>
   );
 };

@@ -100,6 +100,8 @@ export default defineConfig({
         "src/hooks/useRouteFocus.ts",
         // Voice mic button — recording state must be conveyed non-visually
         "src/components/voice/VoiceMicButton.tsx",
+        // Issue #1687: voice stream identification must refuse ambiguity
+        "src/components/voice/streamIdentifier.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

@@ -50,6 +50,12 @@ export interface VoiceContextValue {
   pendingDestructiveCommand: VoiceCommandDef | null;
   availableCommands: VoiceCommandDef[];
   panelOpen: boolean;
+  /**
+   * Set when a spoken reference was refused as ambiguous or unconfident. Names
+   * the candidate streams so the user can be asked to disambiguate; `null`
+   * whenever the last phrase was handled. Absent means no refusal is pending.
+   */
+  ambiguityPrompt?: string | null;
   toggleListening: () => void;
   startListening: () => void;
   stopListening: () => void;
