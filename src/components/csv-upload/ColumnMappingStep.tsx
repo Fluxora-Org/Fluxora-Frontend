@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { CanonicalHeader, ColumnMapping } from './types';
-import { CANONICAL_HEADERS } from './types';
+import { CANONICAL_HEADERS, REQUIRED_CANONICAL_HEADERS } from './types';
 import { ValidationMessage } from '../ValidationMessage';
 
 /** Human-readable labels for each canonical field. */
@@ -63,8 +63,10 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
   const getFieldError = useCallback(
     (field: CanonicalHeader): string | undefined => {
       if (!touched[field] && !submitted) return undefined;
-      if (!mapping[field]) return `${FIELD_LABELS[field]} is required`;
+      const isRequired = REQUIRED_CANONICAL_HEADERS.includes(field);
+      if (isRequired && !mapping[field]) return `${FIELD_LABELS[field]} is required`;
       // Check duplicate (this field's value appears in another field too)
+      if (!mapping[field]) return undefined;
       const val = mapping[field]!;
       const otherUsages = CANONICAL_HEADERS.filter(
         (c) => c !== field && mapping[c] === val,
@@ -76,7 +78,7 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
   );
 
   const isComplete =
-    CANONICAL_HEADERS.every((c) => Boolean(mapping[c])) && !hasDuplicates;
+    REQUIRED_CANONICAL_HEADERS.every((c) => Boolean(mapping[c])) && !hasDuplicates;
 
   const handleApply = useCallback(() => {
     setSubmitted(true);
@@ -100,7 +102,7 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
       >
         <h3 id="column-mapping-heading" className="sr-only">Map your CSV columns</h3>
         <div className="column-mapping-table-header">
-          <span className="column-mapping-col-label">Required field</span>
+          <span className="column-mapping-col-label">Field</span>
           <span className="column-mapping-col-select">Your CSV column</span>
         </div>
 
@@ -116,7 +118,9 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
                 className="column-mapping-field-label"
               >
                 {FIELD_LABELS[canonical]}
-                <span className="required" aria-hidden="true"> *</span>
+                {REQUIRED_CANONICAL_HEADERS.includes(canonical) && (
+                  <span className="required" aria-hidden="true"> *</span>
+                )}
               </span>
 
               <div className="column-mapping-select-wrap">
@@ -137,7 +141,7 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
                       setTouched((prev) => ({ ...prev, [canonical]: true }))
                     }
                     aria-labelledby={labelId}
-                    aria-required="true"
+                    aria-required={REQUIRED_CANONICAL_HEADERS.includes(canonical)}
                     aria-invalid={Boolean(fieldError)}
                     aria-describedby={
                       fieldError ? `${selectId}-error` : undefined
