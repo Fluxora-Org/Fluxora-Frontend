@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { History, RotateCcw, X } from "lucide-react";
 import "./session-recovery-banner.css";
 
@@ -13,11 +13,19 @@ export interface SessionRecoveryBannerProps {
   now: number;
   /** whether the snapshot also contains a meaningful, resumable create-stream draft */
   hasDraft: boolean;
+  /** The account that is currently signed in / connected. */
+  accountId: string | null | undefined;
+  /** The account that created the snapshot. A missing value (e.g. a legacy,
+   *  unscoped snapshot) is treated as foreign and fails closed. */
+  snapshotAccountId: string | null | undefined;
   onRestore: () => void;
   onStartFresh: () => void;
   onResumeDraft: () => void;
   /** Dismiss ("ignore") — hides the banner without applying or clearing anything */
   onDismiss: () => void;
+  /** Called (silently, no UI) when the snapshot belongs to a different account
+   *  so the parent can delete it from storage. */
+  onDiscard?: () => void;
 }
 
 function formatElapsed(savedAt: number, now: number): string {
@@ -40,19 +48,41 @@ export default function SessionRecoveryBanner({
   savedAt,
   now,
   hasDraft,
+  accountId,
+  snapshotAccountId,
   onRestore,
   onStartFresh,
   onResumeDraft,
   onDismiss,
+  onDiscard,
 }: SessionRecoveryBannerProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const onDiscardRef = useRef(onDiscard);
+  onDiscardRef.current = onDiscard;
+
+  // A snapshot may only be offered to the account that created it. Both ids
+  // must be present and equal; anything else fails closed.
+  const isOwnSession = Boolean(accountId) && accountId === snapshotAccountId;
+
+  // Foreign snapshots are discarded silently: no banner, no alert, no error.
+  useEffect(() => {
+    if (!isOwnSession) onDiscardRef.current?.();
+  }, [isOwnSession, accountId, snapshotAccountId]);
 
   // Move focus to the banner heading whenever its state changes so screen
   // reader and keyboard users notice the offer/confirmation immediately,
   // rather than needing to discover it by tabbing around the page.
   useLayoutEffect(() => {
-    headingRef.current?.focus();
-  }, [state]);
+    if (isOwnSession) headingRef.current?.focus();
+  }, [state, isOwnSession]);
+
+  if (!isOwnSession) return null;
+
+  // Defense in depth: even if a stale handler fires, it cannot act on a
+  // session that is not the current account's.
+  const guard = (fn: () => void) => () => {
+    if (isOwnSession) fn();
+  };
 
   const elapsed = formatElapsed(savedAt, now);
 
@@ -101,14 +131,14 @@ export default function SessionRecoveryBanner({
               <button
                 type="button"
                 className="session-recovery-banner__action session-recovery-banner__action--primary"
-                onClick={onRestore}
+                onClick={guard(onRestore)}
               >
                 Restore
               </button>
               <button
                 type="button"
                 className="session-recovery-banner__action session-recovery-banner__action--secondary"
-                onClick={onStartFresh}
+                onClick={guard(onStartFresh)}
               >
                 Start fresh
               </button>
@@ -133,7 +163,7 @@ export default function SessionRecoveryBanner({
                 <button
                   type="button"
                   className="session-recovery-banner__action session-recovery-banner__action--primary"
-                  onClick={onResumeDraft}
+                  onClick={guard(onResumeDraft)}
                 >
                   Resume draft stream →
                 </button>
@@ -156,7 +186,7 @@ export default function SessionRecoveryBanner({
       <button
         type="button"
         className="session-recovery-banner__dismiss"
-        onClick={onDismiss}
+        onClick={guard(onDismiss)}
         aria-label="Dismiss"
       >
         <X size={16} aria-hidden="true" />
