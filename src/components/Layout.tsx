@@ -164,6 +164,7 @@ export default function Layout() {
           <main
             id="main-content"
             className="app-main"
+            aria-label="Main content"
             // tabIndex={-1} makes the skip-link target programmatically focusable
             // (activated by `Tab` and by clicking the `#main-content` fragment
             // link) — required for the WCAG 2.4.1 bypass-block pattern that
