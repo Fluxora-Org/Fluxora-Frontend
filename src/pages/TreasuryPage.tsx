@@ -9,12 +9,7 @@ const TreasuryFlowSankey = lazy(() => import("../components/treasuryOverviewPage
 const RecentStreams = lazy(() => import("../components/treasuryOverviewPage/RecentStreams"));
 const ReportBuilderPanel = lazy(() => import("../components/treasuryOverviewPage/ReportBuilderPanel"));
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
-import {
-  ColorBlindSimulationProvider,
-  ColorBlindToggle,
-} from "../components/colorBlindSimulation";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
-import { IS_DEV } from "../utils/env";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -32,12 +27,8 @@ import { IS_DEV } from "../utils/env";
  * a defensive empty-state fallback is shown.
  *
  * ## Colour-blind simulation
- * The entire page content is wrapped in {@link ColorBlindSimulationProvider}
- * and a {@link ColorBlindToggle} is rendered at the top of the layout. This
- * is a **developer / design-QA affordance only** — not a shipped end-user
- * setting. The toggle allows designers and QA engineers to verify that status
- * indicators (StatusPill, MetricCard) remain legible under protanopia,
- * deuteranopia, and tritanopia simulations.
+ * Colour-blind simulation controls are provided by the persistent app layout
+ * so the preview can be disabled after navigating to another affected view.
  */
 export default function TreasuryPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<TreasuryPeriod>("30d");
@@ -54,104 +45,88 @@ export default function TreasuryPage() {
 
   if (loading) {
     return (
-      <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
-          {isDemoMode && <DemoBanner state={demoState} />}
-          {/* Design-QA: colour-blind simulation toggle */}
-          {IS_DEV && <ColorBlindToggle />}
-          <Header
-            selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
-            loading={true}
-            resolvedPeriod={resolvedPeriod}
-            boundaries={boundaries}
-          />
-          <div role="status" className="text-sm text-gray-500">
-            Loading treasury overview...
-          </div>
+      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+        {isDemoMode && <DemoBanner state={demoState} />}
+        <Header
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          loading={true}
+          resolvedPeriod={resolvedPeriod}
+          boundaries={boundaries}
+        />
+        <div role="status" className="text-sm text-gray-500">
+          Loading treasury overview...
         </div>
-      </ColorBlindSimulationProvider>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <ColorBlindSimulationProvider>
-        <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
-          {isDemoMode && <DemoBanner state={demoState} />}
-          {/* Design-QA: colour-blind simulation toggle */}
-          {IS_DEV && <ColorBlindToggle />}
-          <Header
-            selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
-            loading={false}
-            resolvedPeriod={resolvedPeriod}
-            boundaries={boundaries}
-          />
-          <div role="alert" className="text-sm text-red-600">
-            {error}
-          </div>
+      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+        {isDemoMode && <DemoBanner state={demoState} />}
+        <Header
+          selectedPeriod={selectedPeriod}
+          onPeriodChange={setSelectedPeriod}
+          loading={false}
+          resolvedPeriod={resolvedPeriod}
+          boundaries={boundaries}
+        />
+        <div role="alert" className="text-sm text-red-600">
+          {error}
         </div>
-      </ColorBlindSimulationProvider>
+      </div>
     );
   }
 
   return (
-    <ColorBlindSimulationProvider>
-      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
-        {isDemoMode && <DemoBanner state={demoState} />}
+    <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+      {isDemoMode && <DemoBanner state={demoState} />}
 
-        {/* Design-QA: colour-blind simulation toggle — placed above page content
-            so the entire Metrics and RecentStreams area is filtered.
-            This component is not rendered in production end-user UI; it is
-            intended for design review and QA sessions only. */}
-        {IS_DEV && <ColorBlindToggle />}
-
-        <Header
-          selectedPeriod={selectedPeriod}
-          onPeriodChange={setSelectedPeriod}
-          loading={loading}
-          resolvedPeriod={resolvedPeriod}
-          boundaries={boundaries}
-          onExportClick={() => setShowReportBuilder(true)}
-          onRefresh={refetch}
-        />
-        {showReportBuilder && (
-          <ErrorBoundary>
-            <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
-              <ReportBuilderPanel
-                streams={streams || []}
-                onClose={() => setShowReportBuilder(false)}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
+      <Header
+        selectedPeriod={selectedPeriod}
+        onPeriodChange={setSelectedPeriod}
+        loading={loading}
+        resolvedPeriod={resolvedPeriod}
+        boundaries={boundaries}
+        onExportClick={() => setShowReportBuilder(true)}
+        onRefresh={refetch}
+      />
+      {showReportBuilder && (
         <ErrorBoundary>
-          <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
-            <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
-          </Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
-            <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
-          </Suspense>
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
-            <RecentStreams
+          <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
+            <ReportBuilderPanel
               streams={streams || []}
-              loading={loading}
-              error={error}
-              onRetry={refetch}
-              walletConnected={walletConnected}
-              isDemoMode={isDemoMode}
+              onClose={() => setShowReportBuilder(false)}
             />
           </Suspense>
         </ErrorBoundary>
-      </div>
-    </ColorBlindSimulationProvider>
+      )}
+      <ErrorBoundary>
+        <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
+          <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
+          <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
+          <RecentStreams
+            streams={streams || []}
+            loading={loading}
+            error={error}
+            onRetry={refetch}
+            walletConnected={walletConnected}
+            isDemoMode={isDemoMode}
+          />
+        </Suspense>
+      </ErrorBoundary>
+    </div>
   );
 }

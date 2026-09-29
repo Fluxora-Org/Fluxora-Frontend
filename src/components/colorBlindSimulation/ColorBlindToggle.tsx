@@ -2,7 +2,7 @@
  * ColorBlindToggle
  * ─────────────────
  * Developer / design-QA affordance for selecting a colour-blind simulation
- * preset on the Treasury overview.
+ * preset across routed app views.
  *
  * ## Accessibility
  * - Rendered as a `<fieldset>` / `<legend>` radio group (WCAG 1.3.1, 4.1.2).
@@ -16,10 +16,10 @@
  *
  * ## Usage
  * ```tsx
- * // Wrap the relevant page section:
+ * // Render inside the shared app layout provider:
  * <ColorBlindSimulationProvider>
  *   <ColorBlindToggle />
- *   <TreasuryMetrics />
+ *   <Outlet />
  * </ColorBlindSimulationProvider>
  * ```
  */

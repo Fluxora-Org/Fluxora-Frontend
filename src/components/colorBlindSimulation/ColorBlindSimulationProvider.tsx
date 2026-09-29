@@ -26,7 +26,8 @@
  * ```tsx
  * // In app root (dev/QA builds):
  * <ColorBlindSimulationProvider>
- *   <TreasuryPage />
+ *   <ColorBlindToggle />
+ *   <Outlet />
  * </ColorBlindSimulationProvider>
  *
  * // In any descendant:

@@ -1,6 +1,6 @@
 # Colour-Blind Simulation Spec
 
-> **Scope:** Developer / design-QA affordance on the Treasury overview page.
+> **Scope:** Developer / design-QA affordance across routed app views.
 > This feature is **not** a shipped end-user accessibility setting.
 
 ---
@@ -89,21 +89,22 @@ Source: Brettel, Viénot & Mollon (1997).
 
 ### Placement
 
-The `<ColorBlindToggle>` component is inserted **above** the `<Header>` in
-`TreasuryPage.tsx`, outside any data-loading branches, so it is always visible
-regardless of loading/error state. This positions it at the natural start of
-the page content flow.
+The `<ColorBlindToggle>` component is inserted in the shared `Layout.tsx`
+before the routed `<Outlet>`. The provider wraps that outlet, so the control,
+active state, and disable banner remain available when navigating between
+affected views. This also keeps the controls available during loading and error
+states.
 
 On mobile (≤ 640 px) the pills stack vertically (see `ColorBlindToggle.css`).
 
 ### States
 
-| State | Visual | aria-checked | Filter active |
+| State | Visual | Radio checked state | Filter active |
 |---|---|---|---|
-| Off | `Off` pill accent border | true | No |
-| Protanopia active | `Protanopia` pill accent border | true | Yes — protanopia |
-| Deuteranopia active | `Deuteranopia` pill accent border | true | Yes — deuteranopia |
-| Tritanopia active | `Tritanopia` pill accent border | true | Yes — tritanopia |
+| Off | `Off` pill accent border | `No simulation` radio checked | No |
+| Protanopia active | `Protanopia` pill accent border | `Protanopia` radio checked | Yes — protanopia |
+| Deuteranopia active | `Deuteranopia` pill accent border | `Deuteranopia` radio checked | Yes — deuteranopia |
+| Tritanopia active | `Tritanopia` pill accent border | `Tritanopia` radio checked | Yes — tritanopia |
 
 ### Design tokens used
 
@@ -236,6 +237,7 @@ For automated evidence in CI, a Playwright visual-regression test can:
 ```
 src/
   components/
+    Layout.tsx       ← Persistent provider and toggle around routed app views
     colorBlindSimulation/
       ColorBlindSimulationProvider.tsx  ← Context, SVG filters, sticky active banner, hook
       ColorBlindToggle.tsx              ← Radio group UI
@@ -248,7 +250,7 @@ src/
     StatusPill.tsx    ← data-status-token, data-status annotations added
     MetricCard.tsx    ← data-token-surface, data-token-border annotations added
   pages/
-    TreasuryPage.tsx  ← Wrapped in ColorBlindSimulationProvider, toggle rendered
+    TreasuryPage.tsx  ← Treasury overview content
 utils/
   contrastUtils.ts   ← WCAG luminance math + simulation helpers
   __tests__/

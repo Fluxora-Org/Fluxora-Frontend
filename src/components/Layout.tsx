@@ -5,6 +5,11 @@ import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { InstallPWABanner } from "./InstallPWABanner";
 import { useRouteFocus } from "../hooks/useRouteFocus";
+import {
+  ColorBlindSimulationProvider,
+  ColorBlindToggle,
+} from "./colorBlindSimulation";
+import { IS_DEV } from "../utils/env";
 import "./Layout.css";
 
 /**
@@ -165,7 +170,10 @@ export default function Layout() {
             // /connect-wallet and /app/* relies on.
             tabIndex={-1}
           >
-            <Outlet />
+            <ColorBlindSimulationProvider>
+              {IS_DEV && <ColorBlindToggle />}
+              <Outlet />
+            </ColorBlindSimulationProvider>
           </main>
 
           {showFooter && <Footer />}
