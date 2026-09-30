@@ -25,6 +25,7 @@ import {
   subscribeToAccountContext,
   type AccountContextMessage,
 } from "../../lib/accountContextSync";
+import { getOnlineStatus, useOnlineStatus } from "../../hooks/useOnlineStatus";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -178,10 +179,6 @@ function classifyWalletError(error: unknown): WalletError {
   return { type: "unknown" };
 }
 
-function isBrowserOffline(): boolean {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
-}
-
 /**
  * Silently asks Freighter whether the current session is usable again. Never
  * opens a popup and never throws.
@@ -209,6 +206,7 @@ async function probeWallet(): Promise<WalletProbe> {
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
+  const isOnline = useOnlineStatus();
   const [state, setState] = useState<WalletState>(INITIAL);
   const stateRef = useRef(state);
   const [accountContextVersion, setAccountContextVersion] = useState(0);
@@ -293,7 +291,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const checkConnection = useCallback((): Promise<void> => {
     if (checkPromiseRef.current) return checkPromiseRef.current;
     if (!stateRef.current.connected) return Promise.resolve();
-    if (isBrowserOffline()) {
+    if (!getOnlineStatus()) {
       markDropped();
       return Promise.resolve();
     }
@@ -321,7 +319,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (result.kind === "unreachable" || isBrowserOffline()) {
+      if (result.kind === "unreachable" || !getOnlineStatus()) {
         setLink("dropped");
         return;
       }
@@ -520,7 +518,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         network !== stateRef.current.network
       ) {
         applyAccountChange({ address, network, connected: true, error: null, loading: false });
-      } else if (linkStatusRef.current !== "ok" && !isBrowserOffline()) {
+      } else if (linkStatusRef.current !== "ok" && getOnlineStatus()) {
         // The same account is reachable again (e.g. extension unlocked).
         setLink("ok");
       }
@@ -565,10 +563,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
-    const handleOffline = () => markDropped();
-    const handleOnline = () => {
-      void checkConnection();
-    };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void checkConnection();
     };
@@ -576,19 +570,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (linkStatusRef.current !== "ok") void checkConnection();
     };
 
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       mountedRef.current = false;
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [checkConnection, markDropped]);
+  }, [checkConnection]);
+
+  // Consume the same settled connectivity state as the rest of the app.
+  useEffect(() => {
+    if (isOnline) void checkConnection();
+    else markDropped();
+  }, [checkConnection, isOnline, markDropped]);
 
   return (
     <WalletContext.Provider

@@ -9,6 +9,7 @@ import {
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useToast } from "../components/toast/ToastProvider";
 import { formatAssetAmount } from "../lib/formatters";
 import type { StreamRecord } from "../data/streamRecords";
@@ -118,6 +119,7 @@ export function getRecipientPageTitle(
 }
 
 export default function Recipient() {
+  const isOnline = useOnlineStatus();
   const wallet = useWallet();
   const { addToast } = useToast();
   const recipientData = useRecipientPageData({
@@ -367,6 +369,7 @@ export default function Recipient() {
 
   const isPending = txState === "signing" || txState === "submitting";
   const disabled =
+    !isOnline ||
     !walletConnected ||
     !wallet.address ||
     balance === 0 ||
@@ -587,6 +590,7 @@ export default function Recipient() {
   };
 
   const executeOnChainWithdraw = async () => {
+    if (!isOnline) return;
     setTxState("signing");
     const recipientAddr = wallet.address!;
     const amountStr = getWithdrawAmount(balance);
