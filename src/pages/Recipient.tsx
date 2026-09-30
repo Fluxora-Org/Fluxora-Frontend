@@ -180,13 +180,13 @@ export default function Recipient() {
   // ── Local Security Gate States ──
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const [isBiometricEnrolled, setIsBiometricEnrolled] = useState(() => {
-    return localStorage.getItem("fluxora_biometric_enrolled") === "true";
+    return false;
   });
   const [backupPin, setBackupPin] = useState(() => {
-    return localStorage.getItem("fluxora_backup_pin");
+    return null;
   });
   const [isSecurityGateEnabled, setIsSecurityGateEnabled] = useState(() => {
-    return localStorage.getItem("fluxora_security_gate_enabled") === "true";
+    return false;
   });
 
   // Enrollment Modal States
@@ -436,7 +436,6 @@ export default function Recipient() {
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      localStorage.setItem("fluxora_biometric_enrolled", "true");
       setIsBiometricEnrolled(true);
       setEnrollmentStep("set-pin");
     } catch (err: unknown) {
@@ -487,7 +486,6 @@ export default function Recipient() {
       if (verifyActionType === "withdraw") {
         executeOnChainWithdraw();
       } else {
-        localStorage.removeItem("fluxora_security_gate_enabled");
         setIsSecurityGateEnabled(false);
         addToast("Local security gate disabled.", "success");
       }
@@ -527,8 +525,6 @@ export default function Recipient() {
           }, 300);
         } else {
           if (nextPin === pinValue) {
-            localStorage.setItem("fluxora_backup_pin", pinValue);
-            localStorage.setItem("fluxora_security_gate_enabled", "true");
             setBackupPin(pinValue);
             setIsSecurityGateEnabled(true);
             setTimeout(() => {

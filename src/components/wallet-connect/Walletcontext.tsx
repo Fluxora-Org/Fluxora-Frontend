@@ -26,6 +26,7 @@ import {
   type AccountContextMessage,
 } from "../../lib/accountContextSync";
 import { getOnlineStatus, useOnlineStatus } from "../../hooks/useOnlineStatus";
+import { clearAccountBrowserStorage } from "../../lib/browserStorage";
 
 /**
  * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
@@ -247,6 +248,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     next: WalletState,
     options: { broadcast: boolean; changedAt?: number } = { broadcast: true },
   ) => {
+    if (!next.connected) clearAccountBrowserStorage();
     accountChangeGenerationRef.current += 1;
     stateRef.current = next;
     // Any account change (including a disconnect) supersedes a dropped link
