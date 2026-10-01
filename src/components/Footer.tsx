@@ -2,6 +2,31 @@ import { Link } from 'react-router-dom';
 import './footer.css';
 
 /**
+ * Visually hidden span that communicates context to screen-reader users
+ * without affecting the visible label. Used to announce that a link opens
+ * in a new tab / leaves the application.
+ */
+function VisuallyHidden({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        position: 'absolute',
+        width: '1px',
+        height: '1px',
+        padding: 0,
+        margin: '-1px',
+        overflow: 'hidden',
+        clip: 'rect(0,0,0,0)',
+        whiteSpace: 'nowrap',
+        border: 0,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
  * A footer link entry.
  * @property label - Accessible link text.
  * @property href  - Destination URL. Must never be "#".
@@ -68,17 +93,17 @@ export default function Footer() {
             </p>
 
             <div className="footer__socials">
-              <a className="footer__icon-button" href="https://twitter.com/FluxoraHQ" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+              <a className="footer__icon-button" href="https://twitter.com/FluxoraHQ" target="_blank" rel="noopener noreferrer" aria-label="Twitter (opens in new tab)">
                 <svg viewBox="0 0 24 24" role="presentation">
                   <path d="M18.8 7.2a4.1 4.1 0 0 1-1.2.4 2.1 2.1 0 0 0 .9-1.2 4.3 4.3 0 0 1-1.3.5 2.1 2.1 0 0 0-3.6 1.4c0 .2 0 .4.1.6a6.1 6.1 0 0 1-4.4-2.2 2.1 2.1 0 0 0 .7 2.8 2 2 0 0 1-1-.3 2.1 2.1 0 0 0 1.7 2.1l-.5.1h-.4a2.1 2.1 0 0 0 2 1.5 4.2 4.2 0 0 1-2.7.9H8a6 6 0 0 0 3.3 1c4 0 6.2-3.3 6.2-6.1v-.3a4.4 4.4 0 0 0 1.1-1.2Z" />
                 </svg>
               </a>
-              <a className="footer__icon-button" href="https://discord.gg/fluxora" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+              <a className="footer__icon-button" href="https://discord.gg/fluxora" target="_blank" rel="noopener noreferrer" aria-label="Discord (opens in new tab)">
                 <svg viewBox="0 0 24 24" role="presentation">
                   <path d="M8.2 8.5a7 7 0 0 1 1.7-.5l.2.4a9.4 9.4 0 0 1 3.8 0l.2-.4a7 7 0 0 1 1.7.5c1.2 1.8 1.5 3.5 1.4 5.2a7 7 0 0 1-2.2 1.1l-.5-.8a4.5 4.5 0 0 0 .9-.4 5 5 0 0 1-1.4.7 7.5 7.5 0 0 1-4 0 5 5 0 0 1-1.4-.7c.3.2.6.4.9.4l-.5.8a7 7 0 0 1-2.2-1.1c0-1.7.2-3.4 1.4-5.2Zm2.2 4.3c.5 0 .9-.5.9-1s-.4-1-.9-1-.9.5-.9 1 .4 1 .9 1Zm3.2 0c.5 0 .9-.5.9-1s-.4-1-.9-1-.9.5-.9 1 .4 1 .9 1Z" />
                 </svg>
               </a>
-              <a className="footer__icon-button" href="mailto:hello@fluxora.xyz" aria-label="Email">
+              <a className="footer__icon-button" href="mailto:hello@fluxora.xyz" aria-label="Email Fluxora">
                 <svg viewBox="0 0 24 24" role="presentation">
                   <path d="M4.5 7.5h15a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm0 1.4 7.3 4.8 7.2-4.8" />
                 </svg>
@@ -100,6 +125,7 @@ export default function Footer() {
                         rel="noopener noreferrer"
                       >
                         {link.label}
+                        <VisuallyHidden> (opens in new tab)</VisuallyHidden>
                       </a>
                     ) : (
                       <Link className="footer__link" to={link.href}>
