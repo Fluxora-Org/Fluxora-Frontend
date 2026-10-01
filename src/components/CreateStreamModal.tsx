@@ -1425,7 +1425,7 @@ export default function CreateStreamModal({
           <button
             type="button"
             className="btn btn-next dry-run-submit-btn"
-            disabled={!bulkDryRunConfirmed || isBulkSubmitting || validCount === 0}
+            disabled={!isOnline || !bulkDryRunConfirmed || isBulkSubmitting || validCount === 0}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}
           >
@@ -1439,6 +1439,7 @@ export default function CreateStreamModal({
   };
 
   const handleBulkSubmit = async (rows: CsvRow[]) => {
+    if (!isOnline) return;
     const validRows = rows.filter((r) => r.status === 'valid');
     if (validRows.length === 0) return;
     if (!wallet.connected) {

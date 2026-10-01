@@ -7,6 +7,21 @@ flush on reconnect, and a clear success/failure outcome.
 
 ## Scope
 
+Application-wide connectivity is owned by `src/hooks/useOnlineStatus.ts`.
+All React consumers use that shared status (including wallet recovery); direct
+`navigator.onLine` reads and separate `online`/`offline` listeners are not
+used to drive application UI. A browser connectivity event is committed only
+after the reported state remains unchanged for 500 ms. Repeated identical
+events do not notify subscribers. This filters brief flaps so the global
+offline notice and recovery handlers announce one settled state transition.
+The notice is the single app-wide offline announcement. Network-only actions
+remain disabled while offline; stream creation is the exception because this
+spec explicitly captures that submission in the local queue for automatic
+replay after recovery.
+
+Recovery is automatic when the shared status settles online: wallet checks run
+again and the stream queue resumes without a reload or user resubmission.
+
 This covers **connectivity loss at submit time**, not full offline/PWA
 support (service worker, asset caching, background sync). Full offline mode
 is already deferred in `DESIGN_SPEC.md` ("PWA/offline mode: defer to Phase

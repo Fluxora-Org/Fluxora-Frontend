@@ -19,13 +19,11 @@ function safeRemove(key: string) {
 }
 
 export function saveSession<T>(accountId: string | null | undefined, state: T): void {
-  if (!accountId) return;
-  const payload: RecoverableSession<T> = { accountId, savedAt: Date.now(), state };
-  try {
-    localStorage.setItem(keyFor(accountId), JSON.stringify(payload));
-  } catch {
-    /* quota / private mode: recovery is best-effort */
-  }
+  // Session snapshots may contain secrets, signed payloads, or private drafts.
+  // Browser storage is readable by every script on this origin, so keep them
+  // in memory only rather than persisting a caller-controlled object.
+  void accountId;
+  void state;
 }
 
 export function clearSession(accountId: string | null | undefined): void {
@@ -36,27 +34,8 @@ export function clearSession(accountId: string | null | undefined): void {
 export function loadSession<T = unknown>(
   accountId: string | null | undefined,
 ): RecoverableSession<T> | null {
-  if (!accountId) return null;
-  const key = keyFor(accountId);
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return null;
-    const parsed = JSON.parse(raw) as Partial<RecoverableSession<T>> | null;
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      parsed.accountId !== accountId ||
-      typeof parsed.savedAt !== "number" ||
-      !("state" in parsed)
-    ) {
-      safeRemove(key); // tampered, corrupt, or copied across keys
-      return null;
-    }
-    return parsed as RecoverableSession<T>;
-  } catch {
-    safeRemove(key);
-    return null;
-  }
+  void accountId;
+  return null;
 }
 
 /** Removes every snapshot not owned by `accountId`, plus legacy unscoped ones. */

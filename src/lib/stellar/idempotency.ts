@@ -25,22 +25,14 @@ export function savePendingTx(
     params,
     createdAt: Date.now(),
   };
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
-  } catch {
-    // sessionStorage may be unavailable in some test environments
-  }
+  // Transaction parameters and hashes can reveal sensitive session data.
+  // Keep recovery data in memory rather than origin-readable storage.
+  void pending;
   return key;
 }
 
 export function loadPendingTx(): PendingTransaction | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as PendingTransaction;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function clearPendingTx(): void {

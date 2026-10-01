@@ -1,5 +1,3 @@
-import { logger } from "./logger";
-
 /**
  * Persistent offline action queue for submissions captured while offline.
  *
@@ -22,43 +20,15 @@ export interface QueuedAction<T = unknown> {
 
 type Listener = () => void;
 
-const STORAGE_KEY = 'fluxora_offline_queue';
 let sequenceCounter = 0;
 let queue: QueuedAction[] = [];
 const listeners = new Set<Listener>();
 
-// Load queue from localStorage on module initialization
-function loadQueueFromStorage(): void {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed.queue)) {
-        queue = parsed.queue;
-        sequenceCounter = parsed.sequenceCounter || 0;
-      }
-    }
-  } catch (error) {
-    logger.error("Failed to load offline queue from storage", error);
-    queue = [];
-    sequenceCounter = 0;
-  }
-}
-
-// Save queue to localStorage
+// Queue payloads can contain signed transactions or credentials; browser
+// storage is origin-readable, so offline submissions are memory-only.
 function saveQueueToStorage(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      queue,
-      sequenceCounter
-    }));
-  } catch (error) {
-    logger.error("Failed to save offline queue to storage", error);
-  }
+  // Never persist caller-controlled action payloads.
 }
-
-// Initialize queue on module load
-loadQueueFromStorage();
 
 function notify(): void {
   listeners.forEach((listener) => listener());

@@ -8,16 +8,7 @@ const RECENT_CREATED_STREAMS_KEY = "fluxora.recent-created-streams";
 const MAX_RECENT_CREATED_STREAMS = 10;
 
 function readRecentCreatedStreams(): RecentCreatedStream[] {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const value = window.sessionStorage.getItem(RECENT_CREATED_STREAMS_KEY);
-    if (!value) return [];
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? (parsed as RecentCreatedStream[]) : [];
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 export function rememberCreatedStream(
@@ -30,15 +21,6 @@ export function rememberCreatedStream(
       (item) => item.streamId !== stream.streamId,
     ),
   ].slice(0, MAX_RECENT_CREATED_STREAMS);
-
-  try {
-    window.sessionStorage.setItem(
-      RECENT_CREATED_STREAMS_KEY,
-      JSON.stringify(recent),
-    );
-  } catch {
-    // Session storage can be unavailable in private or restricted contexts.
-  }
 
   return record;
 }
