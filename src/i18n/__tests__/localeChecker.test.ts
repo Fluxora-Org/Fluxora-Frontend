@@ -58,13 +58,13 @@ describe("checkLocale — MISSING_KEY", () => {
     const missing = report.issues.filter((i) => i.kind === "MISSING_KEY");
     expect(missing).toHaveLength(1);
     expect(missing[0]!.key).toBe("b.key");
-    expect(missing[0]!.severity).toBe("warning");
+    expect(missing[0]!.severity).toBe("error");
   });
 
-  it("MISSING_KEY issues appear in the warnings array, not in errors", () => {
+  it("MISSING_KEY issues appear in the errors array, not in warnings", () => {
     const report = checkLocale("en", source, "es", { "a.key": "Hola {name}" });
-    expect(report.warnings.some((i) => i.kind === "MISSING_KEY")).toBe(true);
-    expect(report.errors.some((i) => i.kind === "MISSING_KEY")).toBe(false);
+    expect(report.errors.some((i) => i.kind === "MISSING_KEY")).toBe(true);
+    expect(report.warnings.some((i) => i.kind === "MISSING_KEY")).toBe(false);
   });
 
   it("reports no MISSING_KEY when locale has all source keys", () => {
@@ -204,14 +204,14 @@ describe("checkLocale — combined issue types", () => {
     };
     const locale = {
       "key.a": "Hola", // PLACEHOLDER_MISMATCH: missing {name}
-      // "key.b" absent → MISSING_KEY (warning)
+      // "key.b" absent → MISSING_KEY (error)
       "key.c": "Fijo",
       "key.d": "Ghost", // EXTRA_KEY (error)
     };
     const report = checkLocale("en", source, "es", locale);
     expect(report.errors.some((i) => i.kind === "PLACEHOLDER_MISMATCH")).toBe(true);
     expect(report.errors.some((i) => i.kind === "EXTRA_KEY")).toBe(true);
-    expect(report.warnings.some((i) => i.kind === "MISSING_KEY")).toBe(true);
+    expect(report.errors.some((i) => i.kind === "MISSING_KEY")).toBe(true);
   });
 });
 
@@ -234,25 +234,33 @@ describe("checkLocale — real en catalog", () => {
     "createStream.button.cancel": "Cancelar",
   };
 
-  it("reports no errors for the existing es partial catalog against en", () => {
+  it("reports MISSING_KEY errors for the untranslated en keys in the es catalog (partial catalog)", () => {
     const report = checkLocale(
       "en",
       en as Record<string, string>,
       "es",
       es
     );
-    expect(report.errors).toHaveLength(0);
+    // Partial es catalog will have MISSING_KEY errors for untranslated keys
+    const missingKeys = report.errors
+      .filter((i) => i.kind === "MISSING_KEY")
+      .map((i) => i.key);
+    // Spot-check a key that is definitely not in `es`
+    expect(missingKeys).toContain("streams.hero.title");
+    expect(missingKeys).toContain("recipient.balance.demo");
+    // There should be errors for missing keys since MISSING_KEY is now an error
+    expect(report.errors.length).toBeGreaterThan(0);
   });
 
-  it("reports MISSING_KEY warnings for the untranslated en keys in the es catalog", () => {
+  it("reports MISSING_KEY errors for the untranslated en keys in the es catalog", () => {
     const report = checkLocale(
       "en",
       en as Record<string, string>,
       "es",
       es
     );
-    // es only covers 6 of the many en keys; the rest must be missing warnings
-    const missingKeys = report.warnings
+    // es only covers 6 of the many en keys; the rest must be missing errors
+    const missingKeys = report.errors
       .filter((i) => i.kind === "MISSING_KEY")
       .map((i) => i.key);
     // Spot-check a key that is definitely not in `es`
@@ -371,24 +379,25 @@ describe("formatReport", () => {
       sourceLocale: "en",
       issues: [
         {
-          severity: "warning",
+          severity: "error",
           kind: "MISSING_KEY",
           key: "some.key",
           message: "[es] MISSING_KEY some.key",
         },
       ],
-      errors: [],
-      warnings: [
+      errors: [
         {
-          severity: "warning",
+          severity: "error",
           kind: "MISSING_KEY",
           key: "some.key",
           message: "[es] MISSING_KEY some.key",
         },
       ],
+      warnings: [],
     };
     const output = formatReport(report);
-    expect(output).toContain("Warning");
+    expect(output).toContain("Errors");
     expect(output).toContain("some.key");
+    expect(output).not.toContain("Warning");
   });
 });

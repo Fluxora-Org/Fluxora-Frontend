@@ -37,6 +37,9 @@ jobs:
       - name: Enable pnpm
         run: corepack enable
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -91,6 +94,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
