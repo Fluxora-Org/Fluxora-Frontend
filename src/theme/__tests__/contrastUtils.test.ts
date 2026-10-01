@@ -825,7 +825,69 @@ describe("alpha-aware contrast", () => {
     expect(r).toBeLessThanOrEqual(21);
   });
 
-  // ── Existing behaviour preserved ──────────────────────────────────────
+  // ── Light theme alpha compositing ───────────────────────────────────────
+
+  it("translucent black over light theme background composes correctly", () => {
+    // #00000080 (50% black) over #ffffff (light theme) → effective grey ≈ (0.498, 0.498, 0.498)
+    const ratio = contrastRatio("#00000080", "#ffffff");
+    expect(ratio).toBeCloseTo(4.0, 0);
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("translucent white over light theme background composes correctly", () => {
+    // #ffffff80 (50% white) over #ffffff (light theme) → effective fg is white → 1:1
+    const ratio = contrastRatio("#ffffff80", "#ffffff");
+    expect(ratio).toBeCloseTo(1, 0);
+  });
+
+  it("50% transparent red over light theme reduces contrast below opaque", () => {
+    const opaqueRatio = contrastRatio("#ff0000", "#ffffff");
+    const translucentRatio = contrastRatio("#ff000080", "#ffffff");
+    expect(opaqueRatio).toBeGreaterThan(translucentRatio);
+    expect(translucentRatio).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Dark theme alpha compositing ──────────────────────────────────────────
+
+  it("translucent black over dark theme background composes correctly", () => {
+    // #00000080 (50% black) over #0a0e17 (dark theme) → effective fg composited over dark bg
+    const ratio = contrastRatio("#00000080", "#0a0e17");
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("translucent white over dark theme background composes correctly", () => {
+    // #ffffff80 (50% white) over #0a0e17 → effective fg is white composited over dark bg
+    const ratio = contrastRatio("#ffffff80", "#0a0e17");
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("50% transparent red over dark theme reduces contrast compared to opaque", () => {
+    const opaqueRatio = contrastRatio("#ff0000", "#0a0e17");
+    const translucentRatio = contrastRatio("#ff000080", "#0a0e17");
+    expect(opaqueRatio).toBeGreaterThan(translucentRatio);
+    expect(translucentRatio).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Custom theme alpha compositing ────────────────────────────────────────
+
+  it("translucent foreground over custom theme background composes correctly", () => {
+    // Custom bg: #1e293b (very dark blue-gray) over which translucent fg is composited
+    const ratio = contrastRatio("#00000080", "#1e293b");
+    expect(ratio).toBeGreaterThan(1);
+    expect(ratio).toBeLessThan(21);
+  });
+
+  it("50% transparent green over custom theme reduces contrast compared to opaque", () => {
+    const opaqueRatio = contrastRatio("#00ff00", "#1e293b");
+    const translucentRatio = contrastRatio("#00ff0080", "#1e293b");
+    expect(opaqueRatio).toBeGreaterThan(translucentRatio);
+    expect(translucentRatio).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Existing behaviour preserved ────────────────────────────────────────
 
   it("opaque black on white still passes AA (no regression)", () => {
     expect(meetsAA("#000000", "#ffffff")).toBe(true);
