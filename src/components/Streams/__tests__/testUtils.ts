@@ -14,7 +14,7 @@ export const defaultStreamCreatedModalProps = {
 /**
  * Helper to set up a mock navigator.clipboard for copy tests.
  */
-export function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
+export function setClipboard(writeText?: ReturnType<typeof vi>) {
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: writeText ? { writeText } : undefined,
@@ -24,7 +24,7 @@ export function setClipboard(writeText?: ReturnType<typeof vi.fn>) {
 /**
  * Helper to set up a mock navigator.share for Web Share API tests.
  */
-export function setShare(share?: ReturnType<typeof vi.fn>) {
+export function setShare(share?: ReturnType<typeof vi>) {
   Object.defineProperty(navigator, "share", {
     configurable: true,
     value: share,
