@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetOfflineQueueForTests,
+  MAX_OFFLINE_ACTION_PAYLOAD_BYTES,
+  OfflineActionQueueInputError,
   dequeueAction,
   enqueueAction,
   getQueueLength,
@@ -74,19 +76,12 @@ describe("offlineActionQueue", () => {
     expect(getQueueLength()).toBe(1);
   });
 
-  it("persists queue to localStorage and restores on reload", () => {
+  it("keeps queued actions in memory without writing them to localStorage", () => {
     const first = enqueueAction({ n: 1 });
     const second = enqueueAction({ n: 2 });
     
-    // Check that data was saved to localStorage
-    expect(mockStorage['fluxora_offline_queue']).toBeDefined();
-    const stored = JSON.parse(mockStorage['fluxora_offline_queue']);
-    expect(stored.queue).toHaveLength(2);
-    expect(stored.sequenceCounter).toBe(2);
-    
-    // Simulate reload by clearing in-memory state and reinitializing
-    // Note: In real usage, this happens on module reload
-    expect(getAllQueuedActions()).toHaveLength(2);
+    expect(mockStorage['fluxora_offline_queue']).toBeUndefined();
+    expect(getAllQueuedActions().map((action) => action.id)).toEqual([first.id, second.id]);
   });
 
   it("notifies subscribers on enqueue and dequeue, and unsubscribe stops further notifications", () => {
@@ -111,6 +106,96 @@ describe("offlineActionQueue", () => {
     dequeueAction("never-queued");
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  describe("input validation", () => {
+    it.each([
+      [undefined, "empty_payload"],
+      [null, "empty_payload"],
+      ["   ", "empty_payload"],
+      [{}, "empty_payload"],
+      [[], "empty_payload"],
+      [() => "not JSON data", "invalid_payload"],
+      [Number.NaN, "invalid_payload"],
+      [{ value: undefined }, "invalid_payload"],
+    ])("rejects invalid payloads before changing queue state", (payload, reason) => {
+      const listener = vi.fn();
+      subscribeToQueue(listener);
+
+      let thrown: unknown;
+      try {
+        enqueueAction(payload);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(OfflineActionQueueInputError);
+      expect((thrown as OfflineActionQueueInputError).reason).toBe(reason);
+      expect(getQueueLength()).toBe(0);
+      expect(listener).not.toHaveBeenCalled();
+      expect(enqueueAction({ valid: true }).sequenceNumber).toBe(1);
+    });
+
+    it("rejects circular payloads with a typed error", () => {
+      const payload: { self?: unknown } = {};
+      payload.self = payload;
+
+      expect(() => enqueueAction(payload)).toThrowError(
+        expect.objectContaining({
+          name: "OfflineActionQueueInputError",
+          reason: "invalid_payload",
+        }),
+      );
+      expect(getQueueLength()).toBe(0);
+    });
+
+    it("rejects payloads above the byte limit before enqueueing", () => {
+      const payload = { value: "x".repeat(MAX_OFFLINE_ACTION_PAYLOAD_BYTES) };
+
+      expect(() => enqueueAction(payload)).toThrowError(
+        expect.objectContaining({
+          name: "OfflineActionQueueInputError",
+          reason: "payload_too_large",
+        }),
+      );
+      expect(getQueueLength()).toBe(0);
+      expect(enqueueAction({ valid: true }).sequenceNumber).toBe(1);
+    });
+
+    it("accepts payloads exactly at the byte limit", () => {
+      const payload = "x".repeat(MAX_OFFLINE_ACTION_PAYLOAD_BYTES - 2);
+
+      expect(enqueueAction(payload).payload).toBe(payload);
+      expect(getQueueLength()).toBe(1);
+    });
+
+    it.each([
+      null,
+      [" "],
+      ["x".repeat(257)],
+      Array.from({ length: 101 }, (_, index) => `dependency-${index}`),
+    ])("rejects malformed dependencies before enqueueing", (dependencies) => {
+      expect(() => enqueueAction({ valid: true }, dependencies as string[])).toThrowError(
+        expect.objectContaining({
+          name: "OfflineActionQueueInputError",
+          reason: "invalid_dependencies",
+        }),
+      );
+      expect(getQueueLength()).toBe(0);
+      expect(enqueueAction({ valid: true }).sequenceNumber).toBe(1);
+    });
+
+    it("accepts valid payloads and dependencies unchanged", () => {
+      const payload = { sender: "GABC", amount: "10" };
+      const dependencies = ["previous-action"];
+
+      const action = enqueueAction(payload, dependencies);
+
+      expect(action.payload).toBe(payload);
+      expect(action.dependencies).toBe(dependencies);
+      expect(action.sequenceNumber).toBe(1);
+      expect(getAllQueuedActions()).toEqual([action]);
+    });
   });
 
   describe("dependency handling", () => {
@@ -378,78 +463,4 @@ describe("offlineActionQueue", () => {
     });
   });
 
-  describe("reload persistence", () => {
-    it("restores queue state exactly after simulated reload", () => {
-      const first = enqueueAction({ n: 1 });
-      const second = enqueueAction({ n: 2 }, [first.id]);
-      
-      updateActionStatus(first.id, 'processing');
-      updateActionStatus(second.id, 'pending');
-      
-      // Verify data was persisted
-      const stored = JSON.parse(mockStorage['fluxora_offline_queue']);
-      expect(stored.queue).toHaveLength(2);
-      expect(stored.sequenceCounter).toBe(2);
-      
-      // Verify state is restored
-      const restoredActions = getAllQueuedActions();
-      expect(restoredActions).toHaveLength(2);
-      
-      const restoredFirst = restoredActions.find(a => a.id === first.id);
-      expect(restoredFirst?.status).toBe('processing');
-      expect(restoredFirst?.sequenceNumber).toBe(1);
-      
-      const restoredSecond = restoredActions.find(a => a.id === second.id);
-      expect(restoredSecond?.status).toBe('pending');
-      expect(restoredSecond?.sequenceNumber).toBe(2);
-      expect(restoredSecond?.dependencies).toEqual([first.id]);
-    });
-
-    it("maintains sequence counter across reloads", () => {
-      // Create some actions
-      enqueueAction({ n: 1 });
-      enqueueAction({ n: 2 });
-      
-      const storedBefore = JSON.parse(mockStorage['fluxora_offline_queue']);
-      expect(storedBefore.sequenceCounter).toBe(2);
-      
-      // After reload (simulated by module re-initialization), counter should be restored
-      const restoredActions = getAllQueuedActions();
-      expect(restoredActions).toHaveLength(2);
-      
-      // Add new action - should continue from where it left off
-      const third = enqueueAction({ n: 3 });
-      expect(third.sequenceNumber).toBe(3);
-      
-      const storedAfter = JSON.parse(mockStorage['fluxora_offline_queue']);
-      expect(storedAfter.sequenceCounter).toBe(3);
-    });
-
-    it("preserves action order after reload", () => {
-      const first = enqueueAction({ n: 1 });
-      const second = enqueueAction({ n: 2 });
-      const third = enqueueAction({ n: 3 });
-      
-      // Mark second as completed
-      updateActionStatus(second.id, 'completed');
-      
-      // Verify order is preserved
-      const actionsBefore = getAllQueuedActions();
-      expect(actionsBefore[0].id).toBe(first.id);
-      expect(actionsBefore[1].id).toBe(second.id);
-      expect(actionsBefore[2].id).toBe(third.id);
-      
-      // Simulate reload by checking storage
-      const stored = JSON.parse(mockStorage['fluxora_offline_queue']);
-      expect(stored.queue[0].id).toBe(first.id);
-      expect(stored.queue[1].id).toBe(second.id);
-      expect(stored.queue[2].id).toBe(third.id);
-      
-      // After restoration, order should still be preserved
-      const actionsAfter = getAllQueuedActions();
-      expect(actionsAfter[0].id).toBe(first.id);
-      expect(actionsAfter[1].id).toBe(second.id);
-      expect(actionsAfter[2].id).toBe(third.id);
-    });
-  });
 });
