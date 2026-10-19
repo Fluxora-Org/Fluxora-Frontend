@@ -354,6 +354,80 @@ describe("useTransactionSubmission", () => {
     expect(getStatus).toHaveBeenCalledTimes(1);
   });
 
+  it("clears pending timers when the hook unmounts and deletes the cleanup path", async () => {
+    const submit = vi.fn().mockResolvedValue({ txHash: "hash-cleanup-assert" });
+    const getStatus = vi.fn().mockResolvedValue("pending");
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    const { result, unmount } = renderHook(() =>
+      useTransactionSubmission({
+        submit,
+        getStatus,
+        pollIntervalMs: 100,
+        maxAttempts: 10,
+        backoffFactor: 1,
+      }),
+    );
+
+    await flushPromises();
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    await flushPromises();
+
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(getStatus).toHaveBeenCalledTimes(1);
+
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it("cleans up the previous polling run when hook inputs change", async () => {
+    const submit = vi.fn().mockResolvedValue({ txHash: "hash-rerender" });
+    const getStatus = vi
+      .fn()
+      .mockResolvedValueOnce("pending")
+      .mockResolvedValueOnce("pending");
+    const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+    const { result, rerender } = renderHook(
+      ({ pollIntervalMs, maxAttempts }) =>
+        useTransactionSubmission({
+          submit,
+          getStatus,
+          pollIntervalMs,
+          maxAttempts,
+          backoffFactor: 1,
+        }),
+      {
+        initialProps: { pollIntervalMs: 100, maxAttempts: 3 },
+      },
+    );
+
+    await flushPromises();
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    await flushPromises();
+
+    rerender({ pollIntervalMs: 250, maxAttempts: 2 });
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    clearTimeoutSpy.mockRestore();
+  });
+
   it("isSubmitting is true during submission and polling", async () => {
     let resolve: (value: { txHash: string }) => void;
     const submit = vi.fn(
