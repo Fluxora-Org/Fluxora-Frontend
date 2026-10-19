@@ -14,6 +14,7 @@ import {
   CONTRAST_PAIRS,
   WCAG_AA_NORMAL,
   WCAG_AA_LARGE,
+  WCAG_AAA_NORMAL,
   type TokenValidationError,
 } from "../contrastUtils";
 
@@ -400,6 +401,18 @@ describe("validateCustomTheme", () => {
 
   it("constant WCAG_AA_LARGE is 3.0", () => {
     expect(WCAG_AA_LARGE).toBe(3.0);
+  });
+
+  it("constant WCAG_AAA_NORMAL is 7.0", () => {
+    // Exported for AAA-level contrast checks. Asserting the exact value
+    // guards against an accidental edit silently shifting the threshold.
+    expect(WCAG_AAA_NORMAL).toBe(7.0);
+  });
+
+  it("WCAG_AAA_NORMAL is the strictest of the three WCAG thresholds", () => {
+    // AAA normal (7:1) must exceed AA normal (4.5:1) and AA large (3:1).
+    expect(WCAG_AAA_NORMAL).toBeGreaterThan(WCAG_AA_NORMAL);
+    expect(WCAG_AAA_NORMAL).toBeGreaterThan(WCAG_AA_LARGE);
   });
 
   it("handles alpha hex in overrides", () => {
