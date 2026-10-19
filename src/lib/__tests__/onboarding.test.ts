@@ -17,6 +17,8 @@ import {
   advanceOnboardingProgress,
   completeOnboardingProgress,
   createInitialOnboardingProgress,
+  getOnboardingStepIndex,
+  isOnboardingStepId,
   readOnboardingDismissed,
   readOnboardingProgress,
   resetOnboardingProgress,
@@ -213,6 +215,27 @@ describe("onboarding storage helpers", () => {
 
 // ── Onboarding progress: exit / reload / corruption / idempotency ─────────────
 
+describe("onboarding step helpers", () => {
+  it("recognizes valid step ids and rejects invalid or boundary values", () => {
+    expect(isOnboardingStepId(ONBOARDING_INITIAL_STEP)).toBe(true);
+    expect(isOnboardingStepId(ONBOARDING_FINAL_STEP)).toBe(true);
+    expect(isOnboardingStepId("how-it-works")).toBe(true);
+    expect(isOnboardingStepId("")).toBe(false);
+    expect(isOnboardingStepId("unknown-step")).toBe(false);
+    expect(isOnboardingStepId(null)).toBe(false);
+    expect(isOnboardingStepId(0)).toBe(false);
+  });
+
+  it("returns the index of valid steps and -1 for unknown values", () => {
+    expect(getOnboardingStepIndex(ONBOARDING_INITIAL_STEP)).toBe(0);
+    expect(getOnboardingStepIndex("how-it-works")).toBe(1);
+    expect(getOnboardingStepIndex(ONBOARDING_FINAL_STEP)).toBe(
+      ONBOARDING_STEPS.length - 1,
+    );
+    expect(getOnboardingStepIndex("not-a-step" as any)).toBe(-1);
+  });
+});
+
 describe("onboarding progress", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -239,6 +262,22 @@ describe("onboarding progress", () => {
       step: "how-it-works",
       completed: false,
     });
+  });
+
+  it("sanitizes invalid progress payloads before persisting", () => {
+    const storage = new MemoryStorage();
+
+    writeOnboardingProgress({ step: "unknown-step" as any, completed: true }, storage);
+
+    expect(storage.getItem(ONBOARDING_PROGRESS_STORAGE_KEY)).toBe(
+      JSON.stringify({
+        version: ONBOARDING_PROGRESS_SCHEMA_VERSION,
+        data: createInitialOnboardingProgress(),
+      }),
+    );
+    expect(readOnboardingProgress(storage)).toEqual(
+      createInitialOnboardingProgress(),
+    );
   });
 
   it("can be exited from every step, clearing persisted progress", () => {
