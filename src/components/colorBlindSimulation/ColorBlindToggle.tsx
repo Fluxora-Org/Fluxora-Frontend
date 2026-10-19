@@ -44,6 +44,7 @@ export default function ColorBlindToggle() {
   const { simulation, setSimulation } = useColorBlindSimulation();
   const { announcement, announce } = useLiveAnnouncer();
   const groupId = useId();
+  const legendId = `${groupId}-legend`;
 
   function handleChange(mode: SimulationMode) {
     setSimulation(mode);
@@ -107,6 +108,7 @@ export default function ColorBlindToggle() {
 
       {/* Radio group */}
       <fieldset
+        aria-labelledby={legendId}
         style={{
           border: "none",
           margin: 0,
@@ -117,6 +119,7 @@ export default function ColorBlindToggle() {
         }}
       >
         <legend
+          id={legendId}
           style={{
             // visually hidden but kept in the accessibility tree
             position: "absolute",
@@ -154,6 +157,7 @@ export default function ColorBlindToggle() {
                 fontSize: "12px",
                 fontWeight: isSelected ? 600 : 400,
                 cursor: "pointer",
+                position: "relative",
                 transition:
                   "border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast)",
                 // Allow the label itself to receive focus rings when
@@ -178,6 +182,8 @@ export default function ColorBlindToggle() {
                   whiteSpace: "nowrap",
                   margin: 0,
                   // When focused, the *label* shows the focus ring via :focus-within.
+                  opacity: 0,
+                  pointerEvents: "none",
                 }}
                 aria-label={SIMULATION_LABELS[mode]}
               />
@@ -201,6 +207,17 @@ export default function ColorBlindToggle() {
         })}
       </fieldset>
 
+      {/* Visible focus ring for the visually-hidden radio inputs */}
+      <style>{`
+        [data-testid="colorblind-toggle"] label:focus-within {
+          outline: 2px solid var(--color-accent-primary);
+          outline-offset: 2px;
+        }
+        [data-testid="colorblind-toggle"] label:focus-within input:focus-visible {
+          outline: none;
+        }
+      `}</style>
+
       {/* Active filter description — visible when simulating */}
       {simulation !== "none" && (
         <p
@@ -209,7 +226,7 @@ export default function ColorBlindToggle() {
             fontSize: "11px",
             color: "var(--color-text-muted)",
           }}
-          aria-live="off"
+          aria-live="polite"
           data-testid="active-filter-description"
         >
           Previewing: <strong>{SIMULATION_LABELS[simulation]}</strong>. Status
