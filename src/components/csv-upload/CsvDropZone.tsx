@@ -222,7 +222,6 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
         htmlFor="csv-file-input"
         className={zoneClass}
         aria-label="Upload CSV file. Drag and drop or click to browse."
-        role="button"
         tabIndex={0}
         aria-describedby={
           zoneState === "parse-error" && parseError
@@ -356,18 +355,20 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
           </span>
         )}
 
+        </label>
+
         {/* Visually hidden file input */}
         <input
           ref={inputRef}
           id="csv-file-input"
           type="file"
+          tabIndex={-1}
           accept=".csv,text/csv"
           className="sr-only"
           aria-label={`Upload CSV file. Accepts .csv format, maximum ${MAX_CSV_ROWS} rows, ${MAX_CSV_FILE_SIZE_LABEL}.`}
           aria-describedby="csv-upload-status"
           onChange={onFileChange}
         />
-      </label>
 
       {/* ── Live status region (announced to screen readers) ── */}
       <div
