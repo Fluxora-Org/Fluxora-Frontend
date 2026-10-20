@@ -1,15 +1,28 @@
 import { useState } from "react";
-import DemoBanner, { type DemoState } from "../components/treasuryOverviewPage/DemoBanner";
-import Header, { type TreasuryPeriod } from "../components/treasuryOverviewPage/Header";
+import DemoBanner, {
+  type DemoState,
+} from "../components/treasuryOverviewPage/DemoBanner";
+import Header, {
+  type TreasuryPeriod,
+} from "../components/treasuryOverviewPage/Header";
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import { lazy, Suspense } from "react";
 import ErrorBoundary from "../components/ErrorBoundary";
-const ActivityHeatmap = lazy(() => import("../components/treasuryOverviewPage/ActivityHeatmap"));
-const TreasuryFlowSankey = lazy(() => import("../components/treasuryOverviewPage/TreasuryFlowSankey"));
-const RecentStreams = lazy(() => import("../components/treasuryOverviewPage/RecentStreams"));
-const ReportBuilderPanel = lazy(() => import("../components/treasuryOverviewPage/ReportBuilderPanel"));
+const ActivityHeatmap = lazy(
+  () => import("../components/treasuryOverviewPage/ActivityHeatmap"),
+);
+const TreasuryFlowSankey = lazy(
+  () => import("../components/treasuryOverviewPage/TreasuryFlowSankey"),
+);
+const RecentStreams = lazy(
+  () => import("../components/treasuryOverviewPage/RecentStreams"),
+);
+const ReportBuilderPanel = lazy(
+  () => import("../components/treasuryOverviewPage/ReportBuilderPanel"),
+);
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { MetaTags } from "../components/MetaTags";
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -32,20 +45,32 @@ import { useWallet } from "../components/wallet-connect/Walletcontext";
  */
 export default function TreasuryPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<TreasuryPeriod>("30d");
-  const { metrics, streams, isDemoMode, loading, error, refetch, resolvedPeriod, boundaries } =
-    useTreasuryOverviewData(selectedPeriod);
+  const {
+    metrics,
+    streams,
+    isDemoMode,
+    loading,
+    error,
+    refetch,
+    resolvedPeriod,
+    boundaries,
+  } = useTreasuryOverviewData(selectedPeriod);
   const { connected: walletConnected } = useWallet();
   const [showReportBuilder, setShowReportBuilder] = useState(false);
 
   const demoState: DemoState = loading
     ? "loading"
     : (metrics && metrics.length > 0) || (streams && streams.length > 0)
-    ? "loaded"
-    : "empty";
+      ? "loaded"
+      : "empty";
 
   if (loading) {
     return (
-      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+      <div
+        className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen"
+        data-demo-mode={isDemoMode || undefined}
+      >
+        <MetaTags title="Treasury Overview" />
         {isDemoMode && <DemoBanner state={demoState} />}
         <Header
           selectedPeriod={selectedPeriod}
@@ -63,7 +88,11 @@ export default function TreasuryPage() {
 
   if (error) {
     return (
-      <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+      <div
+        className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen"
+        data-demo-mode={isDemoMode || undefined}
+      >
+        <MetaTags title="Treasury Overview" />
         {isDemoMode && <DemoBanner state={demoState} />}
         <Header
           selectedPeriod={selectedPeriod}
@@ -80,7 +109,11 @@ export default function TreasuryPage() {
   }
 
   return (
-    <div className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen" data-demo-mode={isDemoMode || undefined}>
+    <div
+      className="p-6 flex flex-col gap-8 bg-gray-50 min-h-screen"
+      data-demo-mode={isDemoMode || undefined}
+    >
+      <MetaTags title="Treasury Overview" />
       {isDemoMode && <DemoBanner state={demoState} />}
 
       <Header
@@ -94,7 +127,13 @@ export default function TreasuryPage() {
       />
       {showReportBuilder && (
         <ErrorBoundary>
-          <Suspense fallback={<div role="status" className="sr-only">Loading export panel...</div>}>
+          <Suspense
+            fallback={
+              <div role="status" className="sr-only">
+                Loading export panel...
+              </div>
+            }
+          >
             <ReportBuilderPanel
               streams={streams || []}
               onClose={() => setShowReportBuilder(false)}
@@ -103,20 +142,52 @@ export default function TreasuryPage() {
         </ErrorBoundary>
       )}
       <ErrorBoundary>
-        <Metrics metrics={metrics || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+        <Metrics
+          metrics={metrics || []}
+          loading={loading}
+          error={error}
+          isDemoMode={isDemoMode}
+        />
       </ErrorBoundary>
       <ErrorBoundary>
-        <Suspense fallback={<div role="status" className="sr-only">Loading treasury activity...</div>}>
-          <ActivityHeatmap streams={streams || []} loading={loading} error={error} />
+        <Suspense
+          fallback={
+            <div role="status" className="sr-only">
+              Loading treasury activity...
+            </div>
+          }
+        >
+          <ActivityHeatmap
+            streams={streams || []}
+            loading={loading}
+            error={error}
+          />
         </Suspense>
       </ErrorBoundary>
       <ErrorBoundary>
-        <Suspense fallback={<div role="status" className="sr-only">Loading treasury flow diagram...</div>}>
-          <TreasuryFlowSankey streams={streams || []} loading={loading} error={error} isDemoMode={isDemoMode} />
+        <Suspense
+          fallback={
+            <div role="status" className="sr-only">
+              Loading treasury flow diagram...
+            </div>
+          }
+        >
+          <TreasuryFlowSankey
+            streams={streams || []}
+            loading={loading}
+            error={error}
+            isDemoMode={isDemoMode}
+          />
         </Suspense>
       </ErrorBoundary>
       <ErrorBoundary>
-        <Suspense fallback={<div role="status" className="sr-only">Loading recent streams...</div>}>
+        <Suspense
+          fallback={
+            <div role="status" className="sr-only">
+              Loading recent streams...
+            </div>
+          }
+        >
           <RecentStreams
             streams={streams || []}
             loading={loading}

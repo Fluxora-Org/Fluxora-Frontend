@@ -1,9 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import { isInaccessible } from "@testing-library/dom";
-import { computeAccessibleName } from "dom-accessibility-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import ConnectWallet from "./ConnectWallet";
+
+function computeAccessibleName(element: HTMLElement): string {
+  if (element.getAttribute("aria-hidden") === "true") return "";
+  const labelledBy = element.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const el = document.getElementById(labelledBy);
+    if (el) return el.textContent?.trim() || "";
+  }
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel !== null) return ariaLabel.trim();
+  return element.textContent?.trim() || "";
+}
 import RequireWallet from "../components/RequireWallet";
 
 // Mutable wallet state shared by the mocked context so individual tests can

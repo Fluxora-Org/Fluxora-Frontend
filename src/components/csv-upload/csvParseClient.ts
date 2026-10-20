@@ -20,22 +20,22 @@
  * back to the synchronous parser so behaviour is unchanged there.
  */
 
-import { parseAndValidateCsv } from './csvParser';
+import { parseAndValidateCsv } from "./csvParser";
 import type {
   CsvCancelRequest,
   CsvParseRequest,
   CsvWorkerResponse,
   CsvProgressPayload,
-} from './csvParseWorker';
-import type { ColumnMapping, ParseResult } from './types';
+} from "./csvParseWorker";
+import type { ColumnMapping, ParseResult } from "./types";
 
 export type { CsvProgressPayload };
 
 /** Rejects the pending promise of a cancelled parse. */
 export class CsvParseCancelledError extends Error {
   constructor() {
-    super('CSV parsing was cancelled.');
-    this.name = 'CsvParseCancelledError';
+    super("CSV parsing was cancelled.");
+    this.name = "CsvParseCancelledError";
   }
 }
 
@@ -87,14 +87,14 @@ export function parseCsvAsync(
 
     // Environments without worker support (jsdom tests, some embedded webviews)
     // fall back to the synchronous parser on the main thread.
-    if (typeof Worker === 'undefined') {
+    if (typeof Worker === "undefined") {
       parseInline();
       return;
     }
 
     try {
-      worker = new Worker(new URL('./csvParseWorker.ts', import.meta.url), {
-        type: 'module',
+      worker = new Worker(new URL("./csvParseWorker.ts", import.meta.url), {
+        type: "module",
       });
     } catch {
       // Worker construction failed (e.g. CSP restrictions) — fall back.
@@ -105,11 +105,11 @@ export function parseCsvAsync(
     worker.onmessage = (event: MessageEvent<CsvWorkerResponse>) => {
       const msg = event.data;
       if (cancelled || msg.requestId !== requestId) return;
-      if (msg.type === 'progress') {
+      if (msg.type === "progress") {
         onProgress?.(msg.progress);
-      } else if (msg.type === 'result') {
+      } else if (msg.type === "result") {
         settleWithResult(msg.result);
-      } else if (msg.type === 'error') {
+      } else if (msg.type === "error") {
         settleWithError(new Error(msg.error));
       }
       // 'cancelled' acks are expected after cancel(); the promise has already
@@ -117,17 +117,25 @@ export function parseCsvAsync(
     };
 
     worker.onerror = (event: ErrorEvent) => {
-      settleWithError(new Error(event.message || 'CSV parsing worker failed.'));
+      settleWithError(new Error(event.message || "CSV parsing worker failed."));
     };
 
-    const request: CsvParseRequest = { type: 'parse', requestId, text, mapping };
+    const request: CsvParseRequest = {
+      type: "parse",
+      requestId,
+      text,
+      mapping,
+    };
     worker.postMessage(request);
   });
 
   const cancel = (): void => {
     if (cancelled) return;
     cancelled = true;
-    worker?.postMessage({ type: 'cancel', requestId } satisfies CsvCancelRequest);
+    worker?.postMessage({
+      type: "cancel",
+      requestId,
+    } satisfies CsvCancelRequest);
     // Terminating guarantees the in-flight parse actually stops working.
     worker?.terminate();
     worker = null;
@@ -135,4 +143,77 @@ export function parseCsvAsync(
   };
 
   return { promise, cancel };
+}
+
+export interface LocatedCsvParseResult {
+  ok: boolean;
+  errors: Array<{ row: number; column?: string; message: string }>;
+}
+
+export function parseCsv(text: string): LocatedCsvParseResult {
+  const lines = text
+    .trim()
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0);
+  if (lines.length === 0) {
+    return { ok: false, errors: [{ row: 1, message: "empty CSV" }] };
+  }
+
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const errors: Array<{ row: number; column?: string; message: string }> = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = i + 1;
+    const cells = lines[i].split(",").map((c) => c.trim());
+
+    if (cells.length < headers.length) {
+      errors.push({
+        row,
+        message: `expected ${headers.length} columns, got ${cells.length}`,
+      });
+      continue;
+    }
+
+    headers.forEach((header, colIdx) => {
+      const val = cells[colIdx];
+      const normalizedHeader = header.toLowerCase();
+
+      if (normalizedHeader === "recipient") {
+        if (!val || val.length === 0) {
+          errors.push({
+            row,
+            column: "recipient",
+            message: "expected a valid recipient address",
+          });
+        }
+      } else if (
+        normalizedHeader === "amount" ||
+        normalizedHeader === "deposit_amount"
+      ) {
+        if (!val || isNaN(Number(val))) {
+          errors.push({
+            row,
+            column: "amount",
+            message: `expected a number, got "${val}"`,
+          });
+        }
+      } else if (
+        normalizedHeader === "startdate" ||
+        normalizedHeader === "start_date"
+      ) {
+        if (!val || isNaN(Date.parse(val))) {
+          errors.push({
+            row,
+            column: "startDate",
+            message: `expected a valid date, got "${val}"`,
+          });
+        }
+      }
+    });
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
 }
