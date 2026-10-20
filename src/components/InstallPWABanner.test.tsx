@@ -330,6 +330,22 @@ describe("InstallPWABanner state announcements", () => {
     expect(localStorage.getItem(PWA_BANNER_STORAGE_KEY)).toBeNull();
   });
 
+  it("does not reuse an install event the browser already consumed", async () => {
+    const user = userEvent.setup();
+    render(<InstallPWABanner />);
+    const { prompt } = showInstallPrompt("dismissed");
+
+    await user.click(screen.getByRole("button", { name: "Install" }));
+    await waitFor(() => expect(announcement()).toHaveTextContent(/not installed/i));
+
+    // A beforeinstallprompt event can only be prompted once; the component
+    // clears it, so a second activation is a safe no-op instead of throwing.
+    await user.click(screen.getByRole("button", { name: "Install" }));
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(banner()).toBeInTheDocument();
+  });
+
   it("announces a permanent dismissal after the banner is removed", async () => {
     const user = userEvent.setup();
     render(<InstallPWABanner />);
