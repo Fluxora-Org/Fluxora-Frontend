@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Breadcrumb from "../Breadcrumb";
 
@@ -14,6 +14,32 @@ const renderBreadcrumb = (items: React.ComponentProps<typeof Breadcrumb>["items"
   );
 
 describe("Breadcrumb", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders no navigation landmark for an empty trail", () => {
+    const { container } = renderBreadcrumb([]);
+
+    expect(container.querySelector('nav[aria-label="Breadcrumb"]')).toBeNull();
+  });
+
+  it("keeps an intermediate item without a destination as text", () => {
+    renderBreadcrumb([
+      { label: "Workspace" },
+      { label: "Streams", to: "/streams" },
+      { label: "Details" },
+    ]);
+
+    expect(screen.queryByRole("link", { name: "Workspace" })).toBeNull();
+    expect(screen.getByText("Workspace")).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Streams" })).toHaveAttribute(
+      "href",
+      "/streams",
+    );
+    expect(screen.getByText("Details")).toHaveAttribute("aria-current", "page");
+  });
+
   it("keeps the current page as non-interactive text with aria-current", () => {
     renderBreadcrumb([
       { label: "Streams", to: "/streams" },
@@ -97,7 +123,19 @@ describe("Breadcrumb", () => {
     );
     expect(keyWarning).toBe(false);
 
-    consoleSpy.mockRestore();
+  });
+
+  it("renders a populated breadcrumb without React console warnings", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderBreadcrumb([
+      { label: "Home", to: "/" },
+      { label: "Treasury", to: "/treasury" },
+      { label: "Current page" },
+    ]);
+
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
+    expect(consoleSpy).not.toHaveBeenCalled();
   });
 
   it("has no automated accessibility violations", async () => {
