@@ -266,7 +266,8 @@ function isValidDateString(dateStr: string): boolean {
 }
 
 const STELLAR_ADDRESS_PATTERN = /^[GC][A-Z2-7]{55}$/;
-const ABBREVIATED_ADDRESS_PATTERN = /^[GC][A-Z0-9]{3,8}\.{2,4}[A-Za-z0-9]{2,8}$/;
+const ABBREVIATED_ADDRESS_PATTERN =
+  /^[GC][A-Z0-9]{3,8}\.{2,4}[A-Za-z0-9]{2,8}$/;
 
 /**
  * Validate and sanitize a Stellar address string before it is rendered in
@@ -376,12 +377,163 @@ export function normalizeStreamRecord(raw: unknown): StreamRecord {
     timeline: readTimeline(source.timeline),
   };
 }
+export type StreamRecordInputErrorReason =
+  | "empty_payload"
+  | "invalid_payload"
+  | "payload_too_large"
+  | "validation_failed";
+
+export class StreamRecordInputError extends Error {
+  readonly reason: StreamRecordInputErrorReason;
+  readonly errors?: readonly string[];
+  readonly recordId?: string;
+
+  constructor(
+    reason: StreamRecordInputErrorReason,
+    message?: string,
+    errors?: readonly string[],
+    recordId?: string,
+  ) {
+    super(message ?? `Invalid stream record input: ${reason}`);
+    this.name = "StreamRecordInputError";
+    this.reason = reason;
+    this.errors = errors;
+    this.recordId = recordId;
+  }
+}
+
+export const MAX_STREAM_RECORD_PAYLOAD_BYTES = 64 * 1024;
+
+function isJsonValue(value: unknown, seen: Set<object>): boolean {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+
+  const prototype = Object.getPrototypeOf(value);
+  if (
+    !Array.isArray(value) &&
+    prototype !== Object.prototype &&
+    prototype !== null
+  ) {
+    return false;
+  }
+
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (
+        Object.keys(value).length !== value.length ||
+        Object.getOwnPropertySymbols(value).length > 0
+      ) {
+        return false;
+      }
+      for (let index = 0; index < value.length; index += 1) {
+        if (
+          !Object.prototype.hasOwnProperty.call(value, index) ||
+          !isJsonValue(value[index], seen)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (Object.getOwnPropertySymbols(value).length > 0) return false;
+    return Object.keys(value).every((key) =>
+      isJsonValue((value as Record<string, unknown>)[key], seen),
+    );
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/**
+ * Validates raw stream record input, ensuring it is a non-empty, non-oversized,
+ * well-formed JSON object meeting all StreamRecord schema requirements.
+ * Throws a typed StreamRecordInputError if input is malformed, empty, or oversized.
+ */
+export function validateStreamRecordInput(
+  input: unknown,
+): asserts input is StreamRecord {
+  if (
+    input === null ||
+    input === undefined ||
+    (typeof input === "string" && input.trim().length === 0) ||
+    (Array.isArray(input) && input.length === 0)
+  ) {
+    throw new StreamRecordInputError(
+      "empty_payload",
+      "StreamRecord input cannot be empty",
+    );
+  }
+
+  if (
+    typeof input !== "object" ||
+    Array.isArray(input) ||
+    !isJsonValue(input, new Set())
+  ) {
+    throw new StreamRecordInputError(
+      "invalid_payload",
+      "StreamRecord input must be a valid plain object",
+    );
+  }
+
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(input);
+  } catch {
+    throw new StreamRecordInputError(
+      "invalid_payload",
+      "StreamRecord input must be serializable JSON",
+    );
+  }
+
+  if (serialized === "{}" || Object.keys(input as object).length === 0) {
+    throw new StreamRecordInputError(
+      "empty_payload",
+      "StreamRecord input cannot be an empty object",
+    );
+  }
+
+  const byteLength = new TextEncoder().encode(serialized).byteLength;
+  if (byteLength > MAX_STREAM_RECORD_PAYLOAD_BYTES) {
+    throw new StreamRecordInputError(
+      "payload_too_large",
+      `StreamRecord input exceeds maximum size of ${MAX_STREAM_RECORD_PAYLOAD_BYTES} bytes (received ${byteLength} bytes)`,
+    );
+  }
+
+  const errors = validateStreamRecord(input as StreamRecord);
+  if (errors.length > 0) {
+    const sourceRecord = input as Record<string, unknown>;
+    const recordId =
+      typeof sourceRecord.id === "string" ? sourceRecord.id : undefined;
+    throw new StreamRecordInputError(
+      "validation_failed",
+      `Validation failed for StreamRecord${recordId ? ` ID '${recordId}'` : ""}:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+      errors,
+      recordId,
+    );
+  }
+}
+
 /**
  * Validates a single StreamRecord against shape invariants, including checksummed Stellar addresses.
  * Returns an array of string error descriptions. If empty, the record is valid.
  */
 export function validateStreamRecord(record: StreamRecord): string[] {
   const errors: string[] = [];
+
+  if (!record || typeof record !== "object") {
+    return ["Invalid stream record: must be a non-null object"];
+  }
 
   if (!record.id || typeof record.id !== "string") {
     errors.push("Invalid or missing 'id'");
@@ -426,7 +578,7 @@ export function validateStreamRecord(record: StreamRecord): string[] {
   }
 
   // Validate numbers
-  const isNumber = (val: any) =>
+  const isNumber = (val: unknown): val is number =>
     typeof val === "number" && !isNaN(val) && isFinite(val);
 
   if (!isNumber(record.monthlyRate) || record.monthlyRate < 0) {
@@ -580,8 +732,11 @@ export function getStreamRecords(): StreamRecord[] {
     for (const record of streamRecords) {
       const errors = validateStreamRecord(record);
       if (errors.length > 0) {
-        throw new Error(
+        throw new StreamRecordInputError(
+          "validation_failed",
           `Validation failed for StreamRecord ID '${record.id}':\n${errors.map((e) => `- ${e}`).join("\n")}`,
+          errors,
+          record.id,
         );
       }
     }
@@ -591,6 +746,10 @@ export function getStreamRecords(): StreamRecord[] {
     return streamRecords.filter((record) => {
       const errors = validateStreamRecord(record);
       if (errors.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Skipping malformed StreamRecord ID '${record.id}' in production due to validation errors:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+        );
         logger.warn(
           `Skipping malformed StreamRecord ID '${record.id}' in production due to validation errors:\n${errors.map((e) => `- ${e}`).join("\n")}`,
         );
@@ -602,7 +761,45 @@ export function getStreamRecords(): StreamRecord[] {
 }
 
 export function getStreamRecord(streamId: string): StreamRecord | undefined {
-  return getStreamRecords().find((stream) => stream.id === streamId);
+  if (typeof streamId !== "string" || !streamId.trim()) {
+    return undefined;
+  }
+  return getStreamRecords().find((stream) => stream.id === streamId.trim());
+}
+
+/**
+ * Adds a validated stream record to the active streamRecords array.
+ * Validates input completely before any state is written.
+ * Rejects malformed, empty, or oversized inputs with a typed StreamRecordInputError.
+ */
+export function addStreamRecord(record: unknown): StreamRecord {
+  validateStreamRecordInput(record);
+  const validatedRecord = record as StreamRecord;
+  streamRecords.push(validatedRecord);
+  return validatedRecord;
+}
+
+const initialSeededRecords: readonly StreamRecord[] = Object.freeze(
+  streamRecords.map((record) => ({
+    ...record,
+    tags: [...record.tags],
+    timeline: [...record.timeline],
+  })),
+);
+
+/**
+ * Resets the active stream records array to its initial seeded state.
+ * Useful for test cleanups.
+ */
+export function resetStreamRecordsForTests(): void {
+  streamRecords.length = 0;
+  streamRecords.push(
+    ...initialSeededRecords.map((record) => ({
+      ...record,
+      tags: [...record.tags],
+      timeline: [...record.timeline],
+    })),
+  );
 }
 
 // Export the internal array under a test prefix to allow testing mutation/filtering behavior
@@ -621,4 +818,3 @@ export {
   deriveRemainingAmount,
   deriveCanonicalProgress,
 } from "./canonicalStreamRecord";
-
