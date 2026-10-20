@@ -1,6 +1,42 @@
 import { vi } from "vitest";
 
 /**
+ * Minimal fake `Response`-like object for apiVersion tests.
+ * Avoids network access while exercising status/body handling.
+ */
+export function makeResponse(
+  body: unknown,
+  init: { ok?: boolean; status?: number } = {},
+) {
+  const status = init.status ?? 200;
+  return {
+    ok: init.ok ?? (status >= 200 && status < 300),
+    status,
+    json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(
+      typeof body === "string" ? body : JSON.stringify(body),
+    ),
+  } as unknown as Response;
+}
+
+/**
+ * Install a fetch mock that resolves with the given responses in order.
+ * Returns the mock so tests can assert call arguments.
+ */
+export function mockFetch(...responses: Array<Response | Error>) {
+  const fetchMock = vi.fn();
+  for (const response of responses) {
+    if (response instanceof Error) {
+      fetchMock.mockRejectedValueOnce(response);
+    } else {
+      fetchMock.mockResolvedValueOnce(response);
+    }
+  }
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+/**
  * Default props for StreamCreatedModal tests.
  */
 export const defaultStreamCreatedModalProps = {
