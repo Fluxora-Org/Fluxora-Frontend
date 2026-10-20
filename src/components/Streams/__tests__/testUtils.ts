@@ -7,7 +7,7 @@ export const defaultStreamCreatedModalProps = {
   isOpen: true,
   onClose: vi.fn(),
   streamId: "STR-123",
-  streamUrl: "https://fluxora.io/stream/STR-123",
+  streamUrl: "https://fluxoura.io/stream/STR-123",
   onCreateAnother: vi.fn(),
 };
 
