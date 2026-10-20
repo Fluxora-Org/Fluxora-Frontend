@@ -30,7 +30,8 @@ type ReceiptStatus = "pending" | "confirmed" | "failed" | "unknown";
 
 async function fetchReceiptStatus(txHash: string): Promise<ReceiptStatus> {
   const configWithUrls = config as { networkUrl?: string; horizonUrl?: string };
-  const networkUrl = configWithUrls.networkUrl ?? configWithUrls.horizonUrl ?? "";
+  const networkUrl =
+    configWithUrls.networkUrl ?? configWithUrls.horizonUrl ?? "";
   const baseUrl = networkUrl.replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/transactions/${txHash}`);
   if (response.status === 404) return "pending";
@@ -129,8 +130,8 @@ export default function StreamCreatedModal({
     let stopped = false;
     let attempts = 0;
     let pollInFlight = false;
-    let intervalId: number | undefined;
-    let timeoutId: number | undefined;
+    let intervalId: number | undefined = undefined;
+    let timeoutId: number | undefined = undefined;
 
     const clearTimers = () => {
       if (intervalId !== undefined) window.clearInterval(intervalId);
@@ -170,8 +171,14 @@ export default function StreamCreatedModal({
     };
 
     void poll();
-    intervalId = window.setInterval(() => void poll(), RECEIPT_POLL_INTERVAL_MS);
-    timeoutId = window.setTimeout(() => finish("unknown"), RECEIPT_POLL_TIMEOUT_MS);
+    intervalId = window.setInterval(
+      () => void poll(),
+      RECEIPT_POLL_INTERVAL_MS,
+    );
+    timeoutId = window.setTimeout(
+      () => finish("unknown"),
+      RECEIPT_POLL_TIMEOUT_MS,
+    );
 
     return () => {
       cancelled = true;
@@ -265,7 +272,10 @@ export default function StreamCreatedModal({
       announce("Stream identifier copied");
       window.setTimeout(() => setIdentifierCopied(false), 2000);
     } else {
-      announce("Could not copy stream identifier. Please copy it manually.", 3000);
+      announce(
+        "Could not copy stream identifier. Please copy it manually.",
+        3000,
+      );
     }
   };
 
@@ -279,19 +289,29 @@ export default function StreamCreatedModal({
       try {
         const parsedUrl = new URL(streamUrl);
         if (parsedUrl.protocol !== "https:") {
+          // eslint-disable-next-line no-console
+          console.error("Invalid URL scheme. Only https is allowed.");
           announce("Invalid stream URL. Only secure links are allowed.", 3000);
           return;
         }
       } catch {
+        // eslint-disable-next-line no-console
+        console.error("Invalid URL provided.");
         announce("Invalid stream URL. Please try again.", 3000);
         return;
       }
 
+      // eslint-disable-next-line no-console
+      console.error("Invalid URL provided.");
       announce("Invalid stream URL. Please try again.", 3000);
       return;
     }
 
-    const newWindow = window.open(safeStreamUrl, "_blank", "noopener,noreferrer");
+    const newWindow = window.open(
+      safeStreamUrl,
+      "_blank",
+      "noopener,noreferrer",
+    );
     if (!newWindow) {
       setIsPopupBlocked(true);
       announce(
@@ -438,7 +458,12 @@ export default function StreamCreatedModal({
         aria-describedby="stream-created-description"
         tabIndex={-1}
       >
-        <div className="sr-only" aria-live="assertive">
+        <div
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {announcement}
         </div>
         <button
@@ -489,7 +514,11 @@ export default function StreamCreatedModal({
                 className={`${styles.identifierCopyButton} ${identifierCopied ? styles.copied : ""}`}
                 onClick={() => void handleCopyIdentifier()}
                 type="button"
-                aria-label={identifierCopied ? "Copied stream identifier" : "Copy stream identifier"}
+                aria-label={
+                  identifierCopied
+                    ? "Copied stream identifier"
+                    : "Copy stream identifier"
+                }
               >
                 {identifierCopied ? "Copied" : "Copy"}
               </button>
@@ -515,6 +544,7 @@ export default function StreamCreatedModal({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
@@ -529,6 +559,7 @@ export default function StreamCreatedModal({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   className={styles.spinning}
+                  aria-hidden="true"
                 >
                   <circle
                     cx="12"
@@ -548,6 +579,7 @@ export default function StreamCreatedModal({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
                   <polyline points="16 6 12 2 8 6"></polyline>
@@ -563,6 +595,7 @@ export default function StreamCreatedModal({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -658,6 +691,7 @@ export default function StreamCreatedModal({
                     type="text"
                     role="combobox"
                     aria-expanded={listOpen}
+                    aria-haspopup="listbox"
                     aria-controls={channelListId}
                     aria-autocomplete="list"
                     aria-activedescendant={
@@ -686,10 +720,7 @@ export default function StreamCreatedModal({
                       aria-label="Available channels"
                     >
                       {channels.length === 0 ? (
-                        <li
-                          className={styles.channelEmpty}
-                          role="presentation"
-                        >
+                        <li className={styles.channelEmpty} role="presentation">
                           No channels match
                         </li>
                       ) : (
@@ -702,6 +733,9 @@ export default function StreamCreatedModal({
                             className={`${styles.channelOption} ${index === activeOptionIndex ? styles.channelOptionActive : ""}`}
                             onMouseDown={(event) => {
                               event.preventDefault();
+                              handleSelectChannel(channel.id, channel.name);
+                            }}
+                            onClick={() => {
                               handleSelectChannel(channel.id, channel.name);
                             }}
                           >
@@ -719,10 +753,15 @@ export default function StreamCreatedModal({
                 aria-labelledby={previewHeadingId}
               >
                 <div className={styles.sharePreviewHeader}>
-                  <h4 id={previewHeadingId} className={styles.sharePreviewLabel}>
+                  <h4
+                    id={previewHeadingId}
+                    className={styles.sharePreviewLabel}
+                  >
                     Message preview
                   </h4>
-                  <span className={styles.shareStatusBadge}>{previewBadge}</span>
+                  <span className={styles.shareStatusBadge}>
+                    {previewBadge}
+                  </span>
                 </div>
                 <dl className={styles.sharePreviewBody}>
                   <div className={styles.sharePreviewRow}>
@@ -749,7 +788,9 @@ export default function StreamCreatedModal({
                           {streamUrl}
                         </a>
                       ) : (
-                        <span className={styles.sharePreviewLink}>{streamUrl}</span>
+                        <span className={styles.sharePreviewLink}>
+                          {streamUrl}
+                        </span>
                       )}
                     </dd>
                   </div>
@@ -831,6 +872,7 @@ export default function StreamCreatedModal({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              aria-hidden="true"
             >
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -861,6 +903,7 @@ export default function StreamCreatedModal({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              aria-hidden="true"
             >
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
               <polyline points="15 3 21 3 21 9"></polyline>
