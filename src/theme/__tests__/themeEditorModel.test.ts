@@ -30,6 +30,13 @@ import {
   updateDraftToken,
   buildCustomThemeDefinition,
   validateThemeDraft,
+  validateThemeEditorInput,
+  ThemeEditorModelInputError,
+  MAX_THEME_EDITOR_PAYLOAD_BYTES,
+  MAX_TOKEN_KEY_LENGTH,
+  MAX_TOKEN_VALUE_LENGTH,
+  MAX_LABEL_LENGTH,
+  MAX_THEME_ID_LENGTH,
   TOKEN_FIELDS,
   DEFAULTS,
 } from "../themeEditorModel";
@@ -132,23 +139,39 @@ describe("themeEditorModel — invalid color format boundaries", () => {
 // ─── 3. Contrast Calculation & Badge Boundary Values ─────────────────────────
 
 describe("themeEditorModel — contrast calculation boundaries", () => {
-  const ctaTextMeta = TOKEN_FIELDS.find((f) => f.key === "--color-cta-primary-text")!;
-  const accentPrimaryMeta = TOKEN_FIELDS.find((f) => f.key === "--color-accent-primary")!;
+  const ctaTextMeta = TOKEN_FIELDS.find(
+    (f) => f.key === "--color-cta-primary-text",
+  )!;
+  const accentPrimaryMeta = TOKEN_FIELDS.find(
+    (f) => f.key === "--color-accent-primary",
+  )!;
 
   it("resolves background hex prioritizing overrides then defaults", () => {
-    expect(resolveBackgroundHex("--color-cta-primary-bg", { "--color-cta-primary-bg": "#123456" })).toBe("#123456");
-    expect(resolveBackgroundHex("--color-cta-primary-bg", {})).toBe(DEFAULTS["--color-cta-primary-bg"]);
+    expect(
+      resolveBackgroundHex("--color-cta-primary-bg", {
+        "--color-cta-primary-bg": "#123456",
+      }),
+    ).toBe("#123456");
+    expect(resolveBackgroundHex("--color-cta-primary-bg", {})).toBe(
+      DEFAULTS["--color-cta-primary-bg"],
+    );
     expect(resolveBackgroundHex(undefined, {})).toBe("#ffffff");
   });
 
   it("returns null when meta has no contrastBg", () => {
-    const bgMeta = TOKEN_FIELDS.find((f) => f.key === "--color-cta-primary-bg")!;
+    const bgMeta = TOKEN_FIELDS.find(
+      (f) => f.key === "--color-cta-primary-bg",
+    )!;
     expect(computeFieldContrast(bgMeta, "#0097a7", {})).toBeNull();
   });
 
   it("returns null when either foreground or background hex is invalid", () => {
     expect(computeFieldContrast(ctaTextMeta, "not-hex", {})).toBeNull();
-    expect(computeFieldContrast(ctaTextMeta, "#04131a", { "--color-cta-primary-bg": "bad-bg" })).toBeNull();
+    expect(
+      computeFieldContrast(ctaTextMeta, "#04131a", {
+        "--color-cta-primary-bg": "bad-bg",
+      }),
+    ).toBeNull();
   });
 
   it("boundary: passes when ratio is exactly equal to required (AA: 4.5:1)", () => {
@@ -211,7 +234,9 @@ describe("themeEditorModel — undo and reset semantics", () => {
 
   it("createInitialDraft seeds from DEFAULTS and applies validated customTheme tokens", () => {
     const draftFromNull = createInitialDraft(null);
-    expect(draftFromNull["--color-accent-primary"]).toBe(DEFAULTS["--color-accent-primary"]);
+    expect(draftFromNull["--color-accent-primary"]).toBe(
+      DEFAULTS["--color-accent-primary"],
+    );
 
     const draftFromCustom = createInitialDraft(sampleAppliedTheme);
     expect(draftFromCustom["--color-accent-primary"]).toBe("#123456");
@@ -223,11 +248,19 @@ describe("themeEditorModel — undo and reset semantics", () => {
     const unchanged = { ...baseline };
     expect(isDraftDirty(unchanged, baseline)).toBe(false);
 
-    const modified = updateDraftToken(baseline, "--color-accent-primary", "#ff0000");
+    const modified = updateDraftToken(
+      baseline,
+      "--color-accent-primary",
+      "#ff0000",
+    );
     expect(isDraftDirty(modified, baseline)).toBe(true);
 
     // Reverting restores clean state
-    const reverted = updateDraftToken(modified, "--color-accent-primary", baseline["--color-accent-primary"]!);
+    const reverted = updateDraftToken(
+      modified,
+      "--color-accent-primary",
+      baseline["--color-accent-primary"]!,
+    );
     expect(isDraftDirty(reverted, baseline)).toBe(false);
   });
 
@@ -241,7 +274,11 @@ describe("themeEditorModel — undo and reset semantics", () => {
 
   it("undoDraftChanges restores to initial baseline state", () => {
     const initialDraft = { ...DEFAULTS, "--color-accent-primary": "#123456" };
-    const undo = undoDraftChanges(initialDraft, "Previous Label", "previous-slug");
+    const undo = undoDraftChanges(
+      initialDraft,
+      "Previous Label",
+      "previous-slug",
+    );
     expect(undo.draft["--color-accent-primary"]).toBe("#123456");
     expect(undo.label).toBe("Previous Label");
     expect(undo.themeId).toBe("previous-slug");
@@ -251,9 +288,13 @@ describe("themeEditorModel — undo and reset semantics", () => {
   it("initThemeEditorState initializes state with canReset only when customTheme exists", () => {
     const stateNoTheme = initThemeEditorState();
     expect(stateNoTheme.canReset).toBe(false);
-    expect(stateNoTheme.draft["--color-accent-primary"]).toBe(DEFAULTS["--color-accent-primary"]);
+    expect(stateNoTheme.draft["--color-accent-primary"]).toBe(
+      DEFAULTS["--color-accent-primary"],
+    );
 
-    const stateWithTheme = initThemeEditorState({ customTheme: sampleAppliedTheme });
+    const stateWithTheme = initThemeEditorState({
+      customTheme: sampleAppliedTheme,
+    });
     expect(stateWithTheme.canReset).toBe(true);
     expect(stateWithTheme.label).toBe("Acme Brand");
     expect(stateWithTheme.themeId).toBe("acme-brand");
@@ -282,24 +323,44 @@ describe("themeEditorModel — submission validation and authorization", () => {
 
   it("enforces theme ID slug boundaries", () => {
     // Empty slug
-    const emptyRes = validateThemeDraft({ themeId: "", label: "Name", draft: validDraft });
+    const emptyRes = validateThemeDraft({
+      themeId: "",
+      label: "Name",
+      draft: validDraft,
+    });
     expect(emptyRes.ok).toBe(false);
 
     // Spaces in slug
-    const spaceRes = validateThemeDraft({ themeId: "slug with spaces", label: "Name", draft: validDraft });
+    const spaceRes = validateThemeDraft({
+      themeId: "slug with spaces",
+      label: "Name",
+      draft: validDraft,
+    });
     expect(spaceRes.ok).toBe(false);
 
     // Uppercase in slug
-    const upperRes = validateThemeDraft({ themeId: "Acme-Theme", label: "Name", draft: validDraft });
+    const upperRes = validateThemeDraft({
+      themeId: "Acme-Theme",
+      label: "Name",
+      draft: validDraft,
+    });
     expect(upperRes.ok).toBe(false);
 
     // Valid slugs
-    const validSlugRes = validateThemeDraft({ themeId: "acme-corp_2026", label: "Name", draft: validDraft });
+    const validSlugRes = validateThemeDraft({
+      themeId: "acme-corp_2026",
+      label: "Name",
+      draft: validDraft,
+    });
     expect(validSlugRes.ok).toBe(true);
   });
 
   it("rejects empty or whitespace theme display name", () => {
-    const emptyLabel = validateThemeDraft({ themeId: "valid-id", label: "   ", draft: validDraft });
+    const emptyLabel = validateThemeDraft({
+      themeId: "valid-id",
+      label: "   ",
+      draft: validDraft,
+    });
     expect(emptyLabel.ok).toBe(false);
     if (!emptyLabel.ok) {
       expect(emptyLabel.reason).toBe("invalid-identity");
@@ -319,7 +380,13 @@ describe("themeEditorModel — submission validation and authorization", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe("invalid-tokens");
-      expect(result.errors.some((e) => e.token === "--color-accent-primary" && e.message.includes("translucent"))).toBe(true);
+      expect(
+        result.errors.some(
+          (e) =>
+            e.token === "--color-accent-primary" &&
+            e.message.includes("translucent"),
+        ),
+      ).toBe(true);
     }
   });
 
@@ -335,7 +402,11 @@ describe("themeEditorModel — submission validation and authorization", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => e.token === "--focus-ring-color" && e.reason === "locked")).toBe(true);
+      expect(
+        result.errors.some(
+          (e) => e.token === "--focus-ring-color" && e.reason === "locked",
+        ),
+      ).toBe(true);
     }
   });
 
@@ -407,15 +478,15 @@ describe("themeEditorModel — WCAG contrast gate (light theme palette)", () => 
     ...DEFAULTS,
     "--surface-base": "#ffffff",
     "--surface-neutral": "#fafbfc",
-    "--text-vivid": "#1a1f36",      // ~15.5:1 on white — passes AA
-    "--text-secondary": "#4a5565",  // ~7.5:1 on white — passes AA
+    "--text-vivid": "#1a1f36", // ~15.5:1 on white — passes AA
+    "--text-secondary": "#4a5565", // ~7.5:1 on white — passes AA
     "--navbar-bg": "#ffffff",
     "--navbar-logo-color": "#1a1f36",
     "--navbar-link-color": "#4a5565",
     "--color-cta-primary-bg": "#0097a7",
-    "--color-cta-primary-text": "#04131a",  // ~12.8:1 on CTA bg — passes AA
-    "--color-accent-primary": "#0097a7",    // 3.51:1 — passes AA-large (3:1)
-    "--color-accent-secondary": "#00a884",  // 3.03:1 — passes AA-large (3:1)
+    "--color-cta-primary-text": "#04131a", // ~12.8:1 on CTA bg — passes AA
+    "--color-accent-primary": "#0097a7", // 3.51:1 — passes AA-large (3:1)
+    "--color-accent-secondary": "#00a884", // 3.03:1 — passes AA-large (3:1)
   };
 
   it("accepts a compliant light palette", () => {
@@ -532,15 +603,15 @@ describe("themeEditorModel — WCAG contrast gate (dark theme palette)", () => {
     ...DEFAULTS,
     "--surface-base": "#0d1117",
     "--surface-neutral": "#161b22",
-    "--text-vivid": "#f0f6fc",      // light text on near-black — ~15:1 — passes AA
-    "--text-secondary": "#8b949e",  // muted light text — ~4.6:1 on #0d1117 — passes AA
+    "--text-vivid": "#f0f6fc", // light text on near-black — ~15:1 — passes AA
+    "--text-secondary": "#8b949e", // muted light text — ~4.6:1 on #0d1117 — passes AA
     "--navbar-bg": "#161b22",
-    "--navbar-logo-color": "#f0f6fc",  // ~14:1 — passes AA
-    "--navbar-link-color": "#8b949e",  // ~4.6:1 — passes AA
+    "--navbar-logo-color": "#f0f6fc", // ~14:1 — passes AA
+    "--navbar-link-color": "#8b949e", // ~4.6:1 — passes AA
     "--color-cta-primary-bg": "#238636",
-    "--color-cta-primary-text": "#ffffff",  // white on dark green — passes AA
-    "--color-accent-primary": "#58a6ff",    // blue on #0d1117 — passes AA-large
-    "--color-accent-secondary": "#3fb950",  // green on #0d1117 — passes AA-large
+    "--color-cta-primary-text": "#ffffff", // white on dark green — passes AA
+    "--color-accent-primary": "#58a6ff", // blue on #0d1117 — passes AA-large
+    "--color-accent-secondary": "#3fb950", // green on #0d1117 — passes AA-large
   };
 
   it("accepts a compliant dark palette", () => {
@@ -581,8 +652,7 @@ describe("themeEditorModel — WCAG contrast gate (dark theme palette)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       const contrastError = result.errors.find(
-        (e) =>
-          e.token === "--text-secondary" && e.reason === "contrast-fail",
+        (e) => e.token === "--text-secondary" && e.reason === "contrast-fail",
       );
       expect(contrastError).toBeDefined();
       expect(contrastError!.ratio!).toBeLessThan(4.5);
@@ -642,8 +712,7 @@ describe("themeEditorModel — WCAG contrast gate (dark theme palette)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       const err = result.errors.find(
-        (e) =>
-          e.token === "--text-secondary" && e.reason === "contrast-fail",
+        (e) => e.token === "--text-secondary" && e.reason === "contrast-fail",
       );
       expect(err).toBeDefined();
       expect(err!.ratio).toBeDefined();
@@ -661,15 +730,15 @@ describe("themeEditorModel — WCAG contrast gate (custom theme)", () => {
     ...DEFAULTS,
     "--surface-base": "#001f2a",
     "--surface-neutral": "#002d3d",
-    "--text-vivid": "#e0f7fa",       // ~16:1 on #001f2a — passes AA
-    "--text-secondary": "#80deea",   // ~7.1:1 on #001f2a — passes AA
+    "--text-vivid": "#e0f7fa", // ~16:1 on #001f2a — passes AA
+    "--text-secondary": "#80deea", // ~7.1:1 on #001f2a — passes AA
     "--navbar-bg": "#002d3d",
-    "--navbar-logo-color": "#e0f7fa",  // passes AA
-    "--navbar-link-color": "#80deea",  // ~6.4:1 — passes AA
+    "--navbar-logo-color": "#e0f7fa", // passes AA
+    "--navbar-link-color": "#80deea", // ~6.4:1 — passes AA
     "--color-cta-primary-bg": "#0097a7",
-    "--color-cta-primary-text": "#04131a",  // dark text on teal — 5.38:1 — passes AA
-    "--color-accent-primary": "#4dd0e1",    // cyan on dark bg — passes AA-large
-    "--color-accent-secondary": "#26c6da",  // teal on dark bg — passes AA-large
+    "--color-cta-primary-text": "#04131a", // dark text on teal — 5.38:1 — passes AA
+    "--color-accent-primary": "#4dd0e1", // cyan on dark bg — passes AA-large
+    "--color-accent-secondary": "#26c6da", // teal on dark bg — passes AA-large
   };
 
   it("accepts a compliant custom palette", () => {
@@ -736,8 +805,7 @@ describe("themeEditorModel — WCAG contrast gate (custom theme)", () => {
     if (!result.ok) {
       const contrastError = result.errors.find(
         (e) =>
-          e.token === "--color-accent-primary" &&
-          e.reason === "contrast-fail",
+          e.token === "--color-accent-primary" && e.reason === "contrast-fail",
       );
       expect(contrastError).toBeDefined();
       expect(contrastError!.required).toBe(3.0); // AA-large
@@ -791,14 +859,799 @@ describe("themeEditorModel — WCAG contrast gate (custom theme)", () => {
     expect(darkResult.ok).toBe(false);
 
     if (!lightResult.ok) {
-      expect(
-        lightResult.errors.some((e) => e.reason === "contrast-fail"),
-      ).toBe(true);
+      expect(lightResult.errors.some((e) => e.reason === "contrast-fail")).toBe(
+        true,
+      );
     }
     if (!darkResult.ok) {
-      expect(
-        darkResult.errors.some((e) => e.reason === "contrast-fail"),
-      ).toBe(true);
+      expect(darkResult.errors.some((e) => e.reason === "contrast-fail")).toBe(
+        true,
+      );
     }
+  });
+});
+
+// ─── 8. Input Validation Hardening (#1977) ───────────────────────────────────
+
+describe("themeEditorModel — input validation hardening (#1977)", () => {
+  const pristineDraft = { ...DEFAULTS };
+
+  describe("empty inputs rejection", () => {
+    it.each([
+      [
+        "updateDraftToken with null draft",
+        () =>
+          updateDraftToken(null as any, "--color-accent-primary", "#0097a7"),
+      ],
+      [
+        "updateDraftToken with undefined draft",
+        () =>
+          updateDraftToken(
+            undefined as any,
+            "--color-accent-primary",
+            "#0097a7",
+          ),
+      ],
+      [
+        "updateDraftToken with empty key",
+        () => updateDraftToken(pristineDraft, "" as any, "#0097a7"),
+      ],
+      [
+        "updateDraftToken with whitespace key",
+        () => updateDraftToken(pristineDraft, "   " as any, "#0097a7"),
+      ],
+      [
+        "updateDraftToken with empty value",
+        () => updateDraftToken(pristineDraft, "--color-accent-primary", ""),
+      ],
+      [
+        "updateDraftToken with whitespace value",
+        () => updateDraftToken(pristineDraft, "--color-accent-primary", "   "),
+      ],
+      [
+        "initThemeEditorState with null options",
+        () => initThemeEditorState(null as any),
+      ],
+      [
+        "initThemeEditorState with empty defaultLabel",
+        () => initThemeEditorState({ defaultLabel: "" }),
+      ],
+      [
+        "initThemeEditorState with whitespace defaultLabel",
+        () => initThemeEditorState({ defaultLabel: "   " }),
+      ],
+      [
+        "initThemeEditorState with empty defaultId",
+        () => initThemeEditorState({ defaultId: "" }),
+      ],
+      [
+        "initThemeEditorState with whitespace defaultId",
+        () => initThemeEditorState({ defaultId: "   " }),
+      ],
+      [
+        "undoDraftChanges with null draft",
+        () => undoDraftChanges(null as any, "Label", "slug"),
+      ],
+      [
+        "undoDraftChanges with empty label",
+        () => undoDraftChanges(pristineDraft, "", "slug"),
+      ],
+      [
+        "undoDraftChanges with whitespace label",
+        () => undoDraftChanges(pristineDraft, "   ", "slug"),
+      ],
+      [
+        "undoDraftChanges with empty themeId",
+        () => undoDraftChanges(pristineDraft, "Label", ""),
+      ],
+      [
+        "undoDraftChanges with whitespace themeId",
+        () => undoDraftChanges(pristineDraft, "Label", "   "),
+      ],
+      [
+        "buildCustomThemeDefinition with empty themeId",
+        () => buildCustomThemeDefinition("", "Label", pristineDraft),
+      ],
+      [
+        "buildCustomThemeDefinition with whitespace themeId",
+        () => buildCustomThemeDefinition("   ", "Label", pristineDraft),
+      ],
+      [
+        "buildCustomThemeDefinition with empty label",
+        () => buildCustomThemeDefinition("my-slug", "", pristineDraft),
+      ],
+      [
+        "buildCustomThemeDefinition with whitespace label",
+        () => buildCustomThemeDefinition("my-slug", "   ", pristineDraft),
+      ],
+      [
+        "buildCustomThemeDefinition with null draft",
+        () => buildCustomThemeDefinition("my-slug", "Label", null as any),
+      ],
+      [
+        "isDraftDirty with null current",
+        () => isDraftDirty(null as any, pristineDraft),
+      ],
+      [
+        "isDraftDirty with null baseline",
+        () => isDraftDirty(pristineDraft, null as any),
+      ],
+      [
+        "validateThemeDraft with null params",
+        () => validateThemeDraft(null as any),
+      ],
+      [
+        "validateThemeDraft with null draft",
+        () =>
+          validateThemeDraft({
+            draft: null as any,
+            label: "Name",
+            themeId: "slug",
+          }),
+      ],
+      [
+        "validateColorFormat with null value",
+        () => validateColorFormat(null as any),
+      ],
+      [
+        "validateThemeEditorInput with null",
+        () => validateThemeEditorInput(null),
+      ],
+      [
+        "validateThemeEditorInput with undefined",
+        () => validateThemeEditorInput(undefined),
+      ],
+      [
+        "validateThemeEditorInput with empty string",
+        () => validateThemeEditorInput(""),
+      ],
+      [
+        "validateThemeEditorInput with whitespace string",
+        () => validateThemeEditorInput("   "),
+      ],
+    ])("rejects %s with a typed error and 'empty_input' reason", (_, fn) => {
+      let thrown: unknown;
+      try {
+        fn();
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(ThemeEditorModelInputError);
+      expect((thrown as ThemeEditorModelInputError).name).toBe(
+        "ThemeEditorModelInputError",
+      );
+      expect((thrown as ThemeEditorModelInputError).reason).toBe("empty_input");
+      expect(
+        (thrown as ThemeEditorModelInputError).message.length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  describe("malformed inputs rejection", () => {
+    it("rejects circular draft payloads with 'invalid_input'", () => {
+      const circular: { [key: string]: unknown } = {};
+      circular["self"] = circular;
+
+      expect(() =>
+        updateDraftToken(circular as any, "--color-accent-primary", "#0097a7"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      expect(() => initThemeEditorState(circular as any)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      expect(() =>
+        undoDraftChanges(circular as any, "Label", "slug"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      expect(() =>
+        buildCustomThemeDefinition("slug", "Label", circular as any),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      expect(() => isDraftDirty(circular as any, pristineDraft)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      expect(() => validateThemeEditorInput(circular)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it.each([
+      ["number key", 123 as any, "#0097a7"],
+      ["boolean key", true as any, "#0097a7"],
+      ["missing '--' prefix", "color-accent-primary" as any, "#0097a7"],
+      ["non-string value", "--color-accent-primary", 9999 as any],
+      ["function value", "--color-accent-primary", (() => {}) as any],
+    ])(
+      "rejects malformed token parameters in updateDraftToken (%s)",
+      (_, key, value) => {
+        expect(() => updateDraftToken(pristineDraft, key, value)).toThrowError(
+          expect.objectContaining({
+            name: "ThemeEditorModelInputError",
+            reason: "invalid_input",
+          }),
+        );
+      },
+    );
+
+    it("rejects non-object types passed as draft in updateDraftToken", () => {
+      for (const invalid of ["not-an-object", 42, true, []]) {
+        expect(() =>
+          updateDraftToken(invalid as any, "--color-accent-primary", "#ffffff"),
+        ).toThrowError(
+          expect.objectContaining({
+            name: "ThemeEditorModelInputError",
+            reason: "invalid_input",
+          }),
+        );
+      }
+    });
+
+    it("rejects malformed defaultId in initThemeEditorState", () => {
+      expect(() =>
+        initThemeEditorState({ defaultId: "Upper Case Slug!" }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() =>
+        initThemeEditorState({ defaultId: 12345 as any }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects non-string defaultLabel in initThemeEditorState", () => {
+      expect(() =>
+        initThemeEditorState({ defaultLabel: 12345 as any }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects malformed customTheme in initThemeEditorState and createInitialDraft", () => {
+      const nonObjectTheme = "not-a-theme" as any;
+      expect(() =>
+        initThemeEditorState({ customTheme: nonObjectTheme }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() => createInitialDraft(nonObjectTheme)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects non-slug themeId in buildCustomThemeDefinition and undoDraftChanges", () => {
+      expect(() =>
+        buildCustomThemeDefinition("INVALID SLUG", "Label", pristineDraft),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() =>
+        undoDraftChanges(pristineDraft, "Label", "INVALID SLUG"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects non-string label in buildCustomThemeDefinition and undoDraftChanges", () => {
+      expect(() =>
+        buildCustomThemeDefinition("valid-slug", 9999 as any, pristineDraft),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() =>
+        undoDraftChanges(pristineDraft, 9999 as any, "valid-slug"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects non-string themeId and label in validateThemeDraft", () => {
+      expect(() =>
+        validateThemeDraft({
+          themeId: 123 as any,
+          label: "Name",
+          draft: pristineDraft,
+        }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() =>
+        validateThemeDraft({
+          themeId: "slug",
+          label: 456 as any,
+          draft: pristineDraft,
+        }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects non-string value in validateColorFormat", () => {
+      expect(() => validateColorFormat(12345 as any)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects payloads containing Symbol or non-finite numbers in validateThemeEditorInput", () => {
+      expect(() =>
+        validateThemeEditorInput({ sym: Symbol("test") }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() => validateThemeEditorInput({ nan: Number.NaN })).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+  });
+
+  describe("oversized inputs rejection", () => {
+    it("rejects payloads exceeding MAX_THEME_EDITOR_PAYLOAD_BYTES in updateDraftToken", () => {
+      const hugeDraft: Record<string, string> = { ...pristineDraft };
+      // Build a payload larger than 64KB
+      for (let i = 0; i < 2000; i++) {
+        hugeDraft[`--custom-pad-${i}`] = "x".repeat(32);
+      }
+
+      expect(() =>
+        updateDraftToken(hugeDraft, "--color-accent-primary", "#ffffff"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+
+    it("rejects oversized token key in updateDraftToken", () => {
+      const oversizedKey = "--" + "a".repeat(MAX_TOKEN_KEY_LENGTH + 1);
+      expect(() =>
+        updateDraftToken(pristineDraft, oversizedKey as any, "#ffffff"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+
+    it("rejects oversized token value in updateDraftToken and validateColorFormat", () => {
+      const oversizedValue = "#" + "f".repeat(MAX_TOKEN_VALUE_LENGTH + 1);
+      expect(() =>
+        updateDraftToken(
+          pristineDraft,
+          "--color-accent-primary",
+          oversizedValue,
+        ),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+      expect(() => validateColorFormat(oversizedValue)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+
+    it("rejects oversized label in buildCustomThemeDefinition, undoDraftChanges, and initThemeEditorState", () => {
+      const oversizedLabel = "L".repeat(MAX_LABEL_LENGTH + 1);
+      expect(() =>
+        buildCustomThemeDefinition("valid-slug", oversizedLabel, pristineDraft),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+      expect(() =>
+        undoDraftChanges(pristineDraft, oversizedLabel, "valid-slug"),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+      expect(() =>
+        initThemeEditorState({ defaultLabel: oversizedLabel }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+
+    it("rejects oversized themeId in buildCustomThemeDefinition, undoDraftChanges, and initThemeEditorState", () => {
+      const oversizedId = "a".repeat(MAX_THEME_ID_LENGTH + 1);
+      expect(() =>
+        buildCustomThemeDefinition(oversizedId, "Label", pristineDraft),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+      expect(() =>
+        undoDraftChanges(pristineDraft, "Label", oversizedId),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+      expect(() =>
+        initThemeEditorState({ defaultId: oversizedId }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+
+    it("rejects oversized string payloads in validateThemeEditorInput", () => {
+      const hugeString = "x".repeat(MAX_THEME_EDITOR_PAYLOAD_BYTES + 1);
+      expect(() => validateThemeEditorInput(hugeString)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+  });
+
+  describe("state protection (rejection before state is written)", () => {
+    it("does not mutate original draft when updateDraftToken rejects malformed or oversized inputs", () => {
+      const frozenDraft = Object.freeze({ ...pristineDraft });
+
+      // Attempt invalid operations
+      expect(() =>
+        updateDraftToken(frozenDraft as any, "" as any, "#000"),
+      ).toThrow();
+      expect(() =>
+        updateDraftToken(frozenDraft as any, "--color-accent-primary", ""),
+      ).toThrow();
+      expect(() =>
+        updateDraftToken(frozenDraft as any, "invalid-key" as any, "#000"),
+      ).toThrow();
+
+      // Original draft remains completely identical
+      expect(frozenDraft).toEqual(pristineDraft);
+    });
+
+    it("preserves previous state snapshot when undoDraftChanges rejects", () => {
+      const current = initThemeEditorState();
+      expect(() => undoDraftChanges(null as any, "Label", "slug")).toThrow();
+      // State created before failure remains untouched and usable
+      expect(current.label).toBe("My Brand Theme");
+      expect(current.themeId).toBe("org-brand");
+      expect(current.isDirty).toBe(false);
+    });
+  });
+
+  describe("caller diagnostic clarity", () => {
+    it("allows callers to inspect error name, reason, and message", () => {
+      try {
+        updateDraftToken(pristineDraft, "bad-token" as any, "#fff");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ThemeEditorModelInputError);
+        const inputErr = err as ThemeEditorModelInputError;
+        expect(inputErr.name).toBe("ThemeEditorModelInputError");
+        expect(inputErr.reason).toBe("invalid_input");
+        expect(inputErr.message).toContain("bad-token");
+      }
+    });
+
+    it("formats custom error message when instantiated directly", () => {
+      const customErr = new ThemeEditorModelInputError(
+        "empty_input",
+        "Custom empty message",
+      );
+      expect(customErr.reason).toBe("empty_input");
+      expect(customErr.message).toBe("Custom empty message");
+
+      const defaultErr = new ThemeEditorModelInputError("input_too_large");
+      expect(defaultErr.message).toContain("input_too_large");
+    });
+  });
+
+  describe("valid inputs remain unaffected", () => {
+    it("allows valid updateDraftToken without mutating the source draft", () => {
+      const baseline = { ...pristineDraft };
+      const updated = updateDraftToken(
+        baseline,
+        "--color-accent-primary",
+        "#112233",
+      );
+
+      expect(updated["--color-accent-primary"]).toBe("#112233");
+      expect(baseline["--color-accent-primary"]).toBe(
+        DEFAULTS["--color-accent-primary"],
+      );
+      expect(updated).not.toBe(baseline);
+    });
+
+    it("allows valid buildCustomThemeDefinition with expected shape", () => {
+      const def = buildCustomThemeDefinition(
+        "valid-slug_2026",
+        "Valid Theme",
+        pristineDraft,
+      );
+      expect(def.id).toBe("valid-slug_2026");
+      expect(def.label).toBe("Valid Theme");
+      expect(def.tokenOverrides).toEqual(pristineDraft);
+    });
+
+    it("allows inputs exactly at the maximum length limits", () => {
+      const boundaryLabel = "a".repeat(MAX_LABEL_LENGTH);
+      const boundarySlug = "b".repeat(MAX_THEME_ID_LENGTH);
+      const def = buildCustomThemeDefinition(
+        boundarySlug,
+        boundaryLabel,
+        pristineDraft,
+      );
+      expect(def.id).toBe(boundarySlug);
+      expect(def.label).toBe(boundaryLabel);
+    });
+
+    it("passes validateThemeEditorInput for valid JSON objects and strings", () => {
+      expect(() =>
+        validateThemeEditorInput({ key: "value", number: 42 }),
+      ).not.toThrow();
+      expect(() =>
+        validateThemeEditorInput("valid-theme-string"),
+      ).not.toThrow();
+    });
+  });
+
+  describe("validateThemeDraft token format boundary coverage", () => {
+    it("identifies invalid-hex (non-translucent malformed hex) tokens during submission", () => {
+      const draftWithBadHex = {
+        ...pristineDraft,
+        "--color-accent-primary": "#gggggg",
+      };
+      const result = validateThemeDraft({
+        themeId: "valid-theme",
+        label: "Valid Label",
+        draft: draftWithBadHex,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe("invalid-tokens");
+        const badHexErr = result.errors.find(
+          (e) =>
+            e.token === "--color-accent-primary" && e.reason === "invalid-hex",
+        );
+        expect(badHexErr).toBeDefined();
+        expect(badHexErr!.message).toContain("#gggggg");
+      }
+    });
+
+    it("handles draft token overrides with undefined values cleanly", () => {
+      const draftWithUndefined = {
+        ...pristineDraft,
+        "--color-accent-primary": undefined,
+      };
+      const result = validateThemeDraft({
+        themeId: "valid-theme",
+        label: "Valid Label",
+        draft: draftWithUndefined,
+      });
+      expect(result.ok).toBe(true);
+    });
+
+    it("rejects non-object or array params in validateThemeDraft", () => {
+      expect(() => validateThemeDraft("not-an-object" as any)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() => validateThemeDraft([] as any)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+      expect(() =>
+        validateThemeDraft({
+          themeId: "slug",
+          label: "Label",
+          draft: [] as any,
+        }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
+
+    it("rejects oversized themeId and label in validateThemeDraft", () => {
+      expect(() =>
+        validateThemeDraft({
+          themeId: "a".repeat(MAX_THEME_ID_LENGTH + 1),
+          label: "Label",
+          draft: pristineDraft,
+        }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+
+      expect(() =>
+        validateThemeDraft({
+          themeId: "valid-slug",
+          label: "L".repeat(MAX_LABEL_LENGTH + 1),
+          draft: pristineDraft,
+        }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "input_too_large",
+        }),
+      );
+    });
+  });
+
+  describe("isJsonValue and assertPayloadSize deep validation branches", () => {
+    it("handles arrays and nested values in isJsonValue", () => {
+      expect(() =>
+        validateThemeEditorInput({ tags: ["alpha", "beta", 123, true] }),
+      ).not.toThrow();
+
+      // Sparse array
+      const sparseArray: unknown[] = [];
+      sparseArray[3] = "sparse";
+      expect(() =>
+        validateThemeEditorInput({ list: sparseArray }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // Array with symbol property
+      const arrayWithSymbol: unknown[] = [1, 2];
+      (arrayWithSymbol as any)[Symbol("prop")] = "val";
+      expect(() =>
+        validateThemeEditorInput({ list: arrayWithSymbol }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // Array with non-json member
+      const arrayWithInvalid = [() => {}];
+      expect(() =>
+        validateThemeEditorInput({ list: arrayWithInvalid }),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // Object with custom prototype
+      class CustomType {
+        value = 1;
+      }
+      expect(() => validateThemeEditorInput(new CustomType())).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // Object with Symbol key
+      const objWithSymbol = { [Symbol("sym")]: "value" };
+      expect(() => validateThemeEditorInput(objWithSymbol)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // BigInt value (fails JSON.stringify)
+      const objWithBigInt = { big: BigInt(42) };
+      expect(() => validateThemeEditorInput(objWithBigInt)).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+
+      // Object with throwing property getter during serialization
+      const objWithThrowingGetter = {
+        get boom() {
+          throw new Error("Serialization error");
+        },
+      };
+      expect(() =>
+        validateThemeEditorInput(objWithThrowingGetter),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "ThemeEditorModelInputError",
+          reason: "invalid_input",
+        }),
+      );
+    });
   });
 });

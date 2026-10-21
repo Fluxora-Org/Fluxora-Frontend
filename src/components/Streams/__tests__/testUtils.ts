@@ -7,7 +7,7 @@ import { vi } from "vitest";
 export function makeResponse(
   body: unknown,
   init: { ok?: boolean; status?: number } = {},
-)  {
+) {
   const status = init.status ?? 200;
   return {
     ok: init.ok ?? (status >= 200 && status < 300),
@@ -27,9 +27,9 @@ export function mockFetch(...responses: Array<Response | Error>) {
   const fetchMock = vi.fn();
   for (const response of responses) {
     if (response instanceof Error) {
-      fetchMock.mockRejectedOnce(response);
+      fetchMock.mockRejectedValueOnce(response);
     } else {
-      fetchMock.mockResolvedOnce(response);
+      fetchMock.mockResolvedValueOnce(response);
     }
   }
   vi.stubGlobal("fetch", fetchMock);

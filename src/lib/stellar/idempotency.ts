@@ -8,7 +8,10 @@ export interface PendingTransaction {
 }
 
 export function generateIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `tx_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -25,14 +28,22 @@ export function savePendingTx(
     params,
     createdAt: Date.now(),
   };
-  // Transaction parameters and hashes can reveal sensitive session data.
-  // Keep recovery data in memory rather than origin-readable storage.
-  void pending;
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
+  } catch {
+    // sessionStorage may be unavailable in some environments
+  }
   return key;
 }
 
 export function loadPendingTx(): PendingTransaction | null {
-  return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingTransaction;
+  } catch {
+    return null;
+  }
 }
 
 export function clearPendingTx(): void {
@@ -46,7 +57,11 @@ export function clearPendingTx(): void {
 export async function reconcilePendingTx(
   getStatus: (hash: string) => Promise<"pending" | "confirmed" | "failed">,
 ): Promise<
-  | { reconciled: true; status: "pending" | "confirmed" | "failed"; txHash: string }
+  | {
+      reconciled: true;
+      status: "pending" | "confirmed" | "failed";
+      txHash: string;
+    }
   | { reconciled: false }
 > {
   const pending = loadPendingTx();

@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "fix/issue-1950-cover-offlineactionqueue-with-unit-tests",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "fix/issue-1950-cover-offlineactionqueue-with-unit-tests": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "fix/issue-1950-cover-offlineactionqueue-with-unit-tests",
+    "origin"
+  ]
+}

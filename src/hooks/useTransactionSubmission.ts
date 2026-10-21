@@ -11,12 +11,7 @@ import {
 } from "../lib/stellar/idempotency";
 
 export type TxStatus =
-  | "idle"
-  | "submitting"
-  | "pending"
-  | "confirmed"
-  | "timeout"
-  | "failed";
+  "idle" | "submitting" | "pending" | "confirmed" | "timeout" | "failed";
 
 /** Outcome reported when the transaction reaches a terminal state. */
 export type TransactionResolvedOutcome = "confirmed" | "failed" | "timeout";
@@ -47,8 +42,19 @@ export interface UseTransactionSubmissionResult {
 }
 
 export function useTransactionSubmission(
-  options: TransactionSubmissionOptions,
+  optionsOrSubmit:
+    | TransactionSubmissionOptions
+    | ((idempotencyKey?: string) => Promise<{ txHash?: string } | unknown>),
 ): UseTransactionSubmissionResult {
+  const options =
+    typeof optionsOrSubmit === "function"
+      ? {
+          submit: optionsOrSubmit as (
+            key: string,
+          ) => Promise<{ txHash: string }>,
+        }
+      : optionsOrSubmit;
+
   const {
     submit,
     getStatus = getOnChainStatus,
@@ -153,10 +159,7 @@ export function useTransactionSubmission(
           }
           clearPendingTx();
           stopTracking();
-          onResolvedRef.current?.(
-            "failed",
-            hash,
-          );
+          onResolvedRef.current?.("failed", hash);
         }
       };
 
@@ -253,11 +256,22 @@ export function useTransactionSubmission(
 
     try {
       const response = await submit(key);
+      const hash =
+        typeof response === "object" &&
+        response !== null &&
+        "txHash" in response
+          ? (response as { txHash: string }).txHash
+          : typeof response === "string"
+            ? response
+            : null;
       if (mountedRef.current) {
-        setTxHash(response.txHash);
-        setStatus("pending");
+        setTxHash(hash);
+        setStatus(hash ? "pending" : "confirmed");
       }
-      poll(response.txHash, 1);
+      submitInFlightRef.current = false;
+      if (hash) {
+        poll(hash, 1);
+      }
     } catch (err) {
       submitInFlightRef.current = false;
       clearPendingTx();
