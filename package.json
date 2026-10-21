@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node api.js && vite",
+    "build": "node api.js && tsc -b && vite build",
     "build:report": "vite build && node scripts/bundle-size-report.mjs",
     "size-check": "npm run build && node scripts/bundle-size-report.mjs --fail",
     "audit:vulnerabilities": "node scripts/vulnerability-audit.mjs",

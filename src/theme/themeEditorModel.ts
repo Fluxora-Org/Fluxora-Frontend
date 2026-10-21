@@ -20,6 +20,219 @@ import {
 } from "./contrastUtils";
 import type { CustomThemeDefinition, RegisteredTheme } from "./ThemeProvider";
 
+// ─── Input Validation & Typed Errors ──────────────────────────────────────────
+
+export type ThemeEditorModelInputErrorReason =
+  | "empty_input"
+  | "invalid_input"
+  | "input_too_large"
+  | "empty_payload"
+  | "invalid_payload"
+  | "payload_too_large";
+
+export class ThemeEditorModelInputError extends Error {
+  constructor(
+    readonly reason: ThemeEditorModelInputErrorReason,
+    message?: string,
+  ) {
+    super(message ?? `Invalid theme editor input: ${reason}`);
+    this.name = "ThemeEditorModelInputError";
+  }
+}
+
+export const MAX_THEME_EDITOR_PAYLOAD_BYTES = 64 * 1024;
+export const MAX_TOKEN_KEY_LENGTH = 128;
+export const MAX_TOKEN_VALUE_LENGTH = 1024;
+export const MAX_LABEL_LENGTH = 256;
+export const MAX_THEME_ID_LENGTH = 128;
+
+function isJsonValue(value: unknown, seen: Set<object>): boolean {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value !== "object") return false;
+  if (seen.has(value)) return false;
+
+  const prototype = Object.getPrototypeOf(value);
+  if (
+    !Array.isArray(value) &&
+    prototype !== Object.prototype &&
+    prototype !== null
+  ) {
+    return false;
+  }
+
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (
+        Object.keys(value).length !== value.length ||
+        Object.getOwnPropertySymbols(value).length > 0
+      ) {
+        return false;
+      }
+      for (let index = 0; index < value.length; index += 1) {
+        if (
+          !Object.prototype.hasOwnProperty.call(value, index) ||
+          !isJsonValue(value[index], seen)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (Object.getOwnPropertySymbols(value).length > 0) return false;
+    return Object.keys(value).every((key) => {
+      try {
+        return isJsonValue((value as Record<string, unknown>)[key], seen);
+      } catch {
+        return false;
+      }
+    });
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function assertPayloadSize(
+  payload: unknown,
+  maxBytes: number = MAX_THEME_EDITOR_PAYLOAD_BYTES,
+): void {
+  try {
+    const serialized = JSON.stringify(payload);
+    if (
+      serialized &&
+      new TextEncoder().encode(serialized).byteLength > maxBytes
+    ) {
+      throw new ThemeEditorModelInputError(
+        "input_too_large",
+        `Theme editor input exceeds maximum allowed size of ${maxBytes} bytes.`,
+      );
+    }
+  } catch (err) {
+    if (err instanceof ThemeEditorModelInputError) throw err;
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Input payload could not be serialized.",
+    );
+  }
+}
+
+/**
+ * Validates arbitrary inputs destined for themeEditorModel.
+ * Throws a typed ThemeEditorModelInputError with reason if invalid.
+ */
+export function validateThemeEditorInput(input: unknown): void {
+  if (input === null || input === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Theme editor input cannot be null or undefined.",
+    );
+  }
+  if (typeof input === "string") {
+    if (input.trim().length === 0) {
+      throw new ThemeEditorModelInputError(
+        "empty_input",
+        "Theme editor input string cannot be empty.",
+      );
+    }
+    if (
+      new TextEncoder().encode(input).byteLength >
+      MAX_THEME_EDITOR_PAYLOAD_BYTES
+    ) {
+      throw new ThemeEditorModelInputError(
+        "input_too_large",
+        "Theme editor input exceeds maximum allowed size.",
+      );
+    }
+    return;
+  }
+  if (typeof input !== "object" || !isJsonValue(input, new Set())) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Theme editor input contains malformed or non-serializable data.",
+    );
+  }
+  assertPayloadSize(input);
+}
+
+function validateDraftTokenInput(
+  draft: unknown,
+  key: unknown,
+  value: unknown,
+): asserts key is AllowedTokenKey {
+  if (draft === null || draft === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Draft cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof draft !== "object" ||
+    Array.isArray(draft) ||
+    !isJsonValue(draft, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Draft must be a valid plain object.",
+    );
+  }
+  assertPayloadSize(draft);
+
+  if (
+    key === null ||
+    key === undefined ||
+    (typeof key === "string" && key.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Token key cannot be empty.",
+    );
+  }
+  if (typeof key !== "string" || !key.startsWith("--")) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      `Token key must be a string starting with '--' (received "${String(key)}").`,
+    );
+  }
+  if (key.length > MAX_TOKEN_KEY_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      `Token key exceeds maximum allowed length of ${MAX_TOKEN_KEY_LENGTH} characters.`,
+    );
+  }
+
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Token value cannot be empty.",
+    );
+  }
+  if (typeof value !== "string") {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Token value must be a string.",
+    );
+  }
+  if (value.length > MAX_TOKEN_VALUE_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      `Token value exceeds maximum allowed length of ${MAX_TOKEN_VALUE_LENGTH} characters.`,
+    );
+  }
+}
+
 // ─── Field Metadata ──────────────────────────────────────────────────────────
 
 export interface TokenFieldMeta {
@@ -173,6 +386,25 @@ export interface ColorFormatValidationResult {
 export function validateColorFormat(
   value: string,
 ): ColorFormatValidationResult {
+  if (value === null || value === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Colour value cannot be null or undefined.",
+    );
+  }
+  if (typeof value !== "string") {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Colour value must be a string.",
+    );
+  }
+  if (value.length > MAX_TOKEN_VALUE_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      "Colour value exceeds maximum allowed length.",
+    );
+  }
+
   const trimmed = value.trim();
   if (!trimmed) {
     return {
@@ -390,6 +622,20 @@ export interface ThemeEditorState {
 export function createInitialDraft(
   customTheme?: RegisteredTheme | null,
 ): ThemeEditorDraft {
+  if (customTheme !== undefined && customTheme !== null) {
+    if (
+      typeof customTheme !== "object" ||
+      Array.isArray(customTheme) ||
+      !isJsonValue(customTheme, new Set())
+    ) {
+      throw new ThemeEditorModelInputError(
+        "invalid_input",
+        "customTheme must be a valid object.",
+      );
+    }
+    assertPayloadSize(customTheme);
+  }
+
   return {
     ...DEFAULTS,
     ...(customTheme?.validatedTokens ?? {}),
@@ -403,6 +649,33 @@ export function isDraftDirty(
   current: ThemeEditorDraft,
   baseline: ThemeEditorDraft,
 ): boolean {
+  if (
+    current === null ||
+    current === undefined ||
+    baseline === null ||
+    baseline === undefined
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Draft parameters cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof current !== "object" ||
+    typeof baseline !== "object" ||
+    Array.isArray(current) ||
+    Array.isArray(baseline) ||
+    !isJsonValue(current, new Set()) ||
+    !isJsonValue(baseline, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Draft parameters must be valid objects.",
+    );
+  }
+  assertPayloadSize(current);
+  assertPayloadSize(baseline);
+
   const allKeys = new Set([...Object.keys(current), ...Object.keys(baseline)]);
   for (const key of allKeys) {
     if (current[key as AllowedTokenKey] !== baseline[key as AllowedTokenKey]) {
@@ -418,6 +691,91 @@ export function isDraftDirty(
 export function initThemeEditorState(
   options: ThemeEditorModelOptions = {},
 ): ThemeEditorState {
+  if (options === null || options === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Options cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof options !== "object" ||
+    Array.isArray(options) ||
+    !isJsonValue(options, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Options must be a valid object.",
+    );
+  }
+  assertPayloadSize(options);
+
+  if (options.defaultLabel !== undefined) {
+    if (
+      options.defaultLabel === null ||
+      (typeof options.defaultLabel === "string" &&
+        options.defaultLabel.trim().length === 0)
+    ) {
+      throw new ThemeEditorModelInputError(
+        "empty_input",
+        "defaultLabel cannot be empty.",
+      );
+    }
+    if (typeof options.defaultLabel !== "string") {
+      throw new ThemeEditorModelInputError(
+        "invalid_input",
+        "defaultLabel must be a string.",
+      );
+    }
+    if (options.defaultLabel.length > MAX_LABEL_LENGTH) {
+      throw new ThemeEditorModelInputError(
+        "input_too_large",
+        "defaultLabel exceeds maximum length.",
+      );
+    }
+  }
+
+  if (options.defaultId !== undefined) {
+    if (
+      options.defaultId === null ||
+      (typeof options.defaultId === "string" &&
+        options.defaultId.trim().length === 0)
+    ) {
+      throw new ThemeEditorModelInputError(
+        "empty_input",
+        "defaultId cannot be empty.",
+      );
+    }
+    if (
+      typeof options.defaultId !== "string" ||
+      !/^[a-z0-9_-]+$/.test(options.defaultId.trim())
+    ) {
+      throw new ThemeEditorModelInputError(
+        "invalid_input",
+        "defaultId must be a valid lowercase slug.",
+      );
+    }
+    if (options.defaultId.length > MAX_THEME_ID_LENGTH) {
+      throw new ThemeEditorModelInputError(
+        "input_too_large",
+        "defaultId exceeds maximum length.",
+      );
+    }
+  }
+
+  if (options.customTheme !== undefined && options.customTheme !== null) {
+    if (
+      typeof options.customTheme !== "object" ||
+      Array.isArray(options.customTheme) ||
+      !isJsonValue(options.customTheme, new Set())
+    ) {
+      throw new ThemeEditorModelInputError(
+        "invalid_input",
+        "customTheme must be a valid object.",
+      );
+    }
+    assertPayloadSize(options.customTheme);
+  }
+
   const initialDraft = createInitialDraft(options.customTheme);
   const initialLabel =
     options.customTheme?.label ?? options.defaultLabel ?? "My Brand Theme";
@@ -470,6 +828,73 @@ export function undoDraftChanges(
   themeId: string;
   touched: Set<string>;
 } {
+  if (initialDraft === null || initialDraft === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "initialDraft cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof initialDraft !== "object" ||
+    Array.isArray(initialDraft) ||
+    !isJsonValue(initialDraft, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "initialDraft must be a valid plain object.",
+    );
+  }
+  assertPayloadSize(initialDraft);
+
+  if (
+    initialLabel === null ||
+    initialLabel === undefined ||
+    (typeof initialLabel === "string" && initialLabel.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "initialLabel cannot be empty.",
+    );
+  }
+  if (typeof initialLabel !== "string") {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "initialLabel must be a string.",
+    );
+  }
+  if (initialLabel.length > MAX_LABEL_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      "initialLabel exceeds maximum length.",
+    );
+  }
+
+  if (
+    initialThemeId === null ||
+    initialThemeId === undefined ||
+    (typeof initialThemeId === "string" && initialThemeId.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "initialThemeId cannot be empty.",
+    );
+  }
+  if (
+    typeof initialThemeId !== "string" ||
+    !/^[a-z0-9_-]+$/.test(initialThemeId.trim())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "initialThemeId must be a valid lowercase slug.",
+    );
+  }
+  if (initialThemeId.length > MAX_THEME_ID_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      "initialThemeId exceeds maximum length.",
+    );
+  }
+
   return {
     draft: { ...initialDraft },
     label: initialLabel,
@@ -486,6 +911,7 @@ export function updateDraftToken(
   key: AllowedTokenKey,
   value: string,
 ): ThemeEditorDraft {
+  validateDraftTokenInput(draft, key, value);
   return {
     ...draft,
     [key]: value,
@@ -500,6 +926,70 @@ export function buildCustomThemeDefinition(
   label: string,
   draft: ThemeEditorDraft,
 ): CustomThemeDefinition {
+  if (
+    themeId === null ||
+    themeId === undefined ||
+    (typeof themeId === "string" && themeId.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Theme ID cannot be empty.",
+    );
+  }
+  if (typeof themeId !== "string" || !/^[a-z0-9_-]+$/.test(themeId.trim())) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Theme ID must be a lowercase slug containing only alphanumeric characters, '-' or '_'.",
+    );
+  }
+  if (themeId.length > MAX_THEME_ID_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      `Theme ID exceeds maximum allowed length of ${MAX_THEME_ID_LENGTH} characters.`,
+    );
+  }
+
+  if (
+    label === null ||
+    label === undefined ||
+    (typeof label === "string" && label.trim().length === 0)
+  ) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Theme display name cannot be empty.",
+    );
+  }
+  if (typeof label !== "string") {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Theme display name must be a string.",
+    );
+  }
+  if (label.length > MAX_LABEL_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      `Theme display name exceeds maximum allowed length of ${MAX_LABEL_LENGTH} characters.`,
+    );
+  }
+
+  if (draft === null || draft === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Draft cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof draft !== "object" ||
+    Array.isArray(draft) ||
+    !isJsonValue(draft, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Draft must be a valid plain object.",
+    );
+  }
+  assertPayloadSize(draft);
+
   return {
     id: themeId,
     label,
@@ -522,8 +1012,7 @@ export interface DraftValidationFailure {
 }
 
 export type DraftValidationResult =
-  | DraftValidationSuccess
-  | DraftValidationFailure;
+  DraftValidationSuccess | DraftValidationFailure;
 
 /**
  * Validates a theme draft submission before registration/preview.
@@ -547,7 +1036,56 @@ export function validateThemeDraft(params: {
   draft: ThemeEditorDraft;
   isAuthorized?: boolean;
 }): DraftValidationResult {
+  if (params === null || params === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Theme draft validation params cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof params !== "object" ||
+    Array.isArray(params) ||
+    !isJsonValue(params, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Theme draft validation params must be a valid object.",
+    );
+  }
+  assertPayloadSize(params);
+
   const { themeId, label, draft, isAuthorized = true } = params;
+
+  if (draft === null || draft === undefined) {
+    throw new ThemeEditorModelInputError(
+      "empty_input",
+      "Draft cannot be null or undefined.",
+    );
+  }
+  if (
+    typeof draft !== "object" ||
+    Array.isArray(draft) ||
+    !isJsonValue(draft, new Set())
+  ) {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "Draft must be a valid object.",
+    );
+  }
+
+  if (typeof themeId !== "string" || typeof label !== "string") {
+    throw new ThemeEditorModelInputError(
+      "invalid_input",
+      "themeId and label must be strings.",
+    );
+  }
+
+  if (themeId.length > MAX_THEME_ID_LENGTH || label.length > MAX_LABEL_LENGTH) {
+    throw new ThemeEditorModelInputError(
+      "input_too_large",
+      "themeId or label exceeds maximum length.",
+    );
+  }
 
   // 1. Authorization check
   if (!isAuthorized) {
@@ -660,10 +1198,7 @@ export function validateThemeDraft(params: {
 
       const required =
         pair.level === "AA-large" ? WCAG_AA_LARGE : WCAG_AA_NORMAL;
-      const ratio = contrastRatio(
-        normaliseHex(fgValue),
-        normaliseHex(bgValue),
-      );
+      const ratio = contrastRatio(normaliseHex(fgValue), normaliseHex(bgValue));
 
       if (ratio < required) {
         errors.push({

@@ -175,10 +175,8 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
     [clearTimer, resetDelay],
   );
 
-  // Clear any pending timer on unmount.
-  useEffect(() => clearTimer, [clearTimer]);
+  // Clear any pending timer on unmount or when the reset delay changes.
+  useEffect(() => clearTimer, [clearTimer, resetDelay]);
 
   return { copy, share, status, support, reset };
 }
-
-

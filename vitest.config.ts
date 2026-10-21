@@ -102,6 +102,8 @@ export default defineConfig({
         "src/components/voice/VoiceMicButton.tsx",
         // Issue #1687: voice stream identification must refuse ambiguity
         "src/components/voice/streamIdentifier.ts",
+        // Issue #1982: InstallPWABanner keyboard and screen-reader coverage
+        "src/components/InstallPWABanner.tsx",
       ],
       exclude: [
         "src/components/**/*.test.tsx",

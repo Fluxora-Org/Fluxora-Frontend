@@ -12,8 +12,8 @@ export interface StreamListResponse {
    * Opaque cursor for the next page, or `null` when the list is exhausted.
    *
    * The cursor anchors on the last row of the page it was issued from
-   * (sort key + unique id), so seeking with it is stable even when rows are
-   * inserted or deleted between page reads. Single-shot callers that do not
+   * (sort key + unique id), so seeking with it is stable even when rows
+   * are inserted or deleted between page reads. Single-shot callers that do not
    * paginate receive `null` and are unaffected.
    */
   nextCursor: string | null;
