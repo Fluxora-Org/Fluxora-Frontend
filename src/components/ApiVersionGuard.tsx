@@ -1,25 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { config } from "../lib/config";
 import {
   checkApiVersion,
   SUPPORTED_API_VERSION_RANGE,
 } from "../lib/apiVersion";
 
-export default function ApiVersionGuard() {
+interface ApiVersionGuardProps {
+  children?: ReactNode;
+}
+
+export default function ApiVersionGuard({ children }: ApiVersionGuardProps = {}) {
   const [incompatible, setIncompatible] = useState(false);
 
   useEffect(() => {
     if (!config.apiUrl || config.useMocks) return;
     let active = true;
-    void checkApiVersion(config.apiUrl).then((result) => {
-      if (active && result.status === "incompatible") setIncompatible(true);
-    });
+    void checkApiVersion(config.apiUrl)
+      .then((result) => {
+        if (active && result.status === "incompatible") setIncompatible(true);
+      })
+      .catch(() => {
+        // Transient network failures or outages do not trigger an incompatibility alert
+      });
     return () => {
       active = false;
     };
   }, []);
 
-  if (!incompatible) return null;
+  if (!incompatible) return children ? <>{children}</> : null;
 
   return (
     <div
