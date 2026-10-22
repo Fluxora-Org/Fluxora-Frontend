@@ -5,10 +5,12 @@ import { X, Share2, Copy, Check } from "lucide-react";
 import { useModalAccessibility } from "./useModalAccessibility";
 
 interface StreamOGPreviewModalProps {
-  stream: StreamRecord;
+  stream?: StreamRecord | null;
   isOpen: boolean;
   onClose: () => void;
   triggerRef?: React.RefObject<HTMLElement>;
+  isLoading?: boolean;
+  error?: string | Error | null;
 }
 
 /**
@@ -23,6 +25,8 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
   isOpen,
   onClose,
   triggerRef,
+  isLoading = false,
+  error = null,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -37,20 +41,24 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
     returnFocusRef: triggerRef,
   });
 
+  if (!isOpen) return null;
+
   // Compute OG Image URL with cache-busting timestamp
-  const parsedEndDate = stream.endDate
+  const parsedEndDate = stream?.endDate
     ? Date.parse(stream.endDate)
     : Number.NaN;
   const timestamp = Number.isFinite(parsedEndDate) ? parsedEndDate : 0;
-  const ogImageUrl = `https://fluxora.app/og-image/${stream.id}.png?v=${timestamp}`;
-  const streamPageUrl =
-    typeof window !== "undefined"
+  const ogImageUrl = stream?.id
+    ? `https://fluxora.app/og-image/${stream.id}.png?v=${timestamp}`
+    : "";
+  const streamPageUrl = stream?.id
+    ? typeof window !== "undefined"
       ? window.location.href
-      : `https://fluxora.app/app/streams/${stream.id}`;
-
-  if (!isOpen) return null;
+      : `https://fluxora.app/app/streams/${stream.id}`
+    : "";
 
   const handleCopyOgUrl = async () => {
+    if (!ogImageUrl) return;
     try {
       await navigator.clipboard.writeText(ogImageUrl);
       setCopiedUrl(true);
@@ -62,6 +70,7 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
   };
 
   const handleShareOrCopyStream = async () => {
+    if (!stream) return;
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
@@ -177,107 +186,212 @@ export const StreamOGPreviewModal: React.FC<StreamOGPreviewModalProps> = ({
           </button>
         </div>
 
-        {/* Scaled Preview Canvas Wrapper */}
-        <div
-          style={{
-            padding: "1.5rem",
-            display: "flex",
-            justifyContent: "center",
-            backgroundColor: "#020617",
-            overflow: "hidden",
-          }}
-        >
-          {/* Scaled canvas: 1200x630 scaled down to fit max container width ~800px (scale 0.65) */}
+        {/* Modal Body: Loading, Error, Empty, or Populated Canvas */}
+        {isLoading ? (
           <div
             style={{
-              width: "780px",
-              height: "409.5px",
-              overflow: "hidden",
-              position: "relative",
-              borderRadius: "14px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+              padding: "4rem 1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#020617",
+              minHeight: "300px",
+              gap: "1rem",
             }}
+            role="status"
+            aria-live="polite"
           >
-            <StreamOGImageTemplate stream={stream} scale={0.65} />
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                border: "3px solid rgba(255, 255, 255, 0.1)",
+                borderTopColor: "#38BDF8",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+              }}
+              data-testid="loading-spinner"
+            />
+            <span style={{ color: "#94A3B8", fontSize: "0.95rem" }}>
+              Loading preview...
+            </span>
           </div>
-        </div>
-
-        {/* Action Controls Footer */}
-        <div
-          style={{
-            padding: "1rem 1.5rem",
-            borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-          }}
-        >
+        ) : error ? (
           <div
             style={{
-              fontSize: "0.8125rem",
-              color: "#94A3B8",
-              fontFamily: "monospace",
-              wordBreak: "break-all",
-              maxWidth: "50%",
+              padding: "3rem 1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#020617",
+              minHeight: "300px",
+              textAlign: "center",
+              gap: "0.75rem",
             }}
+            role="alert"
           >
-            <span style={{ color: "#64748B" }}>OG Image URL: </span>
-            {ogImageUrl}
-          </div>
-
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button
-              onClick={handleCopyOgUrl}
-              type="button"
-              data-testid="copy-og-url-btn"
+            <div
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.5rem 1rem",
-                borderRadius: "8px",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                background: "rgba(255, 255, 255, 0.05)",
-                color: "#F8FAFC",
-                fontSize: "0.875rem",
+                color: "#F87171",
+                fontSize: "1.125rem",
                 fontWeight: 600,
-                cursor: "pointer",
               }}
             >
-              {copiedUrl ? (
-                <Check size={16} color="#34D399" />
-              ) : (
-                <Copy size={16} />
-              )}
-              <span>{copiedUrl ? "Copied URL!" : "Copy Image URL"}</span>
-            </button>
-
-            <button
-              onClick={handleShareOrCopyStream}
-              type="button"
-              data-testid="share-og-stream-btn"
+              Failed to load preview
+            </div>
+            <p
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.5rem 1rem",
-                borderRadius: "8px",
-                border: "none",
-                background: "linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)",
-                color: "#FFFFFF",
+                color: "#94A3B8",
                 fontSize: "0.875rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(6, 182, 212, 0.3)",
+                maxWidth: "400px",
+                margin: 0,
               }}
             >
-              {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
-              <span>{copiedLink ? "Copied Stream Link!" : "Share Stream"}</span>
-            </button>
+              {typeof error === "string" ? error : error.message}
+            </p>
           </div>
-        </div>
+        ) : !stream ? (
+          <div
+            style={{
+              padding: "3rem 1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#020617",
+              minHeight: "300px",
+              textAlign: "center",
+              gap: "0.5rem",
+            }}
+            data-testid="empty-preview-state"
+          >
+            <div
+              style={{
+                color: "#E2E8F0",
+                fontSize: "1.125rem",
+                fontWeight: 600,
+              }}
+            >
+              No stream preview available
+            </div>
+            <p
+              style={{
+                color: "#94A3B8",
+                fontSize: "0.875rem",
+                margin: 0,
+              }}
+            >
+              No preview data found for this stream.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Scaled Preview Canvas Wrapper */}
+            <div
+              style={{
+                padding: "1.5rem",
+                display: "flex",
+                justifyContent: "center",
+                backgroundColor: "#020617",
+                overflow: "hidden",
+              }}
+            >
+              {/* Scaled canvas: 1200x630 scaled down to fit max container width ~800px (scale 0.65) */}
+              <div
+                style={{
+                  width: "780px",
+                  height: "409.5px",
+                  overflow: "hidden",
+                  position: "relative",
+                  borderRadius: "14px",
+                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+                }}
+              >
+                <StreamOGImageTemplate stream={stream} scale={0.65} />
+              </div>
+            </div>
+
+            {/* Action Controls Footer */}
+            <div
+              style={{
+                padding: "1rem 1.5rem",
+                borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "1rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.8125rem",
+                  color: "#94A3B8",
+                  fontFamily: "monospace",
+                  wordBreak: "break-all",
+                  maxWidth: "50%",
+                }}
+              >
+                <span style={{ color: "#64748B" }}>OG Image URL: </span>
+                {ogImageUrl}
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <button
+                  onClick={handleCopyOgUrl}
+                  type="button"
+                  data-testid="copy-og-url-btn"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    color: "#F8FAFC",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {copiedUrl ? (
+                    <Check size={16} color="#34D399" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                  <span>{copiedUrl ? "Copied URL!" : "Copy Image URL"}</span>
+                </button>
+
+                <button
+                  onClick={handleShareOrCopyStream}
+                  type="button"
+                  data-testid="share-og-stream-btn"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "8px",
+                    border: "none",
+                    background:
+                      "linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)",
+                    color: "#FFFFFF",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(6, 182, 212, 0.3)",
+                  }}
+                >
+                  {copiedLink ? <Check size={16} /> : <Share2 size={16} />}
+                  <span>{copiedLink ? "Copied Stream Link!" : "Share Stream"}</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
