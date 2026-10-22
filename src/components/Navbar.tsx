@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import WalletButton from "./wallet-connect/Walletbutton";
@@ -135,6 +135,10 @@ export default function Navbar({
   );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => isMobileViewport());
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  const isFirstRender = useRef(true);
+  const prevTheme = useRef(theme);
+  const prevMobileOpen = useRef(mobileMenuOpen);
 
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
@@ -160,6 +164,42 @@ export default function Navbar({
     };
   }, []);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (prevMobileOpen.current !== mobileMenuOpen) {
+      prevMobileOpen.current = mobileMenuOpen;
+      setLiveAnnouncement(
+        mobileMenuOpen ? "Navigation menu opened" : "Navigation menu closed",
+      );
+    }
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (prevTheme.current !== theme) {
+      prevTheme.current = theme;
+      setLiveAnnouncement(`Theme switched to ${theme} mode`);
+    }
+  }, [theme]);
+
   const handleThemeToggle = () => {
     onThemeToggle?.();
   };
@@ -171,11 +211,19 @@ export default function Navbar({
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
   };
-    
 
   return (
     <>
       <nav style={styles.navbar} role="navigation" aria-label="Main navigation">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="navbar-live-region"
+          style={styles.visuallyHidden}
+        >
+          {liveAnnouncement}
+        </div>
         <div style={styles.logoContainer}>
           <Link
             to="/"
@@ -322,6 +370,7 @@ export default function Navbar({
           onClick={toggleMobileMenu}
           aria-label="Toggle navigation menu"
           aria-expanded={mobileMenuOpen}
+          aria-controls="navbar-mobile-menu"
         >
           <span
             style={{
@@ -348,6 +397,7 @@ export default function Navbar({
         </button>
 
         <div
+          id="navbar-mobile-menu"
           style={{
             ...styles.navLinksContainer,
             ...(mobileMenuOpen && isMobile
@@ -503,7 +553,12 @@ export default function Navbar({
           )}
         </div>
 
-        <div style={styles.rightContainer}>
+        <div
+          style={{
+            ...styles.rightContainer,
+            ...(isMobile ? { display: "none" } : {}),
+          }}
+        >
           <button
             style={styles.themeToggle}
             onClick={handleThemeToggle}
@@ -654,7 +709,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "0.5rem",
     textDecoration: "none",
     color: "var(--color-text-primary)",
-    outline: "none",
   },
   logoBrand: {
     display: "flex",
@@ -729,7 +783,6 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     cursor: "pointer",
     transition: "var(--transition-base)",
-    outline: "none",
     minHeight: "44px",
     display: "flex",
     alignItems: "center",
@@ -769,7 +822,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-text-primary)",
     transition: "var(--transition-base)",
     padding: 0,
-    outline: "none",
   },
   connectWalletBtn: {
     background: "var(--cta-bg)",
@@ -783,7 +835,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     boxShadow: "var(--cta-shadow)",
-    outline: "none",
     whiteSpace: "nowrap",
     minHeight: "44px",
   },
@@ -794,7 +845,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     cursor: "pointer",
     padding: "8px",
-    outline: "none",
     zIndex: 11,
     minHeight: "44px",
     minWidth: "44px",
@@ -816,6 +866,17 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: 0,
     background: "rgba(0, 0, 0, 0.5)",
     zIndex: 999,
+  },
+  visuallyHidden: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    padding: 0,
+    margin: "-1px",
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
   },
 };
 
@@ -864,6 +925,19 @@ if (typeof document !== "undefined") {
         text-decoration-thickness: 2px;
         text-underline-offset: 3px;
         font-weight: 700;
+      }
+
+      /* Visible focus indicator for keyboard users (issue #1973) */
+      nav a:focus-visible,
+      nav button:focus-visible {
+        outline: 2px solid var(--color-accent-secondary, #00B8D4) !important;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba(0, 184, 212, 0.25);
+      }
+
+      nav a:not(:focus-visible):focus,
+      nav button:not(:focus-visible):focus {
+        outline: none;
       }
       
       @media ${mediaDown("md")} {
