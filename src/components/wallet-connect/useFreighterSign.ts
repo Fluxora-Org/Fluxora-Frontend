@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useWallet } from "./Walletcontext";
 
 export type SignState =
@@ -25,7 +25,11 @@ export interface UseFreighterSignResult<T> {
 
 export function isUserRejection(err: unknown): boolean {
   if (!err) return false;
-  const candidate = err as { type?: unknown; code?: unknown; message?: unknown };
+  const candidate = err as {
+    type?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
   if (
     candidate.type === "rejected" ||
     candidate.code === "user_rejected" ||
@@ -49,7 +53,12 @@ export function isUserRejection(err: unknown): boolean {
 
 export function isTimeoutError(err: unknown): boolean {
   if (!err) return false;
-  const candidate = err as { type?: unknown; code?: unknown; name?: unknown; message?: unknown };
+  const candidate = err as {
+    type?: unknown;
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+  };
   if (
     candidate.type === "timeout" ||
     candidate.code === "TIMEOUT" ||
@@ -60,18 +69,34 @@ export function isTimeoutError(err: unknown): boolean {
   const message = (
     typeof candidate.message === "string" ? candidate.message : String(err)
   ).toLowerCase();
-  return /\btime(d)?[-_\s]?out\b/i.test(message) || /\bdeadline\s+exceeded\b/i.test(message);
+  return (
+    /\btime(d)?[-_\s]?out\b/i.test(message) ||
+    /\bdeadline\s+exceeded\b/i.test(message)
+  );
 }
 
 export function useFreighterSign<T = unknown>(
-  options?: UseFreighterSignOptions
+  options?: UseFreighterSignOptions,
 ): UseFreighterSignResult<T> {
   const wallet = useWallet();
   const [txState, setTxState] = useState<SignState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const lastOperationRef = useRef<(() => Promise<T>) | null>(null);
+  const activeTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const timers = activeTimersRef.current;
+    return () => {
+      isMountedRef.current = false;
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, [options?.timeoutMs]);
 
   const resetState = useCallback(() => {
+    if (!isMountedRef.current) return;
     setTxState("idle");
     setErrorMsg(null);
   }, []);
@@ -82,18 +107,31 @@ export function useFreighterSign<T = unknown>(
       resetState();
 
       if (!wallet.connected || !wallet.address) {
-        setTxState("error");
-        setErrorMsg("Wallet disconnected: Please reconnect your wallet to sign.");
+        if (isMountedRef.current) {
+          setTxState("error");
+          setErrorMsg(
+            "Wallet disconnected: Please reconnect your wallet to sign.",
+          );
+        }
         return null;
       }
 
       if (wallet.isNetworkMismatch) {
-        setTxState("error");
-        setErrorMsg("Wrong network: Please switch to the expected network in Freighter.");
+        if (isMountedRef.current) {
+          setTxState("error");
+          setErrorMsg(
+            "Wrong network: Please switch to the expected network in Freighter.",
+          );
+        }
         return null;
       }
 
-      setTxState("signing");
+      if (isMountedRef.current) {
+        setTxState("signing");
+      }
+      activeTimersRef.current.forEach((t) => clearTimeout(t));
+      activeTimersRef.current.clear();
+
       let timer: ReturnType<typeof setTimeout> | undefined;
 
       try {
@@ -104,20 +142,26 @@ export function useFreighterSign<T = unknown>(
           const timeoutPromise = new Promise<never>((_, reject) => {
             timer = setTimeout(() => {
               const timeoutErr = new Error(
-                `Transaction signing timed out after ${options.timeoutMs}ms.`
+                `Transaction signing timed out after ${options.timeoutMs}ms.`,
               );
               (timeoutErr as { type?: string }).type = "timeout";
               reject(timeoutErr);
             }, options.timeoutMs);
+            activeTimersRef.current.add(timer);
           });
           result = await Promise.race([opPromise, timeoutPromise]);
         } else {
           result = await opPromise;
         }
 
-        setTxState("confirmed");
+        if (isMountedRef.current) {
+          setTxState("confirmed");
+        }
         return result;
       } catch (err: unknown) {
+        if (!isMountedRef.current) {
+          return null;
+        }
         const errorObj = err as { type?: unknown; message?: string };
         if (isUserRejection(err)) {
           setTxState("rejected");
@@ -127,27 +171,36 @@ export function useFreighterSign<T = unknown>(
           setErrorMsg(
             typeof errorObj?.message === "string"
               ? errorObj.message
-              : "Transaction signing timed out. Please try again."
+              : "Transaction signing timed out. Please try again.",
           );
         } else if (errorObj?.type === "network_mismatch") {
           setTxState("error");
-          setErrorMsg("Wrong network: Please switch to the expected network in Freighter.");
+          setErrorMsg(
+            "Wrong network: Please switch to the expected network in Freighter.",
+          );
         } else {
           setTxState("error");
           setErrorMsg(
             typeof errorObj?.message === "string"
               ? errorObj.message
-              : "An unexpected error occurred during signing."
+              : "An unexpected error occurred during signing.",
           );
         }
         return null;
       } finally {
         if (timer) {
           clearTimeout(timer);
+          activeTimersRef.current.delete(timer);
         }
       }
     },
-    [wallet.connected, wallet.address, wallet.isNetworkMismatch, resetState, options?.timeoutMs]
+    [
+      wallet.connected,
+      wallet.address,
+      wallet.isNetworkMismatch,
+      resetState,
+      options?.timeoutMs,
+    ],
   );
 
   const retry = useCallback(async (): Promise<T | null> => {
@@ -157,7 +210,9 @@ export function useFreighterSign<T = unknown>(
     return signAndSubmit(lastOperationRef.current);
   }, [signAndSubmit]);
 
-  const canRetry = (txState === "error" || txState === "timeout") && lastOperationRef.current !== null;
+  const canRetry =
+    (txState === "error" || txState === "timeout") &&
+    lastOperationRef.current !== null;
 
   return {
     txState,
