@@ -93,7 +93,9 @@ describe("useFreighterSign", () => {
     });
 
     it("handles user rejection by message phrasing (declined/cancelled) without error presentation", async () => {
-      mockOperation.mockRejectedValueOnce(new Error("The user declined to sign the transaction."));
+      mockOperation.mockRejectedValueOnce(
+        new Error("The user declined to sign the transaction."),
+      );
 
       const { result } = renderHook(() => useFreighterSign());
 
@@ -110,7 +112,9 @@ describe("useFreighterSign", () => {
 
   describe("Wallet failure and retry handling", () => {
     it("handles wallet failure with an error message and enables retry", async () => {
-      const failureError = new Error("Freighter extension connection failed unexpectedly");
+      const failureError = new Error(
+        "Freighter extension connection failed unexpectedly",
+      );
       mockOperation.mockRejectedValueOnce(failureError);
 
       const { result } = renderHook(() => useFreighterSign());
@@ -122,7 +126,9 @@ describe("useFreighterSign", () => {
 
       expect(mockOperation).toHaveBeenCalledTimes(1);
       expect(result.current.txState).toBe("error");
-      expect(result.current.errorMsg).toBe("Freighter extension connection failed unexpectedly");
+      expect(result.current.errorMsg).toBe(
+        "Freighter extension connection failed unexpectedly",
+      );
       expect(result.current.canRetry).toBe(true);
       expect(submitResult).toBeNull();
 
@@ -157,7 +163,9 @@ describe("useFreighterSign", () => {
       expect(mockOperation).toHaveBeenCalledTimes(1);
       // Timeout is distinguished from both rejection (which has no error) and general error
       expect(result.current.txState).toBe("timeout");
-      expect(result.current.errorMsg).toBe("Signing request timed out after 5000ms");
+      expect(result.current.errorMsg).toBe(
+        "Signing request timed out after 5000ms",
+      );
       expect(result.current.canRetry).toBe(true);
       expect(submitResult).toBeNull();
 
@@ -180,7 +188,9 @@ describe("useFreighterSign", () => {
       // Operation that never resolves on its own
       mockOperation.mockImplementation(() => new Promise(() => {}));
 
-      const { result } = renderHook(() => useFreighterSign({ timeoutMs: 3000 }));
+      const { result } = renderHook(() =>
+        useFreighterSign({ timeoutMs: 3000 }),
+      );
 
       let submitPromise: Promise<any>;
       act(() => {
@@ -195,7 +205,9 @@ describe("useFreighterSign", () => {
       const submitResult = await submitPromise!;
 
       expect(result.current.txState).toBe("timeout");
-      expect(result.current.errorMsg).toBe("Transaction signing timed out after 3000ms.");
+      expect(result.current.errorMsg).toBe(
+        "Transaction signing timed out after 3000ms.",
+      );
       expect(result.current.canRetry).toBe(true);
       expect(submitResult).toBeNull();
 
@@ -229,7 +241,9 @@ describe("useFreighterSign", () => {
 
     expect(mockOperation).not.toHaveBeenCalled(); // Blocked before prompt
     expect(result.current.txState).toBe("error");
-    expect(result.current.errorMsg).toBe("Wallet disconnected: Please reconnect your wallet to sign.");
+    expect(result.current.errorMsg).toBe(
+      "Wallet disconnected: Please reconnect your wallet to sign.",
+    );
     expect(submitResult).toBeNull();
   });
 
@@ -259,7 +273,9 @@ describe("useFreighterSign", () => {
 
     expect(mockOperation).not.toHaveBeenCalled(); // Blocked before prompt
     expect(result.current.txState).toBe("error");
-    expect(result.current.errorMsg).toBe("Wrong network: Please switch to the expected network in Freighter.");
+    expect(result.current.errorMsg).toBe(
+      "Wrong network: Please switch to the expected network in Freighter.",
+    );
     expect(submitResult).toBeNull();
   });
 
@@ -309,5 +325,114 @@ describe("useFreighterSign", () => {
     expect(result.current.txState).toBe("idle");
     expect(result.current.errorMsg).toBeNull();
     expect(result.current.canRetry).toBe(false);
+  });
+
+  describe("Cleanup path and lifecycle", () => {
+    it("unmounting removes active timers the hook creates", () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+      mockOperation.mockImplementation(() => new Promise(() => {}));
+
+      const { result, unmount } = renderHook(() =>
+        useFreighterSign({ timeoutMs: 5000 }),
+      );
+
+      act(() => {
+        void result.current.signAndSubmit(mockOperation);
+      });
+
+      expect(clearTimeoutSpy).not.toHaveBeenCalled();
+
+      unmount();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it("re-running with changed inputs does not leak the previous run", () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+      mockOperation.mockImplementation(() => new Promise(() => {}));
+
+      const { result, rerender } = renderHook(
+        (props: { timeoutMs: number }) =>
+          useFreighterSign({ timeoutMs: props.timeoutMs }),
+        { initialProps: { timeoutMs: 5000 } },
+      );
+
+      act(() => {
+        void result.current.signAndSubmit(mockOperation);
+      });
+
+      expect(clearTimeoutSpy).not.toHaveBeenCalled();
+
+      rerender({ timeoutMs: 10000 });
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it("starting a new operation cleans up timers from previous in-flight run", () => {
+      vi.useFakeTimers();
+      const clearTimeoutSpy = vi.spyOn(window, "clearTimeout");
+
+      mockOperation.mockImplementation(() => new Promise(() => {}));
+
+      const { result } = renderHook(() =>
+        useFreighterSign({ timeoutMs: 5000 }),
+      );
+
+      act(() => {
+        void result.current.signAndSubmit(mockOperation);
+      });
+
+      expect(clearTimeoutSpy).not.toHaveBeenCalled();
+
+      act(() => {
+        void result.current.signAndSubmit(mockOperation);
+      });
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it("does not update state after hook is unmounted", async () => {
+      vi.useFakeTimers();
+
+      let resolveOp: (val: string) => void;
+      mockOperation.mockImplementation(
+        () =>
+          new Promise<string>((resolve) => {
+            resolveOp = resolve;
+          }),
+      );
+
+      const { result, unmount } = renderHook(() =>
+        useFreighterSign({ timeoutMs: 5000 }),
+      );
+
+      let promise: Promise<any>;
+      act(() => {
+        promise = result.current.signAndSubmit(mockOperation);
+      });
+
+      expect(result.current.txState).toBe("signing");
+
+      unmount();
+
+      await act(async () => {
+        resolveOp!("tx_done_after_unmount");
+        await promise;
+      });
+
+      expect(result.current.txState).toBe("signing");
+
+      vi.useRealTimers();
+    });
   });
 });
