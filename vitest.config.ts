@@ -25,7 +25,6 @@ export default defineConfig({
       "src/components/__tests__/CreateStreamModal.contrast.test.tsx",
       "src/components/__tests__/CreateStreamModal.edgeCases.test.tsx",
       "src/components/__tests__/CreateStreamModal.failure.test.tsx",
-      "src/components/__tests__/CreateStreamModal.offlineQueue.test.tsx",
       "src/components/__tests__/CreateStreamModal.review.test.tsx",
       "src/components/__tests__/ErrorBoundary.telemetry.test.tsx",
       "src/components/__tests__/GetStartedCTA.test.tsx",
