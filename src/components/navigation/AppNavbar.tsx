@@ -6,17 +6,10 @@ import { useTheme } from "../../theme/ThemeProvider";
 import NavLink from "./NavLink";
 import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
-import { useTickingNow } from "../../hooks/useTickingNow";
-import {
-  formatNavbarTime,
-  formatLocalISOWithOffset,
-  getBrowserTimezone,
-  getFormattedUTCOffset,
-} from "../../lib/timePresentation";
-
 import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
 import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
+import TimezoneIndicator from "./TimezoneIndicator";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -284,135 +277,6 @@ function useBreadcrumbs(pathname: string): BreadcrumbItem[] {
   }, [pathname]);
 }
 
-function NavbarTimeIndicator() {
-  const [manualTime, setManualTime] = useState<Date | null>(null);
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  const tickingNow = useTickingNow({ precision: "minute" });
-
-  useEffect(() => {
-    setManualTime(null);
-  }, [tickingNow]);
-
-  const displayTimeDate = manualTime || new Date(tickingNow);
-  const tz = getBrowserTimezone();
-  const isUTCFallback = tz === "UTC";
-
-  const desktopText = isUTCFallback
-    ? `UTC: ${formatNavbarTime(displayTimeDate, { compact: true, timezone: "UTC" })}`
-    : `Local: ${formatNavbarTime(displayTimeDate, { compact: false, timezone: tz })}`;
-
-  const mobileText = formatNavbarTime(displayTimeDate, {
-    compact: true,
-    timezone: tz,
-  });
-
-  const handleFocus = () => {
-    setManualTime(new Date());
-    setIsTooltipOpen(true);
-  };
-
-  const handleBlur = () => {
-    setIsTooltipOpen(false);
-    setManualTime(null);
-  };
-
-  const handleMouseEnter = () => {
-    setIsTooltipOpen(true);
-  };
-
-  const handleMouseLeave = () => {
-    setIsTooltipOpen(false);
-  };
-
-  const handleClick = () => {
-    setManualTime(new Date());
-    setIsTooltipOpen((p) => !p);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      setIsTooltipOpen(false);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        aria-label={`Current time: ${desktopText}. Click or focus for details.`}
-        aria-expanded={isTooltipOpen}
-        aria-describedby="navbar-time-tooltip"
-        className="px-3 min-h-[44px] rounded-full border border-[var(--navbar-icon-border)] hover:border-[var(--accent)]/50 text-[var(--color-text-secondary)] hover:text-[var(--accent)] bg-transparent hover:bg-[var(--surface-elevated)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center justify-center cursor-pointer select-none"
-      >
-        <span
-          aria-live="off"
-          className="hidden md:inline font-sans text-xs font-semibold"
-        >
-          {desktopText}
-        </span>
-        <span
-          aria-live="off"
-          className="md:hidden font-sans text-xs font-semibold"
-        >
-          {mobileText}
-        </span>
-      </button>
-
-      {isTooltipOpen && (
-        <div
-          id="navbar-time-tooltip"
-          role="tooltip"
-          className="absolute right-0 mt-2 p-4 w-72 rounded-xl bg-[var(--tooltip-bg,var(--surface-elevated))] border border-[var(--tooltip-border,var(--border-neutral))] shadow-[var(--tooltip-shadow)] text-[var(--tooltip-text-color,var(--text-secondary))] font-mono text-xs z-[1100] flex flex-col gap-2.5 pointer-events-none"
-        >
-          <div className="font-semibold text-[var(--tooltip-title-color,var(--text-vivid))] border-b border-[var(--navbar-border)] pb-1.5 flex items-center justify-between">
-            <span>Time Details</span>
-            {isUTCFallback && (
-              <span className="text-[10px] text-amber-400 font-sans px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
-                Fallback
-              </span>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
-                ISO Timestamp
-              </span>
-              <span className="text-[var(--text-vivid)] select-all break-all">
-                {formatLocalISOWithOffset(displayTimeDate)}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
-                Resolved Timezone
-              </span>
-              <span className="text-[var(--text-vivid)]">{tz}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-sans font-medium">
-                UTC Offset
-              </span>
-              <span className="text-[var(--text-vivid)]">
-                {getFormattedUTCOffset(displayTimeDate, tz)}
-              </span>
-            </div>
-            {isUTCFallback && (
-              <div className="mt-1 pt-1.5 border-t border-[var(--navbar-border)] text-[10px] text-amber-400 font-sans italic">
-                Timezone detection unavailable. Using UTC fallback.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function AppNavbar({
   onSidebarToggle,
   isSidebarOpen = false,
@@ -569,7 +433,7 @@ export default function AppNavbar({
 
         {/* Right Actions & Time Indicator */}
         <div className="flex items-center gap-3">
-          <NavbarTimeIndicator />
+          <TimezoneIndicator />
 
           {/* Right: Actions (desktop) */}
           <div className="hidden md:flex items-center gap-3">
