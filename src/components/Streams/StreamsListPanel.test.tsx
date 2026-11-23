@@ -332,9 +332,9 @@ describe("StreamsListPanel — pagination", () => {
 // ─── Session persistence indicator ───────────────────────────────────────────
 
 describe("StreamsListPanel — session persistence indicator", () => {
-  // The indicator only claims persistence after a write succeeded (#1663).
+  // Session snapshots remain memory-only under the browser-storage security policy.
   beforeEach(() => {
-    streamsSessionWriteStatus.record(true);
+    streamsSessionWriteStatus.record(false);
   });
 
   afterEach(() => {
@@ -347,7 +347,7 @@ describe("StreamsListPanel — session persistence indicator", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     expect(
       screen.getByRole("img", {
-        name: "Your filters and search are saved on this device",
+        name: "Your filters and search aren't being saved",
       }),
     ).toBeInTheDocument();
   });
