@@ -7,12 +7,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import {
-  isConnected,
-  getAddress,
-  getNetwork,
-  WatchWalletChanges,
-} from "@stellar/freighter-api";
+import { WatchWalletChanges } from "@stellar/freighter-api";
 import {
   getExpectedStellarNetwork,
   isStellarNetworkMismatch,
@@ -24,16 +19,23 @@ import {
   subscribeToAccountContext,
   type AccountContextMessage,
 } from "../../lib/accountContextSync";
+import {
+  forgetWalletProviderId,
+  isWalletProviderId,
+  readRememberedWalletProviderId,
+  rememberWalletProviderId,
+  setActiveWalletProviderId,
+  toWalletProviderError,
+  type WalletProviderErrorType,
+  type WalletProviderId,
+} from "./walletProvider";
+import { getWalletProvider } from "./walletProviders";
 
 /**
- * Safe wallet restore error categories exposed to the UI. Raw Freighter errors
+ * Safe wallet restore error categories exposed to the UI. Raw wallet errors
  * stay inside the provider so addresses and extension internals are not leaked.
  */
-export type WalletError =
-  | { type: "not_installed" }
-  | { type: "rejected" }
-  | { type: "network_error" }
-  | { type: "unknown" };
+export type WalletError = { type: WalletProviderErrorType };
 
 interface WalletState {
   address: string | null;
@@ -42,6 +44,8 @@ interface WalletState {
   error: WalletError | null;
   /** True while the provider is silently restoring a prior session. */
   loading: boolean;
+  /** Wallet that owns the current session (remembered across reloads). */
+  providerId: WalletProviderId | null;
 }
 
 interface WalletContextType extends WalletState {
@@ -50,7 +54,13 @@ interface WalletContextType extends WalletState {
   expectedNetwork: StellarNetwork;
   expectedNetworkLabel: string;
   isNetworkMismatch: boolean;
-  connect: (address: string, network: string) => void;
+  /** Active wallet adapter; `freighter` unless another provider connected. */
+  providerId: WalletProviderId | null;
+  connect: (
+    address: string,
+    network: string,
+    providerId?: WalletProviderId,
+  ) => void;
   disconnect: () => void;
 }
 
@@ -93,6 +103,7 @@ const INITIAL: WalletState = {
   connected: false,
   error: null,
   loading: true,
+  providerId: null,
 };
 
 const DISCONNECTED: WalletState = {
@@ -101,50 +112,11 @@ const DISCONNECTED: WalletState = {
   connected: false,
   error: null,
   loading: false,
-};
-
-type FreighterErrorLike = {
-  code?: number;
-  message?: string;
+  providerId: null,
 };
 
 function classifyWalletError(error: unknown): WalletError {
-  if (!error || typeof error !== "object") {
-    return { type: "unknown" };
-  }
-
-  const { code, message } = error as FreighterErrorLike;
-  const normalizedMessage = message?.toLowerCase() ?? "";
-
-  if (
-    normalizedMessage.includes("not supported") ||
-    normalizedMessage.includes("not installed") ||
-    normalizedMessage.includes("extension not found") ||
-    normalizedMessage.includes("content script")
-  ) {
-    return { type: "not_installed" };
-  }
-
-  if (
-    code === -4 ||
-    normalizedMessage.includes("declined") ||
-    normalizedMessage.includes("denied") ||
-    normalizedMessage.includes("rejected") ||
-    normalizedMessage.includes("not allowed")
-  ) {
-    return { type: "rejected" };
-  }
-
-  if (
-    normalizedMessage.includes("network") ||
-    normalizedMessage.includes("rpc") ||
-    normalizedMessage.includes("timeout") ||
-    normalizedMessage.includes("failed to fetch")
-  ) {
-    return { type: "network_error" };
-  }
-
-  return { type: "unknown" };
+  return { type: toWalletProviderError(error, "unknown").type };
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
@@ -184,20 +156,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         address: next.address,
         network: next.network,
         connected: next.connected,
+        providerId: next.providerId,
         changedAt,
         source: sourceRef.current,
       });
     }
   }, []);
 
-  const connect = (address: string, network: string) => {
+  const connect = (
+    address: string,
+    network: string,
+    providerId: WalletProviderId = "freighter",
+  ) => {
     if (!isValidStellarAddress(address)) return;
+    // Keep the signing layer and the persisted session in sync with the
+    // selected wallet so `tx.ts` signs with the same provider.
+    setActiveWalletProviderId(providerId);
+    rememberWalletProviderId(providerId);
     applyAccountChange({
       address,
       network,
       connected: true,
       error: null,
       loading: false,
+      providerId,
     });
   };
 
@@ -205,6 +187,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Invalidate any callback captured by the previous watcher before the
     // disconnected state is exposed to consumers.
     watcherGenerationRef.current += 1;
+    const provider = getWalletProvider(
+      stateRef.current.providerId ?? "freighter",
+    );
+    // Release provider listeners/handles (e.g. Albedo's cached account) and
+    // forget the remembered provider so the next visit starts clean.
+    void provider.disconnect().catch(() => {});
+    forgetWalletProviderId();
     applyAccountChange(DISCONNECTED);
   };
 
@@ -222,9 +211,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (message.connected && (!message.address || !isValidStellarAddress(message.address))) return;
       latestRemoteChangeRef.current = message.changedAt;
       latestChangeSourceRef.current = message.source;
+      const providerId: WalletProviderId | null = message.connected
+        ? isWalletProviderId(message.providerId)
+          ? message.providerId
+          : (readRememberedWalletProviderId() ?? "freighter")
+        : null;
+      if (providerId) setActiveWalletProviderId(providerId);
       applyAccountChange(
         message.connected
-          ? { address: message.address, network: message.network, connected: true, error: null, loading: false }
+          ? { address: message.address, network: message.network, connected: true, error: null, loading: false, providerId }
           : DISCONNECTED,
         { broadcast: false, changedAt: message.changedAt },
       );
@@ -272,48 +267,35 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    // Restore with the wallet that was used last. Freighter stays the default
+    // for first-time visitors.
+    const restoreProviderId = readRememberedWalletProviderId() ?? "freighter";
+    const restoreProvider = getWalletProvider(restoreProviderId);
+    setActiveWalletProviderId(restoreProviderId);
+
     (async () => {
       try {
-        const conn = await isConnected();
-        if (conn.error) {
-          restoreError(conn.error);
-          return;
-        }
-        if (!conn.isConnected) {
+        const account = await restoreProvider.restore();
+        if (!account) {
           finishRestore();
           return;
         }
 
-        const addr = await getAddress(); // no popup — returns "" if not approved
-        if (addr.error) {
-          restoreError(addr.error);
-          return;
-        }
-        if (!addr.address) {
-          restoreError({ message: "Freighter address request rejected" });
-          return;
-        }
-
-        if (!isValidStellarAddress(addr.address)) {
+        if (!isValidStellarAddress(account.address)) {
           restoreError({
-            message: "Invalid Stellar address returned by Freighter",
+            message: `Invalid Stellar address returned by ${restoreProvider.name}`,
           });
-          return;
-        }
-
-        const net = await getNetwork();
-        if (net.error) {
-          restoreError(net.error);
           return;
         }
 
         if (cancelled || accountChangeGenerationRef.current !== restoreGeneration) return;
         applyAccountChange({
-          address: addr.address,
-          network: net.network,
+          address: account.address,
+          network: account.network,
           connected: true,
           error: null,
           loading: false,
+          providerId: restoreProviderId,
         });
       } catch (error) {
         // Keep restore silent but expose a recoverable category to consumers.
@@ -326,9 +308,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Watch for account / network switches inside Freighter.
+  // Watch for account / network switches inside Freighter. Other providers
+  // surface a changed account through their next signing request, so only the
+  // extension-based watcher runs here.
   useEffect(() => {
-    if (!state.connected) {
+    if (!state.connected || state.providerId !== "freighter") {
       return undefined;
     }
 
@@ -353,7 +337,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         address !== stateRef.current.address ||
         network !== stateRef.current.network
       ) {
-        applyAccountChange({ address, network, connected: true, error: null, loading: false });
+        applyAccountChange({
+          address,
+          network,
+          connected: true,
+          error: null,
+          loading: false,
+          providerId: "freighter",
+        });
       }
     });
 
@@ -370,7 +361,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       watcher.stop();
     };
-  }, [applyAccountChange, state.connected]);
+  }, [applyAccountChange, state.connected, state.providerId]);
 
   return (
     <WalletContext.Provider
@@ -380,6 +371,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         expectedNetwork,
         expectedNetworkLabel,
         isNetworkMismatch,
+        providerId: state.providerId,
         connect,
         disconnect,
       }}

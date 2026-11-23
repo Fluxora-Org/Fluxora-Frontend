@@ -186,6 +186,15 @@ export const en = {
   "connectWallet.rejected.ariaRetry": "Retry connecting to Freighter wallet",
   "connectWallet.rejected.ariaBack": "Back to wallet selection list",
 
+  // ── Albedo popup blocked ──────────────────────────────────────────────────
+  "connectWallet.popupBlocked.badge": "Popup Blocked",
+  "connectWallet.popupBlocked.title": "Wallet Popup Blocked",
+  "connectWallet.popupBlocked.description": "Your browser blocked the wallet approval window. Allow popups for albedo.link in your browser settings, then try connecting again.",
+  "connectWallet.popupBlocked.retryBtn": "Retry Connection",
+  "connectWallet.popupBlocked.backBtn": "Back to wallet list",
+  "connectWallet.popupBlocked.ariaRetry": "Retry connecting with Albedo wallet",
+  "connectWallet.popupBlocked.ariaBack": "Back to wallet selection list",
+
   // Error: Network mismatch
   "connectWallet.networkMismatch.badge": "Network Mismatch",
   "connectWallet.networkMismatch.title": "Wrong Stellar Network",

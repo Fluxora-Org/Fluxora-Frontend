@@ -25,6 +25,7 @@
     "check:locales": "vitest run src/i18n/__tests__/checkLocalesCI.test.ts"
   },
   "dependencies": {
+    "@albedo-link/intent": "^0.13.0",
     "react-helmet-async": "^2.0.5",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",

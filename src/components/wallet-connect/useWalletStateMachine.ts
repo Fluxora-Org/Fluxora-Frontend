@@ -14,7 +14,7 @@
  * State topology (simplified):
  *
  *   idle ──SELECT_FREIGHTER──► connecting ──CONNECTION_SUCCESS──► connected
- *        │                              └──ERROR(kind)──────────► <error state>
+ *        ├──SELECT_ALBEDO─────► connecting      └──ERROR(kind)────► <error state>
  *        │
  *        ├──SELECT_HARDWARE──────────────► device_searching
  *        │                                      └──DEVICE_FOUND──► device_found_selecting
@@ -36,6 +36,7 @@ export type WalletMachineState =
   | "connecting"
   | "not_installed"
   | "rejected"
+  | "popup_blocked"
   | "network_mismatch"
   | "network_timeout"
   | "device_searching"
@@ -48,11 +49,15 @@ export type WalletMachineState =
   | "connected";
 
 /** Error states that can be reached from `connecting`. */
-export type FreighterErrorState =
+export type ConnectErrorState =
   | "not_installed"
   | "rejected"
+  | "popup_blocked"
   | "network_mismatch"
   | "network_timeout";
+
+/** @deprecated Kept for callers that still import the old name. */
+export type FreighterErrorState = ConnectErrorState;
 
 /** Error states reachable during hardware-wallet flow. */
 export type HardwareErrorState =
@@ -64,6 +69,7 @@ export type HardwareErrorState =
 
 export type WalletMachineEvent =
   | { type: "SELECT_FREIGHTER" }
+  | { type: "SELECT_ALBEDO" }
   | { type: "SELECT_HARDWARE" }
   | { type: "SELECT_HARDWARE_MOBILE" }
   | { type: "DEVICE_FOUND" }
@@ -71,7 +77,7 @@ export type WalletMachineEvent =
   | { type: "BACK" }
   | { type: "RETRY" }
   | { type: "CONNECTION_SUCCESS" }
-  | { type: "ERROR"; error: FreighterErrorState | HardwareErrorState }
+  | { type: "ERROR"; error: ConnectErrorState | HardwareErrorState }
   | { type: "RESET" };
 
 // ─── Machine context (extended state) ───────────────────────────────────────
@@ -103,6 +109,13 @@ export function walletMachineReducer(
   switch (event.type) {
     // ── SELECT_FREIGHTER: only valid from idle ──────────────────────────────
     case "SELECT_FREIGHTER":
+      if (state === "idle") {
+        return { ...ctx, state: "connecting", hardwareRetryTarget: null };
+      }
+      return ctx;
+
+    // ── SELECT_ALBEDO: only valid from idle ─────────────────────────────────
+    case "SELECT_ALBEDO":
       if (state === "idle") {
         return { ...ctx, state: "connecting", hardwareRetryTarget: null };
       }
@@ -155,6 +168,7 @@ export function walletMachineReducer(
         state === "connecting" &&
         (error === "not_installed" ||
           error === "rejected" ||
+          error === "popup_blocked" ||
           error === "network_mismatch" ||
           error === "network_timeout")
       ) {
@@ -179,9 +193,10 @@ export function walletMachineReducer(
 
     // ── RETRY ───────────────────────────────────────────────────────────────
     case "RETRY":
-      // Freighter errors retry by going back to connecting
+      // Connect errors retry by going back to connecting
       if (
         state === "rejected" ||
+        state === "popup_blocked" ||
         state === "network_mismatch" ||
         state === "network_timeout"
       ) {
@@ -253,8 +268,12 @@ export function useWalletStateMachine(): UseWalletStateMachineReturn {
   const inFlightRef = useRef(false);
 
   const send = useCallback((event: WalletMachineEvent) => {
-    // Guard: if a request is already in flight, swallow any new SELECT_FREIGHTER.
-    if (event.type === "SELECT_FREIGHTER" && inFlightRef.current) {
+    // Guard: if a request is already in flight, swallow any new provider
+    // selection (concurrent connect requests are impossible).
+    if (
+      (event.type === "SELECT_FREIGHTER" || event.type === "SELECT_ALBEDO") &&
+      inFlightRef.current
+    ) {
       return;
     }
     dispatch(event);
