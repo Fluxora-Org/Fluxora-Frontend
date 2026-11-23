@@ -7,6 +7,7 @@ import './styles/accessibility.css'; /* Global focus management & a11y */
 import { HelmetProvider } from 'react-helmet-async';
 import { isSupportedBrowser } from './lib/browserSupport';
 import { config, configError } from './lib/config';
+import { initWebVitals } from './lib/webVitals';
 
 const root = document.getElementById('root')!;
 
@@ -32,6 +33,8 @@ if (!isSupportedBrowser(navigator.userAgent)) {
     </main>,
   );
 } else {
+  initWebVitals();
+
   // Resolve and apply the theme before React renders to prevent a flash of the
   // wrong theme (FOUC). The ThemeProvider owns it from here on.
   initTheme();
