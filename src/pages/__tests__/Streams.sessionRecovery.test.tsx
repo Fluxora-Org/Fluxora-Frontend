@@ -6,6 +6,7 @@ import { ToastProvider } from "../../components/toast/ToastProvider";
 import { streamRecords } from "../../data/streamRecords";
 import {
   DEFAULT_STREAMS_FILTERS,
+  readStreamsSession,
   writeStreamsSession,
   clearStreamsSession,
 } from "../../lib/streamsSessionRecovery";
@@ -160,6 +161,8 @@ describe("Streams session recovery account isolation", () => {
         }),
       ).toBeInTheDocument();
     });
+
+    expect(readStreamsSession(Date.now(), ALICE)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     expect(searchInput).toHaveValue("bob-only");
