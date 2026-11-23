@@ -63,6 +63,12 @@ src/components/navigation/AppNavbar.tsx  ← Toggle UI
 .github/workflows/ci.yml                 ← CI integration
 ```
 
+## Archived documentation
+
+- [Theme E2E test checklist](../docs/archive/THEME_E2E_CHECKLIST.md)
+- [Theme E2E implementation summary](../docs/archive/THEME_E2E_IMPLEMENTATION_SUMMARY.md)
+- [Theme E2E validation guide](../docs/archive/THEME_E2E_TEST_VALIDATION.md)
+
 ## Common Issues
 
 **Test fails with "button not found"**

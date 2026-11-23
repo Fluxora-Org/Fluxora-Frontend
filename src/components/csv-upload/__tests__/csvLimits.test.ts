@@ -86,14 +86,13 @@ describe('CSV parsing limits', () => {
     expect(result.rows).toHaveLength(0);
   });
 
-  it('handles a malformed row with an unclosed quote without exceeding limits', () => {
-    // An unclosed quote makes splitCsvLine treat the rest of the line as one cell.
-    // This should not throw and should not be rejected by the column limit.
+  it('aborts parsing when encountering a malformed row with an unclosed quote', () => {
+    // An unclosed quote should trigger a malformed row error and abort parsing,
+    // rather than treating the rest of the line as one cell and producing a partial batch.
     const row = '"unclosed,quote';
     const result = parseAndValidateCsv(makeCsv([row]));
-    expect(result.parseError).toBeUndefined();
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].fieldErrors.recipient).toBe('Invalid Stellar address');
+    expect(result.parseError).toContain('1 rows have parsing errors: Row 2, column "1": unclosed quote');
+    expect(result.rows).toHaveLength(0);
   });
 
   it('parses a large synthetic file near the row limit with bounded time', () => {

@@ -27,6 +27,7 @@ import { VoiceConfirmModal } from "./components/voice/VoiceConfirmModal";
 import { VoiceProvider } from "./components/voice/VoiceContext";
 import { WalletProvider } from "./components/wallet-connect/Walletcontext";
 import WalletConnectionNotice from "./components/wallet-connect/WalletConnectionNotice";
+import OfflineStatusNotice from "./components/OfflineStatusNotice";
 import { I18nProvider } from "./i18n";
 import { configError } from "./lib/config";
 import ConnectWallet from "./pages/ConnectWallet";
@@ -134,6 +135,7 @@ export default function App() {
                   isSidebarOpen={isSidebarOpen}
                 />
                 <WalletConnectionNotice />
+                <OfflineStatusNotice />
 
                 <ErrorBoundary>
                   <Routes>

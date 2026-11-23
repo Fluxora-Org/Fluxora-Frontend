@@ -1,5 +1,8 @@
 # Fluxora Frontend
 
+**Live app: [https://flf-fawn.vercel.app](https://flf-fawn.vercel.app)**
+
+
 [![CI](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/Fluxora-Org/Fluxora-Frontend/actions/workflows/ci.yml)
 
 React dashboard and recipient portal for the Fluxora treasury streaming protocol.

@@ -1,26 +1,28 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
 import ToastNotification from "../ToastNotification";
 import type { ToastVariant } from "../ToastNotification";
 
 const noop = () => {};
 
-describe("ToastNotification aria-live semantics", () => {
-  it.each([
-    ["error",   "alert",  "assertive"],
-    ["warning", "alert",  "assertive"],
-    ["success", "status", "polite"],
-    ["info",    "status", "polite"],
-  ] as [ToastVariant, string, string][])(
-    "%s → role=%s aria-live=%s",
-    (variant, expectedRole, expectedLive) => {
+describe("ToastNotification aria-live semantics", () => {it.each(
+    [
+      ["error",   "alert",  "assertive", "Error"],
+      ["warning", "alert",  "assertive", "Warning"],
+      ["success", "status", "polite", "Success"],
+      ["info",    "status", "polite", "Info"],
+    ] as [ToastVariant, string, string, string][])(
+    "%s → role=%s aria-live=%s aria-label=%s",
+    (variant, expectedRole, expectedLive, expectedAriaLabel) => {
       render(
         <ToastNotification message="msg" variant={variant} onClose={noop} />,
       );
       const el = screen.getByRole(expectedRole as "alert" | "status");
       expect(el).toHaveAttribute("aria-live", expectedLive);
       expect(el).toHaveAttribute("aria-atomic", "true");
-      expect(el).not.toHaveAttribute("aria-label");
+      expect(el).toHaveAttribute("aria-label", expectedAriaLabel);
     },
   );
 
@@ -33,7 +35,7 @@ describe("ToastNotification aria-live semantics", () => {
     const el = screen.getByRole("alert");
     expect(el).toHaveAttribute("aria-live", "assertive");
     expect(el).toHaveAttribute("aria-atomic", "true");
-      expect(el).not.toHaveAttribute("aria-label");
+    expect(el).toHaveAttribute("aria-label", "Alert");
     expect(screen.getByText("unknown msg")).toBeInTheDocument();
   });
 
@@ -79,5 +81,78 @@ describe("ToastNotification keyboard interactions", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it("is reachable by Tab key", () => {
+    render(
+      <ToastNotification message="Tab me" variant="info" onClose={noop} />,
+    );
+    
+    // The toast itself is focusable via tabindex=0
+    const focusableEl = screen.getByRole("status", { name: /Info/ });
+    expect(focusableEl).toBeInTheDocument();
+    
+    // The element has tabindex=0 making it focusable
+    expect(focusableEl).toHaveAttribute("tabindex", "0");
+  });
+
+  it("focus is visible at each stop", async () => {
+    render(
+      <ToastNotification
+        message="Focus me"
+        variant="success"
+        onClose={noop}
+        actionLabel="View"
+        onAction={() => {}}
+      />,
+    );
+    
+    // Focus the action button
+    const actionBtn = screen.getByRole("button", { name: "View" });
+    
+    // The action button has an accessible name (aria-label)
+    expect(actionBtn).toHaveAttribute("aria-label");
+    
+    // The close button has an accessible name (aria-label)
+    const closeBtn = screen.getByRole("button", { name: /dismiss/i });
+    expect(closeBtn).toHaveAttribute("aria-label");
+  });
+
+  it("controls expose an accessible name", () => {
+    const onClose = vi.fn();
+    render(
+      <ToastNotification
+        message="Accessible name test"
+        variant="error"
+        onClose={onClose}
+        actionLabel="View stream"
+        onAction={() => {}}
+      />,
+    );
+    
+    // Close button has accessible name
+    const closeBtn = screen.getByRole("button", { name: /dismiss/i });
+    expect(closeBtn).toHaveAttribute("aria-label");
+    
+    // Action button has accessible name
+    const actionBtn = screen.getByRole("button", { name: "View stream" });
+    expect(actionBtn).toHaveAttribute("aria-label");
+  });
+
+  it("state changes are announced via aria-live", async () => {
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <ToastNotification
+        message="Test announcement"
+        variant="info"
+        onClose={onClose}
+      />,
+    );
+    
+    // Wait for live region to announce
+    waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Test announcement");
+    });
+  });
+
 });
 

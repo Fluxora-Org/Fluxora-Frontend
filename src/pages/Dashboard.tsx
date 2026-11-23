@@ -23,7 +23,6 @@ import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
 import ErrorBoundary from "../components/ErrorBoundary";
 import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
-import ErrorBoundary from "../components/ErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
 import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";

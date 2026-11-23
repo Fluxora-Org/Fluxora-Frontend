@@ -198,6 +198,34 @@ test.describe("Colour-blind operation flow", () => {
     expect(await colorBlindChainIsIntact(page, "tritanopia")).toBe(false);
   });
 
+  test("simulation stays discoverable and can be disabled after navigating to another view", async ({
+    page,
+  }) => {
+    await openColorBlindControls(page);
+    await selectPreset(page, "Protanopia", "Protanopia (red-blind)");
+
+    const mainNavigation = page.getByRole("navigation", {
+      name: "Main navigation",
+    });
+    await mainNavigation.getByRole("link", { name: "Streams" }).click();
+    await expect(page).toHaveURL(/\/app\/streams$/);
+
+    const toggle = page.getByTestId("colorblind-toggle");
+    await expect(toggle).toBeVisible();
+    await expect(
+      toggle.getByRole("radio", { name: "Protanopia (red-blind)" }),
+    ).toBeChecked();
+    await expect(page.getByTestId("colorblind-active-banner")).toBeVisible();
+
+    await page.getByTestId("colorblind-disable-button").click();
+
+    await expect(
+      toggle.getByRole("radio", { name: "No simulation" }),
+    ).toBeChecked();
+    await expect(page.locator('[data-colorblind-simulation="none"]')).toHaveCount(1);
+    await expect(page.getByTestId("colorblind-active-banner")).toHaveCount(0);
+  });
+
   test("success path: preset is reachable by keyboard alone", async ({ page }) => {
     const toggle = await openColorBlindControls(page);
 

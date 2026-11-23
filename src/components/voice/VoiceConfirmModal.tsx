@@ -131,7 +131,7 @@ export const VoiceConfirmModal: React.FC = () => {
             className="p-2 text-[var(--text-muted)] hover:text-[var(--text-vivid)] transition-colors rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             aria-label="Cancel destructive action"
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
@@ -167,7 +167,7 @@ export const VoiceConfirmModal: React.FC = () => {
 
         {/* Spoken instructions */}
         <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex gap-2.5 items-center">
-          <AlertTriangle size={16} className="flex-shrink-0" />
+          <AlertTriangle size={16} className="flex-shrink-0" aria-hidden="true" />
           <span>
             Say <strong>"Confirm"</strong> or click button below to proceed. Say{" "}
             <strong>"Cancel"</strong> to abort.

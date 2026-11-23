@@ -1,8 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { isInaccessible } from "@testing-library/dom";
-import { computeAccessibleName } from "dom-accessibility-api";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GlowingDot from "../GlowingDot";
+
+function computeAccessibleName(element: HTMLElement): string {
+  if (element.getAttribute("aria-hidden") === "true") return "";
+  const labelledBy = element.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const el = document.getElementById(labelledBy);
+    if (el) return el.textContent?.trim() || "";
+  }
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel !== null) return ariaLabel.trim();
+  return element.textContent?.trim() || "";
+}
 
 // ---------------------------------------------------------------------------
 // Mock usePrefersReducedMotion so tests can control the reduced-motion

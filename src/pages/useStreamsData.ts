@@ -143,6 +143,7 @@ export interface StreamsDataResult {
   recentlySaved: boolean;
   /** Whether the wallet identity used for recovery still matches current wallet. */
   recoveryIdentityMatches: boolean;
+  walletAddress: string | null;
   handleRestoreSession: () => void;
   handleStartFreshSession: () => void;
   handleDismissSessionBanner: () => void;
@@ -600,6 +601,7 @@ export function useStreamsData(): StreamsDataResult {
     setRestoredDraft,
     recentlySaved,
     recoveryIdentityMatches,
+    walletAddress: walletAddress || null,
     handleRestoreSession,
     handleStartFreshSession,
     handleDismissSessionBanner,

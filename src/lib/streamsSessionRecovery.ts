@@ -262,33 +262,12 @@ export function readStreamsSession(
   accountAddress: string,
   storage: StorageReader | null = getLocalStorage(),
 ): StreamsSessionSnapshot | null {
-  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
-  if (!storage || !normalizedAccountAddress) return null;
-
-  const storageKey = getStorageKey(normalizedAccountAddress);
-  const raw = readBrowserStorage(storageKey, storage);
-  if (!raw) return null;
-
-  const snapshot = parseVersionedSnapshot(raw);
-  if (!snapshot) {
-    logger.warn(
-      "Discarding unsupported or malformed streams session payload for recovery.",
-      {
-        storageKey,
-      },
-    );
-    removeBrowserStorage(storageKey, storage as any);
-    return null;
-  }
-
-  if (snapshot.accountAddress !== normalizedAccountAddress) {
-    removeBrowserStorage(storageKey, storage as any);
-    return null;
-  }
-  if (now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS) return null;
-  if (now < snapshot.savedAt) return null;
-
-  return snapshot;
+  // Session recovery can include recipient addresses and draft payment data.
+  // Those values must never be written to origin-readable browser storage.
+  void now;
+  void accountAddress;
+  void storage;
+  return null;
 }
 
 /**
@@ -308,24 +287,12 @@ export function writeStreamsSession(
   accountAddress: string,
   storage: StorageWriter | null = getLocalStorage(),
 ): boolean {
-  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
-  if (!normalizedAccountAddress) return false;
-
-  const full: StreamsSessionSnapshot = {
-    ...snapshot,
-    savedAt: now,
-    accountAddress: normalizedAccountAddress,
-  };
-  const written = writeBrowserStorage(
-    getStorageKey(normalizedAccountAddress),
-    JSON.stringify({
-      version: STREAMS_SESSION_SCHEMA_VERSION,
-      data: full,
-    }),
-    storage,
-  );
-  streamsSessionWriteStatus.record(written);
-  return written;
+  void snapshot;
+  void now;
+  void accountAddress;
+  void storage;
+  streamsSessionWriteStatus.record(false);
+  return false;
 }
 
 /**

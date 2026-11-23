@@ -1,5 +1,8 @@
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
+export const ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT =
+  "fluxora:account-browser-storage-cleared";
+
 const fallbackValues = new WeakMap<object, Map<string, string>>();
 
 function getFallbackValues(storage: object): Map<string, string> {
@@ -82,6 +85,49 @@ export function getBrowserStorage(
     return window[name] ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Clear account/session data when a wallet disconnects, preserving preferences. */
+export function clearAccountBrowserStorage(): void {
+  const local = getBrowserStorage("localStorage");
+  const session = getBrowserStorage("sessionStorage");
+  try {
+    session?.clear();
+  } catch {
+    // Storage can be blocked by browser policy.
+  }
+  if (!local) return;
+  const sensitiveKeys = new Set([
+    "fluxora_offline_queue",
+    "fluxora_pending_stream_tx",
+    "fluxora_optimistic_operations",
+    "fluxora.recent-created-streams",
+    "fluxora_address_book",
+    "fluxora_backup_pin",
+    "fluxora_biometric_enrolled",
+    "fluxora_security_gate_enabled",
+    "fluxora-share-workspaces",
+    "fluxora:session-recovery",
+  ]);
+  try {
+    const keys = Array.from({ length: local.length }, (_, index) => local.key(index))
+      .filter((key): key is string => Boolean(key));
+    for (const key of keys) {
+      if (sensitiveKeys.has(key)) {
+        removeBrowserStorage(key, local);
+      } else if (
+        key.startsWith("fluxora:session-recovery:v1:") ||
+        key.startsWith("fluxora_streams_session_v2_")
+      ) {
+        local.removeItem(key);
+      }
+    }
+  } catch {
+    // Best effort: preserve the disconnect path if storage is unavailable.
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT));
   }
 }
 

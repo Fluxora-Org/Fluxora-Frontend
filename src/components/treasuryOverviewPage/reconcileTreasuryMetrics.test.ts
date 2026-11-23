@@ -1,65 +1,70 @@
 import { describe, it, expect } from "vitest";
-import { reconcileTreasuryMetrics, type TreasuryMetricsInput } from "./reconcileTreasuryMetrics";
+import {
+  reconcileTreasuryMetrics,
+  type TreasuryMetricItem,
+  type TreasuryMetricsInput,
+} from "./reconcileTreasuryMetrics";
 
-const metrics = {
-  totalValueLocked: 125000.5,
-  totalStreamed: 42000.25,
-  activeStreamsCount: 7,
-  netFlow: -1500,
-  currency: "USDC",
-  asOf: "2026-09-25T00:00:00.000Z",
-};
+const asOf = "2026-09-25T00:00:00.000Z";
+const metrics: TreasuryMetricItem[] = [
+  { id: "tvl", label: "Total Value Locked", value: 125000.5, currency: "USD", asOf },
+  { id: "streamed", label: "Total Streamed", value: 42000.25, currency: "USD", asOf },
+  { id: "net-flow", label: "Net Flow", value: -1500, currency: "USD", asOf },
+];
 
 describe("reconcileTreasuryMetrics", () => {
   it("never renders partial data: loading with no metrics is loading, not ready", () => {
-    const input: TreasuryMetricsInput = { loading: true, error: null, metrics: null };
-    expect(reconcileTreasuryMetrics(input).status).toBe("loading");
+    const input: TreasuryMetricsInput = { loading: true, error: null, metrics: undefined };
+    expect(reconcileTreasuryMetrics(input)).toEqual({ status: "loading" });
   });
 
   it("never renders partial data: metrics present but still loading is loading, not ready", () => {
     const input: TreasuryMetricsInput = { loading: true, error: null, metrics };
-    expect(reconcileTreasuryMetrics(input).status).toBe("loading");
+    expect(reconcileTreasuryMetrics(input)).toEqual({ status: "loading" });
   });
 
   it("error takes precedence and never leaks stale figures", () => {
-    const input: TreasuryMetricsInput = { loading: false, error: new Error("boom"), metrics };
-    expect(reconcileTreasuryMetrics(input)).toEqual({ status: "error" });
+    const input: TreasuryMetricsInput = { loading: false, error: "boom", metrics };
+    expect(reconcileTreasuryMetrics(input)).toEqual({ status: "error", reason: "boom" });
   });
 
   it("ready only when loading is false, error is absent, and metrics exist", () => {
     const input: TreasuryMetricsInput = { loading: false, error: null, metrics };
-    const snap = reconcileTreasuryMetrics(input);
-    expect(snap.status).toBe("ready");
+    expect(reconcileTreasuryMetrics(input).status).toBe("ready");
   });
 
-  it("all figures come from the same snapshot (one asOf, one currency)", () => {
-    const snap = reconcileTreasuryMetrics({ loading: false, error: null, metrics });
-    expect(snap.status).toBe("ready");
-    if (snap.status !== "ready") return;
-    expect(snap.asOf).toBe(metrics.asOf);
-    expect(snap.currency).toBe("USDC");
-    // Every currency-bearing figure must show the same currency code.
-    expect(snap.figures.totalValueLocked).toContain("$"); // USDC formatted via Intl as currency
-    expect(snap.figures.totalStreamed).toMatch(/\d/);
-    expect(snap.figures.netFlow).toMatch(/\d/);
+  it("renders figures only from the same currency and snapshot", () => {
+    const snapshot = reconcileTreasuryMetrics({ loading: false, error: null, metrics });
+    expect(snapshot.status).toBe("ready");
+    if (snapshot.status !== "ready") return;
+
+    expect(snapshot.asOf).toBe(asOf);
+    expect(snapshot.currency).toBe("USD");
+    expect(snapshot.items).toHaveLength(metrics.length);
+    expect(snapshot.items.every((item) => item.currency === snapshot.currency && item.asOf === snapshot.asOf)).toBe(true);
+    expect(snapshot.items.map((item) => item.formattedValue)).toEqual([
+      "$125,000.50",
+      "$42,000.25",
+      "-$1,500.00",
+    ]);
   });
 
-  it("precision is consistent: currency figures always show 2 decimal places", () => {
-    const snap = reconcileTreasuryMetrics({
+  it("rejects metrics from different currencies or snapshot times", () => {
+    const snapshot = reconcileTreasuryMetrics({
       loading: false,
       error: null,
-      metrics: { ...metrics, totalValueLocked: 100, totalStreamed: 100.1 },
+      metrics: [metrics[0]!, { ...metrics[1]!, asOf: "2026-09-26T00:00:00.000Z" }],
     });
-    expect(snap.status).toBe("ready");
-    if (snap.status !== "ready") return;
-    expect(snap.figures.totalValueLocked).toMatch(/\.\d{2}$/);
-    expect(snap.figures.totalStreamed).toMatch(/\.\d{2}$/);
+
+    expect(snapshot).toEqual({
+      status: "error",
+      reason: "Treasury figures are inconsistent and cannot be displayed together.",
+    });
   });
 
-  it("a negative net flow is still formatted consistently with the others", () => {
-    const snap = reconcileTreasuryMetrics({ loading: false, error: null, metrics: { ...metrics, netFlow: -1500 } });
-    expect(snap.status).toBe("ready");
-    if (snap.status !== "ready") return;
-    expect(snap.figures.netFlow).toMatch(/-?\$[\d,]+\.\d{2}/);
+  it("returns empty when no metrics are available", () => {
+    expect(reconcileTreasuryMetrics({ loading: false, error: null, metrics: [] })).toEqual({
+      status: "empty",
+    });
   });
 });

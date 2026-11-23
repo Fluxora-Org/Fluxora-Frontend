@@ -124,6 +124,14 @@ export function splitCsvLine(line: string): string[] {
       current += ch;
     }
   }
+  
+  if (inQuotes) {
+    const error = new Error('unclosed quote');
+    (error as any).column = cells.length + 1;
+    (error as any).isMalformedRow = true;
+    throw error;
+  }
+  
   cells.push(current.trim());
   return cells;
 }
@@ -338,8 +346,22 @@ export function prepareCsvParse(
   // rows are reported together (#1746).
   const boundErrors: CsvParseError[] = [];
   for (let i = 0; i < dataLines.length; i++) {
-    const cells = splitCsvLine(dataLines[i]);
     const rowNumber = i + 1;
+    let cells: string[];
+    try {
+      cells = splitCsvLine(dataLines[i]);
+    } catch (e: any) {
+      if (e.isMalformedRow) {
+        boundErrors.push({
+          row: rowNumber,
+          // `column` is a canonical header name; a malformed row only knows a
+          // positional index, so it is reported in the message instead.
+          message: `column ${String(e.column)}: ${e.message}`,
+        });
+        continue;
+      }
+      throw e;
+    }
     if (cells.length > MAX_CSV_COLUMNS) {
       boundErrors.push({
         row: rowNumber,
@@ -368,7 +390,7 @@ export function prepareCsvParse(
       parseError:
         boundErrors.length === 1
           ? formatCsvParseError(boundErrors[0])
-          : `${boundErrors.length} rows exceed size limits: ${boundErrors.map(formatCsvParseError).join('; ')}`,
+          : `${boundErrors.length} rows have parsing errors: ${boundErrors.map(formatCsvParseError).join('; ')}`,
       parseErrors: boundErrors,
     };
   }

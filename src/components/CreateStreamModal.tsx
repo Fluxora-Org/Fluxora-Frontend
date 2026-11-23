@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
+import RecipientAddressPicker from './RecipientAddressPicker';
 import {
   formatAmountString,
   multiplyAmountStrings,
@@ -16,7 +17,7 @@ import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createStream } from '../lib/stellar/tx';
 import { addOptimistic, confirmOptimistic, rollbackOptimistic } from '../lib/optimisticTransactions';
-import { isValidStellarAddress, maskAddress } from '../lib/stellar';
+import { isValidStellarAddress } from '../lib/stellar';
 import {
   dequeueAction,
   enqueueAction,
@@ -40,7 +41,7 @@ import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import TruncatedAddress from './common/TruncatedAddress';
-import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
+import { parseCsvNumber } from './csv-upload/csvParser';
 import { CsvParseCancelledError, parseCsvAsync } from './csv-upload/csvParseClient';
 import type { CsvParseTask } from './csv-upload/csvParseClient';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
@@ -55,9 +56,6 @@ import {
 } from '../utils/contrastUtils';
 import { formatReceiptAmount } from '../utils/receiptGenerator';
 import { amountToSmallestUnits } from '../lib/formatters';
-
-/** Maximum time to wait for a transaction receipt before timing out. */
-const RECEIPT_POLL_TIMEOUT_MS = 60_000;
 
 /** Top-level flow mode: choose between single-stream or bulk-CSV. */
 type FlowMode = 'choose' | 'single' | 'bulk';
@@ -309,7 +307,6 @@ export default function CreateStreamModal({
     { id: string; position: number } | null
   >(null);
   const [queueLength, setQueueLength] = useState(0);
-  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
   const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -330,9 +327,7 @@ export default function CreateStreamModal({
   const optimisticOpIdRef = useRef<string | null>(null);
 
   const txSubmission = useTransactionSubmission({
-    // timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
-    // cancelOnUnmount: true,
-    submit: async (idempotencyKey) => {
+    submit: async () => {
       const sender = wallet.address!;
       const parsedAmount = parseStreamNumber(depositAmount) || 0;
       // Convert the exact entered decimal string into USDC smallest units
@@ -651,7 +646,6 @@ export default function CreateStreamModal({
         return; // Skip non-stream actions
       }
 
-      setIsFlushingQueue(true);
       setQueuedSubmission(null); // Clear the queued banner
       updateActionStatus(nextAction.id, 'processing');
 
@@ -712,8 +706,6 @@ export default function CreateStreamModal({
         }
         
         setQueueLength(getQueueLength());
-      } finally {
-        if (!cancelled) setIsFlushingQueue(false);
       }
     };
 
@@ -1025,27 +1017,6 @@ export default function CreateStreamModal({
         onStreamError?.(err);
       }
     }
-  };
-
-  const handleRetryQueuedSubmission = async () => {
-    const payload = pendingSubmissionRef.current;
-    if (!payload) return;
-    setQueueFlushError(null);
-
-    if (!isOnline) {
-      const entry = enqueueAction(payload);
-      setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
-      setQueueLength(getQueueLength());
-      return;
-    }
-
-    await submitPayload(payload);
-  };
-
-  const handleEditQueuedSubmission = () => {
-    setQueueFlushError(null);
-    pendingSubmissionRef.current = null;
-    setCurrentStep(1);
   };
 
   const handleBack = () => {
@@ -1425,7 +1396,7 @@ export default function CreateStreamModal({
           <button
             type="button"
             className="btn btn-next dry-run-submit-btn"
-            disabled={!bulkDryRunConfirmed || isBulkSubmitting || validCount === 0}
+            disabled={!isOnline || !bulkDryRunConfirmed || isBulkSubmitting || validCount === 0}
             onClick={() => handleBulkSubmit(bulkRows)}
             aria-busy={isBulkSubmitting}
           >
@@ -1439,6 +1410,7 @@ export default function CreateStreamModal({
   };
 
   const handleBulkSubmit = async (rows: CsvRow[]) => {
+    if (!isOnline) return;
     const validRows = rows.filter((r) => r.status === 'valid');
     if (validRows.length === 0) return;
     if (!wallet.connected) {
@@ -1879,18 +1851,15 @@ export default function CreateStreamModal({
                     helperText={t("createStream.step1.recipientHelper")}
                     success={recipientSuccess}
                   >
-                    <input
-                      ref={recipientInputRef}
-                      type="text"
-                      className="input-field"
+                    <RecipientAddressPicker
                       value={recipient}
-                      onChange={(e) => {
-                        setRecipient(e.target.value);
+                      onRecipientChange={(value) => {
+                        setRecipient(value);
                         if (errors.recipient) setErrors(prev => ({ ...prev, recipient: undefined }));
                       }}
+                      ref={recipientInputRef}
                       onBlur={() => handleBlur('recipient')}
                       placeholder={t("createStream.step1.recipientPlaceholder")}
-                      autoComplete="off"
                     />
                   </InputField>
 
@@ -2874,18 +2843,15 @@ export default function CreateStreamModal({
                           helperText={t("createStream.step1.recipientHelper")}
                           success={recipientSuccess}
                         >
-                          <input
-                            ref={recipientInputRef}
-                            type="text"
-                            className="input-field"
+                          <RecipientAddressPicker
                             value={recipient}
-                            onChange={(e) => {
-                              setRecipient(e.target.value);
+                            onRecipientChange={(value) => {
+                              setRecipient(value);
                               if (error) setError(null);
                             }}
+                            ref={recipientInputRef}
                             onBlur={() => handleBlur('recipient')}
                             placeholder={t("createStream.step1.recipientPlaceholder")}
-                            autoComplete="off"
                           />
                         </InputField>
 

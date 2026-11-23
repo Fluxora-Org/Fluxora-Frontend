@@ -191,7 +191,7 @@ npm run test:e2e -- theme-customization
 
 See `THEME_TEST_QUICK_REFERENCE.md` for common commands and validation steps.
 
-Full validation guide: `../THEME_E2E_TEST_VALIDATION.md`
+Full validation guide: `../docs/archive/THEME_E2E_TEST_VALIDATION.md`
 
 ## Colour-blind simulation flow
 

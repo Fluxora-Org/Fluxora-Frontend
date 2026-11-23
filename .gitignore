@@ -16,3 +16,4 @@ test-results/
 
 # Local pull-request draft; intentionally excluded from commits.
 /pr.txt
+.opencode

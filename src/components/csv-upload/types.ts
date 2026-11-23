@@ -23,6 +23,11 @@ export const CANONICAL_HEADERS = [
 
 export type CanonicalHeader = (typeof CANONICAL_HEADERS)[number];
 
+export const REQUIRED_CANONICAL_HEADERS: CanonicalHeader[] = [
+  'recipient',
+  'deposit_amount',
+];
+
 /**
  * Hard limits for CSV uploads to prevent denial of service.
  * These are enforced in `csvParser.ts` before any parsing or preview rendering.
