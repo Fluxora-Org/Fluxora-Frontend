@@ -277,7 +277,10 @@ describe("RecipientStreams — populated state", () => {
       />,
     );
     expect(await screen.findByText(/From:.*Vendor Inc/)).toBeInTheDocument();
-    expect(screen.getByText(/From:.*GABC123/)).toBeInTheDocument();
+    // Without a name (or address-book label) the "From:" line reads
+    // "Treasury" and the sender address is shown by TruncatedAddress below it.
+    expect(screen.getByText(/From:\s*Treasury/)).toBeInTheDocument();
+    expect(screen.getAllByText("GABC123").length).toBeGreaterThan(0);
   });
 
   it("renders amount followed by 'XLM' suffix", async () => {

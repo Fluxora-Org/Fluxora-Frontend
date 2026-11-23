@@ -58,9 +58,11 @@ describe("RecipientStreams (real fetchStreamsFn API)", () => {
     );
     const row = await screen.findByText(amountPattern);
     expect(row).toBeInTheDocument();
+    // TruncatedAddress renders the full address both in an sr-only span and
+    // in the hover/focus reveal chip, so it legitimately appears more than once.
     expect(
-      screen.getByText(/GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN/i).length,
+    ).toBeGreaterThan(0);
   });
 
   it("shows a human-readable error when the fetcher rejects", async () => {
