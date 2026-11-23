@@ -48,7 +48,7 @@ export interface StreamsSessionSnapshot {
   draft: StreamDraftSnapshot | null;
 }
 
-type StorageReader = Pick<Storage, "getItem">;
+type StorageReader = Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>;
 type StorageWriter = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {
@@ -182,11 +182,20 @@ export function isFilterSnapshotMeaningful(
 export function readStreamsSession(
   now: number,
   accountAddress: string,
-  storage: StorageReader | null = null,
+  storage: StorageReader | null = getLocalStorage(),
 ): StreamsSessionSnapshot | null {
-  void storage;
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!normalizedAccountAddress || !Number.isFinite(now)) return null;
+
+  // Remove any snapshot written by an older build before considering recovery.
+  // New session data is never read from or written to browser storage.
+  if (storage?.removeItem) {
+    removeBrowserStorage(
+      `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${normalizedAccountAddress}`,
+      storage as Pick<Storage, "removeItem">,
+    );
+    streamsSessionWriteStatus.record(false);
+  }
 
   const snapshot = sessionsByAccount.get(normalizedAccountAddress);
   if (!snapshot) return null;
