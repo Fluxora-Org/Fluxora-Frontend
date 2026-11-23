@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import EmptyState from "../EmptyState";
 import { Skeleton, SkeletonCard } from "../Skeleton";
+import TruncatedAddress from "../common/TruncatedAddress";
+import { useAddressBook } from "../../hooks/useAddressBook";
 import "../skeleton.css";
 
 // Types matching stream properties across testing matrix & app contracts
@@ -45,6 +47,7 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
   fetchStreamsFn,
   pollIntervalMs = 10000,
 }) => {
+  const { getLabelForAddress } = useAddressBook();
   const [internalStreams, setInternalStreams] = useState<Stream[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [internalError, setInternalError] = useState<string | null>(null);
@@ -455,8 +458,18 @@ export const RecipientStreams: React.FC<RecipientStreamsProps> = ({
             >
               <div>
                 <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>
-                  From: {stream.senderName ?? stream.sender}
+                  From: {
+                    stream.senderName && stream.senderName !== stream.sender
+                      ? stream.senderName
+                      : getLabelForAddress(stream.sender) ?? "Treasury"
+                  }
                 </p>
+                {stream.sender && (
+                  <TruncatedAddress
+                    address={stream.sender}
+                    label={getLabelForAddress(stream.sender) ?? "Sender"}
+                  />
+                )}
                 <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>
                   {stream.amount} XLM
                 </p>
