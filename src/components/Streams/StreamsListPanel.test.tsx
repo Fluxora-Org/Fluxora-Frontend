@@ -347,7 +347,7 @@ describe("StreamsListPanel — session persistence indicator", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     expect(
       screen.getByRole("img", {
-        name: "Your filters and search aren't being saved",
+        name: "Your filters and search are kept only while this page is open",
       }),
     ).toBeInTheDocument();
   });
