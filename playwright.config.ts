@@ -14,6 +14,8 @@ export default defineConfig({
   // Shard across CI workers to keep total runtime under the CI budget.
   // Locally, workers are left to Playwright's default (half the CPU cores).
   workers: process.env.CI ? 4 : undefined,
+  // NOTE: Playwright sharding (`--shard=N/M`) is driven from the workflow matrix;
+  // see e2e/README.md for the per-shard invocation and the 15-minute budget.
   // CI retries absorb transient races (lazy-loaded modal chunks, dev-server
   // cold compiles) instead of failing the whole workflow; traces are captured
   // on the first retry via `trace: "on-first-retry"` below.
