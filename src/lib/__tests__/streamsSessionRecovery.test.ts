@@ -285,15 +285,15 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, "   ", storage)).toBeNull();
     });
 
-    it("uses separate storage keys for different accounts", () => {
+    it("keeps account snapshots separate without creating browser-storage keys", () => {
       writeStreamsSession(
-        { filters: DEFAULT_STREAMS_FILTERS, draft: null },
+        { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" }, draft: null },
         NOW,
         ACCOUNT_ALICE,
         storage,
       );
       writeStreamsSession(
-        { filters: DEFAULT_STREAMS_FILTERS, draft: null },
+        { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "bob" }, draft: null },
         NOW,
         ACCOUNT_BOB,
         storage,
@@ -302,9 +302,11 @@ describe("streamsSessionRecovery", () => {
       const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
       const bobKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_BOB}`;
 
-      expect(storage.getItem(aliceKey)).not.toBeNull();
-      expect(storage.getItem(bobKey)).not.toBeNull();
       expect(aliceKey).not.toBe(bobKey);
+      expect(storage.getItem(aliceKey)).toBeNull();
+      expect(storage.getItem(bobKey)).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.filters.searchQuery).toBe("alice");
+      expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)?.filters.searchQuery).toBe("bob");
     });
   });
 
