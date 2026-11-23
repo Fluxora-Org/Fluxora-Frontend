@@ -49,6 +49,17 @@ describe("idempotency utilities", () => {
       expect(loaded!.txHash).toBeNull();
     });
 
+    it("persists a supplied idempotency key for a retry", () => {
+      const key = savePendingTx(
+        { action: "pause", streamId: "2" },
+        null,
+        "retry-key",
+      );
+
+      expect(key).toBe("retry-key");
+      expect(loadPendingTx()?.idempotencyKey).toBe("retry-key");
+    });
+
     it("returns null when nothing has been saved", () => {
       expect(loadPendingTx()).toBeNull();
     });
