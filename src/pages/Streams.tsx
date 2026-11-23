@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -32,7 +31,6 @@ import {
   STATUS_FILTERS,
   MAX_LOADING_RETRIES,
 } from "./useStreamsData";
-import { clearResolved as clearResolvedOptimistic } from "../lib/optimisticTransactions";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -56,7 +54,6 @@ import type {
 import type { StreamSortMode } from "../lib/streamSorting";
 
 const DISCLOSURE_DURATION_MS = 200;
-const STREAMS_VIRTUALIZATION_THRESHOLD = 20;
 
 /**
  * Formats a USDC amount with full fractional precision (2 decimal places).
@@ -781,7 +778,6 @@ export default function Streams() {
   const { streamId } = useParams();
   const { addToast } = useToast();
   const { t } = useI18n();
-  const hasMountedFilterAnnouncer = useRef(false);
 
   // ── All data + filter logic lives in the hook ──────────────────────────────
   const data = useStreamsData();
@@ -816,13 +812,11 @@ export default function Streams() {
     showZeroAccrual,
     zeroAccrualReason,
     effectiveExpandedId,
-    expandedStreamId,
     setExpandedStreamId,
     selectedStreamId,
     setSelectedStreamId,
     bannerState,
     detectedSnapshot,
-    liveDraft,
     setLiveDraft,
     restoredDraft,
     setRestoredDraft,
