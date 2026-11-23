@@ -184,7 +184,7 @@ describe("Streams Pagination boundary and error recovery tests", () => {
     expect(nextBtn).toBeDisabled();
 
     // Assert: Check accessible name/ARIA label for active page button
-    const pageOneBtn = screen.getByRole("button", { name: "1" });
+    const pageOneBtn = screen.getByRole("button", { name: "Page 1" });
     expect(pageOneBtn).toHaveAttribute("aria-current", "page");
   });
 
