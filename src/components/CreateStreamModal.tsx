@@ -1021,6 +1021,16 @@ export default function CreateStreamModal({
         return;
       }
 
+      // Re-check step-1 fields against the *current* wallet: an account switch
+      // after step 1 can make the recipient equal to the new sender
+      // (ACCOUNT_SWITCH_INVARIANTS_SPEC.md, Property 2: no self-payment).
+      // Return to step 1 so the field error is visible before signing.
+      if (!validateStep1()) {
+        setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
+        setCurrentStep(1);
+        return;
+      }
+
       setError(null);
       setStreamError(null);
       resetTransactionState();
