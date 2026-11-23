@@ -172,12 +172,18 @@ describe("useTreasury", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(getStreams).toHaveBeenLastCalledWith({ status: "All" });
+    expect(getStreams).toHaveBeenLastCalledWith(
+      { status: "All" },
+      { signal: expect.any(AbortSignal) },
+    );
 
     rerender({ status: "Active" });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(getStreams).toHaveBeenLastCalledWith({ status: "Active" });
+    expect(getStreams).toHaveBeenLastCalledWith(
+      { status: "Active" },
+      { signal: expect.any(AbortSignal) },
+    );
   });
 
   it("groups metrics by token and avoids indiscriminate summing", async () => {

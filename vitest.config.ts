@@ -19,7 +19,7 @@ export default defineConfig({
       "e2e/**",
       ".kilo/**",
       ".kiro/**",
-      // TODO(drips-wave): re-enable — these 63 test files fail on main (drift between
+      // TODO(drips-wave): re-enable — these 58 test files fail on main (drift between
       // components and tests after merged PRs); skipped to get CI green.
       "src/components/__tests__/CreateStreamModal.accountSwitch.test.tsx",
       "src/components/__tests__/CreateStreamModal.dryRun.test.tsx",
@@ -53,11 +53,6 @@ export default defineConfig({
       "src/components/Streams/StreamCreatedModal.keyboard.test.tsx",
       "src/components/Streams/StreamsListPanel.test.tsx",
       "src/components/StreamsLoading.layoutShift.test.tsx",
-      "src/components/treasuryOverviewPage/__tests__/ReportBuilderPanel.test.tsx",
-      "src/components/treasuryOverviewPage/__tests__/useTreasury.test.tsx",
-      "src/components/treasuryOverviewPage/__tests__/useTreasury.unmount.test.tsx",
-      "src/components/treasuryOverviewPage/__tests__/useWidgetLayout.test.tsx",
-      "src/components/treasuryOverviewPage/reconcileTreasuryMetrics.test.ts",
       "src/components/wallet-connect/__tests__/reconnectViewState.test.tsx",
       "src/components/wallet-connect/__tests__/Walletcontext.test.tsx",
       "src/hooks/__tests__/useOnlineStatus.test.tsx",
