@@ -311,7 +311,7 @@ describe("streamsSessionRecovery", () => {
   });
 
   describe("malformed data", () => {
-    it("does not read browser-storage records", () => {
+    it("discards legacy browser-storage records without reading them", () => {
       const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
       storage.setItem(key, JSON.stringify({
         savedAt: NOW,
