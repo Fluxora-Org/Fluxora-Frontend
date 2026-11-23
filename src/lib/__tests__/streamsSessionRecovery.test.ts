@@ -250,7 +250,7 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)).not.toBeNull();
     });
 
-    it("never trusts an injected browser-storage snapshot for another account", () => {
+    it("discards a legacy browser-storage snapshot instead of trusting it", () => {
       const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
       storage.setItem(aliceKey, JSON.stringify({
         savedAt: NOW,
@@ -260,7 +260,7 @@ describe("streamsSessionRecovery", () => {
       }));
 
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
-      expect(storage.getItem(aliceKey)).not.toBeNull();
+      expect(storage.getItem(aliceKey)).toBeNull();
     });
 
     it("returns null when accountAddress is empty string", () => {
@@ -321,6 +321,7 @@ describe("streamsSessionRecovery", () => {
       }));
 
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
+      expect(storage.getItem(key)).toBeNull();
     });
 
     it("falls back to defaults for malformed individual filter fields", () => {
