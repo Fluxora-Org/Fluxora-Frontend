@@ -177,7 +177,7 @@ export function isFilterSnapshotMeaningful(
 
 /**
  * Reads only the current page's in-memory snapshot for the requested account.
- * The storage argument remains for call-site compatibility but is never read.
+ * Any legacy browser-storage copy is removed without being read or restored.
  */
 export function readStreamsSession(
   now: number,
