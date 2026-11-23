@@ -100,6 +100,11 @@ export default defineConfig({
         "src/hooks/useRouteFocus.ts",
         // Voice mic button — recording state must be conveyed non-visually
         "src/components/voice/VoiceMicButton.tsx",
+        // Streams service and Stellar transaction layer
+        "src/lib/api/streamsService.ts",
+        "src/lib/stellar/tx.ts",
+        "src/lib/stellar/idempotency.ts",
+        "src/lib/stellar/telemetry.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
