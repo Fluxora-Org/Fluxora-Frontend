@@ -22,7 +22,6 @@ export default defineConfig({
       // TODO(drips-wave): re-enable — these 58 test files fail on main (drift between
       // components and tests after merged PRs); skipped to get CI green.
       "src/components/__tests__/CreateStreamModal.accountSwitch.test.tsx",
-      "src/components/__tests__/CreateStreamModal.dryRun.test.tsx",
       "src/components/__tests__/CreateStreamModal.contrast.test.tsx",
       "src/components/__tests__/CreateStreamModal.edgeCases.test.tsx",
       "src/components/__tests__/CreateStreamModal.failure.test.tsx",
