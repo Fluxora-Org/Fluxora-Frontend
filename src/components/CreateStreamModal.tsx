@@ -16,7 +16,7 @@ import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createStream } from '../lib/stellar/tx';
 import { addOptimistic, confirmOptimistic, rollbackOptimistic } from '../lib/optimisticTransactions';
-import { isValidStellarAddress, maskAddress } from '../lib/stellar';
+import { isValidStellarAddress } from '../lib/stellar';
 import {
   dequeueAction,
   enqueueAction,
@@ -40,7 +40,7 @@ import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import TruncatedAddress from './common/TruncatedAddress';
-import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
+import { parseCsvNumber } from './csv-upload/csvParser';
 import { CsvParseCancelledError, parseCsvAsync } from './csv-upload/csvParseClient';
 import type { CsvParseTask } from './csv-upload/csvParseClient';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
@@ -55,9 +55,6 @@ import {
 } from '../utils/contrastUtils';
 import { formatReceiptAmount } from '../utils/receiptGenerator';
 import { amountToSmallestUnits } from '../lib/formatters';
-
-/** Maximum time to wait for a transaction receipt before timing out. */
-const RECEIPT_POLL_TIMEOUT_MS = 60_000;
 
 /** Top-level flow mode: choose between single-stream or bulk-CSV. */
 type FlowMode = 'choose' | 'single' | 'bulk';
@@ -309,7 +306,6 @@ export default function CreateStreamModal({
     { id: string; position: number } | null
   >(null);
   const [queueLength, setQueueLength] = useState(0);
-  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
   const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -330,9 +326,7 @@ export default function CreateStreamModal({
   const optimisticOpIdRef = useRef<string | null>(null);
 
   const txSubmission = useTransactionSubmission({
-    // timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
-    // cancelOnUnmount: true,
-    submit: async (idempotencyKey) => {
+    submit: async () => {
       const sender = wallet.address!;
       const parsedAmount = parseStreamNumber(depositAmount) || 0;
       // Convert the exact entered decimal string into USDC smallest units
@@ -651,7 +645,6 @@ export default function CreateStreamModal({
         return; // Skip non-stream actions
       }
 
-      setIsFlushingQueue(true);
       setQueuedSubmission(null); // Clear the queued banner
       updateActionStatus(nextAction.id, 'processing');
 
@@ -712,8 +705,6 @@ export default function CreateStreamModal({
         }
         
         setQueueLength(getQueueLength());
-      } finally {
-        if (!cancelled) setIsFlushingQueue(false);
       }
     };
 
@@ -1025,27 +1016,6 @@ export default function CreateStreamModal({
         onStreamError?.(err);
       }
     }
-  };
-
-  const handleRetryQueuedSubmission = async () => {
-    const payload = pendingSubmissionRef.current;
-    if (!payload) return;
-    setQueueFlushError(null);
-
-    if (!isOnline) {
-      const entry = enqueueAction(payload);
-      setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
-      setQueueLength(getQueueLength());
-      return;
-    }
-
-    await submitPayload(payload);
-  };
-
-  const handleEditQueuedSubmission = () => {
-    setQueueFlushError(null);
-    pendingSubmissionRef.current = null;
-    setCurrentStep(1);
   };
 
   const handleBack = () => {
