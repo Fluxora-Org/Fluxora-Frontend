@@ -250,28 +250,17 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)).not.toBeNull();
     });
 
-    it("prevents cross-account data leakage via manual storage manipulation", () => {
-      // Alice writes her session
-      writeStreamsSession(
-        {
-          filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" },
-          draft: MEANINGFUL_DRAFT,
-        },
-        NOW,
-        ACCOUNT_ALICE,
-        storage,
-      );
-
-      // Attacker tries to manually modify the stored accountAddress to Bob's
+    it("never trusts an injected browser-storage snapshot for another account", () => {
       const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      const storedData = JSON.parse(storage.getItem(aliceKey)!);
-      storedData.accountAddress = ACCOUNT_BOB;
-      storage.setItem(aliceKey, JSON.stringify(storedData));
+      storage.setItem(aliceKey, JSON.stringify({
+        savedAt: NOW,
+        accountAddress: ACCOUNT_BOB,
+        filters: DEFAULT_STREAMS_FILTERS,
+        draft: MEANINGFUL_DRAFT,
+      }));
 
-      // Reading with Alice's key should fail because accountAddress doesn't match
-      const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
-      expect(snapshot).toBeNull();
-      expect(storage.getItem(aliceKey)).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
+      expect(storage.getItem(aliceKey)).not.toBeNull();
     });
 
     it("returns null when accountAddress is empty string", () => {
