@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
+import RecipientAddressPicker from './RecipientAddressPicker';
 import {
   formatAmountString,
   multiplyAmountStrings,
@@ -1850,18 +1851,15 @@ export default function CreateStreamModal({
                     helperText={t("createStream.step1.recipientHelper")}
                     success={recipientSuccess}
                   >
-                    <input
-                      ref={recipientInputRef}
-                      type="text"
-                      className="input-field"
+                    <RecipientAddressPicker
                       value={recipient}
-                      onChange={(e) => {
-                        setRecipient(e.target.value);
+                      onRecipientChange={(value) => {
+                        setRecipient(value);
                         if (errors.recipient) setErrors(prev => ({ ...prev, recipient: undefined }));
                       }}
+                      ref={recipientInputRef}
                       onBlur={() => handleBlur('recipient')}
                       placeholder={t("createStream.step1.recipientPlaceholder")}
-                      autoComplete="off"
                     />
                   </InputField>
 
@@ -2845,18 +2843,15 @@ export default function CreateStreamModal({
                           helperText={t("createStream.step1.recipientHelper")}
                           success={recipientSuccess}
                         >
-                          <input
-                            ref={recipientInputRef}
-                            type="text"
-                            className="input-field"
+                          <RecipientAddressPicker
                             value={recipient}
-                            onChange={(e) => {
-                              setRecipient(e.target.value);
+                            onRecipientChange={(value) => {
+                              setRecipient(value);
                               if (error) setError(null);
                             }}
+                            ref={recipientInputRef}
                             onBlur={() => handleBlur('recipient')}
                             placeholder={t("createStream.step1.recipientPlaceholder")}
-                            autoComplete="off"
                           />
                         </InputField>
 

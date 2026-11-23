@@ -6,6 +6,7 @@ import type { Stream } from "./Stream";
 import { formatNumber } from "../../lib/formatters";
 import { useOptionalToast } from "../toast/ToastProvider";
 import { useClipboard } from "../../hooks/useClipboard";
+import { useAddressBook } from "../../hooks/useAddressBook";
 import { stellarExplorerUrl } from "../../lib/stellar";
 import TruncatedAddress from "../common/TruncatedAddress";
 import "./StreamRow.css";
@@ -39,6 +40,7 @@ export default function StreamRow({
 }: Props) {
   const navigate = useNavigate();
   const toast = useOptionalToast();
+  const { getLabelForAddress } = useAddressBook();
   const { copy } = useClipboard();
 
   // Menu states
@@ -325,7 +327,11 @@ export default function StreamRow({
         title={stream.recipient}
         aria-label={`Recipient ${stream.recipient}`}
       >
-        <TruncatedAddress address={stream.recipient} label="" className="stream-row__address" />
+        <TruncatedAddress
+          address={stream.recipient}
+          label={getLabelForAddress(stream.recipient) ?? ""}
+          className="stream-row__address"
+        />
       </td>
 
       <td className="stream-row__cell py-4 px-3" data-label="RATE" style={{ color: "var(--color-text-primary)" }}>
