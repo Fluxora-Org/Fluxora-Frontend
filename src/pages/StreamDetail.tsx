@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -14,6 +15,81 @@ import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
 import { Share2 } from "lucide-react";
+
+/**
+ * Stream status presentation
+ * ──────────────────────────
+ * Every status the detail view can encounter resolves to an explicit, visible
+ * presentation (label + description + colour). Statuses the view does not
+ * recognise fall back to a clearly labelled "unknown" presentation instead of
+ * rendering a blank region, so the user can always tell whether a stream is
+ * unusual or the page is broken.
+ */
+export interface StreamStatusPresentation {
+  /** Human-readable label rendered in the status pill. */
+  label: string;
+  /** One-line explanation of what the status means for the viewer. */
+  description: string;
+  /** Colour used for the status dot and label. */
+  color: string;
+  /** False when the raw status is not one the view explicitly knows about. */
+  recognized: boolean;
+}
+
+const KNOWN_STREAM_STATUS_PRESENTATIONS: Record<
+  string,
+  Omit<StreamStatusPresentation, "recognized">
+> = {
+  active: {
+    label: "Active",
+    description: "The stream is live and accrues funds on schedule.",
+    color: "var(--color-success, #16a34a)",
+  },
+  paused: {
+    label: "Paused",
+    description:
+      "Accrual is paused. The balance already streamed stays available to the recipient.",
+    color: "var(--color-warning, #d97706)",
+  },
+  completed: {
+    label: "Completed",
+    description: "The stream finished and its full schedule was delivered.",
+    color: "var(--color-text-secondary, #6b7280)",
+  },
+  cancelled: {
+    label: "Cancelled",
+    description:
+      "The stream was cancelled before its scheduled end date and no longer accrues.",
+    color: "var(--color-error, #b91c1c)",
+  },
+  matured: {
+    label: "Matured",
+    description: "The stream reached maturity and no longer accrues funds.",
+    color: "var(--color-text-secondary, #6b7280)",
+  },
+};
+
+/**
+ * Resolve the presentation for any status string. Always returns a defined
+ * presentation; unknown values get an explicit fallback (never blank).
+ */
+export function getStreamStatusPresentation(
+  status: string | null | undefined,
+): StreamStatusPresentation {
+  const key = typeof status === "string" ? status.trim().toLowerCase() : "";
+  const known = key ? KNOWN_STREAM_STATUS_PRESENTATIONS[key] : undefined;
+  if (known) {
+    return { ...known, recognized: true };
+  }
+  const label = key ? key.charAt(0).toUpperCase() + key.slice(1) : "Unknown";
+  return {
+    label,
+    description:
+      "This status is not recognised by the stream detail view. Confirm the stream state in the treasury console before acting on it.",
+    color: "var(--color-text-secondary, #6b7280)",
+    recognized: false,
+  };
+}
 
 /**
  * StreamDetail page
@@ -44,23 +120,24 @@ export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { address: accountId } = useWallet();
-  const { viewers, isPresenceEnabled, updateCursor, isLoading } = usePresenceViewers(
-    streamId,
-    undefined,
-    accountId ?? undefined,
-  );
+  const { viewers, isPresenceEnabled, updateCursor, isLoading } =
+    usePresenceViewers(streamId, undefined, accountId ?? undefined);
 
   // Compare mode: ?compare=<otherStreamId>
   const compareWithId = searchParams.get("compare");
   const isCompareMode = Boolean(compareWithId && streamId);
 
   const [isOgModalOpen, setIsOgModalOpen] = useState(false);
+  const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
+
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a
@@ -199,7 +276,7 @@ export default function StreamDetail() {
   if (error) {
     const handleRetry = () => {
       if (!streamId) return;
-      
+
       // Same guard as the effect above: cancel any still-pending fetch
       // before starting a new one, so a slow earlier retry (or a route
       // change that happens before this retry resolves) can never
@@ -339,6 +416,8 @@ export default function StreamDetail() {
     Settled: "var(--color-text-secondary, #6b7280)",
   };
 
+  const statusPresentation = getStreamStatusPresentation(stream.status);
+
   // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
@@ -368,13 +447,16 @@ export default function StreamDetail() {
           >
             {stream.name}
           </h1>
-          <p style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}>
+          <p
+            style={{ color: "var(--color-text-secondary, #6b7280)", margin: 0 }}
+          >
             {stream.summary}
           </p>
         </div>
 
         {/* Share & Social Preview Card Trigger */}
         <button
+          ref={shareTriggerRef}
           onClick={() => setIsOgModalOpen(true)}
           data-testid="share-og-preview-btn"
           aria-label={`Share ${stream.name} and preview social card`}
@@ -427,6 +509,102 @@ export default function StreamDetail() {
           {stream.health} — {stream.healthNote}
         </span>
       </div>
+
+      {/* Top-Up Flow */}
+      <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <input
+            type="number"
+            aria-label="Top up amount"
+            placeholder="Amount"
+            value={topUpAmount}
+            onChange={(e) => setTopUpAmount(e.target.value)}
+            disabled={topUpStatus === "pending"}
+            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border, #e5e7eb)" }}
+          />
+          <button
+            onClick={() => {
+              setTopUpStatus("pending");
+              setTimeout(() => {
+                if (Number(topUpAmount) <= 0) {
+                  setTopUpStatus("rejected");
+                } else {
+                  setTopUpStatus("confirmed");
+                }
+              }, 500);
+            }}
+            disabled={topUpStatus === "pending" || !topUpAmount}
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "4px",
+              background: "var(--color-text-primary, #111827)",
+              color: "var(--color-surface-1, #fff)",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Submit Top Up
+          </button>
+        </div>
+        {topUpStatus !== "idle" && (
+          <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
+            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+          </div>
+        )}
+      </div>
+      {/* Status presentation — always renders a defined state, even for
+          statuses this view does not recognise, so the region is never blank. */}
+      <section
+        aria-labelledby="stream-status-heading"
+        data-testid="stream-status"
+        data-status={String(stream.status).toLowerCase()}
+        data-status-recognized={statusPresentation.recognized ? "true" : "false"}
+        style={{ marginBottom: "1.5rem" }}
+      >
+        <h2 id="stream-status-heading" className="sr-only">
+          Stream status
+        </h2>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.375rem",
+            padding: "0.25rem 0.75rem",
+            borderRadius: "9999px",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            background: "var(--color-surface-2, #f3f4f6)",
+            color: statusPresentation.color,
+          }}
+        >
+          <span aria-hidden="true">●</span>
+          {statusPresentation.label}
+        </span>
+        <p
+          data-testid="stream-status-description"
+          style={{
+            margin: "0.5rem 0 0",
+            fontSize: "0.875rem",
+            color: "var(--color-text-secondary, #6b7280)",
+          }}
+        >
+          {statusPresentation.description}
+        </p>
+        {!statusPresentation.recognized && (
+          <p
+            data-testid="stream-status-fallback"
+            style={{
+              margin: "0.25rem 0 0",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              color: "var(--color-warning, #d97706)",
+            }}
+          >
+            Unrecognised stream status: <code>{String(stream.status)}</code>
+          </p>
+        )}
+      </section>
 
       {/* Metrics grid */}
       <dl
@@ -503,10 +681,7 @@ export default function StreamDetail() {
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -540,15 +715,14 @@ export default function StreamDetail() {
       )}
 
       {/* Cursor indicator overlays */}
-      {isPresenceEnabled && (
-        <PresenceCursorOverlay viewers={viewers} />
-      )}
+      {isPresenceEnabled && <PresenceCursorOverlay viewers={viewers} />}
 
       {/* Open Graph Social Preview Modal */}
       <StreamOGPreviewModal
         stream={stream}
         isOpen={isOgModalOpen}
         onClose={() => setIsOgModalOpen(false)}
+        triggerRef={shareTriggerRef}
       />
     </div>
   );

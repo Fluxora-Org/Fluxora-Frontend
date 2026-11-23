@@ -9,6 +9,12 @@ interface ImportMetaEnv {
   readonly VITE_TX_POLL_INTERVAL_MS?: string;
   readonly VITE_TX_POLL_MAX_ATTEMPTS?: string;
   readonly VITE_TX_POLL_BACKOFF_FACTOR?: string;
+  /**
+   * Wall-clock ceiling (ms) for a single `useTransactionStatus` polling run,
+   * measured from the first attempt. Defaults to `30000`. Independent of
+   * `VITE_TX_POLL_MAX_ATTEMPTS` — see `transactionPollingConfig.deadlineMs`.
+   */
+  readonly VITE_TX_POLL_DEADLINE_MS?: string;
   readonly VITE_TX_DEMO_CONFIRMATION_ATTEMPTS?: string;
   readonly VITE_DEMO_MODE?: string;
   readonly VITE_TX_BASE_FEE?: string;

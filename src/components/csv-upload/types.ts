@@ -5,6 +5,14 @@
  * validation logic, and components all share a single source of truth.
  */
 
+
+/** A single located parse/validation error: which row, optionally which column, and what was expected. */
+export interface CsvParseError {
+  row: number;
+  column?: CanonicalHeader;
+  message: string;
+}
+
 /** Canonical column names used internally after mapping. */
 export const CANONICAL_HEADERS = [
   'recipient',
@@ -14,6 +22,11 @@ export const CANONICAL_HEADERS = [
 ] as const;
 
 export type CanonicalHeader = (typeof CANONICAL_HEADERS)[number];
+
+export const REQUIRED_CANONICAL_HEADERS: CanonicalHeader[] = [
+  'recipient',
+  'deposit_amount',
+];
 
 /**
  * Hard limits for CSV uploads to prevent denial of service.
@@ -71,6 +84,9 @@ export interface ParseResult {
   rows: CsvRow[];
   /** Top-level parse error (wrong file type, empty, or exceeds any CSV_LIMITs threshold). */
   parseError?: string;
+
+  /** Every located parse/validation error found for this file, if any. */
+  parseErrors?: CsvParseError[];
 }
 
 /** State of the upload zone. */

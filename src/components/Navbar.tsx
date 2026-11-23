@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import WalletButton from "./wallet-connect/Walletbutton";
 import {
   isMobileViewport,
+  mediaDown,
   VIEWPORT_RESIZE_DEBOUNCE_MS,
 } from "../lib/breakpoints";
 
@@ -12,13 +13,132 @@ interface NavbarProps {
   theme?: "light" | "dark";
 }
 
+/**
+ * The entries the default links can point at: `product` is a route, the other
+ * two are fragments of the landing page.
+ */
+type NavLinkEntry = "product" | "documentation" | "pricing";
+
+/** Every entry the header can show, including the treasury-only `dashboard`. */
+type NavEntry = NavLinkEntry | "dashboard";
+
+const NAV_ENTRY_LABEL: Record<NavEntry, string> = {
+  product: "Product",
+  documentation: "Documentation",
+  pricing: "Pricing",
+  dashboard: "Dashboard",
+};
+
+/** In-page fragments the default links target. */
+const NAV_LINK_FRAGMENTS: readonly NavLinkEntry[] = [
+  "documentation",
+  "pricing",
+];
+
+/** Routes that replace the default links with the single "Dashboard" entry. */
+const TREASURY_PATH_FRAGMENT = "treasurypage";
+
+/**
+ * Resolves which entry — if any — is the page the user is on, so that exactly
+ * one item can carry `aria-current="page"` at a time (issue #1657).
+ *
+ * A route no entry leads to resolves to `null` rather than marking the nearest
+ * neighbour, so the announced current item is never a guess.
+ */
+function resolveCurrentEntry(
+  pathname: string,
+  hash: string | undefined,
+): NavEntry | null {
+  if (pathname.includes(TREASURY_PATH_FRAGMENT)) {
+    return "dashboard";
+  }
+
+  const fragment = hash?.replace(/^#/, "");
+  if (fragment && NAV_LINK_FRAGMENTS.includes(fragment as NavLinkEntry)) {
+    return fragment as NavLinkEntry;
+  }
+
+  return pathname === "/" ? "product" : null;
+}
+
+/**
+ * Non-colour cue for the entry the user is on (issue #1657).
+ *
+ * The slot always reserves its space so marking the current entry causes no
+ * layout shift, and the marker inside is drawn only for that entry. Its
+ * *presence* — a solid geometric shape — stays identifiable in greyscale and
+ * under every colour-blind simulation. It is decorative: the programmatic cue
+ * is the `aria-current="page"` on the entry itself.
+ */
+function NavEntryMarker({ current }: { current: boolean }) {
+  return (
+    <span aria-hidden="true" style={styles.navEntryMarkerSlot}>
+      {current && (
+        <span
+          data-testid="navbar-active-indicator"
+          style={styles.navEntryMarker}
+        />
+      )}
+    </span>
+  );
+}
+
+/**
+ * A single default navigation entry, marked current when it leads to the page
+ * the user is on. The route entry is a router `Link` so client-side navigation
+ * keeps updating the current marking; the fragment entries stay plain anchors
+ * so the browser's own fragment scrolling is preserved.
+ */
+function NavEntryItem({
+  entry,
+  currentEntry,
+  onSelect,
+}: {
+  entry: NavLinkEntry;
+  currentEntry: NavEntry | null;
+  onSelect: () => void;
+}) {
+  const current = entry === currentEntry;
+
+  const shared = {
+    style: styles.navLink,
+    "aria-current": current ? ("page" as const) : undefined,
+    "data-active": current ? "true" : "false",
+  };
+
+  const contents = (
+    <>
+      {NAV_ENTRY_LABEL[entry]}
+      <NavEntryMarker current={current} />
+    </>
+  );
+
+  return entry === "product" ? (
+    <Link to="/" onClick={onSelect} {...shared}>
+      {contents}
+    </Link>
+  ) : (
+    <a href={`#${entry}`} onClick={onSelect} {...shared}>
+      {contents}
+    </a>
+  );
+}
+
 export default function Navbar({
   onThemeToggle,
   theme = "light",
 }: NavbarProps) {
   const location = useLocation();
+  const currentEntry = resolveCurrentEntry(
+    location.pathname,
+    location.hash,
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => isMobileViewport());
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  const isFirstRender = useRef(true);
+  const prevTheme = useRef(theme);
+  const prevMobileOpen = useRef(mobileMenuOpen);
 
   useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | undefined;
@@ -44,6 +164,42 @@ export default function Navbar({
     };
   }, []);
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (prevMobileOpen.current !== mobileMenuOpen) {
+      prevMobileOpen.current = mobileMenuOpen;
+      setLiveAnnouncement(
+        mobileMenuOpen ? "Navigation menu opened" : "Navigation menu closed",
+      );
+    }
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (prevTheme.current !== theme) {
+      prevTheme.current = theme;
+      setLiveAnnouncement(`Theme switched to ${theme} mode`);
+    }
+  }, [theme]);
+
   const handleThemeToggle = () => {
     onThemeToggle?.();
   };
@@ -55,11 +211,19 @@ export default function Navbar({
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
   };
-    
 
   return (
     <>
       <nav style={styles.navbar} role="navigation" aria-label="Main navigation">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="navbar-live-region"
+          style={styles.visuallyHidden}
+        >
+          {liveAnnouncement}
+        </div>
         <div style={styles.logoContainer}>
           <Link
             to="/"
@@ -206,6 +370,7 @@ export default function Navbar({
           onClick={toggleMobileMenu}
           aria-label="Toggle navigation menu"
           aria-expanded={mobileMenuOpen}
+          aria-controls="navbar-mobile-menu"
         >
           <span
             style={{
@@ -232,6 +397,7 @@ export default function Navbar({
         </button>
 
         <div
+          id="navbar-mobile-menu"
           style={{
             ...styles.navLinksContainer,
             ...(mobileMenuOpen && isMobile
@@ -241,24 +407,29 @@ export default function Navbar({
                 : {}),
           }}
         >
-          {location.pathname.includes("treasurypage") ? (
+          {currentEntry === "dashboard" ? (
             // show dashboard title instead of default nav
-            <span className="font-bold justify-start">Dashboard</span>
+            <span className="font-bold justify-start" aria-current="page" data-active="true">
+              {NAV_ENTRY_LABEL.dashboard}
+              <NavEntryMarker current />
+            </span>
           ) : (
             <>
-              <Link to="/" style={styles.navLink} onClick={closeMobileMenu}>
-                Product
-              </Link>
-              <a
-                href="#documentation"
-                style={styles.navLink}
-                onClick={closeMobileMenu}
-              >
-                Documentation
-              </a>
-              <a href="#pricing" style={styles.navLink} onClick={closeMobileMenu}>
-                Pricing
-              </a>
+              <NavEntryItem
+                entry="product"
+                currentEntry={currentEntry}
+                onSelect={closeMobileMenu}
+              />
+              <NavEntryItem
+                entry="documentation"
+                currentEntry={currentEntry}
+                onSelect={closeMobileMenu}
+              />
+              <NavEntryItem
+                entry="pricing"
+                currentEntry={currentEntry}
+                onSelect={closeMobileMenu}
+              />
             </>
           )}
 
@@ -382,7 +553,12 @@ export default function Navbar({
           )}
         </div>
 
-        <div style={styles.rightContainer}>
+        <div
+          style={{
+            ...styles.rightContainer,
+            ...(isMobile ? { display: "none" } : {}),
+          }}
+        >
           <button
             style={styles.themeToggle}
             onClick={handleThemeToggle}
@@ -533,7 +709,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "0.5rem",
     textDecoration: "none",
     color: "var(--color-text-primary)",
-    outline: "none",
   },
   logoBrand: {
     display: "flex",
@@ -608,10 +783,23 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     cursor: "pointer",
     transition: "var(--transition-base)",
-    outline: "none",
     minHeight: "44px",
     display: "flex",
     alignItems: "center",
+  },
+  navEntryMarkerSlot: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "10px",
+    marginLeft: "0.25rem",
+    flexShrink: 0,
+  },
+  navEntryMarker: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "9999px",
+    background: "var(--color-accent-secondary)",
   },
   rightContainer: {
     display: "flex",
@@ -634,7 +822,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-text-primary)",
     transition: "var(--transition-base)",
     padding: 0,
-    outline: "none",
   },
   connectWalletBtn: {
     background: "var(--cta-bg)",
@@ -648,7 +835,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     boxShadow: "var(--cta-shadow)",
-    outline: "none",
     whiteSpace: "nowrap",
     minHeight: "44px",
   },
@@ -659,7 +845,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     cursor: "pointer",
     padding: "8px",
-    outline: "none",
     zIndex: 11,
     minHeight: "44px",
     minWidth: "44px",
@@ -681,6 +866,17 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: 0,
     background: "rgba(0, 0, 0, 0.5)",
     zIndex: 999,
+  },
+  visuallyHidden: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    padding: 0,
+    margin: "-1px",
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
   },
 };
 
@@ -719,8 +915,32 @@ if (typeof document !== "undefined") {
       nav > div:nth-of-type(2) > div > a:hover {
         opacity: 0.8;
       }
+
+      /* Current page (issue #1657): the entry the user is on is marked
+         programmatically with aria-current="page", and this rule gives it a
+         visual state that does not depend on hue — an underline and a heavier
+         weight both survive greyscale and every colour-blind simulation. */
+      nav [aria-current="page"] {
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 3px;
+        font-weight: 700;
+      }
+
+      /* Visible focus indicator for keyboard users (issue #1973) */
+      nav a:focus-visible,
+      nav button:focus-visible {
+        outline: 2px solid var(--color-accent-secondary, #00B8D4) !important;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba(0, 184, 212, 0.25);
+      }
+
+      nav a:not(:focus-visible):focus,
+      nav button:not(:focus-visible):focus {
+        outline: none;
+      }
       
-      @media (max-width: 768px) {
+      @media ${mediaDown("md")} {
         nav {
           padding: 0 1rem;
         }

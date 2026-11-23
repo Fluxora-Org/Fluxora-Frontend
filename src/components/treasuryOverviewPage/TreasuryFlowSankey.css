@@ -203,7 +203,7 @@
 }
 
 /* ─── Responsive: table is forced below --breakpoint-md ─── */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .sankey-diagram-wrapper {
     display: none;
   }

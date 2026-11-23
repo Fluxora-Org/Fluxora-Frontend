@@ -38,9 +38,8 @@ describe('CsvDropZone limits', () => {
   });
 
   it('accepts a file exactly at MAX_CSV_FILE_SIZE_BYTES', async () => {
-    // The content doesn't need to be a valid CSV for the size check to pass;
-    // we just need to verify that the boundary is not rejected.
-    const content = 'x'.repeat(MAX_CSV_FILE_SIZE_BYTES);
+    const padding = ' '.repeat(MAX_CSV_FILE_SIZE_BYTES - ONE_ROW.length);
+    const content = ONE_ROW + padding;
     const file = makeFile(content, 'boundary.csv');
     render(<CsvDropZone onParsed={onParsed} />);
     const input = screen.getByLabelText(/accepts \.csv format/i) as HTMLInputElement;

@@ -49,7 +49,7 @@ describe("CreateStreamModal transaction confirmation", () => {
 
     vi.mocked(createStream).mockResolvedValue({
       status: "SUCCESS",
-      txHash: "abcdef1234567890",
+      txHash: "abcdef1234567890", status: "success", latestLedger: "1", latestLedgerCloseTime: "1", oldestLedger: "1", oldestLedgerCloseTime: "1",
     } as any);
     vi.mocked(getTransactionStatus).mockResolvedValue("confirmed");
 
@@ -132,7 +132,7 @@ describe("CreateStreamModal transaction confirmation", () => {
     expect(createStream).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolve!({ txHash: "hash-1" });
+      resolve!({ txHash: "hash-1", status: "success", latestLedger: "1", latestLedgerCloseTime: "1", oldestLedger: "1", oldestLedgerCloseTime: "1" });
       await Promise.resolve();
     });
   });
@@ -164,7 +164,7 @@ describe("CreateStreamModal transaction confirmation", () => {
 
     vi.mocked(createStream).mockResolvedValue({
       status: "SUCCESS",
-      txHash: "hash-retry",
+      txHash: "hash-retry", status: "success", latestLedger: "1", latestLedgerCloseTime: "1", oldestLedger: "1", oldestLedgerCloseTime: "1",
     } as any);
     vi.mocked(getTransactionStatus).mockResolvedValue("confirmed");
 

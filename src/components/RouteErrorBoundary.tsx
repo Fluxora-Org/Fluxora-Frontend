@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ErrorBoundary from "./ErrorBoundary";
 import ErrorPage from "../pages/ErrorPage";
 import WalletFallback from "./WalletFallback";
@@ -44,6 +44,7 @@ export default function RouteErrorBoundary({
   load,
 }: RouteErrorBoundaryProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [attempt, setAttempt] = useState(0);
 
   const retry = useCallback(() => setAttempt((current) => current + 1), []);
@@ -58,6 +59,7 @@ export default function RouteErrorBoundary({
 
   return (
     <ErrorBoundary
+      key={`${location.pathname}${location.search}`}
       fallback={({ reset }) => (
         <ErrorPage
           type="default"

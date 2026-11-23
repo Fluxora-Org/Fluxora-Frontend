@@ -137,7 +137,13 @@ export default function NewsletterSection() {
               setEmail(e.target.value);
               setFeedback(null);
             }}
-            style={styles.input}
+            disabled={submitting}
+            aria-disabled={submitting}
+            style={{
+              ...styles.input,
+              opacity: submitting ? 0.7 : 1,
+              cursor: submitting ? "not-allowed" : "text",
+            }}
             aria-invalid={feedback?.inputInvalid === true}
             aria-describedby={messageId}
             maxLength={EMAIL_MAX_LENGTH}

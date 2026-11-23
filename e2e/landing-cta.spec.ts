@@ -12,7 +12,9 @@ test("landing page hero CTA navigates to connect-wallet entry point", async ({ p
   ).toBeVisible();
 
 
-  const launchApp = hero.getByRole("button", { name: "Launch App" });
+  const launchApp = hero.getByRole("button", {
+    name: "Connect wallet to launch",
+  });
   await expect(launchApp).toBeVisible();
   await expect(launchApp).toBeEnabled();
 

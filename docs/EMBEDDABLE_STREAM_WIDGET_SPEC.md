@@ -172,6 +172,40 @@ location / {
 3. **Specific Paths**: Apply embedding permissions only to `/embed/` routes
 4. **Audit Logging**: Monitor embed usage and sources
 
+## Framing Trust (Client-Side)
+
+Server-side `frame-ancestors` is the primary framing control, but it cannot be
+verified from inside the widget. The widget therefore applies its own
+defence-in-depth check before rendering any sensitive figures, implemented in
+`src/lib/embedFramingPolicy.ts`.
+
+### Trust Rules
+
+- **Allowlist source**: `VITE_EMBED_ALLOWED_ORIGINS` (comma-separated origins).
+  This is the only authoritative signal. `document.referrer` is used to derive
+  the framing origin but is never trusted on its own, because a hostile page can
+  suppress or control it.
+- **Top-level page** (`window.top === window.self`): trusted. Nothing wraps it.
+- **Framed + allowlisted referrer origin**: trusted, full widget.
+- **Framed + no allowlist configured**: not trusted, fail closed.
+- **Framed + missing/opaque referrer**: not trusted, even with an allowlist.
+- **Framed + referrer origin not allowlisted**: not trusted.
+
+### Degraded Mode
+
+When trust cannot be established, the widget renders a degraded state instead of
+the normal layout:
+
+- Shows stream identity (name) and the network/stream disclosure.
+- Hides all balances, amounts, payment rates, progress, and the timeline.
+- Never crashes or exposes figures on an origin-check failure.
+
+### Disclosure
+
+Every success-state render displays a disclosure line stating which network and
+stream it is showing, e.g. `Testnet · Stream STR-001`, so a viewer can always
+tell what a framed widget claims to represent.
+
 ## Mock Data Architecture
 
 ### Data Layer Abstraction

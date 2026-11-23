@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import RecipientEmptyState from "../components/RecipientEmptyState";
+import { MetaTags } from "../components/MetaTags";
+import ConnectWalletModal from "../components/ConnectWalletModal";
 import {
   RecipientStreams,
   type Stream,
@@ -7,6 +9,7 @@ import {
 import RecipientLoading from "../components/RecipientLoading";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useToast } from "../components/toast/ToastProvider";
 import { formatAssetAmount } from "../lib/formatters";
 import type { StreamRecord } from "../data/streamRecords";
@@ -116,11 +119,13 @@ export function getRecipientPageTitle(
 }
 
 export default function Recipient() {
+  const isOnline = useOnlineStatus();
   const wallet = useWallet();
   const { addToast } = useToast();
   const recipientData = useRecipientPageData({
     address: wallet.address,
     connected: wallet.connected,
+    accountContextVersion: wallet.accountContextVersion,
   });
   const {
     streams: liveStreams,
@@ -168,18 +173,20 @@ export default function Recipient() {
   >("not-yet-asked");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  // Connect-wallet dialog offered by the not-connected empty state (#1732).
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Local Security Gate States ──
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const [isBiometricEnrolled, setIsBiometricEnrolled] = useState(() => {
-    return localStorage.getItem("fluxora_biometric_enrolled") === "true";
+    return false;
   });
-  const [backupPin, setBackupPin] = useState(() => {
-    return localStorage.getItem("fluxora_backup_pin");
+  const [backupPin, setBackupPin] = useState<string | null>(() => {
+    return null;
   });
   const [isSecurityGateEnabled, setIsSecurityGateEnabled] = useState(() => {
-    return localStorage.getItem("fluxora_security_gate_enabled") === "true";
+    return false;
   });
 
   // Enrollment Modal States
@@ -362,6 +369,7 @@ export default function Recipient() {
 
   const isPending = txState === "signing" || txState === "submitting";
   const disabled =
+    !isOnline ||
     !walletConnected ||
     !wallet.address ||
     balance === 0 ||
@@ -428,7 +436,6 @@ export default function Recipient() {
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      localStorage.setItem("fluxora_biometric_enrolled", "true");
       setIsBiometricEnrolled(true);
       setEnrollmentStep("set-pin");
     } catch (err: unknown) {
@@ -479,7 +486,6 @@ export default function Recipient() {
       if (verifyActionType === "withdraw") {
         executeOnChainWithdraw();
       } else {
-        localStorage.removeItem("fluxora_security_gate_enabled");
         setIsSecurityGateEnabled(false);
         addToast("Local security gate disabled.", "success");
       }
@@ -519,8 +525,6 @@ export default function Recipient() {
           }, 300);
         } else {
           if (nextPin === pinValue) {
-            localStorage.setItem("fluxora_backup_pin", pinValue);
-            localStorage.setItem("fluxora_security_gate_enabled", "true");
             setBackupPin(pinValue);
             setIsSecurityGateEnabled(true);
             setTimeout(() => {
@@ -582,6 +586,7 @@ export default function Recipient() {
   };
 
   const executeOnChainWithdraw = async () => {
+    if (!isOnline) return;
     setTxState("signing");
     const recipientAddr = wallet.address!;
     const amountStr = getWithdrawAmount(balance);
@@ -614,13 +619,13 @@ export default function Recipient() {
       };
       setReceiptData(newReceipt);
       setShowReceiptModal(true);
-      addToast("Withdrawal completed successfully on-chain!", "success");
+      addToast("Withdrawal completed successfully on-chain!", "success", 0);
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: unknown) {
       const error = err as Error;
       setTxState("error");
       setErrorMsg(error.message || "Withdrawal failed.");
-      addToast(`Withdrawal failed: ${error.message || error}`, "error");
+      addToast(`Withdrawal failed: ${error.message || error}`, "error", 0);
     }
   };
 
@@ -653,6 +658,7 @@ export default function Recipient() {
   if (!walletConnected || !hasStreams || serviceError) {
     return (
       <main aria-labelledby="recipient-page-title">
+        <MetaTags title="Recipient" />
         <h1
           id="recipient-page-title"
           style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}
@@ -667,6 +673,9 @@ export default function Recipient() {
           loading={effectiveEmptyStateLoading}
           error={walletConnected ? streamsError : null}
           onRetry={walletConnected ? handlePageRefetch : undefined}
+          onPrimaryAction={
+            walletConnected ? undefined : () => setIsConnectModalOpen(true)
+          }
           ctaDisabled={isRetryingDisabled}
           retryButtonRef={pageRetryButtonRef}
         />
@@ -724,12 +733,23 @@ export default function Recipient() {
             </div>
           </section>
         )}
+
+        {/* ── Connect-wallet dialog (#1732): the not-connected empty state's
+             "Connect wallet" CTA opens this so the visitor can act on the
+             offer, instead of being shown a dead button. ── */}
+        {!walletConnected && (
+          <ConnectWalletModal
+            isOpen={isConnectModalOpen}
+            onClose={() => setIsConnectModalOpen(false)}
+          />
+        )}
       </main>
     );
   }
 
   return (
     <main className="streams-page">
+      <MetaTags title="Recipient" />
       {/* ── Page Header (Hero) ── */}
       <section className="streams-hero">
         <div className="streams-hero__copy">

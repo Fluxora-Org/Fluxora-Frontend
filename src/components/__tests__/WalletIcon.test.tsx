@@ -3,17 +3,26 @@ import { describe, it, expect } from "vitest";
 import WalletIcon from "../WalletIcon";
 
 describe("WalletIcon", () => {
-  describe("decorative mode (no props)", () => {
-    it("renders the generic wallet SVG", () => {
+  describe("decorative mode (no name / decorative prop)", () => {
+    it("renders the generic wallet SVG when name is omitted", () => {
       const { container } = render(<WalletIcon />);
       const svg = container.querySelector("svg");
       expect(svg).toBeInTheDocument();
     });
 
-    it("is marked as aria-hidden", () => {
+    it("is marked as aria-hidden when name is omitted", () => {
       const { container } = render(<WalletIcon />);
       const div = container.firstElementChild as HTMLElement;
       expect(div.getAttribute("aria-hidden")).toBe("true");
+    });
+
+    it("is aria-hidden when decorative=true even if a name is passed", () => {
+      const { container } = render(
+        <WalletIcon name="Freighter" iconSrc="/assets/freighter.svg" decorative />,
+      );
+      const div = container.firstElementChild as HTMLElement;
+      expect(div.getAttribute("aria-hidden")).toBe("true");
+      expect(screen.queryByRole("img")).not.toBeInTheDocument();
     });
   });
 
@@ -23,7 +32,7 @@ describe("WalletIcon", () => {
       expect(screen.getByText("F")).toBeInTheDocument();
     });
 
-    it("sets aria-label to the wallet name", () => {
+    it("sets an accessible name identifying the wallet", () => {
       render(<WalletIcon name="Albedo" />);
       const el = screen.getByRole("img", { name: "Albedo" });
       expect(el).toBeInTheDocument();
@@ -48,10 +57,10 @@ describe("WalletIcon", () => {
       expect(img.tagName).toBe("IMG");
     });
 
-    it("sets alt text to the wallet name with logo suffix", () => {
+    it("sets alt text to the wallet name", () => {
       render(<WalletIcon name="Freighter" iconSrc="/assets/freighter.svg" />);
-      const img = screen.getByRole("img");
-      expect(img).toHaveAttribute("alt", "Freighter wallet logo");
+      const img = screen.getByRole("img", { name: "Freighter" });
+      expect(img).toHaveAttribute("alt", "Freighter");
       expect(img.tagName).toBe("IMG");
     });
 

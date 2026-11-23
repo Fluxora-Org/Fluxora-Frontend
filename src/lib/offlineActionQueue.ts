@@ -1,8 +1,8 @@
 /**
- * Persistent offline action queue for submissions captured while offline.
+ * In-memory offline action queue for submissions captured while offline.
  *
- * Maintains proper ordering across reloads and reconnects with sequence metadata,
- * dependency tracking, and idempotency keys to prevent duplicate replay.
+ * Maintains ordering across reconnects with sequence metadata, dependency
+ * tracking, and idempotency keys to prevent duplicate replay.
  */
 
 export interface QueuedAction<T = unknown> {
@@ -18,45 +18,125 @@ export interface QueuedAction<T = unknown> {
   error?: string;
 }
 
+export type OfflineActionQueueInputErrorReason =
+  | 'empty_payload'
+  | 'invalid_payload'
+  | 'payload_too_large'
+  | 'invalid_dependencies';
+
+export class OfflineActionQueueInputError extends Error {
+  constructor(readonly reason: OfflineActionQueueInputErrorReason) {
+    super(`Invalid offline action queue input: ${reason}`);
+    this.name = 'OfflineActionQueueInputError';
+  }
+}
+
+export const MAX_OFFLINE_ACTION_PAYLOAD_BYTES = 64 * 1024;
+const MAX_DEPENDENCIES = 100;
+const MAX_DEPENDENCY_ID_LENGTH = 256;
+
 type Listener = () => void;
 
-const STORAGE_KEY = 'fluxora_offline_queue';
 let sequenceCounter = 0;
 let queue: QueuedAction[] = [];
 const listeners = new Set<Listener>();
 
-// Load queue from localStorage on module initialization
-function loadQueueFromStorage(): void {
+function isJsonValue(value: unknown, seen: Set<object>): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return true;
+  }
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object') return false;
+  if (seen.has(value)) return false;
+
+  const prototype = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  seen.add(value);
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed.queue)) {
-        queue = parsed.queue;
-        sequenceCounter = parsed.sequenceCounter || 0;
+    if (Array.isArray(value)) {
+      if (
+        Object.keys(value).length !== value.length ||
+        Object.getOwnPropertySymbols(value).length > 0
+      ) {
+        return false;
       }
+      for (let index = 0; index < value.length; index += 1) {
+        if (
+          !Object.prototype.hasOwnProperty.call(value, index) ||
+          !isJsonValue(value[index], seen)
+        ) {
+          return false;
+        }
+      }
+      return true;
     }
-  } catch (error) {
-    console.warn('Failed to load offline queue from storage:', error);
-    queue = [];
-    sequenceCounter = 0;
+
+    if (Object.getOwnPropertySymbols(value).length > 0) return false;
+    return Object.keys(value).every((key) =>
+      isJsonValue((value as Record<string, unknown>)[key], seen),
+    );
+  } finally {
+    seen.delete(value);
   }
 }
 
-// Save queue to localStorage
-function saveQueueToStorage(): void {
+function validateEnqueueInput(payload: unknown, dependencies: unknown): void {
+  let serialized: string | undefined;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      queue,
-      sequenceCounter
-    }));
+    if (
+      payload === null ||
+      payload === undefined ||
+      (typeof payload === 'string' && payload.trim().length === 0) ||
+      (Array.isArray(payload) && payload.length === 0)
+    ) {
+      throw new OfflineActionQueueInputError('empty_payload');
+    }
+    if (!isJsonValue(payload, new Set())) {
+      throw new OfflineActionQueueInputError('invalid_payload');
+    }
+    serialized = JSON.stringify(payload);
   } catch (error) {
-    console.warn('Failed to save offline queue to storage:', error);
+    if (error instanceof OfflineActionQueueInputError) throw error;
+    throw new OfflineActionQueueInputError('invalid_payload');
+  }
+
+  if (serialized === undefined) {
+    throw new OfflineActionQueueInputError('invalid_payload');
+  }
+  if (serialized === '{}' || serialized === '[]') {
+    throw new OfflineActionQueueInputError('empty_payload');
+  }
+  if (new TextEncoder().encode(serialized).byteLength > MAX_OFFLINE_ACTION_PAYLOAD_BYTES) {
+    throw new OfflineActionQueueInputError('payload_too_large');
+  }
+
+  let validDependencies: boolean;
+  try {
+    validDependencies =
+      Array.isArray(dependencies) &&
+      dependencies.length <= MAX_DEPENDENCIES &&
+      dependencies.every(
+        (dependency) =>
+          typeof dependency === 'string' &&
+          dependency.trim().length > 0 &&
+          dependency.length <= MAX_DEPENDENCY_ID_LENGTH,
+      );
+  } catch {
+    throw new OfflineActionQueueInputError('invalid_dependencies');
+  }
+  if (!validDependencies) {
+    throw new OfflineActionQueueInputError('invalid_dependencies');
   }
 }
 
-// Initialize queue on module load
-loadQueueFromStorage();
+// Queue payloads can contain signed transactions or credentials; browser
+// storage is origin-readable, so offline submissions are memory-only.
+function saveQueueToStorage(): void {
+  // Never persist caller-controlled action payloads.
+}
 
 function notify(): void {
   listeners.forEach((listener) => listener());
@@ -67,6 +147,8 @@ export function enqueueAction<T>(
   payload: T, 
   dependencies: string[] = []
 ): QueuedAction<T> {
+  validateEnqueueInput(payload, dependencies);
+
   const action: QueuedAction<T> = {
     id: crypto.randomUUID(),
     payload,
@@ -206,9 +288,6 @@ export function __resetOfflineQueueForTests(): void {
   queue = [];
   sequenceCounter = 0;
   listeners.clear();
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    // Ignore localStorage errors in tests
-  }
+  // The queue is memory-only (see the note above), so there is nothing to clear
+  // from localStorage here.
 }

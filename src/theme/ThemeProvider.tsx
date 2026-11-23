@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -116,10 +117,15 @@ export interface ThemeRegistrationError {
 
 // ─── 3. Storage helpers ───────────────────────────────────────────────────────
 
-export type ThemePreference = "light" | "dark" | "auto";
+export type ThemePreference = "light" | "dark" | "cyberpunk" | "auto";
 
 export function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "auto";
+  return (
+    value === "light" ||
+    value === "dark" ||
+    value === "cyberpunk" ||
+    value === "auto"
+  );
 }
 
 function getStoredTheme(): ThemePreference | null {
@@ -494,14 +500,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Keep hasExplicitChoiceRef in sync with themePreference state
   hasExplicitChoiceRef.current = themePreference !== "auto";
 
-  // Mirror built-in theme to DOM (only when not in custom mode).
-  useEffect(() => {
+  const isFirstMountRef = useRef<boolean>(true);
+  if (isFirstMountRef.current && typeof document !== "undefined") {
+    isFirstMountRef.current = false;
+    const storedCustom = getStoredCustomTheme();
+    if (storedCustom) {
+      applyCustomTokens(storedCustom.validatedTokens);
+      applyTheme("custom");
+    } else {
+      applyTheme(theme);
+    }
+    applyFontPreference(easyReadFont);
+  }
+
+  // Mirror built-in theme to DOM before paint (only when not in custom mode).
+  useLayoutEffect(() => {
     if (document.documentElement.getAttribute("data-theme") !== "custom") {
       applyTheme(theme);
     }
   }, [theme]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFontPreference(easyReadFont);
   }, [easyReadFont]);
 
@@ -520,13 +539,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     (next: Theme) => {
-      if (next === "light" || next === "dark") {
-        setThemePreference(next);
-      } else {
-        hasExplicitChoiceRef.current = true;
-        writeBrowserStorage(THEME_STORAGE_KEY, next, window.localStorage);
-        setThemeState(next);
-      }
+      // Every built-in `Theme` is now a valid explicit preference, so route the
+      // write through `setThemePreference`. This keeps the persisted preference
+      // (`themePreference`) and the applied theme (`theme`) in lock-step —
+      // including `"cyberpunk"`, which previously bypassed the preference state
+      // and was silently dropped on reload.
+      setThemePreference(next);
     },
     [setThemePreference],
   );
@@ -661,8 +679,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     TokenValidationError[]
   >([]);
 
-  // Apply persisted custom theme on initial mount.
-  useEffect(() => {
+  // Apply persisted custom theme before paint on initial mount.
+  useLayoutEffect(() => {
     const stored = getStoredCustomTheme();
     if (stored) {
       applyCustomTokens(stored.validatedTokens);

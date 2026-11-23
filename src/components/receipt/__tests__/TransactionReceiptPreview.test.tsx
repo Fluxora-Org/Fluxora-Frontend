@@ -46,6 +46,31 @@ describe("TransactionReceiptPreview component", () => {
     expect(screen.getByText(/pending rpc confirmation/i)).toBeInTheDocument();
   });
 
+  it("never presents a failed transaction as a confirmed receipt", () => {
+    render(
+      <TransactionReceiptPreview
+        data={{ ...mockConfirmedData, status: "failed" }}
+      />,
+    );
+
+    expect(screen.getByText(/transaction failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/transaction was not confirmed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/on-chain confirmed/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /explorer/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download creation receipt/i })).toBeDisabled();
+  });
+
+  it("treats an unknown result with a hash as unverified", () => {
+    render(
+      <TransactionReceiptPreview
+        data={{ ...mockConfirmedData, status: "unknown" }}
+      />,
+    );
+
+    expect(screen.getByText(/confirmation unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /explorer/i })).not.toBeInTheDocument();
+  });
+
   it("renders explorer link with testnet network segment when network is TESTNET", () => {
     const testnetData: ReceiptData = {
       ...mockConfirmedData,

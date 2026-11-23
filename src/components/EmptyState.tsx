@@ -20,6 +20,8 @@ export interface EmptyStateProps {
   error?: string | null;
   onRetry?: () => void;
   onPrimaryAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   /** search-no-results: callback to clear active filters */
   onClearFilters?: () => void;
   /** error variant: optional descriptive message override */
@@ -210,6 +212,8 @@ export default function EmptyState({
   error = null,
   onRetry,
   onPrimaryAction,
+  secondaryActionLabel,
+  onSecondaryAction,
   onClearFilters,
   errorMessage,
   ctaDisabled = false,
@@ -219,7 +223,11 @@ export default function EmptyState({
   // When zero-accrual is flagged and variant is not already zero-accrual,
   // override the icon+copy to zero-accrual semantics.
   const effectiveVariant: EmptyStateVariant =
-    zeroAccrual && variant !== "zero-accrual" ? "zero-accrual" : variant;
+    error && variant !== "error"
+      ? "error"
+      : zeroAccrual && variant !== "zero-accrual"
+      ? "zero-accrual"
+      : variant;
   const cfg = CONFIG[effectiveVariant];
   const isConnected = walletConnected;
 
@@ -314,6 +322,15 @@ export default function EmptyState({
           )}
           {ctaLabel}
         </button>
+        {secondaryActionLabel && onSecondaryAction && (
+          <button
+            type="button"
+            onClick={onSecondaryAction}
+            style={secondaryCtaStyle}
+          >
+            {secondaryActionLabel}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -432,6 +449,19 @@ function ctaStyle(variant: EmptyStateVariant, connected: boolean, disabled = fal
         : "none",
   };
 }
+
+const secondaryCtaStyle: React.CSSProperties = {
+  marginTop: 12,
+  minHeight: 44,
+  padding: "10px 16px",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "transparent",
+  color: "var(--text)",
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 const errorBanner: React.CSSProperties = {
   display: "flex",

@@ -1,0 +1,37 @@
+/* Dropped-connection notice (#1678). Sits above modals (z-index 1000) and
+   below toasts (1200) so it stays visible during stream setup. */
+.wallet-connection-notice {
+  position: fixed;
+  top: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  max-width: calc(100vw - 2 * var(--space-lg));
+}
+
+.wallet-connection-notice__body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  font: var(--font-label-lg);
+}
+
+.wallet-connection-notice__action {
+  background: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: 4px var(--space-md);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wallet-connection-notice__action:focus-visible {
+  outline: 2px solid var(--color-accent-secondary);
+  outline-offset: 2px;
+}

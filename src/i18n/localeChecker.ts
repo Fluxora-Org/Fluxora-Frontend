@@ -26,7 +26,7 @@
  *
  *   const report = checkLocale('en', en, 'es', es);
  *   if (report.errors.length) {
- *     console.error(formatReport(report));
+ *     logger.error(formatReport(report));
  *     process.exit(1);
  *   }
  */
@@ -117,11 +117,11 @@ export function checkLocale(
   const sourceKeys = new Set(Object.keys(source));
   const catalogKeys = new Set(Object.keys(catalog));
 
-  // ── Missing keys (warning: runtime falls back to source) ────────────────
+  // ── Missing keys (error: must translate) ───────────────────────────────
   for (const key of sourceKeys) {
     if (!catalogKeys.has(key)) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         kind: "MISSING_KEY",
         key,
         message:

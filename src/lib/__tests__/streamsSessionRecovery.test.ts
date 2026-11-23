@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   STREAMS_SESSION_STORAGE_KEY_PREFIX,
   STREAMS_SESSION_MAX_AGE_MS,
@@ -8,6 +8,7 @@ import {
   clearStreamsSession,
   isDraftMeaningful,
   isFilterSnapshotMeaningful,
+  streamsSessionWriteStatus,
   type StreamDraftSnapshot,
 } from "../streamsSessionRecovery";
 
@@ -583,5 +584,83 @@ describe("streamsSessionRecovery", () => {
         isFilterSnapshotMeaningful({ ...DEFAULT_STREAMS_FILTERS, currentPage: 2 }),
       ).toBe(true);
     });
+  });
+});
+
+describe("streams session write status (#1663)", () => {
+  const originalLocalStorage = Object.getOwnPropertyDescriptor(
+    window,
+    "localStorage",
+  );
+  const EMPTY_SESSION = { filters: DEFAULT_STREAMS_FILTERS, draft: null };
+
+  function blockSiteData() {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    });
+  }
+
+  beforeEach(() => {
+    streamsSessionWriteStatus.reset();
+  });
+
+  afterEach(() => {
+    if (originalLocalStorage) {
+      Object.defineProperty(window, "localStorage", originalLocalStorage);
+    }
+    streamsSessionWriteStatus.reset();
+  });
+
+  it("returns true and records available when the write succeeds", () => {
+    expect(
+      writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, new MemoryStorage()),
+    ).toBe(true);
+    expect(streamsSessionWriteStatus.getSnapshot()).toBe("available");
+  });
+
+  it.each(["SecurityError", "QuotaExceededError"])(
+    "returns false and records unavailable when setItem throws %s",
+    (errorName) => {
+      const storage = new MemoryStorage();
+      vi.spyOn(storage, "setItem").mockImplementation(() => {
+        throw new DOMException("Storage write failed", errorName);
+      });
+
+      expect(writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, storage)).toBe(
+        false,
+      );
+      expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
+    },
+  );
+
+  it("does not throw when accessing window.localStorage throws (site data blocked)", () => {
+    blockSiteData();
+
+    expect(() => readStreamsSession(NOW, ACCOUNT_ALICE)).not.toThrow();
+    expect(readStreamsSession(NOW, ACCOUNT_ALICE)).toBeNull();
+    expect(() => clearStreamsSession(ACCOUNT_ALICE)).not.toThrow();
+    expect(writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE)).toBe(false);
+    expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
+  });
+
+  it("records unavailable when clearing the session throws", () => {
+    const storage = new MemoryStorage();
+    vi.spyOn(storage, "removeItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+
+    clearStreamsSession(ACCOUNT_ALICE, storage);
+
+    expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
+  });
+
+  it("does not change the status when there is no account to write for", () => {
+    expect(writeStreamsSession(EMPTY_SESSION, NOW, "  ", new MemoryStorage())).toBe(
+      false,
+    );
+    expect(streamsSessionWriteStatus.getSnapshot()).toBe("unknown");
   });
 });

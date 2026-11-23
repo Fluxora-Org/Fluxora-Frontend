@@ -47,6 +47,68 @@ export default function TreasuryOverviewLoading({
         ))}
       </div>
 
+      <div
+        className="activity-heatmap-container"
+        data-testid="treasury-activity-heatmap-loading"
+        aria-hidden="true"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--color-surface-default)",
+          border: "1px solid var(--color-border-default)",
+          borderRadius: "var(--radius-lg)",
+          padding: "var(--space-xl)",
+          marginTop: "var(--space-xl)",
+          marginBottom: "var(--space-xl)",
+        }}
+      >
+        <div
+          className="activity-heatmap-header"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "var(--space-md)",
+          }}
+        >
+          <Skeleton width={156} height={24} />
+          <Skeleton width={110} height={32} borderRadius={6} />
+        </div>
+        <div
+          className="heatmap-grid-scroll-wrapper"
+          style={{ width: "100%", overflowX: "auto", paddingBottom: "var(--space-sm)" }}
+        >
+          <div className="heatmap-grid-scroll-content" style={{ width: "max-content" }}>
+            <div
+              className="heatmap-grid"
+              style={{
+                display: "grid",
+                gridTemplateRows: "repeat(7, 12px)",
+                gridTemplateColumns: "repeat(12, 12px)",
+                gridAutoFlow: "column",
+                gap: 3,
+              }}
+            >
+              {Array.from({ length: 84 }).map((_, index) => (
+                <Skeleton key={index} width={12} height={12} borderRadius={2} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div
+          className="heatmap-legend"
+          style={{ display: "flex", alignItems: "center", gap: 6, marginTop: "var(--space-md)" }}
+        >
+          <Skeleton width={28} height={12} />
+          <div style={{ display: "flex", gap: 8 }}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} width={12} height={12} borderRadius={2} />
+            ))}
+          </div>
+          <Skeleton width={28} height={12} />
+        </div>
+      </div>
+
       {/* Recent streams section header */}
       <div className="recent-header" aria-hidden="true">
         <Skeleton width={140} height={18} borderRadius={6} />

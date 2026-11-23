@@ -74,23 +74,13 @@ export interface OptimisticSnapshot {
 const STORAGE_KEY = "fluxora_optimistic_operations";
 
 function readFromStorage(): OptimisticOperation[] {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as OptimisticOperation[];
-  } catch {
-    return [];
-  }
+  // Operation data can include transaction hashes and private stream details.
+  return [];
 }
 
 function writeToStorage(ops: OptimisticOperation[]): void {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(ops));
-  } catch {
-    // sessionStorage may be unavailable in some test / SSR environments.
-  }
+  // Keep transaction lifecycle data in memory only.
+  void ops;
 }
 
 // ── Internal state ────────────────────────────────────────────────────────────

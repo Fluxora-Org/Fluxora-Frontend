@@ -31,6 +31,15 @@ export interface RecognizedCommand {
   command: VoiceCommandDef;
   rawTranscript: string;
   timestamp: number;
+  /** Parsed values to review before executing a destructive voice command. */
+  intent?: VoiceConfirmationIntent;
+}
+
+export interface VoiceConfirmationIntent {
+  action: string;
+  amount: string | null;
+  recipient: string | null;
+  stream: string | null;
 }
 
 export interface VoiceContextValue {
@@ -41,6 +50,12 @@ export interface VoiceContextValue {
   pendingDestructiveCommand: VoiceCommandDef | null;
   availableCommands: VoiceCommandDef[];
   panelOpen: boolean;
+  /**
+   * Set when a spoken reference was refused as ambiguous or unconfident. Names
+   * the candidate streams so the user can be asked to disambiguate; `null`
+   * whenever the last phrase was handled. Absent means no refusal is pending.
+   */
+  ambiguityPrompt?: string | null;
   toggleListening: () => void;
   startListening: () => void;
   stopListening: () => void;

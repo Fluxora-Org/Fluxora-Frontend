@@ -32,15 +32,23 @@ export default function PresenceViewerList({
   // Reactive "now" timestamp that ticks on a coarse cadence (useTickingNow)
   // so the "last seen N seconds ago" text stays live while the list is open
   // without requiring a viewers prop change (Issue #955).
-  const now = useTickingNow();
+  const now = useTickingNow({ precision: "second", intervalMs: 5_000 });
 
-  // Get masked name or address
+  /**
+   * Determine what identity information is exposed to other viewers.
+   * This enforces privacy so viewers can be present without being identified
+   * beyond what they have explicitly shared.
+   *
+   * 1. If a viewer shares a `displayName`, it is shown.
+   * 2. If a viewer is identified by a Stellar public key (56 chars, starts with 'G'), it is masked.
+   * 3. Otherwise, the viewer's raw `id` (e.g. session UUID) is NOT exposed and they appear as "Anonymous viewer".
+   */
   const getDisplayName = (viewer: Viewer) => {
     if (viewer.displayName) return viewer.displayName;
     if (viewer.id.startsWith("G") && viewer.id.length === 56) {
       return maskAddress(viewer.id, 6, 4);
     }
-    return viewer.id;
+    return "Anonymous viewer";
   };
 
   // Get elapsed seconds string — uses the reactive `now` timestamp so

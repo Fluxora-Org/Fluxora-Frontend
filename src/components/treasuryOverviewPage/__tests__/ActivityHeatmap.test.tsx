@@ -1,11 +1,14 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ActivityHeatmap, {
   getActivityTone,
   buildTrailingDays,
   HeatmapCell,
   __heatmapCellRenderStats,
+  HEATMAP_INTENSITY_SCALE,
+  getIntensityPipCount,
 } from "../ActivityHeatmap";
+import { ColorBlindSimulationProvider } from "../../colorBlindSimulation/ColorBlindSimulationProvider";
 import type { Stream } from "../Stream";
 
 describe("ActivityHeatmap", () => {
@@ -26,7 +29,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 1",
       recipient: "addr1",
       rate: "10/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-24", // 1 event (Level 1)
     },
     {
@@ -34,7 +37,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 2",
       recipient: "addr2",
       rate: "20/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-23", // Part of 2 events on 23rd
     },
     {
@@ -42,7 +45,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 3",
       recipient: "addr3",
       rate: "30/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-23", // Part of 2 events on 23rd (Level 2)
     },
     {
@@ -50,7 +53,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 4",
       recipient: "addr4",
       rate: "40/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -58,7 +61,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 5",
       recipient: "addr5",
       rate: "50/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -66,7 +69,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 6",
       recipient: "addr6",
       rate: "60/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22",
     },
     {
@@ -74,7 +77,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 7",
       recipient: "addr7",
       rate: "70/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-22", // Part of 4 events on 22nd (Level 3)
     },
     {
@@ -82,7 +85,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 8",
       recipient: "addr8",
       rate: "80/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -90,7 +93,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 9",
       recipient: "addr9",
       rate: "90/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -98,7 +101,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 10",
       recipient: "addr10",
       rate: "100/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -106,7 +109,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 11",
       recipient: "addr11",
       rate: "110/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -114,7 +117,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 12",
       recipient: "addr12",
       rate: "120/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -122,7 +125,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 13",
       recipient: "addr13",
       rate: "130/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -130,7 +133,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 14",
       recipient: "addr14",
       rate: "140/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21",
     },
     {
@@ -138,7 +141,7 @@ describe("ActivityHeatmap", () => {
       name: "Stream 15",
       recipient: "addr15",
       rate: "150/mo",
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       startDate: "2026-07-21", // Part of 8 events on 21st (Level 4)
     },
   ];
@@ -528,7 +531,7 @@ describe("ActivityHeatmap", () => {
           name: "No start stream",
           recipient: "addr",
           rate: "0",
-          status: "Active",
+          status: "Active", accruedAmount: 0, startDate: "2026-01-01",
           startDate: undefined,
         },
       ];
@@ -566,7 +569,7 @@ describe("ActivityHeatmap", () => {
             name: `Dense ${i}-${e}`,
             recipient: "addr",
             rate: "1",
-            status: "Active",
+            status: "Active", accruedAmount: 0, startDate: "2026-01-01",
             startDate: `2026-07-${day}`,
           });
         }
@@ -652,7 +655,7 @@ describe("ActivityHeatmap", () => {
           name: "Single",
           recipient: "a",
           rate: "1",
-          status: "Active",
+          status: "Active", accruedAmount: 0, startDate: "2026-01-01",
           startDate: "2026-07-24",
         },
       ];
@@ -950,4 +953,133 @@ describe("ActivityHeatmap", () => {
       });
     });
   });
+
+  describe("Non-colour intensity encoding (WCAG 1.4.1) — issue #1691", () => {
+    // mockStreams produces one day per level, which lets every assertion below
+    // check the full 0–4 range from a single render.
+    const LEVEL_CASES = [
+      { label: "2026-07-25: no activity", level: 0, pips: 0 },
+      { label: "2026-07-24: 1 stream event", level: 1, pips: 1 },
+      { label: "2026-07-23: 2 stream events", level: 2, pips: 2 },
+      { label: "2026-07-22: 4 stream events", level: 3, pips: 3 },
+      { label: "2026-07-21: 8 stream events", level: 4, pips: 4 },
+    ] as const;
+
+    it("every cell carries a density marker whose pip count equals its level", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+
+      for (const { label, level, pips } of LEVEL_CASES) {
+        const cell = screen.getByLabelText(label);
+        expect(cell).toHaveAttribute("data-intensity-level", String(level));
+
+        const marker = cell.querySelector(".heatmap-cell-pips");
+        expect(marker).not.toBeNull();
+        // Decorative: hidden from AT so the aria-label stays the only name.
+        expect(marker).toHaveAttribute("aria-hidden", "true");
+        expect(marker?.querySelectorAll(".heatmap-cell-pip").length).toBe(pips);
+      }
+    });
+
+    it("gives every level a unique, strictly increasing pip count", () => {
+      const counts = HEATMAP_INTENSITY_SCALE.map(({ level }) =>
+        getIntensityPipCount(level),
+      );
+      expect(counts).toEqual([0, 1, 2, 3, 4]);
+      // Uniqueness is what makes the channel unambiguous without colour.
+      expect(new Set(counts).size).toBe(HEATMAP_INTENSITY_SCALE.length);
+
+      // Defensive clamping so an out-of-range level can never collide.
+      expect(getIntensityPipCount(-1)).toBe(0);
+      expect(getIntensityPipCount(9)).toBe(4);
+      expect(getIntensityPipCount(Number.NaN)).toBe(0);
+    });
+
+    it("exposes a machine-readable data-intensity-level on all 84 cells", () => {
+      const { container } = render(<ActivityHeatmap streams={mockStreams} />);
+      const cells = Array.from(
+        container.querySelectorAll(".heatmap-grid .heatmap-cell"),
+      );
+      expect(cells.length).toBe(84);
+
+      cells.forEach((cell) => {
+        const level = Number(cell.getAttribute("data-intensity-level"));
+        expect(Number.isInteger(level)).toBe(true);
+        expect(level).toBeGreaterThanOrEqual(0);
+        expect(level).toBeLessThanOrEqual(4);
+      });
+    });
+
+    it("keeps the cell's accessible name textual despite the added marker", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+
+      // Resolving by label proves the aria-hidden pips did not leak into the
+      // accessible name; the value is still exposed textually.
+      const cell = screen.getByLabelText("2026-07-21: 8 stream events");
+      expect(cell).toBeInTheDocument();
+      expect(cell.textContent).toBe("");
+    });
+
+    it("legend states the numeric scale and mirrors the same pip encoding", () => {
+      render(<ActivityHeatmap streams={mockStreams} />);
+      const legend = screen.getByRole("group", {
+        name: /Activity intensity legend/i,
+      });
+
+      // The scale is stated textually (event-count ranges), not colour alone.
+      HEATMAP_INTENSITY_SCALE.forEach(({ countRange }) => {
+        expect(within(legend).getByText(countRange)).toBeInTheDocument();
+      });
+
+      const swatches = legend.querySelectorAll(".legend-cell");
+      expect(swatches.length).toBe(HEATMAP_INTENSITY_SCALE.length);
+      swatches.forEach((swatch, index) => {
+        const { level } = HEATMAP_INTENSITY_SCALE[index];
+        expect(swatch.className).toContain(`heatmap-cell--level-${level}`);
+        // Same pip channel as the data cells, so legend and grid agree.
+        expect(swatch.querySelectorAll(".heatmap-cell-pip").length).toBe(level);
+      });
+
+      const label = legend.getAttribute("aria-label") ?? "";
+      expect(label).toMatch(/0 to 4 dots/i);
+      expect(label).toMatch(/without colour/i);
+    });
+
+    it("stays interpretable under every colour-blind simulation mode", () => {
+      const modes = [
+        "none",
+        "protanopia",
+        "deuteranopia",
+        "tritanopia",
+      ] as const;
+
+      for (const mode of modes) {
+        const { container, unmount } = render(
+          <ColorBlindSimulationProvider initialMode={mode}>
+            <ActivityHeatmap streams={mockStreams} />
+          </ColorBlindSimulationProvider>,
+        );
+
+        // Confirm the simulation wrapper really is active for this mode, so
+        // the assertions below are made under that filter.
+        expect(
+          container.querySelector("[data-colorblind-simulation]"),
+        ).toHaveAttribute("data-colorblind-simulation", mode);
+
+        for (const { label, level, pips } of LEVEL_CASES) {
+          const cell = screen.getByLabelText(label);
+          // The non-colour channel is identical regardless of the simulation.
+          expect(cell).toHaveAttribute("data-intensity-level", String(level));
+          expect(cell.querySelectorAll(".heatmap-cell-pip").length).toBe(pips);
+        }
+
+        // The legend still states the scale under the filter.
+        expect(
+          screen.getByRole("group", { name: /Activity intensity legend/i }),
+        ).toBeInTheDocument();
+
+        unmount();
+      }
+    });
+  });
 });
+

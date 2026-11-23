@@ -17,6 +17,8 @@
  * entry points like `ErrorBoundary` without ballooning their bundle.
  */
 
+import { logger } from "../logger";
+
 /** Diagnostic fields permitted in emitted telemetry. Everything else is dropped. */
 export const TELEMETRY_ALLOWLIST = [
   'type', // error classification (e.g. TransactionError.type)
@@ -168,7 +170,7 @@ export function redactErrorForTelemetry(
 export function createTelemetryErrorReporter(
   sink?: (payload: TelemetryPayload) => void,
 ): (error: Error, errorInfo?: unknown) => void {
-  const emit = sink ?? ((payload) => console.error('[telemetry]', payload));
+  const emit = sink ?? ((payload) => logger.error("Telemetry error", payload));
   return (error: Error, _errorInfo?: unknown) => {
     try {
       emit(redactErrorForTelemetry(error));

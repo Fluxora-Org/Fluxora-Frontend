@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWallet } from "../wallet-connect/Walletcontext";
 import { WidgetLayout, WidgetConfig, WidgetSize } from "./widgetLayout";
 import { Metric } from "./Metric";
+import { logger } from "../../lib/logger";
 
 export const slugify = (text: string): string => {
   return text
@@ -81,7 +82,7 @@ export function useWidgetLayout(metrics: Metric[]) {
       }
       throw new Error("Invalid layout structure or version");
     } catch (e) {
-      console.warn("Failed to load layout from localStorage, falling back to default.", e);
+      logger.warn("Failed to load layout from localStorage, falling back to default.", e);
       return defaultLayout;
     }
   }, [metrics, storageKey, generateDefaultLayout]);
@@ -98,7 +99,7 @@ export function useWidgetLayout(metrics: Metric[]) {
     try {
       localStorage.setItem(storageKey, JSON.stringify(newLayout));
     } catch (e) {
-      console.warn("Failed to persist layout to localStorage.", e);
+      logger.warn("Failed to persist layout to localStorage.", e);
     }
   }, [storageKey]);
 

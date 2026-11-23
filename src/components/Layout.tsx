@@ -4,6 +4,12 @@ import ConnectWalletModal from "./ConnectWalletModal";
 import Footer from "./Footer";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { InstallPWABanner } from "./InstallPWABanner";
+import { useRouteFocus } from "../hooks/useRouteFocus";
+import {
+  ColorBlindSimulationProvider,
+  ColorBlindToggle,
+} from "./colorBlindSimulation";
+import { IS_DEV } from "../utils/env";
 import "./Layout.css";
 
 /**
@@ -39,6 +45,12 @@ export default function Layout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const connectBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Move focus to the new page heading or main region on every route change
+  // so keyboard and screen-reader users are not stranded at the previous
+  // page's element after navigation. Back/forward navigations are also covered
+  // because React Router updates location.key on every history change.
+  useRouteFocus({ mainContentId: "main-content" });
 
   const showFooter = !location.pathname.includes("/treasurypage");
 
@@ -152,13 +164,17 @@ export default function Layout() {
           <main
             id="main-content"
             className="app-main"
+            aria-label="Main content"
             // tabIndex={-1} makes the skip-link target programmatically focusable
             // (activated by `Tab` and by clicking the `#main-content` fragment
             // link) — required for the WCAG 2.4.1 bypass-block pattern that
             // /connect-wallet and /app/* relies on.
             tabIndex={-1}
           >
-            <Outlet />
+            <ColorBlindSimulationProvider>
+              {IS_DEV && <ColorBlindToggle />}
+              <Outlet />
+            </ColorBlindSimulationProvider>
           </main>
 
           {showFooter && <Footer />}

@@ -50,6 +50,7 @@ import type { StreamRecord, StreamStatus } from "../data/streamRecords";
 import { useI18n } from "../i18n";
 import { MAX_LOADING_RETRIES } from "../components/Skeleton";
 import type { SessionRecoveryBannerState } from "../components/SessionRecoveryBanner";
+import { shouldShowZeroAccrualBanner } from "../lib/zeroAccrualBannerCondition";
 
 // ─── Constants (duplicated here so hook is self-contained) ───────────────────
 export type StatusFilter = "All" | StreamStatus;
@@ -142,6 +143,7 @@ export interface StreamsDataResult {
   recentlySaved: boolean;
   /** Whether the wallet identity used for recovery still matches current wallet. */
   recoveryIdentityMatches: boolean;
+  walletAddress: string | null;
   handleRestoreSession: () => void;
   handleStartFreshSession: () => void;
   handleDismissSessionBanner: () => void;
@@ -151,6 +153,7 @@ export interface StreamsDataResult {
 
   // ── ARIA / announcements ──────────────────────────────────────────────────
   announcement: string;
+  alertAnnouncement: string;
 
   // ── Cleared optimistic state ──────────────────────────────────────────────
   clearResolvedOptimisticOps: () => void;
@@ -161,7 +164,7 @@ export interface StreamsDataResult {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function useStreamsData(): StreamsDataResult {
-  const { announcement, announce } = useLiveAnnouncer();
+  const { announcement, alertAnnouncement, announce } = useLiveAnnouncer();
   const { t } = useI18n();
   const wallet = useWallet();
   const walletAddress = wallet.address?.trim() ?? "";
@@ -489,16 +492,21 @@ export function useStreamsData(): StreamsDataResult {
   // walletConnected is always treated as true on this page (same as Streams.tsx).
   const walletConnected = true;
   const showEmptyState = !walletConnected || !hasStreams;
-  const showZeroAccrual =
-    !showEmptyState &&
-    walletConnected &&
-    hasStreams &&
-    withdrawableNow === 0 &&
-    activeStreams.length > 0;
-  const hasZeroRateStream = activeStreams.some((s) => s.monthlyRate === 0);
-  const zeroAccrualReason: "rate-zero" | "cliff" = hasZeroRateStream
-    ? "rate-zero"
-    : "cliff";
+
+  // Derive banner visibility from the shared pure utility so the condition
+  // matches the contract's accrual computation (issue #1669).
+  const zeroAccrualState = shouldShowZeroAccrualBanner(
+    streams.map((s) => ({
+      status: s.status,
+      monthlyRate: s.monthlyRate,
+      cliffDate: s.cliffDate,
+      withdrawableAmount: s.withdrawableAmount,
+    })),
+    walletConnected,
+  );
+  const showZeroAccrual = !showEmptyState && zeroAccrualState.show;
+  const zeroAccrualReason: "rate-zero" | "cliff" =
+    zeroAccrualState.reason === "rate-zero" ? "rate-zero" : "cliff";
 
   const effectiveExpandedId = paginatedStreams.some(
     (s) => s.id === expandedStreamId,
@@ -526,7 +534,7 @@ export function useStreamsData(): StreamsDataResult {
   }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
 
   // ── Abort-error guard ──────────────────────────────────────────────────────
-  const isAbortError = error instanceof Error && error.name === "AbortError";
+  const isAbortError = Boolean(error && (error as any) instanceof Error && (error as any).name === "AbortError");
 
   // ── Loading/error boundary helpers that Streams.tsx uses ──────────────────
   // Expose retryCount so Streams.tsx can check >= MAX_LOADING_RETRIES.
@@ -593,6 +601,7 @@ export function useStreamsData(): StreamsDataResult {
     setRestoredDraft,
     recentlySaved,
     recoveryIdentityMatches,
+    walletAddress: walletAddress || null,
     handleRestoreSession,
     handleStartFreshSession,
     handleDismissSessionBanner,
@@ -601,6 +610,7 @@ export function useStreamsData(): StreamsDataResult {
 
     // aria
     announcement,
+    alertAnnouncement,
 
     // helpers
     clearResolvedOptimisticOps: clearResolvedOptimistic,

@@ -2,6 +2,7 @@ const DEFAULT_POLL_INTERVAL_MS = 750;
 const DEFAULT_MAX_ATTEMPTS = 6;
 const DEFAULT_BACKOFF_FACTOR = 1.25;
 const DEFAULT_DEMO_CONFIRMATION_ATTEMPTS = 2;
+const DEFAULT_POLL_DEADLINE_MS = 30_000;
 
 function readPositiveNumber(
   key: keyof ImportMetaEnv,
@@ -59,6 +60,28 @@ export const transactionPollingConfig = {
       DEFAULT_DEMO_CONFIRMATION_ATTEMPTS,
       { min: 1 },
     ),
+  ),
+  /**
+   * Wall-clock ceiling, in milliseconds, for a single `useTransactionStatus`
+   * polling run, measured from the first attempt.
+   *
+   * This is the deadline that actually bounds polling time. `maxAttempts`
+   * alone does not reliably bound it: because `backoffFactor` grows the
+   * delay between attempts, the same `maxAttempts` value corresponds to very
+   * different amounts of real time depending on `pollIntervalMs` and
+   * `backoffFactor`. `deadlineMs` is checked independently before every
+   * attempt, so polling always stops by this point regardless of how those
+   * are tuned.
+   *
+   * When the deadline (or `maxAttempts`) is reached before the status source
+   * reports `confirmed` or `failed`, `useTransactionStatus` reports
+   * `"indeterminate"` — not `"failed"` — since the transaction may still
+   * settle after this hook stops watching it.
+   */
+  deadlineMs: readPositiveNumber(
+    "VITE_TX_POLL_DEADLINE_MS",
+    DEFAULT_POLL_DEADLINE_MS,
+    { min: 1 },
   ),
 };
 

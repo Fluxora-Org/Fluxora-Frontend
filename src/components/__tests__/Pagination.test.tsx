@@ -106,4 +106,88 @@ describe('Pagination Component Defensive Normalization', () => {
       expect(options).toEqual([10, 15, 20, 50]);
     });
   });
+
+  describe('Accessibility', () => {
+    test('exposes current page programmatically', () => {
+      render(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={2}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      const currentPageBtn = screen.getByRole('button', { name: 'Page 2' });
+      expect(currentPageBtn).toHaveAttribute('aria-current', 'page');
+    });
+
+    test('announces page change to screen readers', () => {
+      const { rerender } = render(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={1}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      
+      const liveRegion = screen.getByTestId('pagination-info');
+      expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+      expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
+      expect(liveRegion).toHaveTextContent('Page 1 of 5');
+
+      rerender(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={2}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      expect(liveRegion).toHaveTextContent('Page 2 of 5');
+    });
+
+    test('controls have accessible names', () => {
+      render(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={2}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      expect(screen.getByRole('button', { name: 'Go to previous page' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to next page' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to page 1' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Page 2' })).toBeInTheDocument();
+    });
+
+    test('conveys disabled state on first and last pages', () => {
+      const { rerender } = render(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={1}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      
+      const prevBtn = screen.getByRole('button', { name: 'Go to previous page' });
+      expect(prevBtn).toBeDisabled();
+      expect(prevBtn).toHaveAttribute('aria-disabled', 'true');
+      
+      rerender(
+        <Pagination
+          totalItems={50}
+          itemsPerPage={10}
+          currentPage={5}
+          onPageChange={mockOnPageChange}
+        />
+      );
+      
+      const nextBtn = screen.getByRole('button', { name: 'Go to next page' });
+      expect(nextBtn).toBeDisabled();
+      expect(nextBtn).toHaveAttribute('aria-disabled', 'true');
+    });
+  });
 });

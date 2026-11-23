@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StreamCreatedModal from "../StreamCreatedModal";
+import { clearRecentCreatedStreams, getRecentCreatedStreams } from "../../../lib/recentCreatedStreams";
 import { defaultStreamCreatedModalProps } from "./testUtils";
 
 /**
@@ -21,6 +22,8 @@ const { mockCss } = vi.hoisted(() => ({
       streamIdRow: "streamIdRow",
       streamIdLabel: "streamIdLabel",
       streamIdValue: "streamIdValue",
+      streamIdValueGroup: "streamIdValueGroup",
+      identifierCopyButton: "identifierCopyButton",
       urlContainer: "urlContainer",
       urlBar: "urlBar",
       copyButton: "copyButton",
@@ -54,6 +57,7 @@ describe("StreamCreatedModal", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearRecentCreatedStreams();
   });
 
   afterEach(() => {
@@ -69,8 +73,45 @@ describe("StreamCreatedModal", () => {
 
   it("renders streamId with # prefix and streamUrl in the URL bar", () => {
     render(<StreamCreatedModal {...defaultProps} />);
-    expect(screen.getByText("#STR-123")).toBeInTheDocument();
+    expect(screen.getByText("STR-123")).toBeInTheDocument();
     expect(screen.getAllByText("https://fluxora.io/stream/STR-123").length).toBeGreaterThan(0);
+  });
+
+  it("copies the raw stream identifier", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<StreamCreatedModal {...defaultProps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /copy stream identifier/i }));
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith("STR-123");
+    expect(screen.getByRole("button", { name: /copied stream identifier/i })).toBeInTheDocument();
+  });
+
+  it("keeps the created stream retrievable after dismissal", () => {
+    render(<StreamCreatedModal {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /close stream created modal/i }));
+
+    expect(getRecentCreatedStreams()).toEqual([
+      expect.objectContaining({
+        streamId: "STR-123",
+        streamUrl: "https://fluxora.io/stream/STR-123",
+      }),
+    ]);
+  });
+
+  it("provides a direct stream details anchor", () => {
+    render(<StreamCreatedModal {...defaultProps} />);
+    expect(screen.getByRole("link", { name: /open stream details/i })).toHaveAttribute(
+      "href",
+      "https://fluxora.io/stream/STR-123",
+    );
   });
 
   it("announcement text renders when isOpen is true and clears after 1000ms", () => {

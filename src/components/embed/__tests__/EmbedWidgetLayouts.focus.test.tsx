@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import fs from "node:fs";
+import path from "node:path";
 import {
   EmbedWidgetLayoutCard,
   EmbedWidgetLayoutBanner,
@@ -227,6 +230,125 @@ describe("Embed widget keyboard focus contract (browser-level)", () => {
       // boundary and moves focus back to the host page.
       expect(preventDefaultSpy).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(article);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Keyboard-only operability: entry, deterministic tab order, containment
+  // (no drop to body), graceful Escape exit, and visible focus.
+  // -----------------------------------------------------------------------
+  describe("keyboard operability alone", () => {
+    it("entry: focus programmatically enters the widget root container", () => {
+      renderWithHostTrigger(<EmbedWidgetLayoutCard {...commonProps} />);
+
+      const article = screen.getByRole("article");
+      expect(article).toHaveAttribute("tabindex", "-1");
+      expect(document.activeElement).toBe(article);
+      // Keyboard users are not stranded on the host page or body.
+      expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it("tab order: deterministic sequential navigation container -> interactive controls", async () => {
+      const user = userEvent.setup();
+      render(
+        <EmbedHarness title="Fluxora Stream Widget">
+          <div
+            role="alert"
+            aria-live="assertive"
+            data-testid="embed-error-state"
+          >
+            <span>Stream unavailable: Stream not found</span>
+            <button>Try again</button>
+          </div>
+        </EmbedHarness>
+      );
+
+      const alert = screen.getByRole("alert");
+      // Entry lands on the container first.
+      expect(document.activeElement).toBe(alert);
+
+      // Every interactive element is enumerated in DOM order with no
+      // positive-tabindex hacks that would break sequential navigation.
+      const focusable = Array.from(
+        alert.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      expect(focusable).toHaveLength(1);
+      const retry = screen.getByRole("button", { name: "Try again" });
+      expect(focusable[0]).toBe(retry);
+      expect(retry.tabIndex).toBe(0);
+      expect(retry.hasAttribute("disabled")).toBe(false);
+      focusable.forEach((el) => {
+        expect((el as HTMLElement).tabIndex).toBeLessThanOrEqual(0);
+      });
+
+      // Sequential keyboard navigation: container -> Try again.
+      await user.tab();
+      expect(retry).toHaveFocus();
+      expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it("containment: focus never drops to body and Escape restores the host trigger", async () => {
+      const user = userEvent.setup();
+      const { origin } = renderWithHostTrigger(
+        <EmbedHarness title="Fluxora Stream Widget">
+          <div role="alert" data-testid="embed-error-state">
+            <span>Stream unavailable</span>
+            <button>Try again</button>
+          </div>
+        </EmbedHarness>
+      );
+
+      const alert = screen.getByRole("alert");
+      const retry = screen.getByRole("button", { name: "Try again" });
+      expect(document.activeElement).toBe(alert);
+      expect(document.activeElement).not.toBe(document.body);
+
+      await user.tab();
+      expect(retry).toHaveFocus();
+      expect(document.activeElement).not.toBe(document.body);
+
+      // Graceful exit per useEmbedAccessibility contract: Escape restores
+      // focus to the element that owned it before the widget took it.
+      await user.keyboard("{Escape}");
+      expect(origin).toHaveFocus();
+      expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it("containment: Escape without a host origin keeps focus inside and announces exit", async () => {
+      const user = userEvent.setup();
+      render(
+        <EmbedHarness title="Test Stream">
+          <EmbedWidgetLayoutCard {...commonProps} />
+        </EmbedHarness>
+      );
+
+      const article = screen.getByRole("article");
+      expect(document.activeElement).toBe(article);
+
+      await user.keyboard("{Escape}");
+
+      expect(document.activeElement).toBe(article);
+      expect(document.activeElement).not.toBe(document.body);
+      const announcer = document.querySelector('[aria-live="polite"]');
+      expect(announcer?.textContent).toContain(
+        "Press Tab to return to the host page"
+      );
+    });
+
+    it("visibility: widget container and buttons define a :focus-visible ring", () => {
+      const cssPath = path.resolve(
+        process.cwd(),
+        "src/components/embed/EmbedWidgetLayouts.css"
+      );
+      const embedWidgetCss = fs.readFileSync(cssPath, "utf8");
+      expect(embedWidgetCss).toContain(":focus-visible");
+      expect(embedWidgetCss).toContain("var(--interactive-focus-ring, #007acc)");
+      expect(embedWidgetCss).toMatch(/\.embed-widget-card:focus-visible/);
+      expect(embedWidgetCss).toMatch(/\.embed-widget-banner:focus-visible/);
+      expect(embedWidgetCss).toMatch(/\.embed-widget-compact:focus-visible/);
+      expect(embedWidgetCss).toMatch(/button:focus-visible/);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi } from "vitest";
 import PresenceCursorOverlay from "../PresenceCursorOverlay";
 import { Viewer } from "../../../hooks/usePresenceViewers";
 
@@ -88,5 +89,31 @@ describe("PresenceCursorOverlay", () => {
       <PresenceCursorOverlay viewers={[mockViewer1]} />,
     );
     expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("never blocks interaction with controls beneath it", async () => {
+    const user = userEvent.setup();
+    const handleClick = vi.fn();
+
+    const { container } = render(
+      <div style={{ position: "relative" }}>
+        <button onClick={handleClick}>Underlying Button</button>
+        <PresenceCursorOverlay viewers={[mockViewer1]} />
+      </div>
+    );
+
+    // The overlay should be present and configured to not intercept pointers
+    const overlay = container.querySelector(".presence-cursor-overlay");
+    expect(overlay).toHaveStyle({ pointerEvents: "none" });
+
+    // The overlay should not be focusable / in the tab order
+    expect(overlay).not.toHaveAttribute("tabindex");
+
+    // Click the underlying control
+    const button = screen.getByRole("button", { name: "Underlying Button" });
+    await user.click(button);
+
+    // Assert the control receives the event
+    expect(handleClick).toHaveBeenCalledOnce();
   });
 });

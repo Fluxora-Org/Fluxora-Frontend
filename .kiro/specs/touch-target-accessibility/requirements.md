@@ -118,11 +118,11 @@ This feature enforces a minimum 44×44px touch target size for all interactive e
 
 #### Acceptance Criteria
 
-1. THE TESTING_CHECKLIST.md SHALL include a dedicated section for touch target size validation covering AppNavbar and ConnectButton.
+1. THE docs/archive/TESTING_CHECKLIST.md SHALL include a dedicated section for touch target size validation covering AppNavbar and ConnectButton.
 2. THE touch target section SHALL specify the manual steps to measure touch target sizes using browser DevTools.
 3. THE touch target section SHALL include pass criteria stating that all Interactive_Elements must have a computed width ≥ 44px and height ≥ 44px.
-4. THE TESTING_CHECKLIST.md SHALL include steps for running an automated accessibility audit using Axe DevTools or WAVE to detect touch target warnings.
-5. THE TESTING_CHECKLIST.md SHALL include manual mobile testing steps using Chrome DevTools device emulation at 375px and 390px viewport widths.
+4. THE docs/archive/TESTING_CHECKLIST.md SHALL include steps for running an automated accessibility audit using Axe DevTools or WAVE to detect touch target warnings.
+5. THE docs/archive/TESTING_CHECKLIST.md SHALL include manual mobile testing steps using Chrome DevTools device emulation at 375px and 390px viewport widths.
 
 ---
 

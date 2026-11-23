@@ -23,6 +23,16 @@ describe("TreasuryEmptyState — default state", () => {
     screen.getByRole("button", { name: "Create stream" }).click();
     expect(onCreateStream).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the actionable empty state distinct from an error announcement", () => {
+    const onCreateStream = vi.fn();
+    render(<TreasuryEmptyState onCreateStream={onCreateStream} />);
+
+    expect(screen.getByRole("region", { name: "Treasury empty state" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText(/create your first stream/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create stream" })).toBeEnabled();
+  });
 });
 
 // ── Wallet disconnected state ───────────────────────────────────────────────────

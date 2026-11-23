@@ -16,7 +16,7 @@ The changes are purely presentational. No application logic, routing, state mana
 
 ### Non-Goals
 
-- Changes to components other than `AppNavbar`, `ConnectButton`, and `TESTING_CHECKLIST.md`.
+- Changes to components other than `AppNavbar`, `ConnectButton`, and `docs/archive/TESTING_CHECKLIST.md`.
 - Visual redesign beyond the minimum required to meet touch target size.
 - Automated test implementation (covered in Testing Strategy).
 
@@ -34,7 +34,7 @@ src/
       AppNavbar.tsx            ← Tailwind: bump icon buttons to min-h-[44px] min-w-[44px],
                                   NavLink rows to min-h-[44px], logo link to min-h-[44px],
                                   Connect Wallet link to h-[44px], gap-2 between mobile items
-TESTING_CHECKLIST.md           ← add Section 7: Touch Target Validation
+docs/archive/TESTING_CHECKLIST.md           ← add Section 7: Touch Target Validation
 ```
 
 The two components are independent; changes to one do not affect the other.
@@ -97,7 +97,7 @@ Focus ring: the button currently sets `outline: "none"`. Per Requirement 5.3, an
 
 `NavLink` is used inside `AppNavbar`'s mobile drawer. The only change is adding `min-h-[44px] flex items-center` to the `<Link>` className so the touch target height is met. The desktop nav uses `NavLink` too; `min-h-[44px]` on a flex item inside a `h-16` (64px) container has no visual effect on desktop because the container already constrains the height via `items-center`.
 
-### TESTING_CHECKLIST.md
+### docs/archive/TESTING_CHECKLIST.md
 
 A new **Section 7: Touch Target Validation** is appended. It covers:
 - Manual DevTools box-model inspection steps.
@@ -271,7 +271,7 @@ fc.property(fc.integer({ min: 320, max: 767 }), (viewportWidth) => {
 
 ### Manual QA
 
-In addition to automated tests, the TESTING_CHECKLIST.md Section 7 specifies:
+In addition to automated tests, the docs/archive/TESTING_CHECKLIST.md Section 7 specifies:
 1. DevTools box-model inspection at 375px and 390px.
 2. Axe DevTools audit — zero touch target violations.
 3. WAVE audit — zero touch target errors.
