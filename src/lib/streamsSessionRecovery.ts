@@ -1,4 +1,8 @@
-import { createStorageWriteStatus } from "./browserStorage";
+import {
+  createStorageWriteStatus,
+  getBrowserStorage,
+  removeBrowserStorage,
+} from "./browserStorage";
 
 /**
  * Streams recovery is intentionally memory-only. Browser storage is readable
@@ -62,6 +66,10 @@ export const DEFAULT_STREAM_DRAFT_DURATION = "1";
 export const streamsSessionWriteStatus = createStorageWriteStatus();
 
 const sessionsByAccount = new Map<string, StreamsSessionSnapshot>();
+
+function getLocalStorage(): Storage | null {
+  return getBrowserStorage("localStorage");
+}
 
 function normalizeAccountAddress(accountAddress: string): string | null {
   const normalized = accountAddress.trim();
@@ -228,13 +236,23 @@ export function writeStreamsSession(
   return false;
 }
 
-/** Clears the in-memory snapshot for one account without touching browser storage. */
+/**
+ * Clears the in-memory snapshot and removes any legacy persisted copy for the
+ * account. This cleanup is allowed even though new session data is never
+ * written to browser storage.
+ */
 export function clearStreamsSession(
   accountAddress: string,
-  storage: StorageWriter | null = null,
+  storage: StorageWriter | null = getLocalStorage(),
 ): void {
-  void storage;
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!normalizedAccountAddress) return;
+
   sessionsByAccount.delete(normalizedAccountAddress);
+  removeBrowserStorage(
+    `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${normalizedAccountAddress}`,
+    storage,
+  );
+  // Removal is cleanup, not evidence that a session snapshot was persisted.
+  streamsSessionWriteStatus.record(false);
 }
