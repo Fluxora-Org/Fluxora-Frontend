@@ -160,10 +160,15 @@ export default defineConfig({
         "src/hooks/useRouteFocus.ts",
         // Voice mic button — recording state must be conveyed non-visually
         "src/components/voice/VoiceMicButton.tsx",
+<<<<<<< Updated upstream
         // Issue #1687: voice stream identification must refuse ambiguity
         "src/components/voice/streamIdentifier.ts",
         // Issue #1982: InstallPWABanner keyboard and screen-reader coverage
         "src/components/InstallPWABanner.tsx",
+=======
+        // Online/offline status tracking
+        "src/hooks/useOnlineStatus.ts",
+>>>>>>> Stashed changes
       ],
       exclude: [
         "src/components/**/*.test.tsx",
