@@ -131,6 +131,17 @@ describe("Streams Pagination boundary and error recovery tests", () => {
     vi.restoreAllMocks();
   });
 
+  it("renders a distinct loading state without stale rows or pagination", () => {
+    mockTreasuryState.streams = [makeStream({ id: "STR-001", name: "Stale Stream" })];
+    mockTreasuryState.loading = true;
+
+    renderStreams();
+
+    expect(screen.getByRole("status", { name: "Loading streams" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    expect(screen.queryByTestId("pagination-container")).not.toBeInTheDocument();
+  });
+
   it("scenario 1: Empty result behavior (no streams at all)", async () => {
     mockTreasuryState.streams = [];
     renderStreams();
