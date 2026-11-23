@@ -400,7 +400,7 @@ describe("streamsSessionRecovery", () => {
       expect(throwingStorage.setItem).not.toHaveBeenCalled();
     });
 
-    it("does not call removeItem when clearing an account snapshot", () => {
+    it("best-effort removes a legacy browser-storage snapshot when clearing an account", () => {
       const throwingStorage = {
         getItem: vi.fn(),
         setItem: vi.fn(),
@@ -414,22 +414,34 @@ describe("streamsSessionRecovery", () => {
       );
 
       expect(() => clearStreamsSession(ACCOUNT_ALICE, throwingStorage)).not.toThrow();
-      expect(throwingStorage.removeItem).not.toHaveBeenCalled();
+      expect(throwingStorage.removeItem).toHaveBeenCalledWith(
+        `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`,
+      );
+      expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
     });
   });
 
   describe("clearStreamsSession", () => {
-    it("removes the stored snapshot entirely for the specified account", () => {
+    it("clears the in-memory snapshot and any legacy persisted copy for the specified account", () => {
+      const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
+      storage.setItem(aliceKey, "legacy-sensitive-session");
       writeStreamsSession(
         { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
         NOW,
         ACCOUNT_ALICE,
         storage,
       );
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).not.toBeNull();
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
+        NOW,
+        ACCOUNT_BOB,
+        storage,
+      );
 
       clearStreamsSession(ACCOUNT_ALICE, storage);
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
+      expect(storage.getItem(aliceKey)).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)).not.toBeNull();
     });
   });
 
@@ -604,14 +616,17 @@ describe("streams session write status (#1663)", () => {
     expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
   });
 
-  it("does not attempt storage removal when clearing a session", () => {
+  it("removes legacy browser-storage data without claiming persistence", () => {
     const storage = new MemoryStorage();
+    const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
+    storage.setItem(key, "legacy-sensitive-session");
     const removeItem = vi.spyOn(storage, "removeItem");
 
     writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, storage);
     clearStreamsSession(ACCOUNT_ALICE, storage);
 
-    expect(removeItem).not.toHaveBeenCalled();
+    expect(removeItem).toHaveBeenCalledWith(key);
+    expect(storage.getItem(key)).toBeNull();
     expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
   });
 
