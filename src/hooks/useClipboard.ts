@@ -34,6 +34,7 @@ export interface UseClipboardResult {
 /** Legacy `execCommand` copy path for insecure contexts / old browsers. */
 export function fallbackCopy(text: string): boolean {
   if (typeof document === "undefined") return false;
+  if (typeof document.execCommand !== "function") return false;
 
   const textarea = document.createElement("textarea");
   textarea.value = text;
@@ -58,7 +59,10 @@ export function fallbackCopy(text: string): boolean {
  * falling back to document.execCommand in older/insecure environments.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-  if (navigator.clipboard?.writeText) {
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.clipboard?.writeText === "function"
+  ) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
@@ -121,7 +125,9 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
   const [status, setStatus] = useState<ClipboardStatus>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [support] = useState(() => ({
-    clipboard: typeof navigator !== "undefined" && !!navigator.clipboard?.writeText,
+    clipboard:
+      typeof navigator !== "undefined" &&
+      typeof navigator.clipboard?.writeText === "function",
     share: isShareSupported(),
   }));
 
@@ -169,10 +175,8 @@ export function useClipboard(resetDelay = 2000): UseClipboardResult {
     [clearTimer, resetDelay],
   );
 
-  // Clear any pending timer on unmount.
-  useEffect(() => clearTimer, [clearTimer]);
+  // Clear any pending timer on unmount or when the reset delay changes.
+  useEffect(() => clearTimer, [clearTimer, resetDelay]);
 
   return { copy, share, status, support, reset };
 }
-
-

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Stream } from "./Stream";
 import { formatNumber } from "../../lib/formatters";
+import { mediaDown } from "../../lib/breakpoints";
+import { DemoDataBadge } from "./DemoBanner";
 import "./TreasuryFlowSankey.css";
 
 export interface TreasuryFlowSankeyProps {
   streams: Stream[];
   loading?: boolean;
   error?: string | null;
+  isDemoMode?: boolean;
 }
 
 interface FlowNode {
@@ -33,8 +36,8 @@ const OTHERS_KEY = "__others__";
 /** Recipients beyond this rank are collapsed into a single "Others" node. */
 const MAX_VISIBLE_RECIPIENTS = 7;
 
-/** Below `--breakpoint-md` (768px) the diagram defaults to the table view. */
-const RESPONSIVE_TABLE_QUERY = "(max-width: 767px)";
+/** At and below `--breakpoint-md` the diagram defaults to the table view. */
+const RESPONSIVE_TABLE_QUERY = mediaDown("md");
 
 const CHART_PADDING_X = 96;
 const CHART_PADDING_Y = 16;
@@ -176,6 +179,7 @@ export default function TreasuryFlowSankey({
   streams,
   loading,
   error,
+  isDemoMode,
 }: TreasuryFlowSankeyProps) {
   const isBelowMd = useIsBelowMdBreakpoint();
   const [viewMode, setViewMode] = useState<"diagram" | "table">("diagram");
@@ -281,7 +285,10 @@ export default function TreasuryFlowSankey({
   return (
     <div className="treasury-flow-sankey-container">
       <div className="sankey-header">
-        <h3 className="sankey-title">Treasury Stream Flow</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="sankey-title">Treasury Stream Flow</h3>
+          {isDemoMode && <DemoDataBadge />}
+        </div>
         {!isBelowMd && !isEmpty && (
           <button
             type="button"

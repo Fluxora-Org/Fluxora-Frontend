@@ -30,7 +30,7 @@ const fixtureStreams: Stream[] = [
     recipient: "GAAAAA",
     rate: "100 USDC",
     accruedAmount: 500,
-    status: "Active",
+    status: "Active", accruedAmount: 0, startDate: "2026-01-01",
     startDate: "2026-01-10",
   },
   {
@@ -39,7 +39,7 @@ const fixtureStreams: Stream[] = [
     recipient: "GBBBBB",
     rate: "50 USDC",
     accruedAmount: 250,
-    status: "Paused",
+    status: "Paused", accruedAmount: 0, startDate: "2026-01-01",
     startDate: "2026-03-15",
   },
   {
@@ -47,7 +47,7 @@ const fixtureStreams: Stream[] = [
     name: "Stream Gamma",
     recipient: "GAAAAA",
     rate: "200 USDC",
-    status: "Completed",
+    status: "Completed", accruedAmount: 0, startDate: "2026-01-01",
     startDate: "2026-06-01",
   },
 ];
@@ -306,7 +306,7 @@ describe("ReportBuilderPanel", () => {
         name: "Stream No Date",
         recipient: "GCCCCC",
         rate: "75 USDC",
-        status: "Active",
+        status: "Active", accruedAmount: 0, startDate: "2026-01-01",
       },
     ];
     renderPanel(streamsWithMissingDates);
@@ -451,7 +451,7 @@ describe("ReportBuilderPanel", () => {
         name: "Stream No Accrued",
         recipient: "GDDDDD",
         rate: "30 USDC",
-        status: "Active",
+        status: "Active", accruedAmount: 0, startDate: "2026-01-01",
         startDate: "2026-02-01",
       },
     ];

@@ -169,11 +169,23 @@ export function usePresenceViewers(
     setIsLoading(false);
   }, []);
 
+  const removeViewer = useCallback((id: string) => {
+    setViewers(prev => prev.filter(v => v.id !== id));
+  }, []);
+
+  // Graceful degradation for presence failures
+  const handlePresenceError = useCallback((error: Error) => {
+    console.warn("Presence transport failed, gracefully degrading to unavailable state", error);
+    setViewers([]);
+  }, []);
+
   return {
-    viewers,
+    viewers: viewers.slice(0, 50),
     markActive,
     updateCursor,
-    viewerCount,
+    removeViewer,
+    handlePresenceError,
+    viewerCount: Math.min(viewerCount, 50),
     isPresenceEnabled,
     presenceStatus,
     isLoading,

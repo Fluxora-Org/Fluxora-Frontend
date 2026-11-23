@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import StreamsLoading from "../StreamsLoading";
 import TreasuryOverviewLoading from "../TreasuryOverviewLoading";
 import RecipientLoading from "../RecipientLoading";
+import ActivityHeatmap from "../treasuryOverviewPage/ActivityHeatmap";
 import { LOADING_TEST_IDS } from "../Skeleton";
 import StreamRow from "../treasuryOverviewPage/StreamRow";
 import type { Stream } from "../treasuryOverviewPage/Stream";
@@ -121,7 +122,7 @@ describe("StreamsLoading (treasury variant)", () => {
       recipient: "GABCDEFGHIJKLMNOPQRSTUVWXYZ23456789WXYZ",
       rate: "2,500 USDC/mo",
       accruedAmount: 1234.56,
-      status: "Active",
+      status: "Active", accruedAmount: 0, startDate: "2026-01-01",
     };
 
     const { container: loadingContainer } = render(<StreamsLoading variant="treasury" />);
@@ -167,6 +168,22 @@ describe("TreasuryOverviewLoading", () => {
     expect(metricsGrid).not.toBeNull();
     // 3 direct children (the SkeletonCard wrappers)
     expect(metricsGrid!.children).toHaveLength(3);
+  });
+
+  it("reserves the resolved heatmap panel footprint", () => {
+    const { container: loadingContainer } = render(<TreasuryOverviewLoading />);
+    const loadingHeatmap = loadingContainer.querySelector("[data-testid='treasury-activity-heatmap-loading']") as HTMLElement;
+
+    const { container: resolvedContainer } = render(<ActivityHeatmap streams={[]} loading={true} />);
+    const resolvedHeatmap = resolvedContainer.querySelector(".activity-heatmap-container") as HTMLElement;
+
+    expect(loadingHeatmap).toBeInTheDocument();
+    expect(resolvedHeatmap).toBeInTheDocument();
+    expect(loadingHeatmap.style.padding).toBe(resolvedHeatmap.style.padding || "var(--space-xl)");
+    expect(loadingHeatmap.querySelectorAll(".heatmap-grid .skeleton")).toHaveLength(
+      resolvedHeatmap.querySelectorAll(".heatmap-grid .heatmap-cell").length,
+    );
+    expect(loadingHeatmap.querySelector(".heatmap-legend")).toBeInTheDocument();
   });
 
   it("renders table column headers", () => {

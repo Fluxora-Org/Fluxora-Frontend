@@ -66,7 +66,7 @@ describe("useTransactionStatus", () => {
     expect(result.current.error).toBe("Transaction failed before confirmation.");
   });
 
-  it("fails closed when confirmation times out", async () => {
+  it("reports indeterminate — not failed — when maxAttempts is reached", async () => {
     const getStatus = vi.fn<TransactionStatusSource>().mockResolvedValue("pending");
 
     const { result } = renderHook(() =>
@@ -75,6 +75,7 @@ describe("useTransactionStatus", () => {
         pollIntervalMs: 100,
         maxAttempts: 2,
         backoffFactor: 1,
+        deadlineMs: 100_000, // far away: maxAttempts is the binding bound here
       }),
     );
 
@@ -86,8 +87,94 @@ describe("useTransactionStatus", () => {
     });
 
     expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe("indeterminate");
+    expect(result.current.status).not.toBe("failed");
+    expect(result.current.isIndeterminate).toBe(true);
+    expect(result.current.error).toMatch(/deadline/i);
+  });
+
+  it("reports indeterminate — not failed — when the wall-clock deadline is reached, even if maxAttempts hasn't", async () => {
+    const getStatus = vi.fn<TransactionStatusSource>().mockResolvedValue("pending");
+
+    const { result } = renderHook(() =>
+      useTransactionStatus("tx-deadline", {
+        getStatus,
+        pollIntervalMs: 100,
+        backoffFactor: 1,
+        maxAttempts: 1000, // effectively unbounded by attempt count
+        deadlineMs: 250, // the binding bound here
+      }),
+    );
+
+    await flushPromises();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe("indeterminate");
+    expect(result.current.error).toMatch(/deadline/i);
+
+    // No further polling once the deadline has been reported.
+    const callsAtDeadline = getStatus.mock.calls.length;
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(getStatus.mock.calls.length).toBe(callsAtDeadline);
+  });
+
+  it("still reports a genuine on-chain failure as failed, not indeterminate", async () => {
+    const getStatus = vi.fn<TransactionStatusSource>().mockResolvedValue("failed");
+
+    const { result } = renderHook(() =>
+      useTransactionStatus("tx-genuine-failure", {
+        getStatus,
+        pollIntervalMs: 100,
+        deadlineMs: 100,
+      }),
+    );
+
+    await flushPromises();
+
     expect(result.current.status).toBe("failed");
-    expect(result.current.error).toBe("Transaction confirmation timed out.");
+    expect(result.current.error).toBe("Transaction failed before confirmation.");
+  });
+
+  it("applies backoff between polls, growing the delay by backoffFactor each attempt", async () => {
+    const callTimestamps: number[] = [];
+    const getStatus = vi
+      .fn<TransactionStatusSource>()
+      .mockImplementation(async () => {
+        callTimestamps.push(Date.now());
+        return "pending";
+      });
+
+    renderHook(() =>
+      useTransactionStatus("tx-backoff", {
+        getStatus,
+        pollIntervalMs: 100,
+        backoffFactor: 2,
+        maxAttempts: 4,
+        deadlineMs: 100_000,
+      }),
+    );
+
+    await flushPromises(); // attempt 1 (immediate)
+
+    // Delays before attempts 2, 3, 4 are 100 * 2^0, 2^1, 2^2 = 100, 200, 400.
+    for (const delay of [100, 200, 400]) {
+      await act(async () => {
+        vi.advanceTimersByTime(delay);
+        await Promise.resolve();
+      });
+    }
+
+    expect(callTimestamps.length).toBe(4);
+    expect(callTimestamps[1] - callTimestamps[0]).toBe(100);
+    expect(callTimestamps[2] - callTimestamps[1]).toBe(200);
+    expect(callTimestamps[3] - callTimestamps[2]).toBe(400);
   });
 
   it("cleans up polling and aborts the status source on unmount", async () => {

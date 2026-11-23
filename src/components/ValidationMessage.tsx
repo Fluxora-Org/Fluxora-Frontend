@@ -1,9 +1,9 @@
-import React from 'react';
+import React from "react";
 
 export interface ValidationMessageProps {
   id: string;
   message: string;
-  type?: 'error' | 'hint' | 'success';
+  type?: "error" | "hint" | "success";
   /** Prevents live-region output while the owning field is composing. */
   composing?: boolean;
 }
@@ -16,10 +16,15 @@ const ErrorIcon = () => (
     viewBox="0 0 16 16"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    style={{ flexShrink: 0, marginTop: '2px' }}
+    style={{ flexShrink: 0, marginTop: "2px" }}
   >
     <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M8 4.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path
+      d="M8 4.5V9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
     <circle cx="8" cy="11.75" r="1" fill="currentColor" />
   </svg>
 );
@@ -32,29 +37,38 @@ const SuccessIcon = () => (
     viewBox="0 0 16 16"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    style={{ flexShrink: 0, marginTop: '2px' }}
+    style={{ flexShrink: 0, marginTop: "2px" }}
   >
     <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M5 8L7.5 10.5L11 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path
+      d="M5 8L7.5 10.5L11 5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
-const roleMap: Record<NonNullable<ValidationMessageProps['type']>, string | undefined> = {
-  error: 'alert',
-  hint: 'status',
-  success: 'status',
+const roleMap: Record<
+  NonNullable<ValidationMessageProps["type"]>,
+  string | undefined
+> = {
+  error: "alert",
+  hint: "status",
+  success: "status",
 };
 
-const colorMap: Record<NonNullable<ValidationMessageProps['type']>, string> = {
-  error: 'var(--color-error-text)',
-  hint: 'var(--color-text-muted)',
-  success: 'var(--color-success)',
+const colorMap: Record<NonNullable<ValidationMessageProps["type"]>, string> = {
+  error: "var(--color-error-text)",
+  hint: "var(--color-text-muted)",
+  success: "var(--color-success)",
 };
 
-export const ValidationMessage: React.FC<ValidationMessageProps> = ({ 
-  id, 
-  message, 
-  type = 'error',
+export const ValidationMessage: React.FC<ValidationMessageProps> = ({
+  id,
+  message,
+  type = "error",
   composing = false,
 }) => {
   if (!message || composing) return null;
@@ -67,19 +81,20 @@ export const ValidationMessage: React.FC<ValidationMessageProps> = ({
       id={id}
       className={`validation-message validation-message--${type}`}
       {...(role ? { role } : {})}
-      aria-live={type === 'error' ? 'assertive' : 'polite'}
-      style={{ 
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '6px',
-        marginTop: 'var(--space-xs, 4px)',
+      aria-live={type === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "6px",
+        marginTop: "var(--space-xs, 4px)",
         color: textColor,
-        font: 'var(--font-body-sm)',
-        fontWeight: type === 'error' ? 500 : 400
+        font: "var(--font-body-sm)",
+        fontWeight: type === "error" ? 500 : 400,
       }}
     >
-      {type === 'error' && <ErrorIcon />}
-      {type === 'success' && <SuccessIcon />}
+      {type === "error" && <ErrorIcon />}
+      {type === "success" && <SuccessIcon />}
       <span>{message}</span>
     </div>
   );

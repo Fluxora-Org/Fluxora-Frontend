@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { isValidStellarAddress, maskAddress } from "../../lib/stellar";
 import TruncatedReveal from "../common/TruncatedReveal";
+import "./Breadcrumb.css";
 
 export interface BreadcrumbItem {
   label: string;
@@ -36,7 +37,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" style={{ display: "flex", alignItems: "center" }}>
+    <nav aria-label="Breadcrumb" className="breadcrumb-nav">
       <ol
         style={{
           display: "flex",
@@ -66,6 +67,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                   aria-label={isStellarAddress ? item.label : undefined}
                   aria-current={isLast ? "page" : undefined}
                   title={isStellarAddress ? item.label : undefined}
+                  className={isLast ? "breadcrumb-current" : "breadcrumb-text"}
                   style={{
                     color: isLast
                       ? "var(--breadcrumb-color-current)"

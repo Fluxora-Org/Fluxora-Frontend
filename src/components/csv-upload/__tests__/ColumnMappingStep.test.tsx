@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ColumnMappingStep from '../ColumnMappingStep';
@@ -68,12 +68,20 @@ describe('ColumnMappingStep', () => {
   });
 
   describe('required-field validation', () => {
-    it('shows a required error after a field is blurred while empty', async () => {
+    it('shows a required error after a required field is blurred while empty', async () => {
       const user = userEvent.setup();
       renderStep();
       getSelect('recipient').focus();
       await user.tab();
       expect(screen.getByText('Recipient address is required')).toBeInTheDocument();
+    });
+
+    it('does NOT show a required error after an optional field is blurred while empty', async () => {
+      const user = userEvent.setup();
+      renderStep();
+      getSelect('accrual_rate_per_day').focus();
+      await user.tab();
+      expect(screen.queryByText('Rate (USDC/day) is required')).not.toBeInTheDocument();
     });
 
     it('does not show a required error for an untouched, unsubmitted field', () => {
@@ -167,11 +175,11 @@ describe('ColumnMappingStep', () => {
       expect(applyButton).toHaveAttribute('aria-disabled', 'true');
     });
 
-    it('stays disabled when some but not all fields are mapped', async () => {
+    it('stays disabled when some but not all REQUIRED fields are mapped', async () => {
       const user = userEvent.setup();
       renderStep();
       await user.selectOptions(getSelect('recipient'), 'Wallet');
-      await user.selectOptions(getSelect('deposit_amount'), 'Amount');
+      // deposit_amount is not mapped
 
       expect(screen.getByRole('button', { name: /apply mapping/i })).toBeDisabled();
     });
@@ -187,13 +195,12 @@ describe('ColumnMappingStep', () => {
       expect(screen.getByRole('button', { name: /apply mapping/i })).toBeDisabled();
     });
 
-    it('becomes enabled once all four fields are mapped to distinct columns', async () => {
+    it('becomes enabled once all REQUIRED fields are mapped to distinct columns, even if optional fields are missing', async () => {
       const user = userEvent.setup();
       renderStep();
       await user.selectOptions(getSelect('recipient'), 'Wallet');
       await user.selectOptions(getSelect('deposit_amount'), 'Amount');
-      await user.selectOptions(getSelect('accrual_rate_per_day'), 'Rate');
-      await user.selectOptions(getSelect('duration_days'), 'Days');
+      // accrual_rate_per_day and duration_days left empty
 
       const applyButton = screen.getByRole('button', { name: /apply mapping/i });
       expect(applyButton).toBeEnabled();
@@ -218,6 +225,21 @@ describe('ColumnMappingStep', () => {
         deposit_amount: 'Amount',
         accrual_rate_per_day: 'Rate',
         duration_days: 'Days',
+      });
+    });
+
+    it('calls onMappingConfirmed with partial mapping if optional fields are left unmapped', async () => {
+      const user = userEvent.setup();
+      const { onMappingConfirmed } = renderStep();
+
+      await user.selectOptions(getSelect('recipient'), 'Wallet');
+      await user.selectOptions(getSelect('deposit_amount'), 'Amount');
+      await user.click(screen.getByRole('button', { name: /apply mapping/i }));
+
+      expect(onMappingConfirmed).toHaveBeenCalledTimes(1);
+      expect(onMappingConfirmed).toHaveBeenCalledWith({
+        recipient: 'Wallet',
+        deposit_amount: 'Amount',
       });
     });
 

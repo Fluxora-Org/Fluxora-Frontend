@@ -91,7 +91,36 @@
   background-color: transparent;
   color: var(--color-accent-secondary);
   border-left-color: var(--color-accent-secondary);
+  border-left-width: 4px;
   font-weight: 500;
+  /* Non-colour cues (issue #1741): an underline and a thicker left
+     border keep the active item identifiable without relying on hue. */
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/*
+ * Non-colour active cue (issue #1741).
+ * The slot always reserves its space so navigation causes no layout
+ * shift; the marker inside is rendered only for the active route. Its
+ * *presence* — a solid geometric shape — conveys the active route
+ * independently of colour, surviving greyscale and every colour-blind
+ * simulation.
+ */
+.activeSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.activeIndicator {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentColor;
 }
 
 /* ═══════════════════════════════════════════════════════════

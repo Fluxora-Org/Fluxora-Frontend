@@ -94,26 +94,24 @@ describe("PresenceViewerList – address masking", () => {
     expect(screen.getByText("GAAAAA...AWHF")).toBeInTheDocument();
   });
 
-  it("renders raw id when it starts with G but is shorter than 56 chars", () => {
+  it("renders 'Anonymous viewer' when id starts with G but is shorter than 56 chars (not a Stellar address)", () => {
     const viewer: Viewer = {
       ...baseViewer,
       id: "G-short",
       displayName: null,
     };
     render(<PresenceViewerList viewers={[viewer]} onClose={vi.fn()} />);
-    expect(screen.getByText("G-short")).toBeInTheDocument();
+    expect(screen.getByText("Anonymous viewer")).toBeInTheDocument();
   });
 
-  it("renders raw id when it does not start with G", () => {
+  it("renders 'Anonymous viewer' when id does not start with G and no displayName is provided", () => {
     const viewer: Viewer = {
       ...baseViewer,
       id: "A1111111111111111111111111111111111111111111111111111111",
       displayName: null,
     };
     render(<PresenceViewerList viewers={[viewer]} onClose={vi.fn()} />);
-    expect(
-      screen.getByText("A1111111111111111111111111111111111111111111111111111111")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Anonymous viewer")).toBeInTheDocument();
   });
 
   it("prefers displayName over masked address when both are present", () => {

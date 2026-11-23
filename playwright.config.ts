@@ -11,6 +11,10 @@ export default defineConfig({
     timeout: 10_000,
   },
   fullyParallel: true,
+  // CI retries absorb transient races (lazy-loaded modal chunks, dev-server
+  // cold compiles) instead of failing the whole workflow; traces are captured
+  // on the first retry via `trace: "on-first-retry"` below.
+  retries: process.env.CI ? 2 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
@@ -26,7 +30,26 @@ export default defineConfig({
     // so routes like /app/streams/:streamId resolve real records without a live
     // backend. Existing values from the shell env take precedence.
     env: {
+      VITE_NETWORK: process.env.VITE_NETWORK ?? "TESTNET",
       VITE_USE_MOCKS: process.env.VITE_USE_MOCKS ?? "true",
+      // Demo/mock configuration so the app boots without live backend
+      // credentials, and an explicit network so config validation passes.
+      VITE_DEMO_MODE: process.env.VITE_DEMO_MODE ?? "true",
+      VITE_NETWORK: process.env.VITE_NETWORK ?? "TESTNET",
+      // Marks the run as end-to-end so wallet-gated routes are reachable
+      // without a browser wallet extension (see RequireWallet guards).
+      VITE_E2E: "true",
+      VITE_E2E_FORCE_SHARE_FAILURE: "true",
+      // Stream creation flows through the real tx builder at submit time,
+      // which throws without a contract ID / RPC URL. The documented example
+      // values from .env.example are safe here: the Soroban RPC is stubbed
+      // via page.route() in specs (e.g. create-stream-flow.spec.ts),
+      // intercepting the same host VITE_RPC_URL points at.
+      VITE_RPC_URL:
+        process.env.VITE_RPC_URL ?? "https://soroban-testnet.stellar.org",
+      VITE_STREAM_CONTRACT_ID:
+        process.env.VITE_STREAM_CONTRACT_ID ??
+        "CBQQXQSQB4GBB5XDPBFWEXTURY5HDG37TIE7YZ3WHP3DXVZQ2E4UHY4Z",
     },
   },
   projects: [

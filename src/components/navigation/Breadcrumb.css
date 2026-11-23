@@ -1,0 +1,24 @@
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-link {
+  color: var(--breadcrumb-link-color, inherit);
+  text-decoration: none;
+  outline: none;
+}
+
+.breadcrumb-link:focus-visible {
+  outline: 2px solid var(--focus-ring-color, #0ea5e9);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs, 2px);
+}
+
+.breadcrumb-text {
+  color: var(--breadcrumb-color, inherit);
+}
+
+.breadcrumb-current {
+  color: var(--breadcrumb-color-current, inherit);
+}

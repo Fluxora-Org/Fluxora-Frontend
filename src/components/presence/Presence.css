@@ -314,8 +314,8 @@
   }
 }
 
-/* Mobile responsive adjustments */
-@media (max-width: 767px) {
+/* Mobile responsive adjustments — `--breakpoint-md` (768px). */
+@media (max-width: 768px) {
   /* Hide the avatar stack on mobile */
   .presence-avatar-stack {
     display: none;

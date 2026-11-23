@@ -1,7 +1,7 @@
 /**
- * Local connection state for Slack / Teams share workspaces.
- * Design-phase mock: persists OAuth connect/disconnect in localStorage until
- * real OAuth backends replace the simulated connect handlers.
+ * In-memory connection state for Slack / Teams share workspaces.
+ * Never persist workspace identities or OAuth connection state in browser
+ * storage; the real OAuth integration must keep credentials server-side.
  */
 
 export type ShareProvider = "slack" | "teams";
@@ -17,6 +17,7 @@ export type ShareFlowState =
 
 export const SHARE_WORKSPACES_KEY = "fluxora-share-workspaces";
 export const SHARE_WORKSPACES_CHANGED_EVENT = "fluxora-share-workspaces-changed";
+let connectedWorkspaces: ConnectedShareWorkspace[] = [];
 
 function notifyWorkspacesChanged(): void {
   if (typeof window === "undefined") return;
@@ -60,31 +61,14 @@ export function getShareProviderLabel(provider: ShareProvider): string {
 }
 
 export function readConnectedWorkspaces(): ConnectedShareWorkspace[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(SHARE_WORKSPACES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isConnectedShareWorkspace);
-  } catch {
-    return [];
-  }
+  return [...connectedWorkspaces];
 }
 
 export function writeConnectedWorkspaces(
   workspaces: ConnectedShareWorkspace[],
 ): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      SHARE_WORKSPACES_KEY,
-      JSON.stringify(workspaces),
-    );
-    notifyWorkspacesChanged();
-  } catch {
-    // Ignore quota / private-mode write failures.
-  }
+  connectedWorkspaces = workspaces.filter(isConnectedShareWorkspace);
+  notifyWorkspacesChanged();
 }
 
 export function getConnectedWorkspace(

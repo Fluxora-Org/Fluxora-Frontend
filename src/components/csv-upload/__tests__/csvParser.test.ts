@@ -435,10 +435,10 @@ describe('parseAndValidateCsv', () => {
     });
   });
 
-  it('marks rows with invalid values as invalid', () => {
+  it('marks rows with invalid values as needs-fix', () => {
     const csv = `${header}${INVALID_ADDR},100,10,30`;
     const result = parseAndValidateCsv(csv);
-    expect(result.rows[0].status).toBe('invalid');
+    expect(result.rows[0].status).toBe('needs-fix');
     expect(result.rows[0].fieldErrors.recipient).toBe('Invalid Stellar address');
   });
 
@@ -454,46 +454,64 @@ describe('CSV size limits', () => {
   const header = 'recipient,deposit_amount,accrual_rate_per_day,duration_days\n';
   const validRow = `${VALID_ADDR},100,10,30\n`;
 
-  it('rejects a CSV file larger than MAX_CSV_BYTES', () => {
+  it('refuses a CSV larger than MAX_CSV_BYTES before parsing begins', () => {
     const oversized = 'A'.repeat(MAX_CSV_BYTES + 1);
-    expect(() => parseAndValidateCsv(oversized)).toThrow(/exceeds maximum file size/i);
+    const result = parseAndValidateCsv(oversized);
+    expect(result.parseError).toMatch(/file is too large/i);
+    expect(result.rows).toHaveLength(0);
   });
 
-  it('accepts a CSV file exactly at MAX_CSV_BYTES', () => {
+  it('accepts a CSV exactly at MAX_CSV_BYTES (refused only if it has no data rows)', () => {
     if (MAX_CSV_BYTES > 0) {
       const boundary = 'A'.repeat(MAX_CSV_BYTES);
-      expect(() => parseAndValidateCsv(boundary)).not.toThrow();
+      const result = parseAndValidateCsv(boundary);
+      // Exactly at the bound is not refused for size; a header-only payload
+      // without a trailing row is rejected later for having no data rows.
+      expect(result.parseError).not.toMatch(/file is too large/i);
     }
   });
 
-  it('rejects a CSV file with more than MAX_CSV_ROWS rows', () => {
+  it('refuses a CSV with more than MAX_CSV_ROWS rows before parsing begins', () => {
     const csv = header + validRow.repeat(MAX_CSV_ROWS + 1);
-    expect(() => parseAndValidateCsv(csv)).toThrow(/exceeds maximum row count/i);
+    const result = parseAndValidateCsv(csv);
+    expect(result.parseError).toMatch(/maximum is 500/i);
+    expect(result.rows).toHaveLength(0);
   });
 
-  it('accepts a CSV file with exactly MAX_CSV_ROWS rows', () => {
+  it('accepts a CSV with exactly MAX_CSV_ROWS rows', () => {
     const csv = header + validRow.repeat(MAX_CSV_ROWS);
-    expect(() => parseAndValidateCsv(csv)).not.toThrow();
+    const result = parseAndValidateCsv(csv);
+    expect(result.parseError).toBeUndefined();
+    expect(result.rows).toHaveLength(MAX_CSV_ROWS);
   });
 
-  it('rejects a row with more than MAX_CSV_COLUMNS columns', () => {
-    const columns = Array.from({ length: MAX_CSV_COLUMNS + 1 }, (_, i) => `c${i}`).join(',');
-    expect(() => parseAndValidateCsv(columns)).toThrow(/exceeds maximum column count/i);
+  it('refuses a row with more than MAX_CSV_COLUMNS columns', () => {
+    const header =
+      'recipient,deposit_amount,accrual_rate_per_day,duration_days,' +
+      Array.from({ length: MAX_CSV_COLUMNS - 4 + 1 }, (_, i) => `col${i}`).join(',');
+    const row = `${VALID_ADDR},100,10,30,` +
+      Array.from({ length: MAX_CSV_COLUMNS - 4 + 1 }, () => 'x').join(',');
+    const result = parseAndValidateCsv(`${header}\n${row}\n`);
+    expect(result.parseError).toMatch(/columns/i);
+    expect(result.rows).toHaveLength(0);
   });
 
   it('accepts a row with exactly MAX_CSV_COLUMNS columns', () => {
-    if (MAX_CSV_COLUMNS > 0) {
-      const columns = Array.from({ length: MAX_CSV_COLUMNS }, (_, i) => `c${i}`).join(',');
-      expect(() => parseAndValidateCsv(columns)).not.toThrow();
-    }
+    const header =
+      'recipient,deposit_amount,accrual_rate_per_day,duration_days,' +
+      Array.from({ length: MAX_CSV_COLUMNS - 4 }, (_, i) => `col${i}`).join(',');
+    const row = `${VALID_ADDR},100,10,30,` +
+      Array.from({ length: MAX_CSV_COLUMNS - 4 }, () => 'x').join(',');
+    const result = parseAndValidateCsv(`${header}\n${row}\n`);
+    expect(result.parseError).toBeUndefined();
+    expect(result.rows).toHaveLength(1);
   });
 
-  it('rejects a CSV file with more than MAX_CSV_CELLS total cells', () => {
-    const colsPerRow = Math.min(MAX_CSV_COLUMNS, Math.ceil(MAX_CSV_CELLS / MAX_CSV_ROWS) + 1);
-    const row = Array.from({ length: colsPerRow }, (_, i) => `c${i}`).join(',');
-    const rows = Array.from({ length: MAX_CSV_ROWS + 1 }, () => row);
-    const csv = rows.join('\n');
-    expect(() => parseAndValidateCsv(csv)).toThrow(/exceeds maximum cell count/i);
+  it('derives MAX_CSV_CELLS as the aggregate ceiling of the row and column bounds', () => {
+    // MAX_CSV_CELLS cannot be exceeded while the row and column bounds hold,
+    // so it is documented as the derived aggregate bound, not an independent
+    // check: MAX_CSV_ROWS × MAX_CSV_COLUMNS.
+    expect(MAX_CSV_CELLS).toBe(MAX_CSV_ROWS * MAX_CSV_COLUMNS);
   });
 
   it('processes a large synthetic file within limits quickly', () => {

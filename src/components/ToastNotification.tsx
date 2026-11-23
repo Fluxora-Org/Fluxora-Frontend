@@ -385,9 +385,10 @@ export default function ToastNotification({
     <div
       className={`toast-notification toast-notification--${variant}`}
       aria-atomic="true"
-      aria-label={`${label} notification`}
       data-variant={variant}
       {...semantics}
+      tabIndex={0}
+      aria-label={label}
     >
       <div className="toast-notification__icon" aria-hidden="true">
         {icon}
@@ -407,6 +408,7 @@ export default function ToastNotification({
           <button
             type="button"
             className="toast-notification__action"
+            aria-label={actionLabel}
             onClick={() => {
               onAction();
               onClose();

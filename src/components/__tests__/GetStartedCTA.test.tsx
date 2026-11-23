@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GetStartedCTA from "../GetStartedCTA";
+import { useWallet } from "../wallet-connect/Walletcontext";
 
 const mockNavigate = vi.fn();
 
@@ -19,9 +20,14 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("../wallet-connect/Walletcontext", () => ({
+  useWallet: vi.fn(),
+}));
+
 describe("GetStartedCTA", () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    vi.mocked(useWallet).mockReturnValue({ connected: true } as any);
   });
 
   it("renders tokenized styles without hardcoded colors", () => {
@@ -31,7 +37,7 @@ describe("GetStartedCTA", () => {
       screen.getByRole("heading", { name: "Ready to start streaming?" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /launch dashboard/i }),
+      screen.getByRole("button", { name: /connect wallet to launch/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /view documentation/i }),
@@ -67,7 +73,7 @@ describe("GetStartedCTA", () => {
     render(<GetStartedCTA />);
 
     const primaryButton = screen.getByRole("button", {
-      name: /launch dashboard/i,
+      name: /connect wallet to launch/i,
     });
     const secondaryButton = screen.getByRole("button", {
       name: /view documentation/i,
@@ -98,13 +104,26 @@ describe("GetStartedCTA", () => {
     expect(secondaryButton.style.borderColor).toBe("");
   });
 
-  it("navigates to the dashboard from the primary action", async () => {
+  it("navigates to the connect-wallet entry point from the primary action when no wallet is connected", async () => {
     const user = userEvent.setup();
     render(<GetStartedCTA />);
 
-    await user.click(screen.getByRole("button", { name: /launch dashboard/i }));
+    await user.click(
+      screen.getByRole("button", { name: /connect wallet to launch/i }),
+    );
 
     expect(mockNavigate).toHaveBeenCalledOnce();
-    expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+    expect(mockNavigate).toHaveBeenCalledWith("/connect-wallet");
+  });
+
+  it("prompts a first-time visitor to connect their wallet and states consequence", () => {
+    vi.mocked(useWallet).mockReturnValue({ connected: false } as any);
+    render(<GetStartedCTA />);
+
+    const connectButton = screen.getByRole("button", {
+      name: /connect wallet to launch dashboard/i,
+    });
+    
+    expect(connectButton).toHaveTextContent("Connect wallet");
   });
 });

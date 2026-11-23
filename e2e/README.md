@@ -6,8 +6,17 @@ Run the browser smoke suite with:
 npm run test:e2e
 ```
 
+The suite starts the Vite dev server from `playwright.config.ts` and covers:
+- Create stream wizard
+- Recipient withdrawal surface
+- Theme customization flow
+- Wallet connection/disconnection
+- Landing page CTAs
+- Stream detail views
+
+These tests use local demo data only; they do not connect to wallets, sign transactions, or
 The suite starts the Vite dev server from `playwright.config.ts` and covers the
-current create-stream wizard plus the recipient withdrawal surface. These tests
+current create-stream wizard, the recipient withdrawal surface, and the embedded stream widget display flow. These tests
 use local demo data only; they do not connect to wallets, sign transactions, or
 call deploy credentials.
 
@@ -60,6 +69,17 @@ To enable WebKit on a macOS CI runner:
   env:
     CI: true
     PLAYWRIGHT_WEBKIT: "1"
+```
+
+## Landing performance budget
+
+The landing route has a production-build FCP budget of 1,800 ms. The dedicated
+check uses Chromium at a fixed 1280x720 viewport with 4x CPU throttling and
+40 ms / 1.5 Mbps network emulation, so measurements remain comparable across
+releases and fail CI when the budget is exceeded:
+
+```bash
+npm run test:performance
 ```
 
 ### Browser-specific notes
@@ -145,3 +165,54 @@ The `webServer` option in `playwright.config.ts` starts `npm run dev` automatica
   env:
     CI: true
 ```
+
+
+## Theme Customization Tests
+
+The theme customization flow has dedicated end-to-end coverage in `theme-customization.spec.ts`.
+
+### Running theme tests only
+
+```bash
+npm run test:e2e -- theme-customization
+```
+
+### What's covered
+
+- Theme toggle (light ↔ dark)
+- Persistence across page reloads and navigation
+- Keyboard accessibility
+- Mobile menu variant
+- System preference detection
+- localStorage failure graceful degradation
+- Invalid theme value rejection (security)
+
+### Quick validation
+
+See `THEME_TEST_QUICK_REFERENCE.md` for common commands and validation steps.
+
+Full validation guide: `../THEME_E2E_TEST_VALIDATION.md`
+
+## Colour-blind simulation flow
+
+The colour-blind simulation preview on the treasury overview has dedicated
+end-to-end coverage in `colorblind-simulation-flow.spec.ts`.
+
+### Running the flow only
+
+```bash
+npm run test:e2e -- colorblind-simulation-flow
+```
+
+### What's covered
+
+- All three presets (protanopia, deuteranopia, tritanopia): select on the
+  treasury overview, verify the preview, then disable it from the banner.
+- The active preset's filter reference resolves to a real `feColorMatrix`
+  definition (the bridge to `contrastUtils.ts`), so a dropped filter definition
+  fails the suite instead of silently previewing unfiltered colours.
+- Keyboard-only preset selection.
+- Failure paths: spoofed/leftover browser storage cannot enable the preview, and
+  a reload returns to `Off` without persisting anything.
+- A canary test that removes the SVG filter definitions and asserts the flow
+  assertion goes red, so the success path cannot pass vacuously.

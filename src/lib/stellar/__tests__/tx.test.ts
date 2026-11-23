@@ -49,7 +49,9 @@ vi.mock("@stellar/stellar-sdk", async () => {
     rpc: {
       ...actual.rpc,
       Server: MockServer,
-      assembleTransaction: vi.fn((tx) => tx),
+      // SDK 16's assembleTransaction returns a TransactionBuilder; the tx
+      // layer calls .build() on it, so the mock must expose the same shape.
+      assembleTransaction: vi.fn((tx) => ({ build: () => tx })),
     },
   };
 });

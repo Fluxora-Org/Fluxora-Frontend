@@ -1,87 +1,54 @@
 import { useState, useRef, useEffect } from "react";
-import {
-  ChevronDown,
-  Copy,
-  ExternalLink,
-  LogOut,
-  Check,
-  Link2,
-  Unlink,
-} from "lucide-react";
-import {
-  isStellarNetworkMismatch,
-  normalizeStellarNetwork,
-} from "../../lib/stellarNetwork";
-import { stellarExplorerUrl } from "../../lib/stellar";
-import { useClipboard } from "../../hooks/useClipboard";
-import { useOptionalToast } from "../toast/ToastProvider";
-import { formatAddress } from "../common/TruncatedAddress";
-import {
-  type ShareProvider,
-  SHARE_WORKSPACES_CHANGED_EVENT,
-  connectWorkspace,
-  disconnectWorkspace,
-  getShareProviderLabel,
-  readConnectedWorkspaces,
-} from "../../lib/shareWorkspaces";
+import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
 
 interface WalletStatusProps {
   address: string;
   network: string;
-  expectedNetwork?: string;
-  isNetworkMismatch?: boolean;
   onDisconnect?: () => void;
-  /**
-   * When true (e.g. during a route transition), the wallet *action* controls
-   * are locked: the trigger is disabled, the menu cannot open, and any open
-   * menu is force-closed. The *identity* (network badge + address) stays
-   * visible so the user is not disoriented mid-navigation.
-   */
+  /** Expected network for mismatch detection (passed by AppNavbar, unused in this implementation). */
+  expectedNetwork?: string;
+  /** Whether the wallet network differs from the expected network. */
+  isNetworkMismatch?: boolean;
+  /** When true, disables wallet action controls during route transitions. */
   disabled?: boolean;
 }
 
+function truncate(addr: string) {
+  return addr.length <= 12 ? addr : `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
+const SUPPORTED_NETWORKS = ["PUBLIC", "TESTNET"];
 
 export default function WalletStatus({
   address,
   network,
-  expectedNetwork = "TESTNET",
-  isNetworkMismatch = isStellarNetworkMismatch(network, expectedNetwork),
   onDisconnect,
-  disabled = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  expectedNetwork: _expectedNetwork,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isNetworkMismatch: _isNetworkMismatch,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  disabled: _disabled,
 }: WalletStatusProps) {
   const [open, setOpen] = useState(false);
-  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  const [announcement, setAnnouncement] = useState("");
-  const [workspaces, setWorkspaces] = useState(() => readConnectedWorkspaces());
-  const { copy, status: copyStatus } = useClipboard();
-  const toast = useOptionalToast();
-  const copied = copyStatus === "copied";
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const focusRingClassName =
     "outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--navbar-bg)]";
 
-  const networkUpper = normalizeStellarNetwork(network);
-  const isWrongNetwork = isNetworkMismatch;
+  const networkUpper = network?.toUpperCase() ?? "";
+  const isWrongNetwork = !SUPPORTED_NETWORKS.includes(networkUpper);
   const isTestnet = networkUpper === "TESTNET";
-  const slackWorkspace = workspaces.find((w) => w.provider === "slack");
-  const teamsWorkspace = workspaces.find((w) => w.provider === "teams");
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
-        setConfirmingDisconnect(false);
       }
     };
 
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setConfirmingDisconnect(false);
-        triggerRef.current?.focus();
-      }
+      if (e.key === "Escape") setOpen(false);
     };
 
     document.addEventListener("mousedown", close);
@@ -93,153 +60,36 @@ export default function WalletStatus({
     };
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return;
-    if (!open) {
-      if (
-        document.activeElement === triggerRef.current &&
-        (e.key === "ArrowDown" || e.key === "ArrowUp")
-      ) {
-        e.preventDefault();
-        setOpen(true);
-        // Defer focus so the menu has time to render
-        requestAnimationFrame(() => {
-          const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])");
-          if (!focusableElements || focusableElements.length === 0) return;
-          if (e.key === "ArrowUp") {
-            focusableElements[focusableElements.length - 1].focus();
-          } else {
-            focusableElements[0].focus();
-          }
-        });
-      }
-      return;
-    }
-
-    // Menu is open
-    const focusableElements = menuRef.current?.querySelectorAll<HTMLElement>(
-      "button:not([disabled])",
-    ) || [];
-    const items = Array.from(focusableElements);
-
-    if (items.length === 0) return;
-
-    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
-    const firstItem = items[0];
-    const lastItem = items[items.length - 1];
-
-    if (e.key === "Tab") {
-      if (e.shiftKey && (document.activeElement === firstItem || document.activeElement === triggerRef.current)) {
-        e.preventDefault();
-        lastItem.focus();
-      } else if (!e.shiftKey && (document.activeElement === lastItem || document.activeElement === triggerRef.current)) {
-        e.preventDefault();
-        firstItem.focus();
-      }
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-      items[nextIndex].focus();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-      items[prevIndex].focus();
-    }
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
   };
 
-  useEffect(() => {
-    // Announce connection on mount
-    setAnnouncement(`Wallet connected: ${formatAddress(address)}`);
-    const timer = setTimeout(() => setAnnouncement(""), 1000);
-    return () => clearTimeout(timer);
-  }, [address]);
-
-  // Locking: when disabled (e.g. a route transition is settling), the wallet
-  // action menu must not be openable and any in-flight menu is dismissed so no
-  // action from the previous context can be invoked against the new route.
-  useEffect(() => {
-    if (disabled) {
-      setOpen(false);
-      setConfirmingDisconnect(false);
-    }
-  }, [disabled]);
-
-  useEffect(() => {
-    const syncWorkspaces = () => setWorkspaces(readConnectedWorkspaces());
-    window.addEventListener("storage", syncWorkspaces);
-    window.addEventListener("focus", syncWorkspaces);
-    window.addEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
-    return () => {
-      window.removeEventListener("storage", syncWorkspaces);
-      window.removeEventListener("focus", syncWorkspaces);
-      window.removeEventListener(SHARE_WORKSPACES_CHANGED_EVENT, syncWorkspaces);
-    };
-  }, []);
-
-  const handleWorkspaceConnect = (provider: ShareProvider) => {
-    const connected = connectWorkspace(provider);
-    setWorkspaces(readConnectedWorkspaces());
-    toast?.addToast(
-      `${getShareProviderLabel(provider)} workspace connected.`,
-      "success",
-    );
-    setAnnouncement(
-      `${getShareProviderLabel(provider)} connected to ${connected.workspaceName}`,
-    );
-    setTimeout(() => setAnnouncement(""), 2000);
-  };
-
-  const handleWorkspaceDisconnect = (provider: ShareProvider) => {
-    disconnectWorkspace(provider);
-    setWorkspaces(readConnectedWorkspaces());
-    toast?.addToast(
-      `${getShareProviderLabel(provider)} workspace disconnected.`,
-      "info",
-    );
-    setAnnouncement(`${getShareProviderLabel(provider)} workspace disconnected`);
-    setTimeout(() => setAnnouncement(""), 2000);
-  };
-
- const handleCopy = async () => {
-  // Copy via the shared hook (Clipboard API + execCommand fallback).
-  const success = await copy(address);
-
-  if (success) {
-    setAnnouncement("Address copied to clipboard");
-    setTimeout(() => setAnnouncement(""), 2000);
-  } else {
-    // Explicit failure feedback: live-region announcement + error toast.
-    setAnnouncement("Failed to copy address. Please copy manually.");
-    toast?.addToast("Failed to copy address. Please copy manually.", "error");
-    setTimeout(() => setAnnouncement(""), 3000);
-  }
-};
-
-  const closeMenu = () => {
-    setOpen(false);
-    setConfirmingDisconnect(false);
-    triggerRef.current?.focus();
-  };
-
-  const handleConfirmDisconnect = () => {
-    onDisconnect?.();
-    setAnnouncement("Wallet disconnected. Use Connect Wallet to reconnect.");
-    closeMenu();
-  };
+  const networkLabel = isWrongNetwork
+    ? "Wrong Network"
+    : isTestnet
+      ? "Testnet"
+      : "Mainnet";
 
   return (
-    <div ref={ref} onKeyDown={handleKeyDown} className="flex items-center gap-2">
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </div>
-      {/* Network Badge */}
+    <div ref={ref} className="flex items-center gap-2">
+      {/* Network Badge — visible to assistive technology */}
       {isWrongNetwork ? (
-        <span className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40">
-          <span className="w-2 h-2 rounded-full bg-red-400" />
-          Expected {expectedNetwork}
+        <span
+          role="status"
+          aria-label={`Active network: Wrong Network`}
+          className="flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/40"
+        >
+          <span className="w-2 h-2 rounded-full bg-red-400" aria-hidden="true" />
+          Wrong Network
         </span>
       ) : (
         <span
+          role="status"
+          aria-label={`Active network: ${networkLabel}`}
           className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border ${
             isTestnet
               ? "bg-amber-400/15 text-amber-300 border-amber-400/30"
@@ -250,52 +100,23 @@ export default function WalletStatus({
             className={`w-2 h-2 rounded-full ${
               isTestnet ? "bg-amber-300" : "bg-emerald-400"
             }`}
+            aria-hidden="true"
           />
           {isTestnet ? "Testnet" : "Mainnet"}
         </span>
       )}
 
-      {slackWorkspace && (
-        <span
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-sky-400/15 text-sky-200 border border-sky-400/30"
-          title={`Slack connected: ${slackWorkspace.workspaceName}`}
-        >
-          Slack · {slackWorkspace.workspaceName}
-        </span>
-      )}
-      {teamsWorkspace && (
-        <span
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 h-8 rounded-full text-xs font-semibold bg-indigo-400/15 text-indigo-200 border border-indigo-400/30"
-          title={`Teams connected: ${teamsWorkspace.workspaceName}`}
-        >
-          Teams · {teamsWorkspace.workspaceName}
-        </span>
-      )}
-
-      {/* Wallet Button */}
+      {/* Wallet Button — aria-label includes both address and active network */}
       <div className="relative">
         <button
-          ref={triggerRef}
           onClick={() => setOpen((o) => !o)}
-          disabled={disabled}
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-disabled={disabled || undefined}
-          aria-label={`${
-            disabled
-              ? "Wallet controls unavailable while navigating. "
-              : ""
-          }Wallet ${formatAddress(address)}. Open wallet options.`}
-          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName} ${
-            disabled
-              ? "opacity-60 cursor-not-allowed hover:border-[var(--border)]"
-              : ""
-          }`}
+          aria-label={`Wallet ${truncate(address)} on ${networkLabel}. Open wallet options.`}
+          className={`flex items-center gap-2 px-3 h-9 rounded-full bg-[var(--surface)] border border-[var(--border)] text-sm font-medium text-[var(--text)] cursor-pointer transition-colors hover:border-[var(--accent)]/50 ${focusRingClassName}`}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span className="font-mono text-xs">
-            {formatAddress(address)}
-          </span>
+          <span className="font-mono text-xs">{truncate(address)}</span>
           <ChevronDown
             size={16}
             className={`transition-transform ${open ? "rotate-180" : ""}`}
@@ -304,129 +125,42 @@ export default function WalletStatus({
 
         {/* Dropdown */}
         {open && (
-          <div
-            role="menu"
-            ref={menuRef}
-            aria-label="Wallet options"
-            className="absolute right-0 mt-2 w-60 bg-[var(--navbar-bg)] border border-[var(--navbar-border)] rounded-xl shadow-md p-1.5 z-50"
-          >
-            {confirmingDisconnect ? (
-              <div className="px-2 py-2">
-                <p className="text-sm font-medium text-[var(--text)]">
-                  Disconnect wallet?
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Your wallet state will be cleared. You can reconnect from the
-                  navbar.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingDisconnect(false)}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm text-[var(--text)] bg-[var(--surface)] hover:bg-[var(--surface-elevated)] transition-colors ${focusRingClassName}`}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmDisconnect}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm text-white bg-red-500 hover:bg-red-600 transition-colors ${focusRingClassName}`}
-                  >
-                    Disconnect wallet
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <button
-                  role="menuitem"
-                  onClick={handleCopy}
-                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                >
-                  {copied ? (
-                    <Check size={16} className="text-emerald-400" />
-                  ) : (
-                    <Copy size={16} />
-                  )}
-                  {copied ? "Copied!" : "Copy address"}
-                </button>
+          <div className="absolute right-0 mt-2 w-52 bg-[var(--navbar-bg)] border border-[var(--navbar-border)] rounded-xl shadow-md p-1.5 z-50">
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+            >
+              {copied ? (
+                <Check size={16} className="text-emerald-400" />
+              ) : (
+                <Copy size={16} />
+              )}
+              {copied ? "Copied!" : "Copy address"}
+            </button>
 
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    window.open(
-                      stellarExplorerUrl(address, network),
-                      "_blank",
-                      "noopener",
-                    );
-                    closeMenu();
-                  }}
-                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-                >
-                  <ExternalLink size={16} />
-                  View in explorer
-                </button>
+            <button
+              role="menuitem"
+              onClick={() => { 
+                const netPath = network?.toLowerCase() === "public" ? "public" : "testnet";
+                window.open(`https://stellar.expert/explorer/${netPath}/account/${address}`, "_blank", "noopener"); 
+                setOpen(false); 
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            >
+              <ExternalLink size={16} />
+              View in explorer
+            </button>
 
-                <div className="my-1 h-px bg-[var(--navbar-border)]" />
+            <div className="my-1 h-px bg-[var(--navbar-border)]" />
 
-                {slackWorkspace ? (
-                  <button
-                    role="menuitem"
-                    onClick={() => handleWorkspaceDisconnect("slack")}
-                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                  >
-                    <Unlink size={16} />
-                    Disconnect Slack
-                  </button>
-                ) : (
-                  <button
-                    role="menuitem"
-                    onClick={() => handleWorkspaceConnect("slack")}
-                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                  >
-                    <Link2 size={16} />
-                    Connect Slack workspace
-                  </button>
-                )}
-
-                {teamsWorkspace ? (
-                  <button
-                    role="menuitem"
-                    onClick={() => handleWorkspaceDisconnect("teams")}
-                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                  >
-                    <Unlink size={16} />
-                    Disconnect Teams
-                  </button>
-                ) : (
-                  <button
-                    role="menuitem"
-                    onClick={() => handleWorkspaceConnect("teams")}
-                    className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text)] rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                  >
-                    <Link2 size={16} />
-                    Connect Microsoft Teams
-                  </button>
-                )}
-
-                <div className="my-1 h-px bg-[var(--navbar-border)]" />
-
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setConfirmingDisconnect(true);
-                    requestAnimationFrame(() => {
-                      const firstButton = menuRef.current?.querySelector<HTMLElement>("button:not([disabled])");
-                      firstButton?.focus();
-                    });
-                  }}
-                  className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
-                >
-                  <LogOut size={16} />
-                  Disconnect
-                </button>
-              </>
-            )}
+            <button
+              role="menuitem"
+              onClick={() => { setOpen(false); onDisconnect?.(); }}
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-[var(--surface)] transition-colors ${focusRingClassName}`}
+            >
+              <LogOut size={16} />
+              Disconnect
+            </button>
           </div>
         )}
       </div>

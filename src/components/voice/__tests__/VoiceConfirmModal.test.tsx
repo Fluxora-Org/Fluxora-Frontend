@@ -11,7 +11,9 @@ vi.mock("../VoiceContext", () => ({
   useVoiceContext: () => mockContext,
 }));
 
-function buildContext(overrides: Partial<VoiceContextValue> = {}): VoiceContextValue {
+function buildContext(
+  overrides: Partial<VoiceContextValue> = {},
+): VoiceContextValue {
   return {
     state: "idle",
     isSupported: true,
@@ -52,25 +54,37 @@ describe("VoiceConfirmModal", () => {
   // -- isOpen state combinations -----------------------------------------
 
   it("renders null when state is idle and pendingDestructiveCommand is null", () => {
-    mockContext = buildContext({ state: "idle", pendingDestructiveCommand: null });
+    mockContext = buildContext({
+      state: "idle",
+      pendingDestructiveCommand: null,
+    });
     const { container } = render(<VoiceConfirmModal />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders null when state is idle and pendingDestructiveCommand is set (inconsistent)", () => {
-    mockContext = buildContext({ state: "idle", pendingDestructiveCommand: destructiveCmd });
+    mockContext = buildContext({
+      state: "idle",
+      pendingDestructiveCommand: destructiveCmd,
+    });
     const { container } = render(<VoiceConfirmModal />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders null when state is confirming-destructive but pendingDestructiveCommand is null", () => {
-    mockContext = buildContext({ state: "confirming-destructive", pendingDestructiveCommand: null });
+    mockContext = buildContext({
+      state: "confirming-destructive",
+      pendingDestructiveCommand: null,
+    });
     const { container } = render(<VoiceConfirmModal />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders the modal when state is confirming-destructive and pendingDestructiveCommand is set", () => {
-    mockContext = buildContext({ state: "confirming-destructive", pendingDestructiveCommand: destructiveCmd });
+    mockContext = buildContext({
+      state: "confirming-destructive",
+      pendingDestructiveCommand: destructiveCmd,
+    });
     render(<VoiceConfirmModal />);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
@@ -78,9 +92,12 @@ describe("VoiceConfirmModal", () => {
   // -- Rendered phrase text ----------------------------------------------
 
   it("renders the pendingDestructiveCommand phrase in the modal body", () => {
-    mockContext = buildContext({ state: "confirming-destructive", pendingDestructiveCommand: destructiveCmd });
+    mockContext = buildContext({
+      state: "confirming-destructive",
+      pendingDestructiveCommand: destructiveCmd,
+    });
     render(<VoiceConfirmModal />);
-    expect(screen.getByText(/Cancel stream/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent(/Cancel stream/);
   });
 
   // -- Escape key lifecycle ----------------------------------------------
@@ -147,7 +164,9 @@ describe("VoiceConfirmModal", () => {
     expect(cancelButton).toHaveFocus();
 
     // Confirm Action should still be reachable via Tab
-    const confirmButton = screen.getByRole("button", { name: /confirm action/i });
+    const confirmButton = screen.getByRole("button", {
+      name: /confirm action/i,
+    });
     expect(confirmButton).toBeInTheDocument();
     expect(confirmButton).not.toHaveFocus();
 
@@ -196,8 +215,12 @@ describe("VoiceConfirmModal", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     const dialog = screen.getByRole("dialog");
-    const closeButton = screen.getByRole("button", { name: /cancel destructive action/i });
-    const confirmButton = screen.getByRole("button", { name: /confirm action/i });
+    const closeButton = screen.getByRole("button", {
+      name: /cancel destructive action/i,
+    });
+    const confirmButton = screen.getByRole("button", {
+      name: /confirm action/i,
+    });
     const cancelButton = screen.getByRole("button", { name: /^Cancel$/i });
 
     closeButton.focus();
@@ -221,7 +244,9 @@ describe("VoiceConfirmModal", () => {
     await user.tab({ shift: true });
     expect(closeButton).toHaveFocus();
 
-    expect(dialog as HTMLElement).toContainElement(document.activeElement as HTMLElement);
+    expect(dialog as HTMLElement).toContainElement(
+      document.activeElement as HTMLElement,
+    );
 
     vi.useRealTimers();
   });

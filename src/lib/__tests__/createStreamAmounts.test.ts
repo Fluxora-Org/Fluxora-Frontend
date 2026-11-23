@@ -1,4 +1,7 @@
-import { sanitizeAmount, parseAmount } from "../../lib/createStreamAmounts";
+import {
+  sanitizeAmount,
+  parseAmountToMinorUnits,
+} from "../../lib/createStreamAmounts";
 
 describe("sanitizeAmount validation", () => {
   it("rejects scientific notation input", () => {
@@ -14,11 +17,15 @@ describe("sanitizeAmount validation", () => {
   it("rejects malformed commas", () => {
     expect(sanitizeAmount("12,34,567")).toBe("");
     expect(sanitizeAmount(",1234")).toBe("");
-    expect(sanitizeAmount("1234," )).toBe("");
+    expect(sanitizeAmount("1234,")).toBe("");
   });
 
-  it("parseAmount returns 0 for invalid input", () => {
-    expect(parseAmount("1e5")).toBe(0);
-    expect(parseAmount("12,34,567")).toBe(0);
+  it("parseAmountToMinorUnits returns 0n for invalid input", () => {
+    expect(parseAmountToMinorUnits("1e5")).toBe(0n);
+    expect(parseAmountToMinorUnits("12,34,567")).toBe(0n);
+  });
+
+  it("parseAmountToMinorUnits converts a valid amount to exact minor units", () => {
+    expect(parseAmountToMinorUnits("1,234.56")).toBe(123456n);
   });
 });

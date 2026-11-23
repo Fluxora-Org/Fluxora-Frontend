@@ -3,6 +3,7 @@ import EmptyState from "./EmptyState";
 
 interface TreasuryEmptyStateProps {
   onCreateStream: () => void;
+  onOpenOnboarding?: () => void;
   walletConnected?: boolean;
   loading?: boolean;
   error?: string | null;
@@ -11,6 +12,7 @@ interface TreasuryEmptyStateProps {
 
 const TreasuryEmptyState: React.FC<TreasuryEmptyStateProps> = ({
   onCreateStream,
+  onOpenOnboarding,
   walletConnected = true,
   loading = false,
   error = null,
@@ -23,6 +25,8 @@ const TreasuryEmptyState: React.FC<TreasuryEmptyStateProps> = ({
     error={error}
     onRetry={onRetry}
     onPrimaryAction={onCreateStream}
+    secondaryActionLabel={onOpenOnboarding ? "View onboarding" : undefined}
+    onSecondaryAction={onOpenOnboarding}
   />
 );
 

@@ -37,6 +37,7 @@ const makeStreamRecord = (
   overrides: Partial<StreamRecord> = {},
 ): StreamRecord => ({
   id: 'STR-TEST-1',
+  public: true,
   name: 'Core Infrastructure Grant',
   recipientName: 'Satoshi N.',
   recipientAddress: 'GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P',

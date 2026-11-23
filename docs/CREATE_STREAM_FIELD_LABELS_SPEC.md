@@ -706,7 +706,7 @@ Cliff date must be on or after the start date.
 - [WCAG 2.1 AA Guidelines](https://www.w3.org/WAI/WCAG21/quickref/?showtechniques=135)
 - [Stellar Address Format](https://developers.stellar.org/docs/fundamentals-and-concepts/stellar-data-structures/accounts)
 - [Design Tokens Quick Reference](./DESIGN_TOKENS_QUICK_REFERENCE.md)
-- [Modal Accessibility Verification](./MODAL_ACCESSIBILITY_VERIFICATION.md)
+- [Modal Accessibility Verification](./archive/MODAL_ACCESSIBILITY_VERIFICATION.md)
 - [Component States](./COMPONENT_STATES.md)
 
 ---

@@ -281,15 +281,25 @@ test.describe("CreateStream Modal Accessibility & Focus Management", () => {
     ).toHaveCount(0);
 
     // Step 1: recipient + deposit amount.
-    await dialog
-      .getByRole("textbox", { name: "Recipient" })
-      .fill(VALID_STELLAR_RECIPIENT);
-    await dialog.getByRole("textbox", { name: "Deposit amount" }).fill("150");
+    // The modal settles asynchronously after mount; refill until the committed
+    // values stick instead of racing a late remount (see create-stream-flow.spec.ts).
+    const recipientBox = dialog.getByRole("textbox", { name: "Recipient" });
+    const depositBox = dialog.getByRole("textbox", { name: "Deposit amount" });
+    await expect(async () => {
+      await recipientBox.fill(VALID_STELLAR_RECIPIENT);
+      await depositBox.fill("150");
+      await expect(recipientBox).toHaveValue(VALID_STELLAR_RECIPIENT);
+      await expect(depositBox).toHaveValue("150");
+    }).toPass({ timeout: 15_000 });
 
     // Advance to step 2 by activating "Next" with the keyboard.
     const nextToStep2 = dialog.getByRole("button", { name: /^next$/i });
-    await nextToStep2.focus();
-    await expect(nextToStep2).toBeFocused();
+    // The button can be re-mounted while the modal settles; retry focus
+    // acquisition but press Enter exactly once once focus is stable.
+    await expect(async () => {
+      await nextToStep2.focus();
+      await expect(nextToStep2).toBeFocused();
+    }).toPass({ timeout: 10_000 });
     await nextToStep2.press("Enter");
 
     await expect(
@@ -298,8 +308,10 @@ test.describe("CreateStream Modal Accessibility & Focus Management", () => {
 
     // Advance to step 3 (Review & create).
     const nextToStep3 = dialog.getByRole("button", { name: /^next$/i });
-    await nextToStep3.focus();
-    await expect(nextToStep3).toBeFocused();
+    await expect(async () => {
+      await nextToStep3.focus();
+      await expect(nextToStep3).toBeFocused();
+    }).toPass({ timeout: 10_000 });
     await nextToStep3.press("Enter");
 
     await expect(dialog.getByText("By creating this stream:")).toBeVisible();

@@ -181,4 +181,35 @@ describe("transactionConfig", () => {
       expect(transactionConfig.confirmationDelayMs).toBe(1500);
     });
   });
+
+  // ── transactionPollingConfig.deadlineMs ─────────────────────────────────
+
+  describe("transactionPollingConfig.deadlineMs", () => {
+    it("defaults to 30000 ms when VITE_TX_POLL_DEADLINE_MS is unset", async () => {
+      vi.resetModules();
+      const { transactionPollingConfig } = await import("../transactionConfig");
+      expect(transactionPollingConfig.deadlineMs).toBe(30000);
+    });
+
+    it("reads a valid positive integer from env", async () => {
+      vi.stubEnv("VITE_TX_POLL_DEADLINE_MS", "45000");
+      vi.resetModules();
+      const { transactionPollingConfig } = await import("../transactionConfig");
+      expect(transactionPollingConfig.deadlineMs).toBe(45000);
+    });
+
+    it("falls back to default 30000 when the value is non-numeric", async () => {
+      vi.stubEnv("VITE_TX_POLL_DEADLINE_MS", "not-a-number");
+      vi.resetModules();
+      const { transactionPollingConfig } = await import("../transactionConfig");
+      expect(transactionPollingConfig.deadlineMs).toBe(30000);
+    });
+
+    it("falls back to default 30000 when a negative value is provided", async () => {
+      vi.stubEnv("VITE_TX_POLL_DEADLINE_MS", "-1000");
+      vi.resetModules();
+      const { transactionPollingConfig } = await import("../transactionConfig");
+      expect(transactionPollingConfig.deadlineMs).toBe(30000);
+    });
+  });
 });

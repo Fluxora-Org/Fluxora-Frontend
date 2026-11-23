@@ -8,7 +8,10 @@ export interface PendingTransaction {
 }
 
 export function generateIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `tx_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -28,7 +31,7 @@ export function savePendingTx(
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
   } catch {
-    // sessionStorage may be unavailable in some test environments
+    // sessionStorage may be unavailable in some environments
   }
   return key;
 }
@@ -54,7 +57,11 @@ export function clearPendingTx(): void {
 export async function reconcilePendingTx(
   getStatus: (hash: string) => Promise<"pending" | "confirmed" | "failed">,
 ): Promise<
-  | { reconciled: true; status: "pending" | "confirmed" | "failed"; txHash: string }
+  | {
+      reconciled: true;
+      status: "pending" | "confirmed" | "failed";
+      txHash: string;
+    }
   | { reconciled: false }
 > {
   const pending = loadPendingTx();

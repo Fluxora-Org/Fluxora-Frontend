@@ -353,7 +353,8 @@
 
 /* ─── Responsive: Mobile (full-screen sheet) ─── */
 
-@media (max-width: 639px) {
+/* `--breakpoint-sm` (640px), spelled as a token rather than sm - 1. */
+@media (max-width: 640px) {
   .backdrop {
     align-items: flex-end;
     padding: 0;

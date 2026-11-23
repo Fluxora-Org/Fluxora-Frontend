@@ -15,12 +15,13 @@
  *  9. Accessibility — group/region roles, aria-label attributes
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StreamsListPanel } from "./StreamsListPanel";
 import type { StreamsListPanelProps } from "./StreamsListPanel";
 import type { StreamRecord } from "../../data/streamRecords";
 import type { StatusFilter } from "../../pages/useStreamsData";
+import { streamsSessionWriteStatus } from "../../lib/streamsSessionRecovery";
 
 // ─── Fixture builder ──────────────────────────────────────────────────────────
 
@@ -331,6 +332,17 @@ describe("StreamsListPanel — pagination", () => {
 // ─── Session persistence indicator ───────────────────────────────────────────
 
 describe("StreamsListPanel — session persistence indicator", () => {
+  // The indicator only claims persistence after a write succeeded (#1663).
+  beforeEach(() => {
+    streamsSessionWriteStatus.record(true);
+  });
+
+  afterEach(() => {
+    // Unmount before resetting so the reset doesn't update a mounted indicator.
+    cleanup();
+    streamsSessionWriteStatus.reset();
+  });
+
   it("renders the autosave icon with correct aria-label", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     expect(

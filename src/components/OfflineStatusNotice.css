@@ -1,0 +1,15 @@
+.offline-status-notice {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.offline-status-notice strong {
+  color: var(--status-warning);
+}

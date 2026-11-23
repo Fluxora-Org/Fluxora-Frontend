@@ -224,4 +224,37 @@ describe("usePresenceViewers — subscription ownership & cleanup (Issue #1428)"
     expect(result.current.viewers[0]?.cursorY).toBe(0.42);
     expect(result.current.viewers[0]?.fadingOut).toBe(false);
   });
+
+  it("removes viewer state on disconnect (removeViewer)", () => {
+    const { result } = renderHook(() =>
+      usePresenceViewers("stream-a", [viewer("alice")])
+    );
+    expect(result.current.viewers.map(v => v.id)).toEqual(["alice"]);
+
+    act(() => {
+      result.current.removeViewer("alice");
+    });
+    expect(result.current.viewers).toEqual([]);
+  });
+
+  it("bounds the viewer list", () => {
+    const mockViewers = Array.from({ length: 55 }, (_, i) => viewer(`viewer-${i}`));
+    const { result } = renderHook(() =>
+      usePresenceViewers("stream-a", mockViewers)
+    );
+    expect(result.current.viewers.length).toBeLessThanOrEqual(50);
+    expect(result.current.viewerCount).toBeLessThanOrEqual(50);
+  });
+
+  it("gracefully degrades to unavailable on presence failure (handlePresenceError)", () => {
+    const { result } = renderHook(() =>
+      usePresenceViewers("stream-a", [viewer("alice")])
+    );
+    expect(result.current.viewers.length).toBe(1);
+
+    act(() => {
+      result.current.handlePresenceError(new Error("transport failed"));
+    });
+    expect(result.current.viewers).toEqual([]);
+  });
 });

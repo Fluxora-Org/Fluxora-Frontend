@@ -78,6 +78,17 @@ describe("VirtualList", () => {
     });
   });
 
+  it("exposes the full item count to assistive technology via aria-setsize", () => {
+    renderVirtualList();
+
+    const list = screen.getByRole("list", { name: "Virtual streams" });
+    expect(list).toHaveAttribute("data-item-count", "30");
+
+    const firstItem = within(list).getAllByRole("listitem")[0];
+    expect(firstItem).toHaveAttribute("aria-setsize", "30");
+    expect(firstItem).toHaveAttribute("aria-posinset", "1");
+  });
+
   it("keeps keyboard navigation in DOM order across mounted rows", async () => {
     const user = userEvent.setup();
 
@@ -155,7 +166,7 @@ describe("VirtualList", () => {
     });
   });
 
-  it("retains focus on the nearest visible row when the focused row is scrolled out of view", () => {
+  it("preserves focus on the keyed row when the rendered window shifts", () => {
     const itemsWithButtons = Array.from({ length: 30 }, (_, index) => ({
       id: `item-${index}`,
       name: `Stream ${index}`,
@@ -194,114 +205,10 @@ describe("VirtualList", () => {
       fireEvent.scroll(window);
     });
 
-    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
-
-    const button8 = screen.getByTestId("button-8");
-    expect(document.activeElement).toBe(button8);
-  });
-
-  it("scans and focuses the nearest mounted row with focusable elements if the closest one has none", () => {
-    const itemsWithSelectiveButtons = Array.from(
-      { length: 30 },
-      (_, index) => ({
-        id: `item-${index}`,
-        name: `Stream ${index}`,
-      }),
-    );
-
-    render(
-      <VirtualList
-        ariaLabel="Virtual streams"
-        className="streams-list"
-        estimateSize={100}
-        getKey={(item) => item.id}
-        items={itemsWithSelectiveButtons}
-        overscan={1}
-        renderItem={(item, index) => (
-          <article>
-            <span>{item.name}</span>
-            {/* Index 8 has no focusable elements, index 9 does */}
-            {index !== 8 && (
-              <button data-testid={`button-${index}`}>Action {index}</button>
-            )}
-          </article>
-        )}
-        testId="virtual-streams"
-        threshold={5}
-      />,
-    );
-
-    const button0 = screen.getByTestId("button-0");
-    button0.focus();
-    expect(document.activeElement).toBe(button0);
-
-    Object.defineProperty(window, "scrollY", {
-      configurable: true,
-      writable: true,
-      value: 900,
-    });
-
-    act(() => {
-      fireEvent.scroll(window);
-    });
-
-    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
-
-    // Since index 8 has no button, focus should skip index 8 and land on the button at index 9!
-    const button9 = screen.getByTestId("button-9");
-    expect(document.activeElement).toBe(button9);
-  });
-
-  it("falls back to focusing the list container when no mounted rows contain focusable elements", () => {
-    const itemsWithSelectiveButtons = Array.from(
-      { length: 30 },
-      (_, index) => ({
-        id: `item-${index}`,
-        name: `Stream ${index}`,
-      }),
-    );
-
-    render(
-      <VirtualList
-        ariaLabel="Virtual streams"
-        className="streams-list"
-        estimateSize={100}
-        getKey={(item) => item.id}
-        items={itemsWithSelectiveButtons}
-        overscan={1}
-        renderItem={(item, index) => (
-          <article>
-            <span>{item.name}</span>
-            {/* Only index 0 has a button; all other rows are non-focusable */}
-            {index === 0 && (
-              <button data-testid={`button-${index}`}>Action {index}</button>
-            )}
-          </article>
-        )}
-        testId="virtual-streams"
-        threshold={5}
-      />,
-    );
-
-    const button0 = screen.getByTestId("button-0");
-    button0.focus();
-    expect(document.activeElement).toBe(button0);
-
-    Object.defineProperty(window, "scrollY", {
-      configurable: true,
-      writable: true,
-      value: 900,
-    });
-
-    act(() => {
-      fireEvent.scroll(window);
-    });
-
-    expect(screen.queryByTestId("button-0")).not.toBeInTheDocument();
-
-    // No mounted rows have buttons, so focus should land on the virtual list container
-    const container = screen.getByRole("list", { name: "Virtual streams" });
-    expect(document.activeElement).toBe(container);
+    // Focused row stays mounted (pinned) so keyboard / SR focus is preserved.
+    expect(screen.getByTestId("button-0")).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByTestId("button-0"));
+    expect(screen.getByText("Stream 8")).toBeInTheDocument();
   });
 
   it("moves focus to the nearest remaining item when the focused item is filtered out", () => {
@@ -335,5 +242,79 @@ describe("VirtualList", () => {
     );
 
     expect(screen.getByTestId("button-item-3")).toHaveFocus();
+  });
+
+  it("traverses every item by arrow keys including rows outside the rendered window", async () => {
+    const user = userEvent.setup();
+    const longItems = Array.from({ length: 20 }, (_, index) => ({
+      id: `item-${index}`,
+      name: `Stream ${index}`,
+    }));
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={longItems}
+        overscan={1}
+        renderItem={(item, index) => (
+          <button data-testid={`button-${index}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "Virtual streams" });
+    list.focus();
+
+    // Start at the first row, then ArrowDown through the entire list.
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByTestId("button-0")).toHaveFocus();
+
+    const reached: number[] = [0];
+    for (let index = 1; index < longItems.length; index += 1) {
+      await user.keyboard("{ArrowDown}");
+      expect(screen.getByTestId(`button-${index}`)).toHaveFocus();
+      const listitem = screen.getByTestId(`button-${index}`).closest(
+        '[role="listitem"]',
+      );
+      expect(listitem).toHaveAttribute("aria-setsize", "20");
+      expect(listitem).toHaveAttribute("aria-posinset", String(index + 1));
+      reached.push(index);
+    }
+
+    expect(reached).toEqual(longItems.map((_, index) => index));
+    expect(window.scrollTo).toHaveBeenCalled();
+  });
+
+  it("moves through items in order with ArrowUp after jumping to End", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <VirtualList
+        ariaLabel="Virtual streams"
+        estimateSize={100}
+        getKey={(item) => item.id}
+        items={items.slice(0, 12)}
+        overscan={1}
+        renderItem={(item, index) => (
+          <button data-testid={`button-${index}`}>{item.name}</button>
+        )}
+        threshold={5}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "Virtual streams" });
+    list.focus();
+
+    await user.keyboard("{End}");
+    expect(screen.getByTestId("button-11")).toHaveFocus();
+
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByTestId("button-10")).toHaveFocus();
+
+    await user.keyboard("{Home}");
+    expect(screen.getByTestId("button-0")).toHaveFocus();
   });
 });

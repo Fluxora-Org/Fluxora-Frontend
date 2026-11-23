@@ -3,11 +3,21 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EmbedStreamWidget from '../EmbedStreamWidget';
 import { getStreamById } from '../../lib/api/streamsService';
+import { getFramingContext } from '../../lib/embedFramingPolicy';
 
 // Mock the streams service
 vi.mock('../../lib/api/streamsService', () => ({
   getStreamById: vi.fn()
 }));
+
+// Framing trust is mocked so the widget tests exercise the trusted and
+// degraded render paths deterministically; the policy itself is unit-tested in
+// src/lib/__tests__/embedFramingPolicy.test.ts.
+vi.mock('../../lib/embedFramingPolicy', () => ({
+  getFramingContext: vi.fn()
+}));
+
+const mockedGetFramingContext = vi.mocked(getFramingContext);
 
 // Mock the useTickingNow hook
 vi.mock('../../hooks/useTickingNow', () => ({
@@ -49,15 +59,30 @@ const mockStream = {
 describe('EmbedStreamWidget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Existing tests assume the full (trusted) widget; framing-specific tests
+    // override this per test.
+    mockedGetFramingContext.mockReturnValue({
+      trusted: true,
+      isFramed: true,
+      embedderOrigin: 'https://host.example'
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
+  let nonceSeq = 0;
   const sendMessage = (data: unknown, origin = window.location.origin) => {
+    // embedMessagePolicy requires a fresh nonce + timestamp on every message;
+    // inject them here so the tests exercise origin/bounds policy, not nonce mechanics.
+    let payload = data;
+    if (data && typeof data === 'object' && (data as Record<string, unknown>).type === 'fluxora:embed' && !(data as Record<string, unknown>).nonce) {
+      nonceSeq += 1;
+      payload = { ...(data as Record<string, unknown>), nonce: `test-nonce-${nonceSeq}`, timestamp: Date.now() };
+    }
     window.dispatchEvent(new MessageEvent("message", {
-      data,
+      data: payload,
       origin,
       source: window,
     }));
@@ -192,8 +217,10 @@ describe('EmbedStreamWidget', () => {
       sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 900 }, 'null');
       sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', height: 1000, padding: 'x'.repeat(5000) });
 
-      expect(container).not.toHaveStyle({ minHeight: '700px' });
-      expect(container).toHaveStyle({ minHeight: '500px' });
+      await waitFor(() => {
+        expect(container).not.toHaveStyle({ minHeight: '700px' });
+        expect(container).toHaveStyle({ minHeight: '500px' });
+      });
     });
 
     it('applies valid bounded resize and theme messages from the parent', async () => {
@@ -204,8 +231,10 @@ describe('EmbedStreamWidget', () => {
       sendMessage({ type: 'fluxora:embed', version: 1, action: 'resize', width: 640, height: 1 });
       sendMessage({ type: 'fluxora:embed', version: 1, action: 'theme', theme: 'dark' });
 
-      expect(container).toHaveStyle({ maxWidth: '640px', minHeight: '1px' });
-      expect(container).toHaveAttribute('data-theme', 'dark');
+      await waitFor(() => {
+        expect(container).toHaveStyle({ maxWidth: '640px', minHeight: '1px' });
+        expect(container).toHaveAttribute('data-theme', 'dark');
+      });
     });
 
     it('renders card preset by default', async () => {
@@ -240,6 +269,39 @@ describe('EmbedStreamWidget', () => {
         expect(screen.getByText('40%')).toBeInTheDocument();
         expect(screen.getByText('Fluxora')).toBeInTheDocument();
       });
+    });
+
+    it('states which network and stream it renders', async () => {
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        expect(screen.getByRole('note')).toHaveTextContent('Testnet · Stream STR-001');
+      });
+    });
+
+    it('degrades safely when the framing origin is not allowlisted (hostile framing)', async () => {
+      mockedGetFramingContext.mockReturnValue({
+        trusted: false,
+        isFramed: true,
+        embedderOrigin: 'https://evil.example'
+      });
+
+      renderEmbedWidget('STR-001');
+
+      await waitFor(() => {
+        // Identity + network disclosure remain so viewers know what this is.
+        expect(screen.getByTestId('embed-degraded-state')).toBeInTheDocument();
+        expect(screen.getByText('Test Stream')).toBeInTheDocument();
+        expect(screen.getByText(/could not verify the page/)).toBeInTheDocument();
+        expect(screen.getByRole('note')).toHaveTextContent('Testnet · Stream STR-001');
+      });
+
+      // No sensitive figures leak into the degraded render: no progress, no
+      // rates/amounts, no timeline, no branding.
+      expect(screen.queryByText('40%')).not.toBeInTheDocument();
+      expect(screen.queryByText(/USDC/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Powered by Fluxora/)).not.toBeInTheDocument();
     });
 
     it('applies dark theme', async () => {
@@ -998,6 +1060,66 @@ describe('EmbedStreamWidget', () => {
       await waitFor(() => {
         const container = document.querySelector('.embed-widget-container') as HTMLElement;
         expect(container.style.isolation).toBe('isolate');
+      });
+    });
+  });
+
+  describe('PostMessage Integration Contract', () => {
+    it('responds to valid theme messages by updating the container theme', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "theme",
+          theme: "dark",
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container');
+        expect(container?.getAttribute('data-theme')).toBe('dark');
+      });
+    });
+
+    it('responds to valid resize messages by updating container styles', async () => {
+      renderEmbedWidget('STR-001');
+      await waitFor(() => {
+        expect(document.querySelector('.embed-widget-container')).toBeInTheDocument();
+      });
+
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+
+      window.dispatchEvent(new MessageEvent('message', {
+        source: window.parent,
+        origin: window.location.origin,
+        data: {
+          type: "fluxora:embed",
+          version: 1,
+          action: "resize",
+          width: 500,
+          height: 800,
+          nonce,
+          timestamp: Date.now()
+        }
+      }));
+
+      await waitFor(() => {
+        const container = document.querySelector('.embed-widget-container') as HTMLElement;
+        expect(container.style.maxWidth).toBe('500px');
+        expect(container.style.minHeight).toBe('800px');
       });
     });
   });

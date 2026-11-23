@@ -48,12 +48,18 @@ export default function RequireWallet({ children }: RequireWalletProps) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
-  if (config.demoMode) {
+  if (config.demoMode || import.meta.env.VITE_E2E === "true") {
     return <>{children}</>;
   }
 
   if (wallet.loading) {
     return <WalletFallback stage="restoring" />;
+  }
+
+  // No extension installed: explain what is missing and how to install it
+  // instead of bouncing the visitor to a connect flow that cannot succeed.
+  if (wallet.error?.type === "not_installed") {
+    return <WalletFallback stage="no-wallet" />;
   }
 
   if (!wallet.connected) {

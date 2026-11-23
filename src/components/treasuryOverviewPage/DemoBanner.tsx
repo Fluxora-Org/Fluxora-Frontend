@@ -64,3 +64,19 @@ export default function DemoBanner({ state }: DemoBannerProps) {
     </div>
   );
 }
+
+export function DemoDataBadge() {
+  return (
+    <span
+      data-testid="demo-data-badge"
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+      style={{
+        backgroundColor: "var(--color-warning-bg)",
+        color: "var(--color-warning)",
+        border: "1px solid var(--color-warning)",
+      }}
+    >
+      DEMO DATA
+    </span>
+  );
+}

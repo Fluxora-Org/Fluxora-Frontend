@@ -13,9 +13,11 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
+import { E2E_FORCE_SHARE_FAILURE } from "../lib/config";
 const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import EmptyState from "../components/EmptyState";
+import { MetaTags } from "../components/MetaTags";
 import StreamCreatedModal from "../components/Streams/StreamCreatedModal";
 import { useToast } from "../components/toast/ToastProvider";
 import StreamsLoading from "../components/StreamsLoading";
@@ -30,9 +32,7 @@ import {
   STATUS_FILTERS,
   MAX_LOADING_RETRIES,
 } from "./useStreamsData";
-import {
-  clearResolved as clearResolvedOptimistic,
-} from "../lib/optimisticTransactions";
+import { clearResolved as clearResolvedOptimistic } from "../lib/optimisticTransactions";
 import {
   formatDateWithTimezone,
   getRelativeTime,
@@ -514,7 +514,7 @@ function StreamDetail({
   onCreateSimilar: () => void;
   onCopyAddress: () => void;
 }) {
-  const currentDate = useTickingNow();
+  const currentDate = useTickingNow({ precision: "minute" });
   return (
     <>
       <button
@@ -610,10 +610,7 @@ function StreamDetail({
           totalAmount={stream.depositAmount}
           status={
             stream.status.toLowerCase() as
-              | "active"
-              | "paused"
-              | "completed"
-              | "upcoming"
+              "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
         />
@@ -785,54 +782,6 @@ export default function Streams() {
   const { addToast } = useToast();
   const { t } = useI18n();
   const hasMountedFilterAnnouncer = useRef(false);
-  const wallet = useWallet();
-  const walletAddress = wallet.address?.trim() ?? "";
-  const { streams: serverStreams, loading, error, refetch, retryCount } = useTreasury(
-    undefined,
-    wallet.accountContextVersion,
-  );
-  const { streams, pendingCount, rolledBackCount } = useOptimisticStreams({ streams: serverStreams });
-
-  // ── Reconcile stale optimistic rows on mount ───────────────────────────
-  // When the user reloads during receipt polling, pending optimistic rows may
-  // already be confirmed or failed on-chain.  We check each one and resolve
-  // it deterministically so the UI never shows a stale optimistic row.
-  const reconciledRef = useRef(false);
-  useEffect(() => {
-    if (reconciledRef.current) return;
-    reconciledRef.current = true;
-    const pending = getPendingOptimistic();
-    if (pending.length === 0) return;
-
-    for (const op of pending) {
-      if (!op.txHash) continue;
-      void getTransactionStatus(op.txHash)
-        .then((onChainStatus: string) => {
-          if (onChainStatus === "confirmed") {
-            resolveOptimisticByTxHash(op.txHash!, "confirmed");
-          } else if (onChainStatus === "failed") {
-            resolveOptimisticByTxHash(op.txHash!, "rolled-back", "Confirmed failed on-chain after reload");
-          }
-          // If still pending, leave it — the polling will eventually resolve it.
-        })
-        .catch(() => {
-          // Network error during reconciliation — leave the row as pending
-          // so the user sees it and can retry or refresh.
-        });
-    }
-  }, []);
-
-  const filterLabels: Record<StatusFilter, string> = {
-    All: t("streams.filter.all"),
-    Active: t("streams.filter.active"),
-    Paused: t("streams.filter.paused"),
-    Completed: t("streams.filter.completed"),
-  };
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<StreamSortMode>("recent");
-  const [expandedStreamId, setExpandedStreamId] = useState<string>("");
-  const [selectedStreamId, setSelectedStreamId] = useState<string>("");
 
   // ── All data + filter logic lives in the hook ──────────────────────────────
   const data = useStreamsData();
@@ -879,12 +828,14 @@ export default function Streams() {
     setRestoredDraft,
     recentlySaved,
     recoveryIdentityMatches,
+    walletAddress,
     handleRestoreSession,
     handleStartFreshSession,
     handleDismissSessionBanner,
     handleResumeDraft,
     resolveSessionOnInteraction,
     announcement,
+    alertAnnouncement,
     clearResolvedOptimisticOps,
   } = data;
 
@@ -910,6 +861,7 @@ export default function Streams() {
       addToast(
         "A pending stream operation did not confirm on-chain and has been reverted.",
         "error",
+        0
       );
     }
     rolledBackToastRef.current = rolledBackCount;
@@ -946,7 +898,13 @@ export default function Streams() {
       clearResolvedOptimisticOps();
       refetchStreams();
     },
-    [clearResolvedOptimisticOps, refetchStreams, setLiveDraft, setRestoredDraft, streams.length],
+    [
+      clearResolvedOptimisticOps,
+      refetchStreams,
+      setLiveDraft,
+      setRestoredDraft,
+      streams.length,
+    ],
   );
 
   const handleStreamError = useCallback(() => {
@@ -992,7 +950,7 @@ export default function Streams() {
   );
 
   const handleToggleStreamCard = useCallback((id: string) => {
-    setExpandedStreamId((current) => (current === id ? "" : id));
+    setExpandedStreamId(((current: string) => (current === id ? "" : id)) as any);
   }, [setExpandedStreamId]);
 
   const handleSelectStreamCard = useCallback(
@@ -1060,6 +1018,7 @@ export default function Streams() {
   if (visibleError) {
     return (
       <section className="streams-page">
+        <MetaTags title="Streams" />
         <h1 style={{ marginTop: 0 }}>Streams</h1>
         <p role="alert" style={{ color: "var(--color-danger, #ef4444)" }}>
           {visibleError}
@@ -1078,6 +1037,7 @@ export default function Streams() {
   if (streamId && !selectedStream) {
     return (
       <>
+        <MetaTags title="Streams" />
         <StreamNotFound
           streamId={streamId}
           onBack={() => navigate("/app/streams")}
@@ -1108,6 +1068,10 @@ export default function Streams() {
           rate={createdStream.rate}
           sender={createdStream.sender}
           recipient={createdStream.recipient}
+          forceShareFailure={
+            E2E_FORCE_SHARE_FAILURE &&
+            window.location.search.includes("e2e-share-failure")
+          }
           onCreateAnother={() => {
             setIsSuccessModalOpen(false);
             setIsCreateModalOpen(true);
@@ -1119,8 +1083,12 @@ export default function Streams() {
 
   return (
     <div className="streams-page">
+      <MetaTags title="Streams" />
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
       </div>
 
       {selectedStream ? (
@@ -1169,6 +1137,8 @@ export default function Streams() {
           {/* Session recovery — see docs/STREAMS_SESSION_RECOVERY_SPEC.md */}
           {bannerState && recoveryIdentityMatches && (
             <SessionRecoveryBanner
+              accountId={walletAddress}
+              snapshotAccountId={detectedSnapshot?.accountAddress ?? null}
               state={bannerState}
               savedAt={detectedSnapshot?.savedAt ?? Date.now()}
               now={Date.now()}
@@ -1317,6 +1287,10 @@ export default function Streams() {
         onClose={() => setIsSuccessModalOpen(false)}
         streamId={createdStream.id}
         streamUrl={createdStream.url}
+        forceShareFailure={
+          E2E_FORCE_SHARE_FAILURE &&
+          window.location.search.includes("e2e-share-failure")
+        }
         onCreateAnother={() => {
           setIsSuccessModalOpen(false);
           setIsCreateModalOpen(true);
@@ -1325,3 +1299,4 @@ export default function Streams() {
     </div>
   );
 }
+

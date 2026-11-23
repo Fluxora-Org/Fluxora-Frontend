@@ -5,6 +5,7 @@ import type { Stream } from "./Stream";
 import StreamsLoading from "../StreamsLoading";
 import EmptyState from "../EmptyState";
 import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
+import { DemoDataBadge } from "./DemoBanner";
 import "./RecentStreams.css";
 
 interface RecentStreamsProps {
@@ -13,6 +14,7 @@ interface RecentStreamsProps {
   error?: string | null;
   onRetry?: () => void;
   walletConnected?: boolean;
+  isDemoMode?: boolean;
 }
 
 interface GraphNode {
@@ -446,6 +448,7 @@ export default function RecentStreams({
   error = null,
   onRetry,
   walletConnected = false,
+  isDemoMode = false,
 }: RecentStreamsProps) {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"table" | "graph">("table");
@@ -488,6 +491,7 @@ export default function RecentStreams({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold text-black">Recent streams</h2>
+          {isDemoMode && <DemoDataBadge />}
           <div className="hidden md:flex bg-gray-200 rounded-lg p-1">
             <button
               onClick={() => setViewMode("table")}
@@ -525,6 +529,7 @@ export default function RecentStreams({
         <div className={viewMode === "table" ? "block" : "block md:hidden"}>
           <StreamsTable
             streams={streams}
+            isDemoMode={isDemoMode}
             onCompare={(leftId, rightId) =>
               navigate(`/app/streams/${encodeURIComponent(leftId)}?compare=${encodeURIComponent(rightId)}`)
             }

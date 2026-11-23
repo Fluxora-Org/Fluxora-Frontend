@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { StreamTimeline } from "../StreamTimeline";
 
@@ -200,6 +200,84 @@ describe("StreamTimeline reduced-motion path", () => {
 
     const bar = screen.getByRole("progressbar");
     expect(bar.getAttribute("data-reduced-motion")).toBe("false");
+  });
+});
+
+// ── status-change marker animation and reduced motion ──────────────────────
+
+describe("StreamTimeline marker animation under both motion preferences", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  function timelineElement(status: "active" | "paused") {
+    return (
+      <StreamTimeline
+        {...BASE}
+        cliffDate={null}
+        currentDate="2024-02-20T00:00:00Z"
+        status={status}
+      />
+    );
+  }
+
+  function marker(): HTMLElement | null {
+    return document.querySelector(".stream-timeline-bar__marker");
+  }
+
+  it("plays the highlight animation on status change when motion is allowed", () => {
+    mockMatchMedia(false);
+    let scheduled: (() => void) | null = null;
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      scheduled = cb;
+      return 1;
+    });
+
+    const { rerender } = render(timelineElement("active"));
+    rerender(timelineElement("paused"));
+
+    expect(scheduled).not.toBeNull();
+    expect(marker()?.className).not.toContain("timeline-marker-animate");
+
+    act(() => scheduled?.());
+    expect(marker()?.className).toContain("timeline-marker-animate");
+  });
+
+  it("does not schedule or play the highlight animation when reduced motion is preferred", () => {
+    mockMatchMedia(true);
+    const rafSpy = vi.fn((cb: () => void) => {
+      cb();
+      return 1;
+    });
+    vi.stubGlobal("requestAnimationFrame", rafSpy);
+
+    const { rerender } = render(timelineElement("active"));
+    rerender(timelineElement("paused"));
+
+    expect(rafSpy).not.toHaveBeenCalled();
+    expect(marker()?.className).not.toContain("timeline-marker-animate");
+  });
+
+  it("honors a mid-session preference change without a reload", () => {
+    const mq = mockMatchMedia(false);
+    let scheduled: (() => void) | null = null;
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      scheduled = cb;
+      return 1;
+    });
+
+    const { rerender } = render(timelineElement("active"));
+    rerender(timelineElement("paused"));
+    act(() => scheduled?.());
+    expect(marker()?.className).toContain("timeline-marker-animate");
+
+    // User enables reduced motion mid-session (no reload).
+    mq.dispatchChange(true);
+    rerender(timelineElement("active"));
+    rerender(timelineElement("paused"));
+
+    expect(marker()?.className).not.toContain("timeline-marker-animate");
   });
 });
 

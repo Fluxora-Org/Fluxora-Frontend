@@ -3,8 +3,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { SECURITY_HEADERS } from "./src/lib/securityHeaders";
+import { VITE_BUILD_TARGETS } from "./src/lib/browserSupport";
+import { resolveRoutePageChunk } from "./src/lib/routeChunks";
 
-const isTesting = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const isTesting =
+  process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+// Playwright drives the dev server for e2e; the e2eCspPlugin below relaxes
+// the CSP for Vite's HMR preamble in that mode.
+const isE2E = process.env.VITE_E2E === "true";
 const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
 
 /**
@@ -26,29 +32,61 @@ const CHUNK_SIZE_WARNING_LIMIT_KB = 650;
  * frame-ancestors override instructions.
  */
 function securityHeadersPlugin(): Plugin {
-  const applyHeaders = (
-    res: { setHeader: (name: string, value: string) => void }
-  ) => {
+  const applyHeaders = (res: {
+    setHeader: (name: string, value: string) => void;
+  }) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-      res.setHeader(name, value);
+      res.setHeader(
+        name,
+        isE2E && name === "Content-Security-Policy"
+          ? value.replace(
+              /script-src[^;]*;/,
+              "script-src 'self' 'unsafe-inline'; worker-src 'self' blob:;",
+            )
+          : value,
+      );
     }
   };
 
   return {
     name: "security-headers",
+    // In dev server (vite dev), remove the static <meta> CSP from index.html
+    // so Vite's @react-refresh preamble inline script is not blocked.
+    // The dev server middleware provides the dev-compatible CSP header instead.
+    transformIndexHtml(html, ctx) {
+      if (ctx.server) {
+        return html.replace(
+          /<meta\s+http-equiv="Content-Security-Policy"[^>]*>/i,
+          "",
+        );
+      }
+      return html;
+    },
     // Dev server (vite dev)
     configureServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, true);
         next();
       });
     },
     // Preview server (vite preview / vite preview --host 127.0.0.1)
     configurePreviewServer(server) {
       server.middlewares.use((_req, res, next) => {
-        applyHeaders(res);
+        applyHeaders(res, false);
         next();
       });
+    },
+  };
+}
+
+function e2eCspPlugin(): Plugin {
+  return {
+    name: "e2e-csp",
+    transformIndexHtml(html) {
+      return html.replace(
+        /script-src[^;]*;/,
+        "script-src 'self' 'unsafe-inline'; worker-src 'self' blob:;",
+      );
     },
   };
 }
@@ -80,40 +118,39 @@ function vendorChunk(id: string) {
 export default defineConfig(async () => {
   const plugins = isTesting
     ? [react()]
-    : [react(), (await import("@tailwindcss/vite")).default(), securityHeadersPlugin()];
+    : [
+        react(),
+        (await import("@tailwindcss/vite")).default(),
+        securityHeadersPlugin(),
+        ...(isE2E ? [e2eCspPlugin()] : []),
+      ];
 
   return {
     plugins,
     server: { port: 5173 },
     build: {
+      target: [...VITE_BUILD_TARGETS],
       chunkSizeWarningLimit: CHUNK_SIZE_WARNING_LIMIT_KB,
       rollupOptions: {
         output: {
           manualChunks(id: string) {
             const normalizedId = id.replace(/\\/g, "/");
 
-            // App-page code splitting (lazy routes).
-            if (normalizedId.includes("/src/pages/Dashboard")) {
-              return "app-dashboard";
-            }
-            if (normalizedId.includes("/src/pages/Streams")) {
-              return "app-streams";
-            }
-            if (normalizedId.includes("/src/pages/Recipient")) {
-              return "app-recipient";
-            }
-            if (normalizedId.includes("/src/pages/TreasuryPage")) {
-              return "app-treasury";
-            }
-            if (normalizedId.includes("/src/pages/EmptyStateDemo")) {
-              return "app-empty-state-demo";
+            // App-page code splitting (lazy routes) — see src/lib/routeChunks.ts.
+            const routeChunk = resolveRoutePageChunk(normalizedId);
+            if (routeChunk) {
+              return routeChunk;
             }
 
             // Below-the-fold landing sections are lazy-loaded from Home and
             // share one chunk so they download together once the user scrolls.
             if (
-              normalizedId.includes("/src/components/landing-page/TrustSection") ||
-              normalizedId.includes("/src/components/ValuePropositionSection") ||
+              normalizedId.includes(
+                "/src/components/landing-page/TrustSection",
+              ) ||
+              normalizedId.includes(
+                "/src/components/ValuePropositionSection",
+              ) ||
               normalizedId.includes("/src/components/GetStartedCTA") ||
               normalizedId.includes("/src/components/NewsletterSection")
             ) {
@@ -133,7 +170,11 @@ export default defineConfig(async () => {
       coverage: {
         provider: "v8",
         reporter: ["text", "json", "html"],
-        include: ["src/components/**/*.tsx", "src/pages/**/*.tsx", "src/theme/**/*.tsx"],
+        include: [
+          "src/components/**/*.tsx",
+          "src/pages/**/*.tsx",
+          "src/theme/**/*.tsx",
+        ],
         exclude: [
           "src/components/**/*.test.tsx",
           "src/pages/**/*.test.tsx",

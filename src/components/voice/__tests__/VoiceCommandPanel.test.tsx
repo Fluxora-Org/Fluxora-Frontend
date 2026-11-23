@@ -205,6 +205,19 @@ describe("VoiceCommandPanel — category filtering", () => {
     expect(screen.getByText("Cancel active stream")).toBeInTheDocument();
   });
 
+  it("exposes every accepted command in the keyboard-reachable reference", () => {
+    mockUseVoiceContext(buildCtx({ availableCommands: ALL_CATEGORY_COMMANDS }));
+    render(<VoiceCommandPanel />);
+
+    const reference = screen.getByLabelText("Accepted voice commands");
+    const commandButtons = within(reference).getAllByRole("button");
+    expect(commandButtons).toHaveLength(ALL_CATEGORY_COMMANDS.length);
+
+    for (const command of ALL_CATEGORY_COMMANDS) {
+      expect(within(reference).getByRole("button", { name: new RegExp(command.phrase) })).toBeInTheDocument();
+    }
+  });
+
   it("renders command aliases as text", () => {
     mockUseVoiceContext(buildCtx({ availableCommands: [NAV_CMD] }));
     render(<VoiceCommandPanel />);
