@@ -7,6 +7,7 @@ import { streamRecords } from "../../data/streamRecords";
 import {
   DEFAULT_STREAMS_FILTERS,
   writeStreamsSession,
+  clearStreamsSession,
 } from "../../lib/streamsSessionRecovery";
 
 const ALICE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -59,9 +60,13 @@ describe("Streams session recovery account isolation", () => {
     mockWalletAddress.current = ALICE;
     mockWalletLoading.current = false;
     localStorage.clear();
+    clearStreamsSession(ALICE);
+    clearStreamsSession(BOB);
   });
 
   afterEach(() => {
+    clearStreamsSession(ALICE);
+    clearStreamsSession(BOB);
     vi.restoreAllMocks();
   });
 
