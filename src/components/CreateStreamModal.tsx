@@ -431,7 +431,9 @@ export default function CreateStreamModal({
       ? t("createStream.button.submitting")
       : currentStep === 3 && isConfirmationPending
         ? t("createStream.button.confirming")
-        : currentStep === 3 && txSubmission.status === "timeout"
+        : currentStep === 3 &&
+            (txSubmission.status === "timeout" ||
+              txSubmission.status === "failed")
           ? t("createStream.button.retry")
           : currentStep === 2
             ? t("createStream.button.next")
@@ -601,7 +603,11 @@ export default function CreateStreamModal({
   ]);
 
   useEffect(() => {
-    if (txSubmission.status !== "failed" || !submittedTxHash) {
+    if (
+      (txSubmission.status !== "failed" &&
+        txSubmission.status !== "timeout") ||
+      !submittedTxHash
+    ) {
       return;
     }
 
@@ -2785,7 +2791,9 @@ export default function CreateStreamModal({
                        </span>
                      </div>
                    )}
-                   {(txSubmission.status === "timeout" || txSubmission.status === "failed") && (
+                   {(txSubmission.status === "timeout" ||
+                     txSubmission.status === "failed") &&
+                     !streamError && (
                      <div
                        className="transaction-status-box transaction-status-box--error"
                        role="alert"
@@ -3578,5 +3586,3 @@ export default function CreateStreamModal({
     </div>
   );
 }
-
-
