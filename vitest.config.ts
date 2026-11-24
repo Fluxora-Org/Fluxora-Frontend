@@ -59,7 +59,6 @@ export default defineConfig({
       "src/lib/__tests__/createStreamAmounts.test.ts",
       "src/lib/__tests__/onboarding.test.ts",
       "src/lib/__tests__/optimisticTransactions.test.ts",
-      "src/lib/__tests__/routeChunks.test.ts",
       "src/lib/__tests__/shareWorkspaces.test.ts",
       "src/lib/__tests__/streamsSessionRecovery.test.ts",
       "src/lib/api/__tests__/responseValidation.test.ts",
