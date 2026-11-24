@@ -2,7 +2,9 @@ import AxeBuilder from "@axe-core/playwright";
 import { Page, expect } from "@playwright/test";
 
 /**
- * Known violations to suppress until fixed.
+ * Known violations to suppress until fixed. Keep this list short and
+ * review it whenever a deferral's tracking issue closes; stale entries hide
+ * regressions in the rule they name.
  * Each entry maps a rule ID to an optional reason comment.
  *
  * To add an allowlist entry:
