@@ -20,7 +20,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type OperationKind = "create" | "cancel" | "withdraw";
+export type OperationKind = "create" | "pause" | "cancel" | "withdraw";
 
 /**
  * Lifecycle of an optimistic operation.
