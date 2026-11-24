@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
+import { verifyStreamOnChain, type StreamVerification } from "../lib/stellar/read";
 import { formatAssetAmount } from "../lib/formatters";
 import Breadcrumb from "../components/navigation/Breadcrumb";
 import { Skeleton } from "../components/Skeleton";
@@ -135,6 +136,7 @@ export default function StreamDetail() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const currentDate = useTickingNow({ precision: "minute" });
+  const [verification, setVerification] = useState<StreamVerification>({ status: "unavailable", reason: "Verification has not started." });
 
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
@@ -202,6 +204,41 @@ export default function StreamDetail() {
       }
     };
   }, [streamId, isCompareMode]);
+
+  // Best-effort, read-only verification. It never delays the API-backed page.
+  useEffect(() => {
+    if (!stream || isCompareMode) {
+      setVerification({ status: "unavailable", reason: "No single stream is available to verify." });
+      return;
+    }
+
+    let cancelled = false;
+    if (!stream.onChainStreamId) {
+      setVerification({
+        status: "unavailable",
+        reason: "The API record does not include the numeric on-chain stream ID required by get_stream.",
+      });
+      return;
+    }
+
+    setVerification({ status: "verifying" });
+    verifyStreamOnChain(stream)
+      .then((result) => {
+        if (!cancelled) setVerification(result);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVerification({
+            status: "unavailable",
+            reason: "The contract state could not be fetched from Soroban RPC.",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stream, isCompareMode]);
 
   // Track local scroll position to broadcast cursorY
   useEffect(() => {
@@ -488,6 +525,44 @@ export default function StreamDetail() {
           </div>
         </div>
       )}
+
+      {/* On-chain verification status */}
+      <section
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="stream-verification"
+        style={{
+          marginBottom: "1.5rem",
+          padding: "1rem",
+          borderRadius: "8px",
+          border: "1px solid var(--color-border, #e5e7eb)",
+          background: "var(--color-surface-1, #fff)",
+        }}
+      >
+        <strong>
+          {verification.status === "verifying"
+            ? "Verifying on-chain…"
+            : verification.status === "verified"
+              ? "Verified on-chain"
+              : verification.status === "mismatch"
+                ? "On-chain mismatch detected"
+                : "On-chain verification unavailable"}
+        </strong>
+        {verification.status === "mismatch" && (
+          <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
+            {verification.mismatches.map((item) => (
+              <li key={item.field}>
+                <strong>{item.field}:</strong> API {item.apiValue} · Contract {item.chainValue}
+              </li>
+            ))}
+          </ul>
+        )}
+        {verification.status === "unavailable" && (
+          <p style={{ margin: "0.375rem 0 0", color: "var(--color-text-secondary, #6b7280)" }}>
+            {verification.reason}
+          </p>
+        )}
+      </section>
 
       {/* Health badge */}
       <div style={{ marginBottom: "1.5rem" }}>
