@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createConfig,
+  describeConfigForLog,
   getNetworkExplorerPath,
   getNetworkLabel,
   getNetworkPassphrase,
@@ -244,8 +245,7 @@ describe("validateContractId", () => {
   });
 });
 
-describe("createConfig contract ID validation", () => {
-  it("leaves streamContractId null when unset", () => {
+describe("createConfig contract ID validation", () => {  it("leaves streamContractId null when unset", () => {
     const config = createConfig(env());
     expect(config.streamContractId).toBeNull();
   });
@@ -296,5 +296,69 @@ describe("createConfig contract ID validation", () => {
     expect(() =>
       createConfig(env({ VITE_API_URL: "bad-url", VITE_STREAM_CONTRACT_ID: "bad-id" })),
     ).toThrow(/apiUrl.*streamContractId|streamContractId.*apiUrl/);
+  });
+});
+
+describe("describeConfigForLog", () => {
+  const VALID_CONTRACT_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
+  function configWith(overrides: Partial<ImportMetaEnv> = {}) {
+    return createConfig({
+      VITE_NETWORK: "TESTNET",
+      VITE_USE_MOCKS: "true",
+      ...overrides,
+    } as ImportMetaEnv);
+  }
+
+  it("includes network, demoMode, and useMocks", () => {
+    const summary = describeConfigForLog(configWith());
+    expect(summary).toEqual({ network: "TESTNET", demoMode: false, useMocks: true });
+  });
+
+  it("never includes rpcUrl", () => {
+    const summary = describeConfigForLog(
+      configWith({ VITE_RPC_URL: "https://rpc.example.com" }),
+    );
+    expect(summary).not.toHaveProperty("rpcUrl");
+  });
+
+  it("never includes apiUrl", () => {
+    const summary = describeConfigForLog(
+      configWith({ VITE_API_URL: "https://api.example.com" }),
+    );
+    expect(summary).not.toHaveProperty("apiUrl");
+  });
+
+  it("never includes streamContractId", () => {
+    const summary = describeConfigForLog(
+      configWith({ VITE_STREAM_CONTRACT_ID: VALID_CONTRACT_ID }),
+    );
+    expect(summary).not.toHaveProperty("streamContractId");
+  });
+
+  it("never includes networkPassphrase", () => {
+    const summary = describeConfigForLog(configWith());
+    expect(summary).not.toHaveProperty("networkPassphrase");
+  });
+
+  it("never includes networkLabel", () => {
+    const summary = describeConfigForLog(configWith());
+    expect(summary).not.toHaveProperty("networkLabel");
+  });
+
+  it("reflects demoMode: true when set", () => {
+    const summary = describeConfigForLog(configWith({ VITE_DEMO_MODE: "true" }));
+    expect(summary.demoMode).toBe(true);
+  });
+
+  it("reflects useMocks: false when unset", () => {
+    const summary = describeConfigForLog(configWith({ VITE_USE_MOCKS: "false" }));
+    expect(summary.useMocks).toBe(false);
+  });
+
+  it("has exactly three keys", () => {
+    const summary = describeConfigForLog(configWith());
+    expect(Object.keys(summary)).toHaveLength(3);
+    expect(Object.keys(summary).sort()).toEqual(["demoMode", "network", "useMocks"]);
   });
 });
