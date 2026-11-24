@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
+import { TransactionStatus } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -14,6 +14,8 @@ import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
+import { useI18n, type TranslationKey } from "../i18n";
+import { en } from "../i18n/en";
 import { Share2 } from "lucide-react";
 
 /**
@@ -26,52 +28,69 @@ import { Share2 } from "lucide-react";
  * unusual or the page is broken.
  */
 export interface StreamStatusPresentation {
-  /** Human-readable label rendered in the status pill. */
+  /** Human-readable label rendered in the status pill (English source value). */
   label: string;
-  /** One-line explanation of what the status means for the viewer. */
+  /** One-line explanation of what the status means for the viewer (English source value). */
   description: string;
+  /** Catalog key for {@link label}, or null when the label is derived from raw data. */
+  labelKey: TranslationKey | null;
+  /** Catalog key for {@link description}. */
+  descriptionKey: TranslationKey;
   /** Colour used for the status dot and label. */
   color: string;
   /** False when the raw status is not one the view explicitly knows about. */
   recognized: boolean;
 }
 
+interface KnownStreamStatusPresentation {
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  color: string;
+}
+
 const KNOWN_STREAM_STATUS_PRESENTATIONS: Record<
   string,
-  Omit<StreamStatusPresentation, "recognized">
+  KnownStreamStatusPresentation
 > = {
   active: {
-    label: "Active",
-    description: "The stream is live and accrues funds on schedule.",
+    labelKey: "streamDetail.status.active.label",
+    descriptionKey: "streamDetail.status.active.description",
     color: "var(--color-success, #16a34a)",
   },
   paused: {
-    label: "Paused",
-    description:
-      "Accrual is paused. The balance already streamed stays available to the recipient.",
+    labelKey: "streamDetail.status.paused.label",
+    descriptionKey: "streamDetail.status.paused.description",
     color: "var(--color-warning, #d97706)",
   },
   completed: {
-    label: "Completed",
-    description: "The stream finished and its full schedule was delivered.",
+    labelKey: "streamDetail.status.completed.label",
+    descriptionKey: "streamDetail.status.completed.description",
     color: "var(--color-text-secondary, #6b7280)",
   },
   cancelled: {
-    label: "Cancelled",
-    description:
-      "The stream was cancelled before its scheduled end date and no longer accrues.",
+    labelKey: "streamDetail.status.cancelled.label",
+    descriptionKey: "streamDetail.status.cancelled.description",
     color: "var(--color-error, #b91c1c)",
   },
   matured: {
-    label: "Matured",
-    description: "The stream reached maturity and no longer accrues funds.",
+    labelKey: "streamDetail.status.matured.label",
+    descriptionKey: "streamDetail.status.matured.description",
     color: "var(--color-text-secondary, #6b7280)",
   },
 };
 
+const UNKNOWN_STATUS_LABEL_KEY: TranslationKey =
+  "streamDetail.status.unknown.label";
+const UNRECOGNIZED_STATUS_DESCRIPTION_KEY: TranslationKey =
+  "streamDetail.status.unrecognized.description";
+
 /**
  * Resolve the presentation for any status string. Always returns a defined
  * presentation; unknown values get an explicit fallback (never blank).
+ *
+ * `label`/`description` are the English source values (resolved from the
+ * catalog, so the copy is single-sourced); `labelKey`/`descriptionKey` let the
+ * page resolve the copy through the active locale at render time.
  */
 export function getStreamStatusPresentation(
   status: string | null | undefined,
@@ -79,17 +98,33 @@ export function getStreamStatusPresentation(
   const key = typeof status === "string" ? status.trim().toLowerCase() : "";
   const known = key ? KNOWN_STREAM_STATUS_PRESENTATIONS[key] : undefined;
   if (known) {
-    return { ...known, recognized: true };
+    return {
+      label: en[known.labelKey],
+      description: en[known.descriptionKey],
+      labelKey: known.labelKey,
+      descriptionKey: known.descriptionKey,
+      color: known.color,
+      recognized: true,
+    };
   }
-  const label = key ? key.charAt(0).toUpperCase() + key.slice(1) : "Unknown";
   return {
-    label,
-    description:
-      "This status is not recognised by the stream detail view. Confirm the stream state in the treasury console before acting on it.",
+    label: key
+      ? key.charAt(0).toUpperCase() + key.slice(1)
+      : en[UNKNOWN_STATUS_LABEL_KEY],
+    description: en[UNRECOGNIZED_STATUS_DESCRIPTION_KEY],
+    labelKey: key ? null : UNKNOWN_STATUS_LABEL_KEY,
+    descriptionKey: UNRECOGNIZED_STATUS_DESCRIPTION_KEY,
     color: "var(--color-text-secondary, #6b7280)",
     recognized: false,
   };
 }
+
+/**
+ * Fallback message used when a non-Error value is thrown while loading.
+ * Resolved from the catalog so the copy is single-sourced in `en.ts` (it is
+ * captured outside the render path, where the `t()` hook is not available).
+ */
+const FALLBACK_STREAM_LOAD_ERROR: string = en["streamDetail.error.fallbackMessage"];
 
 /**
  * StreamDetail page
@@ -117,6 +152,7 @@ export function getStreamStatusPresentation(
  * - **success**   – full single stream detail layout
  */
 export default function StreamDetail() {
+  const { t } = useI18n();
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { address: accountId } = useWallet();
@@ -186,7 +222,7 @@ export default function StreamDetail() {
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to load stream.",
+            err instanceof Error ? err.message : FALLBACK_STREAM_LOAD_ERROR,
           );
           setLoading(false);
         }
@@ -231,8 +267,8 @@ export default function StreamDetail() {
         <div style={{ padding: "0.75rem 1.5rem 0" }}>
           <Breadcrumb
             items={[
-              { label: "Streams", to: "/app/streams" },
-              { label: "Compare" },
+              { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+              { label: t("streamDetail.breadcrumb.compare") },
             ]}
           />
         </div>
@@ -251,8 +287,8 @@ export default function StreamDetail() {
 
   // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
-    { label: "Streams", to: "/app/streams" },
-    { label: stream?.name ?? streamId ?? "Stream" },
+    { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+    { label: stream?.name ?? streamId ?? t("streamDetail.breadcrumb.stream") },
   ];
 
   if (loading) {
@@ -260,11 +296,11 @@ export default function StreamDetail() {
       <div
         data-testid="stream-detail-page"
         role="status"
-        aria-label="Loading stream"
+        aria-label={t("streamDetail.loading.ariaLabel")}
         aria-busy="true"
         style={{ padding: "1.5rem" }}
       >
-        <span className="sr-only">Loading stream…</span>
+        <span className="sr-only">{t("streamDetail.loading.srText")}</span>
         <Skeleton width={280} height={16} style={{ marginBottom: "1.5rem" }} />
         <Skeleton width={320} height={28} style={{ marginBottom: "0.5rem" }} />
         <Skeleton width="60%" height={14} style={{ marginBottom: "2rem" }} />
@@ -307,7 +343,7 @@ export default function StreamDetail() {
         .catch((err: unknown) => {
           if (!cancelled) {
             setError(
-              err instanceof Error ? err.message : "Failed to load stream.",
+              err instanceof Error ? err.message : FALLBACK_STREAM_LOAD_ERROR,
             );
             setLoading(false);
           }
@@ -319,7 +355,9 @@ export default function StreamDetail() {
 
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+        />
         <div
           role="alert"
           style={{
@@ -330,7 +368,7 @@ export default function StreamDetail() {
             color: "var(--color-error, #b91c1c)",
           }}
         >
-          <strong>Error loading stream:</strong> {error}
+          <strong>{t("streamDetail.error.heading")}</strong> {error}
         </div>
         <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
           <button
@@ -345,7 +383,7 @@ export default function StreamDetail() {
               fontWeight: 500,
             }}
           >
-            Try again
+            {t("streamDetail.action.tryAgain")}
           </button>
           <Link
             to="/app/streams"
@@ -356,7 +394,7 @@ export default function StreamDetail() {
               color: "var(--color-text-secondary, #6b7280)",
             }}
           >
-            ← Back to streams
+            {t("streamDetail.action.backToStreams")}
           </Link>
         </div>
       </div>
@@ -366,7 +404,9 @@ export default function StreamDetail() {
   if (stream === null) {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+        />
         <div
           style={{
             marginTop: "3rem",
@@ -381,10 +421,10 @@ export default function StreamDetail() {
               marginBottom: "0.5rem",
             }}
           >
-            Stream not found
+            {t("streamDetail.notFound.title")}
           </p>
           <p style={{ marginBottom: "1.5rem" }}>
-            The stream{" "}
+            {t("streamDetail.notFound.beforeCode")}{" "}
             <code
               style={{
                 fontFamily: "monospace",
@@ -395,9 +435,9 @@ export default function StreamDetail() {
             >
               {streamId}
             </code>{" "}
-            does not exist or has been removed.
+            {t("streamDetail.notFound.afterCode")}
           </p>
-          <Link to="/app/streams">← Back to streams</Link>
+          <Link to="/app/streams">{t("streamDetail.action.backToStreams")}</Link>
         </div>
       </div>
     );
@@ -459,7 +499,7 @@ export default function StreamDetail() {
           ref={shareTriggerRef}
           onClick={() => setIsOgModalOpen(true)}
           data-testid="share-og-preview-btn"
-          aria-label={`Share ${stream.name} and preview social card`}
+          aria-label={t("streamDetail.share.ariaLabel", { name: stream.name })}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -476,7 +516,7 @@ export default function StreamDetail() {
           }}
         >
           <Share2 size={16} />
-          <span>Share / Preview Card</span>
+          <span>{t("streamDetail.share.button")}</span>
         </button>
       </div>
 
@@ -503,21 +543,24 @@ export default function StreamDetail() {
             background: "var(--color-surface-2, #f3f4f6)",
             color: healthColor[stream.health] ?? "inherit",
           }}
-          aria-label={`Health status: ${stream.health}`}
+          aria-label={t("streamDetail.health.ariaLabel", { health: stream.health })}
         >
           <span aria-hidden="true">●</span>
-          {stream.health} — {stream.healthNote}
+          {t("streamDetail.health.summary", {
+            health: stream.health,
+            note: stream.healthNote,
+          })}
         </span>
       </div>
 
       {/* Top-Up Flow */}
       <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>{t("streamDetail.topUp.title")}</h2>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <input
             type="number"
-            aria-label="Top up amount"
-            placeholder="Amount"
+            aria-label={t("streamDetail.topUp.amountAriaLabel")}
+            placeholder={t("streamDetail.topUp.amountPlaceholder")}
             value={topUpAmount}
             onChange={(e) => setTopUpAmount(e.target.value)}
             disabled={topUpStatus === "pending"}
@@ -544,12 +587,15 @@ export default function StreamDetail() {
               fontWeight: 500,
             }}
           >
-            Submit Top Up
+            {t("streamDetail.topUp.submit")}
           </button>
         </div>
         {topUpStatus !== "idle" && (
           <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
-            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+            {t("streamDetail.topUp.statusLabel")}{" "}
+            <span data-testid="top-up-status">
+              {t(`streamDetail.topUp.status.${topUpStatus}`)}
+            </span>
           </div>
         )}
       </div>
@@ -563,7 +609,7 @@ export default function StreamDetail() {
         style={{ marginBottom: "1.5rem" }}
       >
         <h2 id="stream-status-heading" className="sr-only">
-          Stream status
+          {t("streamDetail.status.srHeading")}
         </h2>
         <span
           style={{
@@ -579,7 +625,9 @@ export default function StreamDetail() {
           }}
         >
           <span aria-hidden="true">●</span>
-          {statusPresentation.label}
+          {statusPresentation.labelKey
+            ? t(statusPresentation.labelKey)
+            : statusPresentation.label}
         </span>
         <p
           data-testid="stream-status-description"
@@ -589,7 +637,7 @@ export default function StreamDetail() {
             color: "var(--color-text-secondary, #6b7280)",
           }}
         >
-          {statusPresentation.description}
+          {t(statusPresentation.descriptionKey)}
         </p>
         {!statusPresentation.recognized && (
           <p
@@ -601,7 +649,8 @@ export default function StreamDetail() {
               color: "var(--color-warning, #d97706)",
             }}
           >
-            Unrecognised stream status: <code>{String(stream.status)}</code>
+            {t("streamDetail.status.unrecognized.label")}{" "}
+            <code>{String(stream.status)}</code>
           </p>
         )}
       </section>
@@ -616,27 +665,39 @@ export default function StreamDetail() {
         }}
       >
         {[
-          { label: "Status", value: stream.status },
           {
-            label: "Deposit",
+            id: "status",
+            label: t("streamDetail.metrics.status"),
+            value: stream.status,
+          },
+          {
+            id: "deposit",
+            label: t("streamDetail.metrics.deposit"),
             value: formatAssetAmount(stream.depositAmount, stream.asset),
           },
           {
-            label: "Streamed",
+            id: "streamed",
+            label: t("streamDetail.metrics.streamed"),
             value: formatAssetAmount(stream.streamedAmount, stream.asset),
           },
           {
-            label: "Withdrawable",
+            id: "withdrawable",
+            label: t("streamDetail.metrics.withdrawable"),
             value: formatAssetAmount(stream.withdrawableAmount, stream.asset),
           },
           {
-            label: "Remaining",
+            id: "remaining",
+            label: t("streamDetail.metrics.remaining"),
             value: formatAssetAmount(stream.remainingAmount, stream.asset),
           },
-          { label: "Progress", value: `${stream.progress.toFixed(1)}%` },
-        ].map(({ label, value }) => (
+          {
+            id: "progress",
+            label: t("streamDetail.metrics.progress"),
+            value: `${stream.progress.toFixed(1)}%`,
+          },
+        ].map(({ id, label, value }) => (
           <div
-            key={label}
+            key={id}
             style={{
               padding: "0.875rem 1rem",
               borderRadius: "8px",
@@ -670,7 +731,7 @@ export default function StreamDetail() {
             marginBottom: "0.75rem",
           }}
         >
-          Timeline
+          {t("streamDetail.timeline.heading")}
         </h2>
         <StreamTimeline
           startDate={stream.startDate}
@@ -701,7 +762,7 @@ export default function StreamDetail() {
               marginBottom: "0.375rem",
             }}
           >
-            Audit note
+            {t("streamDetail.audit.heading")}
           </h2>
           <p
             style={{
