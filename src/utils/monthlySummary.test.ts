@@ -224,10 +224,10 @@ describe("property test", () => {
     withdrawableAmount: fc.integer({ min: 0, max: 1000000 }),
     remainingAmount: fc.integer({ min: 0 }),
     progress: fc.integer({ min: 0, max: 100 }),
-    startDate: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-01-01") }).map(d => d.toISOString().split("T")[0]),
-    endDate: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-12-31") }).map(d => d.toISOString().split("T")[0]),
-    cliffDate: fc.date().map(d => d.toISOString().split("T")[0]),
-    nextUnlockDate: fc.date().map(d => d.toISOString().split("T")[0]),
+    startDate: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-01-01"), noInvalidDate: true }).map(d => d.toISOString().split("T")[0]),
+    endDate: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-12-31"), noInvalidDate: true }).map(d => d.toISOString().split("T")[0]),
+    cliffDate: fc.date({ noInvalidDate: true }).map(d => d.toISOString().split("T")[0]),
+    nextUnlockDate: fc.date({ noInvalidDate: true }).map(d => d.toISOString().split("T")[0]),
     summary: fc.string(),
     health: fc.constantFrom("Healthy", "Warning", "Critical"),
     healthNote: fc.string(),
@@ -235,7 +235,7 @@ describe("property test", () => {
     tags: fc.array(fc.string()),
     timeline: fc.array(
       fc.record({
-        date: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-12-31") }).map(d => d.toISOString().split("T")[0]),
+        date: fc.date({ min: new Date("2020-01-01"), max: new Date("2030-12-31"), noInvalidDate: true }).map(d => d.toISOString().split("T")[0]),
         title: fc.oneof(fc.string(), fc.integer({min: 1, max: 1000000}).map(n => `Recipient withdrew ${n} USDC`)),
         detail: fc.string(),
       })

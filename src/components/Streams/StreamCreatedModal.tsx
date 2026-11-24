@@ -88,6 +88,7 @@ export default function StreamCreatedModal({
   const [identifierCopied, setIdentifierCopied] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const identifierResetTimerRef = useRef<number | undefined>(undefined);
   const channelInputRef = useRef<HTMLInputElement>(null);
   const channelListId = useId();
   const channelInputId = useId();
@@ -105,6 +106,7 @@ export default function StreamCreatedModal({
       setSelectedChannelId(null);
       setListOpen(false);
       setIdentifierCopied(false);
+      window.clearTimeout(identifierResetTimerRef.current);
       const timer = setTimeout(() => setAnnouncement(""), 1000);
       return () => clearTimeout(timer);
     }
@@ -270,7 +272,11 @@ export default function StreamCreatedModal({
     if (didCopy) {
       setIdentifierCopied(true);
       announce("Stream identifier copied");
-      window.setTimeout(() => setIdentifierCopied(false), 2000);
+      window.clearTimeout(identifierResetTimerRef.current);
+      identifierResetTimerRef.current = window.setTimeout(
+        () => setIdentifierCopied(false),
+        2000,
+      );
     } else {
       announce(
         "Could not copy stream identifier. Please copy it manually.",
