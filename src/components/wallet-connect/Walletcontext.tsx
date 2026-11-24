@@ -524,7 +524,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             applyAccountChange(DISCONNECTED);
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
     }, WALLET_WATCH_INTERVAL_MS);

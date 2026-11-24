@@ -172,7 +172,7 @@ export function formatDateWithTimezone(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       return (
         new Intl.DateTimeFormat("en-US", {
@@ -411,7 +411,7 @@ export function getBrowserTimezone(): string {
       return "UTC";
     }
     return tz;
-  } catch (e) {
+  } catch {
     return "UTC";
   }
 }
@@ -457,7 +457,7 @@ export function formatNavbarTime(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       const fallbackOptions: Intl.DateTimeFormatOptions = {
         hour: "numeric",
@@ -494,6 +494,22 @@ export function formatLocalISOWithOffset(
     const parts = getZonedDateParts(date, timezone);
     const offset = getTimezoneOffsetMinutes(date, timezone);
     return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${formatTimezoneOffset(offset)}`;
+    const offsetMin = date.getTimezoneOffset();
+    const absOffsetMin = Math.abs(offsetMin);
+    const offsetHours = Math.floor(absOffsetMin / 60);
+    const offsetMinutes = absOffsetMin % 60;
+    const sign = offsetMin <= 0 ? "+" : "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+
+    const offsetStr = `${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetStr}`;
   } catch {
     return date.toISOString();
   }
@@ -557,6 +573,33 @@ export function getFormattedUTCOffset(
     return `UTC${formatTimezoneOffset(
       getTimezoneOffsetMinutes(date, timezone),
     )}`;
+    if (tz && tz !== "UTC") {
+      try {
+        const utcDateStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+        const tzDateStr = date.toLocaleString("en-US", { timeZone: tz });
+        const utcEpoch = new Date(utcDateStr).getTime();
+        const tzEpoch = new Date(tzDateStr).getTime();
+        const offsetMinutesTotal = Math.round(
+          (tzEpoch - utcEpoch) / (60 * 1000),
+        );
+        const sign = offsetMinutesTotal >= 0 ? "+" : "-";
+        const absMin = Math.abs(offsetMinutesTotal);
+        const hours = Math.floor(absMin / 60);
+        const minutes = absMin % 60;
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `UTC${sign}${pad(hours)}:${pad(minutes)}`;
+      } catch {
+        // Fall back to local offset if custom tz calculation fails
+      }
+    }
+
+    const offsetMin = date.getTimezoneOffset();
+    const absOffsetMin = Math.abs(offsetMin);
+    const offsetHours = Math.floor(absOffsetMin / 60);
+    const offsetMinutes = absOffsetMin % 60;
+    const sign = offsetMin <= 0 ? "+" : "-";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
   } catch {
     return "UTC+00:00";
   }

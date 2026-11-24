@@ -19,7 +19,7 @@
  * @module
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { StreamRecord } from "../data/streamRecords";
 import {
   getSnapshot,
