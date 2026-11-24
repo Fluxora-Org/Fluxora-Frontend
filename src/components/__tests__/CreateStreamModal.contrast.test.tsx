@@ -1,8 +1,32 @@
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, test, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import CreateStreamModal from '../CreateStreamModal';
-import { getContrastRatio } from '../../utils/contrastUtils';
+import {
+  getContrastRatio,
+  THEME_BACKGROUNDS,
+} from '../../utils/contrastUtils';
+
+const designTokens = readFileSync(
+  'src/design-tokens.css',
+  'utf8',
+);
+
+function getSurfaceToken(selector: string): string {
+  const start = designTokens.indexOf(selector);
+  if (start === -1) {
+    throw new Error(`Missing design token selector: ${selector}`);
+  }
+  const end = designTokens.indexOf('}', start);
+  const surface = designTokens
+    .slice(start, end)
+    .match(/--surface-base:\s*(#[0-9a-f]{6})/i)?.[1];
+  if (!surface) {
+    throw new Error(`Missing --surface-base token in ${selector}`);
+  }
+  return surface;
+}
 
 // Mock WalletContext & ToastProvider & i18n
 vi.mock('../wallet-connect/Walletcontext', () => ({
@@ -17,6 +41,9 @@ vi.mock('../wallet-connect/Walletcontext', () => ({
 
 vi.mock('../toast/ToastProvider', () => ({
   useToast: () => ({
+    addToast: vi.fn(),
+  }),
+  useOptionalToast: () => ({
     addToast: vi.fn(),
   }),
 }));
@@ -202,6 +229,16 @@ describe('CreateStreamModal - Live Contrast-Check UX', () => {
     // Overridden badge: #92400e on #fef3c7
     const overrideRatio = getContrastRatio('#92400e', '#fef3c7');
     expect(overrideRatio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('checks label colors against the light and dark surface tokens', () => {
+    const lightSurface = getSurfaceToken(':root {');
+    const darkSurface = getSurfaceToken(':root[data-theme="dark"] {');
+
+    expect(lightSurface).toBe(THEME_BACKGROUNDS.light);
+    expect(darkSurface).toBe(THEME_BACKGROUNDS.dark);
+    expect(getContrastRatio('#dc2626', lightSurface)).toBeGreaterThanOrEqual(4.5);
+    expect(getContrastRatio('#00a884', darkSurface)).toBeGreaterThanOrEqual(4.5);
   });
 
   test('10. Advanced Mode: validation blocks low contrast color unless override checked', async () => {
