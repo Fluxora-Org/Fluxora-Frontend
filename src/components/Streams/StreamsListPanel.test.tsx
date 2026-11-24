@@ -343,9 +343,9 @@ describe("StreamsListPanel — pagination", () => {
 // ─── Session persistence indicator ───────────────────────────────────────────
 
 describe("StreamsListPanel — session persistence indicator", () => {
-  // The indicator only claims persistence after a write succeeded (#1663).
+  // Session snapshots remain memory-only under the browser-storage security policy.
   beforeEach(() => {
-    streamsSessionWriteStatus.record(true);
+    streamsSessionWriteStatus.record(false);
   });
 
   afterEach(() => {
@@ -358,24 +358,26 @@ describe("StreamsListPanel — session persistence indicator", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     expect(
       screen.getByRole("img", {
-        name: "Your filters and search are saved on this device",
+        name: "Your filters and search are kept only while this page is open",
       }),
     ).toBeInTheDocument();
   });
 
-  it("passes recentlySaved prop to the indicator", () => {
+  it("does not claim a durable save pulse in memory-only mode", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: true })} />);
-    // The indicator has data-recently-saved attribute when recentlySaved is true
     const indicator = screen.getByRole("img", {
-      name: "Your filters and search are saved on this device",
+      name: "Your filters and search are kept only while this page is open",
     });
-    expect(indicator).toHaveAttribute("data-recently-saved");
+    expect(indicator).not.toHaveAttribute("data-recently-saved");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "For security, session recovery data stays in memory and is discarded when you close or reload this page.",
+    );
   });
 
   it("omits data-recently-saved attribute when recentlySaved is false", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     const indicator = screen.getByRole("img", {
-      name: "Your filters and search are saved on this device",
+      name: "Your filters and search are kept only while this page is open",
     });
     // When false the attribute is not present (undefined → omitted)
     expect(indicator).not.toHaveAttribute("data-recently-saved");
