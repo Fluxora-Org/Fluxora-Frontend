@@ -75,7 +75,6 @@ export default defineConfig({
       "src/pages/__tests__/TreasuryPage.test.tsx",
       "src/pages/Dashboard.test.tsx",
       "src/pages/Recipient.test.tsx",
-      "src/theme/__tests__/themeBootstrapPreference.test.ts",
       "src/theme/__tests__/themeEditorRevertDefaults.test.tsx",
       "src/utils/monthlySummary.test.ts",
       "src/utils/reportExporter.test.ts",
