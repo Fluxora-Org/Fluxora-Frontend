@@ -74,6 +74,7 @@ export default defineConfig({
       "src/pages/Recipient.test.tsx",
       "src/theme/__tests__/themeEditorRevertDefaults.test.tsx",
       "src/utils/reportExporter.test.ts",
+      "src/utils/monthlySummary.test.ts",
     ],
     coverage: {
       provider: "v8",
