@@ -24,6 +24,37 @@ npx playwright test wallet-connect --ui
 npx playwright test --reporter=html && npx playwright show-report
 ```
 
+### Running the full matrix (all browsers)
+
+On macOS or a WebKit-capable runner:
+
+```bash
+npm run test:e2e:full
+# equivalent to: PLAYWRIGHT_WEBKIT=1 playwright test
+```
+
+### CI configuration
+
+The default `test:e2e` script runs Chromium and Firefox. WebKit is opt-in via
+`PLAYWRIGHT_WEBKIT=1` because most Linux CI runners do not support WebKit.
+
+To enable WebKit on a macOS CI runner:
+
+```yaml
+- name: Run full cross-browser e2e
+  run: npm run test:e2e:full
+  env:
+    CI: true
+    PLAYWRIGHT_WEBKIT: "1"
+```
+
+## Landing performance budget
+
+The landing route has a production-build median FCP budget of 1,800 ms across
+three uncached navigations. Each run uses Chromium at a fixed 1280x720 viewport
+with 4x CPU throttling and 40 ms / 1.5 Mbps network emulation. The performance
+gate also measures CLS from navigation using the Web Vitals session-window
+definition, with a maximum score of 0.1:
 Traces and failure screenshots are enabled in the default config; CI retries
 each test twice. HTML reports are written locally with `open: "never"`.
 
@@ -184,6 +215,128 @@ Chromium at a fixed 1280x720 viewport with 4x CPU throttling and 40 ms /
 npm run test:performance
 ```
 
+The HTML report is written to `playwright-performance-report/`. To adjust a
+budget, first capture repeated measurements on the production preview under
+the same emulation settings, investigate and fix regressions rather than
+raising the limit to accommodate noise, then update the corresponding constant
+or assertion in `landing-performance.spec.ts` or `landing-cls.spec.ts` and
+document the rationale here.
+
+### Browser-specific notes
+
+- **Chromium**: Baseline browser; all features expected to work.
+- **Firefox**: `backdrop-filter` support and CSS variable behaviour differ
+  slightly; ensure wallet modal overlays render correctly.
+- **WebKit**: Web Crypto API (`crypto.subtle`) is available but some
+  algorithms behave differently. All e2e flows use mock wallet state — no
+  real wallet extensions or elevated browser permissions are required.
+
+## Accessibility (axe) scans
+
+Automated axe-core accessibility scans cover all primary Fluxora Frontend routes.
+
+### Setup
+
+Dependencies are installed with the rest of the project:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+### Running the scans
+
+Start the dev server and run the accessibility suite:
+
+```bash
+npm run dev &
+npm run test:a11y
+```
+
+Or let the Playwright config start the server automatically:
+
+```bash
+npx playwright test accessibility
+```
+
+### What is scanned
+
+| Route | Label |
+|-------|-------|
+| `/` | Landing (Home) |
+| `/landing` | Landing page |
+| `/app` | Dashboard |
+| `/app/streams` | Streams |
+| `/app/recipient` | Recipient |
+| `/connect-wallet` | Connect Wallet |
+
+Each route is scanned against WCAG 2.0/2.1 AA rules. The suite **fails on any serious or critical violation**.
+
+### Triaging failures
+
+1. Run with `--reporter=html` for a visual report:
+   ```bash
+   npx playwright test --reporter=html
+   npx playwright show-report
+   ```
+2. Each failure message includes the axe rule ID, impact level, and description.
+3. Look up the rule at [dequeuniversity.com/rules/axe](https://dequeuniversity.com/rules/axe/).
+4. Fix the violation in the component, then re-run.
+
+### Allowlisting known issues
+
+If a violation cannot be fixed immediately, add it to the `ALLOWLISTED_RULES` map in `e2e/axe-helper.ts`:
+
+```ts
+export const ALLOWLISTED_RULES: Record<string, string> = {
+  "color-contrast": "tracked in #999 – design token update pending",
+};
+```
+
+> Keep the allowlist small and always reference a tracking issue.
+
+### CI integration
+
+The `webServer` option in `playwright.config.ts` starts `npm run dev` automatically when `CI=true`. Add to your workflow:
+
+```yaml
+- name: Run accessibility tests
+  run: npm run test:a11y
+  env:
+    CI: true
+```
+
+
+## Theme Customization Tests
+
+The theme customization flow has dedicated end-to-end coverage in `theme-customization.spec.ts`.
+
+### Running theme tests only
+
+```bash
+npm run test:e2e -- theme-customization
+```
+
+### What's covered
+
+- Theme toggle (light ↔ dark)
+- Persistence across page reloads and navigation
+- Keyboard accessibility
+- Mobile menu variant
+- System preference detection
+- localStorage failure graceful degradation
+- Invalid theme value rejection (security)
+
+### Quick validation
+
+See `THEME_TEST_QUICK_REFERENCE.md` for common commands and validation steps.
+
+Full validation guide: `../docs/archive/THEME_E2E_TEST_VALIDATION.md`
+
+## Colour-blind simulation flow
+
+The colour-blind simulation preview on the treasury overview has dedicated
+end-to-end coverage in `colorblind-simulation-flow.spec.ts`.
 ## Visual-regression snapshots
 
 `e2e/visual-regression.spec.ts-snapshots` currently contains only `*-win32.png`

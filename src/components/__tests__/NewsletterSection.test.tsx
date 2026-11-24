@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NewsletterSection, {
   validateNewsletterEmail,
@@ -49,6 +49,7 @@ describe("validateNewsletterEmail", () => {
 
 describe("NewsletterSection", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -305,5 +306,61 @@ describe("NewsletterSection", () => {
 
     fireEvent.change(input, { target: { value: "user@example.com" } });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows the failure message and exits submitting state when the request times out", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((_url, init) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(
+              new DOMException("The operation was aborted.", "AbortError"),
+            );
+          });
+        });
+      });
+
+    render(<NewsletterSection />);
+    submitEmail("user@example.com");
+
+    expect(screen.getByRole("button", { name: "Subscribing..." })).toBeDisabled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(
+      "We couldn't subscribe you right now. Please try again.",
+    );
+    expect(screen.getByRole("button", { name: "Subscribe" })).not.toBeDisabled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts an in-flight request on unmount without triggering state updates", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      capturedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error");
+
+    const { unmount } = render(<NewsletterSection />);
+    submitEmail("user@example.com");
+
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(capturedSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(capturedSignal?.aborted).toBe(true);
+    await Promise.resolve();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });

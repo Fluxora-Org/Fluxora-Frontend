@@ -135,6 +135,30 @@ export function calculateRequiredDeposit(rate: string, duration: string): string
 }
 
 /**
+ * Parse an amount into exact minor units, returning zero for invalid input and
+ * clamping values above the maximum supported amount.
+ */
+export function parseAmountToMinorUnits(value: string): bigint {
+  const exact = parseAmountExact(value);
+  if (exact === "") return 0n;
+
+  const minorUnits = BigInt(toSmallestUnitsString(exact, AMOUNT_DECIMAL_PLACES));
+  return minorUnits > MAX_MINOR_UNITS ? MAX_MINOR_UNITS : minorUnits;
+}
+
+/** Format exact minor units as a decimal amount with fixed precision. */
+export function formatAmountFromMinorUnits(value: bigint): string {
+  const negative = value < 0n;
+  const absoluteValue = negative ? -value : value;
+  const whole = absoluteValue / MINOR_UNITS_SCALE;
+  const fraction = (absoluteValue % MINOR_UNITS_SCALE)
+    .toString()
+    .padStart(AMOUNT_DECIMAL_PLACES, "0");
+
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
+/**
  * Convert an entered USDC amount into its smallest-unit integer string without
  * converting through a floating-point number.
  */

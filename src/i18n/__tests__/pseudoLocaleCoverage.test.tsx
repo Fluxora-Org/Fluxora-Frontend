@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.unmock("../index");
 
 import { en } from "../en";
 import {
@@ -77,7 +79,7 @@ describe("pseudo-locale rendered coverage", () => {
       incompleteCatalog,
     );
 
-    expect(report.warnings).toEqual(
+    expect(report.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "MISSING_KEY", key: keyToRemove }),
       ]),
