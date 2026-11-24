@@ -17,7 +17,16 @@ describe("TruncatedReveal states", () => {
     );
 
     expect(screen.getByRole("status", { name: "Loading address" })).toBeVisible();
-    expect(screen.getByText("Loading account details...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Loading account details...", {
+        selector: ".truncateReveal__srValue",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Loading account details...", {
+        selector: ".truncateReveal__chip",
+      }),
+    ).toHaveAttribute("aria-hidden", "true");
   });
 
   it("renders the empty state properly when fullValue is empty", () => {
@@ -55,8 +64,15 @@ describe("TruncatedReveal states", () => {
     expect(
       screen.getByText(
         "Failed to resolve address GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN",
+        { selector: ".truncateReveal__srValue" },
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Failed to resolve address GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN",
+        { selector: ".truncateReveal__chip" },
+      ),
+    ).toHaveAttribute("aria-hidden", "true");
   });
 
   it("renders the populated state displaying the truncated content and full value overlay", () => {

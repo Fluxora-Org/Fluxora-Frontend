@@ -16,16 +16,17 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, within, waitFor } from '@testing-library/react';
-import { act } from 'react';
+import { act, type ReactElement } from 'react';
 import CreateStreamModal from '../CreateStreamModal';
 import { WalletProvider } from '../wallet-connect/Walletcontext';
 import { selectSingleStreamInContainer } from './CreateStreamModal.testUtils';
 import * as txModule from '../../lib/stellar/tx';
 
-// Valid test addresses
+// Valid test addresses. isValidStellarAddress verifies the StrKey checksum,
+// so these must be real ed25519 public keys, not look-alike placeholders.
 const VALID_ACCOUNT_A = 'GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN';
-const VALID_ACCOUNT_B = 'GCZV5G6DBVHQB5BXRXJ5LPZWLXQTQXK6YCIKZLRZ4AXKX6DKFBG2YZZZ';
-const VALID_RECIPIENT = 'GCEXAMPLE1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+const VALID_ACCOUNT_B = 'GDBWW22BDP5HN3ZTG7LLID665PA72DGOLOONLUM5TKQFRAQA3EYGKIRC';
+const VALID_RECIPIENT = 'GAEA6FQ5EQVTEOKAI5HFKXDDNJYXQ74GRWKJXIVJWC335ROM2PNODIMK';
 
 /**
  * Mock wallet context that can simulate account and network changes
@@ -67,6 +68,9 @@ vi.mock('../../lib/offlineActionQueue', () => ({
   getQueuePosition: vi.fn(() => 1),
   getQueueLength: vi.fn(() => 0),
   subscribeToQueue: vi.fn(() => () => {}),
+  getNextEligibleAction: vi.fn(() => null),
+  updateActionStatus: vi.fn(),
+  isActionProcessed: vi.fn(() => false),
 }));
 
 // Mock online status
@@ -83,11 +87,15 @@ vi.mock('../../hooks/useTransactionStatus', () => ({
 }));
 
 // Mock toast provider
-vi.mock('../toast/ToastProvider', () => ({
-  useToast: () => ({
-    addToast: vi.fn(),
-  }),
-}));
+vi.mock('../toast/ToastProvider', () => {
+  const ctx = { addToast: vi.fn(), dismiss: vi.fn() };
+  return {
+    useToast: () => ctx,
+    // Child components read the provider through useOptionalToast.
+    useOptionalToast: () => ctx,
+    ToastProvider: ({ children }: { children: unknown }) => children,
+  };
+});
 
 // Mock i18n
 vi.mock('../../i18n', () => ({
@@ -141,6 +149,17 @@ function renderModalWithWallet(props: any = {}) {
 }
 
 /**
+ * Returns the modal-level validation banner. It was previously rendered as
+ * `.modal-error`; CreateStreamModal now renders it as an alert-role
+ * `.validation-message--error` above the step content.
+ */
+function getModalError(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>(
+    '.modal-body-scroll > .validation-message--error[role="alert"]',
+  );
+}
+
+/**
  * Helper to fill out step 1 (recipient & deposit)
  */
 function fillStep1(container: HTMLElement, recipient: string, deposit: string) {
@@ -173,6 +192,20 @@ function advanceToStep3(container: HTMLElement) {
  */
 function switchAccount(newAddress: string) {
   mockWalletAddress = newAddress;
+}
+
+/**
+ * Helper to simulate a wallet disconnect. In the app the wallet context
+ * update re-renders the modal, so do the same here.
+ */
+function disconnectWallet(rerender: (ui: ReactElement) => void) {
+  mockWalletConnected = false;
+  mockWalletAddress = null as unknown as string;
+  rerender(
+    <WalletProvider>
+      <CreateStreamModal isOpen={true} onClose={() => {}} />
+    </WalletProvider>
+  );
 }
 
 /**
@@ -237,15 +270,14 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
     });
 
     it('should prevent submission with stale account after disconnect', async () => {
-      const { container } = renderModalWithWallet();
+      const { container, rerender } = renderModalWithWallet();
 
       // Fill form with wallet connected
       fillStep1(container, VALID_RECIPIENT, '100');
       advanceToStep3(container);
 
-      // Simulate wallet disconnect
-      mockWalletConnected = false;
-      mockWalletAddress = null;
+      // Simulate wallet disconnect (context update re-renders the modal)
+      disconnectWallet(rerender);
 
       // Try to submit
       const createBtn = within(container).getByRole('button', { name: /create stream/i });
@@ -253,7 +285,7 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
 
       // Should show wallet not connected error
       await waitFor(() => {
-        const errorMessage = container.querySelector('.modal-error');
+        const errorMessage = getModalError(container);
         expect(errorMessage?.textContent).toContain('Wallet not connected');
       });
 
@@ -342,7 +374,7 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
 
       // Should show network mismatch error
       await waitFor(() => {
-        const errorMessage = container.querySelector('.modal-error');
+        const errorMessage = getModalError(container);
         expect(errorMessage?.textContent).toContain('Network mismatch');
       });
 
@@ -373,7 +405,7 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
       fireEvent.click(createBtn);
       
       await waitFor(() => {
-        const errorMessage = container.querySelector('.modal-error');
+        const errorMessage = getModalError(container);
         expect(errorMessage?.textContent).toContain('Network mismatch');
       });
 
@@ -514,21 +546,20 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
 
   describe('Invariant 5: Validation error visibility before signing', () => {
     it('should show clear error when trying to submit with disconnected wallet', () => {
-      const { container } = renderModalWithWallet();
+      const { container, rerender } = renderModalWithWallet();
 
       fillStep1(container, VALID_RECIPIENT, '100');
       advanceToStep3(container);
 
-      // Disconnect wallet
-      mockWalletConnected = false;
-      mockWalletAddress = null;
+      // Disconnect wallet (context update re-renders the modal)
+      disconnectWallet(rerender);
 
       // Try to submit
       const createBtn = within(container).getByRole('button', { name: /create stream/i });
       fireEvent.click(createBtn);
 
       // Error should be visible
-      const errorMessage = container.querySelector('.modal-error');
+      const errorMessage = getModalError(container);
       expect(errorMessage).not.toBeNull();
       expect(errorMessage?.textContent).toContain('Wallet not connected');
     });
@@ -552,7 +583,7 @@ describe('CreateStreamModal - Account Switch Invariants', () => {
       fireEvent.click(createBtn);
 
       // Error should be visible
-      const errorMessage = container.querySelector('.modal-error');
+      const errorMessage = getModalError(container);
       expect(errorMessage).not.toBeNull();
       expect(errorMessage?.textContent).toContain('Network mismatch');
     });

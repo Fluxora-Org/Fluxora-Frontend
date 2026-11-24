@@ -1,22 +1,40 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { StreamsLoading } from "./StreamsLoading";
-// Adjust this import to the real resolved-rows component/props.
-import { StreamsListPanel } from "./Streams/StreamsListPanel";
+import { MemoryRouter } from "react-router-dom";
+import StreamsLoading from "./StreamsLoading";
+import RecentStreams, { type Stream } from "./RecentStreams";
 
 // Documented budget: this is the acceptance criterion "CLS stays within a
 // documented budget." Google's "good" CLS threshold is 0.1; we use a tighter
 // budget for a single component since the rest of the page contributes 0.
 const CLS_BUDGET = 0.05;
 
-const mockStreams = [
-  { id: "1", name: "Stream A", amount: "100", status: "active" },
-  { id: "2", name: "Stream B", amount: "250", status: "paused" },
-  { id: "3", name: "Stream C", amount: "50", status: "active" },
-]; // adjust fields to the real Stream type
+const mockStreams: Stream[] = [
+  {
+    id: "STR-001",
+    name: "Stream A",
+    recipient: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    rate: "100 USDC/mo",
+    status: "Active",
+  },
+  {
+    id: "STR-002",
+    name: "Stream B",
+    recipient: "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    rate: "250 USDC/mo",
+    status: "Paused",
+  },
+  {
+    id: "STR-003",
+    name: "Stream C",
+    recipient: "GCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    rate: "50 USDC/mo",
+    status: "Active",
+  },
+];
 
 function rowHeights(container: HTMLElement) {
-  return Array.from(container.querySelectorAll("[data-testid='stream-row']")).map(
+  return Array.from(container.querySelectorAll("tbody tr")).map(
     (el) => el.getBoundingClientRect().height,
   );
 }
@@ -27,7 +45,11 @@ describe("StreamsLoading -> resolved: layout shift", () => {
     const loadingHeights = rowHeights(loading.container);
     loading.unmount();
 
-    const resolved = render(<StreamsListPanel streams={mockStreams} isLoading={false} />);
+    const resolved = render(
+      <MemoryRouter>
+        <RecentStreams streams={mockStreams} loading={false} />
+      </MemoryRouter>,
+    );
     const resolvedHeights = rowHeights(resolved.container);
 
     expect(loadingHeights.length).toBeGreaterThan(0);
@@ -48,7 +70,11 @@ describe("StreamsLoading -> resolved: layout shift", () => {
     const viewportHeight = 800; // typical viewport used for this budget calc
     loading.unmount();
 
-    const resolved = render(<StreamsListPanel streams={mockStreams} isLoading={false} />);
+    const resolved = render(
+      <MemoryRouter>
+        <RecentStreams streams={mockStreams} loading={false} />
+      </MemoryRouter>,
+    );
     const resolvedHeights = rowHeights(resolved.container);
 
     let cls = 0;
@@ -72,7 +98,11 @@ describe("StreamsLoading -> resolved: layout shift", () => {
     const loadingHeight = loading.container.firstElementChild?.getBoundingClientRect().height ?? 0;
     loading.unmount();
 
-    const resolved = render(<StreamsListPanel streams={mockStreams} isLoading={false} />);
+    const resolved = render(
+      <MemoryRouter>
+        <RecentStreams streams={mockStreams} loading={false} />
+      </MemoryRouter>,
+    );
     const resolvedHeight = resolved.container.firstElementChild?.getBoundingClientRect().height ?? 0;
 
     expect(Math.abs(resolvedHeight - loadingHeight)).toBeLessThanOrEqual(1); // 1px rounding tolerance

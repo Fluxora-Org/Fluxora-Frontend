@@ -148,28 +148,32 @@ export function drawBadgeOverlay(
     // Outer isolation ring
     ctx.fillStyle = borderColor;
     ctx.beginPath();
-    ctx.roundRect
-      ? ctx.roundRect(
-          x - borderOffset,
-          y - borderOffset,
-          width + borderOffset * 2,
-          height + borderOffset * 2,
-          r + borderOffset
-        )
-      : ctx.rect(
-          x - borderOffset,
-          y - borderOffset,
-          width + borderOffset * 2,
-          height + borderOffset * 2
-        );
+    if (ctx.roundRect) {
+      ctx.roundRect(
+        x - borderOffset,
+        y - borderOffset,
+        width + borderOffset * 2,
+        height + borderOffset * 2,
+        r + borderOffset
+      );
+    } else {
+      ctx.rect(
+        x - borderOffset,
+        y - borderOffset,
+        width + borderOffset * 2,
+        height + borderOffset * 2
+      );
+    }
     ctx.fill();
 
     // Inner badge fill
     ctx.fillStyle = badgeBgColor;
     ctx.beginPath();
-    ctx.roundRect
-      ? ctx.roundRect(x, y, width, height, r)
-      : ctx.rect(x, y, width, height);
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, width, height, r);
+    } else {
+      ctx.rect(x, y, width, height);
+    }
     ctx.fill();
 
     // Text

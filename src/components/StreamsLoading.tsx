@@ -10,6 +10,8 @@ import "./skeleton.css";
 interface StreamsLoadingProps {
   retryCount?: number;
   onRetry?: () => void;
+  /** Number of placeholder rows to render (defaults to 5). */
+  rowCount?: number;
   /**
    * "default" matches the plain 4-column streams table used on the
    * dashboard/Streams page. "treasury" matches the 6-column layout
@@ -25,6 +27,7 @@ interface StreamsLoadingProps {
 export default function StreamsLoading({
   retryCount = 0,
   onRetry,
+  rowCount = 5,
   variant = "default",
 }: StreamsLoadingProps) {
   if (retryCount >= MAX_LOADING_RETRIES) {
@@ -83,7 +86,7 @@ export default function StreamsLoading({
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: 5 }).map((_, r) => (
+            {Array.from({ length: rowCount }).map((_, r) => (
               <tr key={r}>
                 {isTreasury && (
                   <td className={cellClassName} style={{ ...cellStyle, width: "2.5rem" }}>
