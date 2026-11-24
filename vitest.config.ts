@@ -49,7 +49,6 @@ export default defineConfig({
       "src/components/navigation/__tests__/WalletStatus.share.test.tsx",
       "src/components/presence/__tests__/PresenceBadge.test.tsx",
       "src/components/Streams/__tests__/StreamCreatedModal.copy.test.tsx",
-      "src/components/Streams/__tests__/StreamCreatedModal.test.tsx",
       "src/components/Streams/StreamCreatedModal.keyboard.test.tsx",
       "src/components/Streams/StreamsListPanel.test.tsx",
       "src/components/StreamsLoading.layoutShift.test.tsx",
