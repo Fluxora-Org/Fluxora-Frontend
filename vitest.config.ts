@@ -64,7 +64,6 @@ export default defineConfig({
       "src/lib/__tests__/configBoundary.test.ts",
       "src/lib/__tests__/createStreamAmounts.property.test.ts",
       "src/lib/__tests__/createStreamAmounts.test.ts",
-      "src/lib/__tests__/onboarding.test.ts",
       "src/lib/__tests__/optimisticTransactions.test.ts",
       "src/lib/__tests__/routeChunks.test.ts",
       "src/lib/__tests__/shareWorkspaces.test.ts",
