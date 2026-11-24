@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Copy, ExternalLink, LogOut, Check } from "lucide-react";
+import { logger } from "../../lib/logger";
 
 interface WalletStatusProps {
   address: string;
@@ -65,7 +66,10 @@ export default function WalletStatus({
       await navigator.clipboard.writeText(address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    } catch (error) {
+      // Clipboard API can be unavailable or denied in restricted contexts; safe to ignore.
+      logger.warn("Failed to copy wallet address to clipboard", error);
+    }
   };
 
   const networkLabel = isWrongNetwork

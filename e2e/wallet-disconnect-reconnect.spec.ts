@@ -58,7 +58,7 @@ async function injectFreighterStub(page: Page, initiallyConnected: boolean) {
         },
         requestAccess: () => Promise.resolve({ address }),
         WatchWalletChanges: class {
-          watch(_cb: unknown) {}
+          watch() {}
           stop() {}
         },
         isBrowser: true,

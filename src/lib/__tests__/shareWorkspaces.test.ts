@@ -6,11 +6,13 @@ import {
   getConnectedWorkspace,
   isProviderConnected,
   readConnectedWorkspaces,
+  writeConnectedWorkspaces,
 } from "../shareWorkspaces";
 
 describe("shareWorkspaces", () => {
   beforeEach(() => {
     window.localStorage.removeItem(SHARE_WORKSPACES_KEY);
+    writeConnectedWorkspaces([]);
   });
 
   it("connects and disconnects providers independently", () => {

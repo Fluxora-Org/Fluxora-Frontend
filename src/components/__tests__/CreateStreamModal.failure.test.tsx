@@ -240,7 +240,7 @@ describe('CreateStreamModal submit failure handling', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Transaction failed before confirmation.'),
+        screen.getByText('Transaction failed on-chain.'),
       ).toBeInTheDocument();
     });
 
@@ -248,7 +248,7 @@ describe('CreateStreamModal submit failure handling', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(onStreamError).toHaveBeenCalledTimes(1);
     expect(onStreamError.mock.calls[0]?.[0]).toMatchObject({
-      message: 'Transaction failed before confirmation.',
+      message: 'Transaction failed on-chain.',
     });
   });
 

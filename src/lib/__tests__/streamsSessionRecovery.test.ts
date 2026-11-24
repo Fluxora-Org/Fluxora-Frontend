@@ -64,6 +64,15 @@ describe("streamsSessionRecovery", () => {
 
   beforeEach(() => {
     storage = new MemoryStorage();
+    clearStreamsSession(ACCOUNT_ALICE);
+    clearStreamsSession(ACCOUNT_BOB);
+    streamsSessionWriteStatus.reset();
+  });
+
+  afterEach(() => {
+    clearStreamsSession(ACCOUNT_ALICE);
+    clearStreamsSession(ACCOUNT_BOB);
+    streamsSessionWriteStatus.reset();
   });
 
   describe("write + read round trip", () => {
@@ -110,7 +119,7 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.draft).toBeNull();
     });
 
-    it("stores under an account-scoped storage key", () => {
+    it("keeps snapshots in memory without writing to browser storage", () => {
       writeStreamsSession(
         { filters: DEFAULT_STREAMS_FILTERS, draft: null },
         NOW,
@@ -119,8 +128,11 @@ describe("streamsSessionRecovery", () => {
       );
 
       const expectedKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      expect(storage.getItem(expectedKey)).not.toBeNull();
+      expect(storage.getItem(expectedKey)).toBeNull();
+      expect(storage.length).toBe(0);
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).not.toBeNull();
     });
+
   });
 
   describe("expiry", () => {
@@ -238,27 +250,16 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)).not.toBeNull();
     });
 
-    it("prevents cross-account data leakage via manual storage manipulation", () => {
-      // Alice writes her session
-      writeStreamsSession(
-        {
-          filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" },
-          draft: MEANINGFUL_DRAFT,
-        },
-        NOW,
-        ACCOUNT_ALICE,
-        storage,
-      );
-
-      // Attacker tries to manually modify the stored accountAddress to Bob's
+    it("discards a legacy browser-storage snapshot instead of trusting it", () => {
       const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      const storedData = JSON.parse(storage.getItem(aliceKey)!);
-      storedData.accountAddress = ACCOUNT_BOB;
-      storage.setItem(aliceKey, JSON.stringify(storedData));
+      storage.setItem(aliceKey, JSON.stringify({
+        savedAt: NOW,
+        accountAddress: ACCOUNT_BOB,
+        filters: DEFAULT_STREAMS_FILTERS,
+        draft: MEANINGFUL_DRAFT,
+      }));
 
-      // Reading with Alice's key should fail because accountAddress doesn't match
-      const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
-      expect(snapshot).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
       expect(storage.getItem(aliceKey)).toBeNull();
     });
 
@@ -284,15 +285,15 @@ describe("streamsSessionRecovery", () => {
       expect(readStreamsSession(NOW, "   ", storage)).toBeNull();
     });
 
-    it("uses separate storage keys for different accounts", () => {
+    it("keeps account snapshots separate without creating browser-storage keys", () => {
       writeStreamsSession(
-        { filters: DEFAULT_STREAMS_FILTERS, draft: null },
+        { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "alice" }, draft: null },
         NOW,
         ACCOUNT_ALICE,
         storage,
       );
       writeStreamsSession(
-        { filters: DEFAULT_STREAMS_FILTERS, draft: null },
+        { filters: { ...DEFAULT_STREAMS_FILTERS, searchQuery: "bob" }, draft: null },
         NOW,
         ACCOUNT_BOB,
         storage,
@@ -301,132 +302,86 @@ describe("streamsSessionRecovery", () => {
       const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
       const bobKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_BOB}`;
 
-      expect(storage.getItem(aliceKey)).not.toBeNull();
-      expect(storage.getItem(bobKey)).not.toBeNull();
       expect(aliceKey).not.toBe(bobKey);
+      expect(storage.getItem(aliceKey)).toBeNull();
+      expect(storage.getItem(bobKey)).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.filters.searchQuery).toBe("alice");
+      expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)?.filters.searchQuery).toBe("bob");
     });
   });
 
   describe("malformed data", () => {
-    it("returns null for invalid JSON", () => {
+    it("discards legacy browser-storage records without reading them", () => {
       const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(key, "{not json");
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
-    });
+      storage.setItem(key, JSON.stringify({
+        savedAt: NOW,
+        accountAddress: ACCOUNT_ALICE,
+        filters: DEFAULT_STREAMS_FILTERS,
+        draft: MEANINGFUL_DRAFT,
+      }));
 
-    it("returns null when the value isn't an object", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(key, JSON.stringify([1, 2, 3]));
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
-    });
-
-    it("returns null when savedAt is missing", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({ filters: DEFAULT_STREAMS_FILTERS, accountAddress: ACCOUNT_ALICE }),
-      );
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
-    });
-
-    it("returns null when accountAddress is missing", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({ savedAt: NOW, filters: DEFAULT_STREAMS_FILTERS }),
-      );
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
-    });
-
-    it("returns null when filters is missing", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({ savedAt: NOW, accountAddress: ACCOUNT_ALICE }),
-      );
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
+      expect(storage.getItem(key)).toBeNull();
     });
 
     it("falls back to defaults for malformed individual filter fields", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({
-          savedAt: NOW,
-          accountAddress: ACCOUNT_ALICE,
-          filters: { statusFilter: 42, searchQuery: null, currentPage: "two" },
-        }),
+      writeStreamsSession(
+        { filters: { statusFilter: 42, searchQuery: null, currentPage: "two" } as never, draft: null },
+        NOW,
+        ACCOUNT_ALICE,
+        storage,
       );
 
-      const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
-      expect(snapshot?.filters).toEqual(DEFAULT_STREAMS_FILTERS);
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.filters).toEqual(DEFAULT_STREAMS_FILTERS);
     });
 
     it("drops a malformed draft rather than throwing", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({
-          savedAt: NOW,
-          accountAddress: ACCOUNT_ALICE,
-          filters: DEFAULT_STREAMS_FILTERS,
-          draft: "not-an-object",
-        }),
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: "not-an-object" as never },
+        NOW,
+        ACCOUNT_ALICE,
+        storage,
       );
 
-      const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
-      expect(snapshot?.draft).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.draft).toBeNull();
     });
 
     it("clamps an out-of-range draft step to 1", () => {
-      const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
-      storage.setItem(
-        key,
-        JSON.stringify({
-          savedAt: NOW,
-          accountAddress: ACCOUNT_ALICE,
-          filters: DEFAULT_STREAMS_FILTERS,
-          draft: { ...MEANINGFUL_DRAFT, step: 3 },
-        }),
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: { ...MEANINGFUL_DRAFT, step: 3 } as never },
+        NOW,
+        ACCOUNT_ALICE,
+        storage,
       );
 
-      const snapshot = readStreamsSession(NOW, ACCOUNT_ALICE, storage);
-      expect(snapshot?.draft?.step).toBe(1);
+      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)?.draft?.step).toBe(1);
     });
   });
 
   describe("storage failure / SSR safety", () => {
-    it("returns null when storage is null", () => {
+    it("returns null when no in-memory snapshot exists, even without storage", () => {
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, null)).toBeNull();
     });
 
-    it("does not throw when write storage is null", () => {
+    it("does not throw when storage is null", () => {
       expect(() =>
         writeStreamsSession({ filters: DEFAULT_STREAMS_FILTERS, draft: null }, NOW, ACCOUNT_ALICE, null),
       ).not.toThrow();
-    });
-
-    it("does not throw when clear storage is null", () => {
       expect(() => clearStreamsSession(ACCOUNT_ALICE, null)).not.toThrow();
     });
 
-    it("returns null rather than propagating when getItem throws", () => {
+    it("does not access storage when getItem throws", () => {
       const throwingStorage = {
-        getItem: vi.fn(() => {
-          throw new Error("boom");
-        }),
+        getItem: vi.fn(() => { throw new Error("boom"); }),
       };
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, throwingStorage)).toBeNull();
+      expect(throwingStorage.getItem).not.toHaveBeenCalled();
     });
 
-    it("keeps the safe session snapshot in memory when setItem throws", () => {
+    it("keeps the snapshot in memory without calling a failing setItem", () => {
       const throwingStorage = {
-        getItem: vi.fn(() => {
-          throw new DOMException("Quota exceeded", "QuotaExceededError");
-        }),
-        setItem: vi.fn(() => {
-          throw new DOMException("Quota exceeded", "QuotaExceededError");
-        }),
+        getItem: vi.fn(() => { throw new DOMException("Quota exceeded", "QuotaExceededError"); }),
+        setItem: vi.fn(() => { throw new DOMException("Quota exceeded", "QuotaExceededError"); }),
         removeItem: vi.fn(),
       };
 
@@ -443,32 +398,51 @@ describe("streamsSessionRecovery", () => {
         filters: DEFAULT_STREAMS_FILTERS,
         draft: MEANINGFUL_DRAFT,
       });
+      expect(throwingStorage.setItem).not.toHaveBeenCalled();
     });
 
-    it("does not throw when removeItem throws", () => {
+    it("best-effort removes a legacy browser-storage snapshot when clearing an account", () => {
       const throwingStorage = {
         getItem: vi.fn(),
         setItem: vi.fn(),
-        removeItem: vi.fn(() => {
-          throw new Error("boom");
-        }),
+        removeItem: vi.fn(() => { throw new Error("boom"); }),
       };
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
+        NOW,
+        ACCOUNT_ALICE,
+        throwingStorage,
+      );
+
       expect(() => clearStreamsSession(ACCOUNT_ALICE, throwingStorage)).not.toThrow();
+      expect(throwingStorage.removeItem).toHaveBeenCalledWith(
+        `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`,
+      );
+      expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
     });
   });
 
   describe("clearStreamsSession", () => {
-    it("removes the stored snapshot entirely for the specified account", () => {
+    it("clears the in-memory snapshot and any legacy persisted copy for the specified account", () => {
+      const aliceKey = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
+      storage.setItem(aliceKey, "legacy-sensitive-session");
       writeStreamsSession(
         { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
         NOW,
         ACCOUNT_ALICE,
         storage,
       );
-      expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).not.toBeNull();
+      writeStreamsSession(
+        { filters: DEFAULT_STREAMS_FILTERS, draft: MEANINGFUL_DRAFT },
+        NOW,
+        ACCOUNT_BOB,
+        storage,
+      );
 
       clearStreamsSession(ACCOUNT_ALICE, storage);
       expect(readStreamsSession(NOW, ACCOUNT_ALICE, storage)).toBeNull();
+      expect(storage.getItem(aliceKey)).toBeNull();
+      expect(readStreamsSession(NOW, ACCOUNT_BOB, storage)).not.toBeNull();
     });
   });
 
@@ -588,10 +562,7 @@ describe("streamsSessionRecovery", () => {
 });
 
 describe("streams session write status (#1663)", () => {
-  const originalLocalStorage = Object.getOwnPropertyDescriptor(
-    window,
-    "localStorage",
-  );
+  const originalLocalStorage = Object.getOwnPropertyDescriptor(window, "localStorage");
   const EMPTY_SESSION = { filters: DEFAULT_STREAMS_FILTERS, draft: null };
 
   function blockSiteData() {
@@ -605,38 +576,38 @@ describe("streams session write status (#1663)", () => {
 
   beforeEach(() => {
     streamsSessionWriteStatus.reset();
+    clearStreamsSession(ACCOUNT_ALICE);
   });
 
   afterEach(() => {
     if (originalLocalStorage) {
       Object.defineProperty(window, "localStorage", originalLocalStorage);
     }
+    clearStreamsSession(ACCOUNT_ALICE);
     streamsSessionWriteStatus.reset();
   });
 
-  it("returns true and records available when the write succeeds", () => {
-    expect(
-      writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, new MemoryStorage()),
-    ).toBe(true);
-    expect(streamsSessionWriteStatus.getSnapshot()).toBe("available");
+  it("keeps the snapshot in memory but does not claim browser persistence", () => {
+    expect(writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, new MemoryStorage())).toBe(false);
+    expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
+    expect(readStreamsSession(NOW, ACCOUNT_ALICE)).not.toBeNull();
   });
 
   it.each(["SecurityError", "QuotaExceededError"])(
-    "returns false and records unavailable when setItem throws %s",
+    "does not attempt browser storage writes for %s",
     (errorName) => {
       const storage = new MemoryStorage();
-      vi.spyOn(storage, "setItem").mockImplementation(() => {
+      const setItem = vi.spyOn(storage, "setItem").mockImplementation(() => {
         throw new DOMException("Storage write failed", errorName);
       });
 
-      expect(writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, storage)).toBe(
-        false,
-      );
+      expect(writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, storage)).toBe(false);
+      expect(setItem).not.toHaveBeenCalled();
       expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
     },
   );
 
-  it("does not throw when accessing window.localStorage throws (site data blocked)", () => {
+  it("does not access localStorage when site data is blocked", () => {
     blockSiteData();
 
     expect(() => readStreamsSession(NOW, ACCOUNT_ALICE)).not.toThrow();
@@ -646,21 +617,22 @@ describe("streams session write status (#1663)", () => {
     expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
   });
 
-  it("records unavailable when clearing the session throws", () => {
+  it("removes legacy browser-storage data without claiming persistence", () => {
     const storage = new MemoryStorage();
-    vi.spyOn(storage, "removeItem").mockImplementation(() => {
-      throw new DOMException("The operation is insecure.", "SecurityError");
-    });
+    const key = `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${ACCOUNT_ALICE}`;
+    storage.setItem(key, "legacy-sensitive-session");
+    const removeItem = vi.spyOn(storage, "removeItem");
 
+    writeStreamsSession(EMPTY_SESSION, NOW, ACCOUNT_ALICE, storage);
     clearStreamsSession(ACCOUNT_ALICE, storage);
 
+    expect(removeItem).toHaveBeenCalledWith(key);
+    expect(storage.getItem(key)).toBeNull();
     expect(streamsSessionWriteStatus.getSnapshot()).toBe("unavailable");
   });
 
   it("does not change the status when there is no account to write for", () => {
-    expect(writeStreamsSession(EMPTY_SESSION, NOW, "  ", new MemoryStorage())).toBe(
-      false,
-    );
+    expect(writeStreamsSession(EMPTY_SESSION, NOW, "  ", new MemoryStorage())).toBe(false);
     expect(streamsSessionWriteStatus.getSnapshot()).toBe("unknown");
   });
 });

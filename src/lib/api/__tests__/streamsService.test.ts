@@ -461,6 +461,54 @@ describe("streamsService live mode", () => {
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
+
+  it("disables timeout when timeoutMs is 0", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(jsonResponse({ data: [] })), 2000),
+        ),
+    );
+
+    const promise = getStreams(undefined, { timeoutMs: 0 });
+
+    // Advance past the default timeout (10s) - should not time out
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(promise).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("disables timeout when timeoutMs is Infinity", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(jsonResponse({ data: [] })), 2000),
+        ),
+    );
+
+    const promise = getStreams(undefined, { timeoutMs: Infinity });
+
+    // Advance past the default timeout (10s) - should not time out
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(promise).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("does not set timeout timer when timeoutMs is not finite", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ data: [] }));
+
+    await getStreams(undefined, { timeoutMs: NaN });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("streamsService mock mode", () => {
