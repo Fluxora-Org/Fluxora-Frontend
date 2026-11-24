@@ -107,8 +107,7 @@ describe("ColorBlindToggle keyboard operability", () => {
 
     // Tab to first radio (Off) in the fieldset
     const offRadio = screen.getByRole("radio", { name: /No simulation/i });
-    await user.click(offRadio); // focus the group
-    offRadio.focus();
+    await user.tab();
     expect(document.activeElement).toBe(offRadio);
   });
 
