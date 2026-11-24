@@ -37,6 +37,7 @@ import "./Recipient.css";
 import { useFaviconBadge } from "../utils/faviconBadge";
 import { useModalAccessibility } from "../components/useModalAccessibility";
 import { useRecipientPageData } from "./useRecipientPageData";
+import { useI18n } from "../i18n";
 
 // (Removed top-level timeoutRef and useEffect; will be added inside component)
 
@@ -119,6 +120,7 @@ export function getRecipientPageTitle(
 }
 
 export default function Recipient() {
+  const { t } = useI18n();
   const isOnline = useOnlineStatus();
   const wallet = useWallet();
   const { addToast } = useToast();
@@ -658,15 +660,15 @@ export default function Recipient() {
   if (!walletConnected || !hasStreams || serviceError) {
     return (
       <main aria-labelledby="recipient-page-title">
-        <MetaTags title="Recipient" />
+        <MetaTags title={t("recipient.pageTitle")} />
         <h1
           id="recipient-page-title"
           style={{ marginTop: 0, fontSize: "2rem", fontWeight: 700 }}
         >
-          Your streams
+          {t("recipient.heading")}
         </h1>
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
-          View your incoming streams and withdraw accrued USDC at any time.
+          {t("recipient.description")}
         </p>
         <RecipientEmptyState
           walletConnected={walletConnected}
@@ -692,24 +694,22 @@ export default function Recipient() {
                   <Shield className="security-gate-icon" aria-hidden="true" />
                 </div>
                 <div>
-                  <h2 id="security-gate-title">Local Security Gate</h2>
+                  <h2 id="security-gate-title">{t("recipient.security.title")}</h2>
                   <p className="security-gate-description">
-                    Add an optional biometric or PIN confirmation step before
-                    each withdrawal. This is a local UX gate only and does not
-                    replace your wallet's cryptographic signing prompt.
+                    {t("recipient.security.description")}
                   </p>
                 </div>
               </div>
               <div className="security-gate-card__actions">
                 <div className="security-gate-status">
-                  <span className="security-status-label">Status:</span>
+                  <span className="security-status-label">{t("recipient.security.status")}</span>
                   <span
                     className={`security-status-badge ${isSecurityGateEnabled ? "security-status-badge--active" : "security-status-badge--inactive"}`}
                     aria-live="polite"
                     role="status"
-                    aria-label={`Local Security Gate status: ${isSecurityGateEnabled ? "Active" : "Disabled"}`}
+                    aria-label={t("recipient.security.statusAria", { status: isSecurityGateEnabled ? t("recipient.security.active") : t("recipient.security.disabled") })}
                   >
-                    {isSecurityGateEnabled ? "Active" : "Disabled"}
+                    {isSecurityGateEnabled ? t("recipient.security.active") : t("recipient.security.disabled")}
                   </span>
                 </div>
                 <button
@@ -717,16 +717,16 @@ export default function Recipient() {
                   className={`streams-primary-button security-gate-toggle-btn ${isSecurityGateEnabled ? "danger" : ""}`}
                   onClick={handleToggleSecurityGate}
                 >
-                  {isSecurityGateEnabled ? "Disable" : "Enable"}
+                  {isSecurityGateEnabled ? t("recipient.security.disable") : t("recipient.security.enable")}
                 </button>
                 {isSecurityGateEnabled && (
                   <button
                     type="button"
                     className="security-gate-pin-btn"
                     onClick={handleUpdatePIN}
-                    aria-label="Update backup PIN"
+                    aria-label={t("recipient.security.updatePinAria")}
                   >
-                    <Key size={14} aria-hidden="true" /> Update PIN
+                    <Key size={14} aria-hidden="true" /> {t("recipient.security.updatePin")}
                   </button>
                 )}
               </div>
@@ -749,16 +749,14 @@ export default function Recipient() {
 
   return (
     <main className="streams-page">
-      <MetaTags title="Recipient" />
+      <MetaTags title={t("recipient.pageTitle")} />
       {/* ── Page Header (Hero) ── */}
       <section className="streams-hero">
         <div className="streams-hero__copy">
-          <p className="streams-eyebrow">Recipient Portal</p>
-          <h1>Your streams</h1>
+          <p className="streams-eyebrow">{t("recipient.hero.eyebrow")}</p>
+          <h1>{t("recipient.heading")}</h1>
           <p className="streams-subtitle">
-            Manage your incoming streams, track accrued balances, and withdraw
-            USDC in real-time. Your accumulated balance is available for instant
-            withdrawal to your connected wallet.
+            {t("recipient.hero.description")}
           </p>
           {(errorMsg || networkMismatch) && (
             <p
@@ -798,28 +796,28 @@ export default function Recipient() {
       )}
 
       {/* ── Overview Metrics ── */}
-      <section className="streams-summary-grid" aria-label="Stream summary">
+      <section className="streams-summary-grid" aria-label={t("recipient.metrics.aria")}>
         <div className="streams-summary-card">
-          <span>Active streams</span>
+          <span>{t("recipient.metrics.active")}</span>
           <strong>{activeStreams}</strong>
-          <p>Currently accruing funds for your wallet.</p>
+          <p>{t("recipient.metrics.activeDescription")}</p>
         </div>
         <div className="streams-summary-card">
-          <span>Total Accrued</span>
+          <span>{t("recipient.metrics.accrued")}</span>
           <strong>{formatAssetAmount(totalAccrued, "USDC")}</strong>
-          <p>Total amount earned over the lifetime of all streams.</p>
+          <p>{t("recipient.metrics.accruedDescription")}</p>
         </div>
         <div className="streams-summary-card">
-          <span>Withdrawn</span>
+          <span>{t("recipient.metrics.withdrawn")}</span>
           <strong>{formatAssetAmount(totalWithdrawn, "USDC")}</strong>
-          <p>Total funds already transferred to your wallet.</p>
+          <p>{t("recipient.metrics.withdrawnDescription")}</p>
         </div>
         <div className="streams-summary-card">
-          <span>Withdrawable now</span>
+          <span>{t("recipient.metrics.withdrawable")}</span>
           <strong style={{ color: "var(--accent)" }}>
             {formatAssetAmount(balance, "USDC")}
           </strong>
-          <p>Available for immediate withdrawal.</p>
+          <p>{t("recipient.metrics.withdrawableDescription")}</p>
         </div>
       </section>
 
@@ -831,8 +829,8 @@ export default function Recipient() {
         aria-labelledby="stream-alerts-title"
       >
         <div>
-          <p className="recipient-alerts-eyebrow">Optional alerts</p>
-          <h2 id="stream-alerts-title">Know when your stream changes</h2>
+          <p className="recipient-alerts-eyebrow">{t("recipient.alerts.eyebrow")}</p>
+          <h2 id="stream-alerts-title">{t("recipient.alerts.title")}</h2>
           <p>
             Get a browser notification when a cliff passes, a stream is fully
             accrued, or a new stream arrives.

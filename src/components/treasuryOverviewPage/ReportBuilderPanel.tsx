@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Stream } from "./Stream";
+import { Stream, StreamStatus } from "./Stream";
 import { useToast } from "../toast/ToastProvider";
 import {
   filterStreamsByDateRange,
@@ -8,6 +8,18 @@ import {
   printReportAsPDF,
   validateReportDateRange,
 } from "../../utils/reportExporter";
+import {
+  MAX_REPORT_PRESETS,
+  RELATIVE_DATE_RANGE_OPTIONS,
+  applyReportPreset,
+  deleteReportPreset,
+  loadReportPresets,
+  renameReportPreset,
+  resolvePresetDateRange,
+  saveReportPreset,
+  type RelativeDateRange,
+  type ReportPreset,
+} from "../../lib/reportPresets";
 
 export interface ReportBuilderPanelProps {
   streams: Stream[];
@@ -19,6 +31,7 @@ export type Grouping = "None" | "Recipient" | "Status";
 export type ExportFormat = "CSV" | "PDF";
 
 const FIELD_ORDER: Field[] = ["name", "recipient", "rate", "accruedAmount", "status"];
+const STATUS_OPTIONS: StreamStatus[] = ["Active", "Paused", "Completed"];
 
 const allFields: { key: Field; label: string }[] = [
   { key: "name", label: "Name" },
@@ -31,17 +44,29 @@ const allFields: { key: Field; label: string }[] = [
 export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPanelProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [relativeDateRange, setRelativeDateRange] = useState<RelativeDateRange | "">("");
   const [selectedFields, setSelectedFields] = useState<Set<Field>>(
     new Set(["name", "recipient", "rate", "status"])
   );
+  const [statusFilters, setStatusFilters] = useState<Set<StreamStatus>>(new Set());
   const [grouping, setGrouping] = useState<Grouping>("None");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("CSV");
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [dateError, setDateError] = useState("");
   const [exportError, setExportError] = useState(false);
+
+  // Saved presets state
+  const [presets, setPresets] = useState<ReportPreset[]>(() => loadReportPresets());
+  const [activePresetId, setActivePresetId] = useState<string>("");
+  const [presetMode, setPresetMode] = useState<"idle" | "saving" | "renaming">("idle");
+  const [presetNameInput, setPresetNameInput] = useState("");
+  const [presetError, setPresetError] = useState("");
+  const [presetAnnouncement, setPresetAnnouncement] = useState("");
+
   const { addToast } = useToast();
   const panelRef = useRef<HTMLDivElement>(null);
+  const presetInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
 
   // Track mounted state for safe async state updates
@@ -52,6 +77,13 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     };
   }, []);
 
+  // Focus preset name input when entering save or rename mode
+  useEffect(() => {
+    if (presetMode !== "idle") {
+      presetInputRef.current?.focus();
+    }
+  }, [presetMode]);
+
   const handleFieldToggle = useCallback((field: Field) => {
     setSelectedFields((prev) => {
       const next = new Set(prev);
@@ -59,6 +91,34 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
       else next.add(field);
       return next;
     });
+  }, []);
+
+  const handleStatusToggle = useCallback((status: StreamStatus) => {
+    setStatusFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }, []);
+
+  const handleRelativeDateRangeChange = useCallback((value: RelativeDateRange | "") => {
+    setRelativeDateRange(value);
+    if (value) {
+      const resolved = resolvePresetDateRange({ type: "relative", range: value });
+      setStartDate(resolved.startDate);
+      setEndDate(resolved.endDate);
+    }
+  }, []);
+
+  const handleStartDateChange = useCallback((value: string) => {
+    setRelativeDateRange("");
+    setStartDate(value);
+  }, []);
+
+  const handleEndDateChange = useCallback((value: string) => {
+    setRelativeDateRange("");
+    setEndDate(value);
   }, []);
 
   // Validate date range
@@ -76,18 +136,26 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
       }
     });
     return () => cancelAnimationFrame(rafId);
-  }, [startDate, endDate, selectedFields, grouping]);
+  }, [startDate, endDate, selectedFields, statusFilters, grouping]);
 
-  // Keyboard handler: Escape to close
+  // Keyboard handler: Escape cancels inline preset form first, otherwise closes panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isExporting) {
-        onClose();
+      if (e.key === "Escape") {
+        if (presetMode !== "idle") {
+          setPresetMode("idle");
+          setPresetNameInput("");
+          setPresetError("");
+          return;
+        }
+        if (!isExporting) {
+          onClose();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isExporting]);
+  }, [onClose, isExporting, presetMode]);
 
   // Focus trap: focus the panel when mounted
   useEffect(() => {
@@ -96,11 +164,12 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
 
   const canExport = selectedFields.size > 0 && !dateError;
 
-  // Streams matching the selected date range; this is what actually gets exported.
-  const reportStreams = useMemo(
-    () => filterStreamsByDateRange(streams, startDate, endDate),
-    [streams, startDate, endDate]
-  );
+  // Streams matching the selected date range and status filters; this is what actually gets exported.
+  const reportStreams = useMemo(() => {
+    const dateFiltered = filterStreamsByDateRange(streams, startDate, endDate);
+    if (statusFilters.size === 0) return dateFiltered;
+    return dateFiltered.filter((s) => statusFilters.has(s.status));
+  }, [streams, startDate, endDate, statusFilters]);
 
   // Preview mirrors export: date-filtered streams in grouping order (no placeholder slice).
   const previewGroups = useMemo(
@@ -112,6 +181,136 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
     () => FIELD_ORDER.filter((f) => selectedFields.has(f)),
     [selectedFields]
   );
+
+  const activePreset = useMemo(
+    () => presets.find((p) => p.id === activePresetId) ?? null,
+    [presets, activePresetId]
+  );
+
+  const handleSelectPreset = useCallback(
+    (presetId: string) => {
+      setActivePresetId(presetId);
+      setPresetError("");
+      setPresetMode("idle");
+      if (!presetId) return;
+
+      const target = presets.find((p) => p.id === presetId);
+      if (!target) return;
+
+      const result = applyReportPreset(target);
+      if (result.error || !result.config) {
+        setPresetError(result.error ?? "Unable to apply preset.");
+        setPresetAnnouncement(result.error ?? "Unable to apply preset.");
+        return;
+      }
+
+      setStartDate(result.config.startDate);
+      setEndDate(result.config.endDate);
+      setRelativeDateRange(result.config.relativeRange);
+      setGrouping(result.config.grouping);
+      setSelectedFields(new Set(result.config.fields));
+      setStatusFilters(new Set(result.config.statusFilters));
+      setExportFormat(result.config.exportFormat);
+      setPresetAnnouncement(`Applied preset "${target.name}".`);
+    },
+    [presets]
+  );
+
+  const handleStartSavePreset = useCallback(() => {
+    setPresetError("");
+    setPresetNameInput("");
+    setPresetMode("saving");
+  }, []);
+
+  const handleStartRenamePreset = useCallback(() => {
+    if (!activePreset) return;
+    setPresetError("");
+    setPresetNameInput(activePreset.name);
+    setPresetMode("renaming");
+  }, [activePreset]);
+
+  const handleCancelPresetForm = useCallback(() => {
+    setPresetMode("idle");
+    setPresetNameInput("");
+    setPresetError("");
+  }, []);
+
+  const handleConfirmPresetForm = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      setPresetError("");
+
+      if (presetMode === "saving") {
+        if (!canExport) {
+          const msg = "Fix configuration errors before saving a preset.";
+          setPresetError(msg);
+          setPresetAnnouncement(msg);
+          return;
+        }
+        const dateRange = relativeDateRange
+          ? { type: "relative" as const, range: relativeDateRange }
+          : { type: "custom" as const, startDate, endDate };
+
+        const result = saveReportPreset(presetNameInput, {
+          dateRange,
+          grouping,
+          fields: orderedSelectedFields,
+          statusFilters: STATUS_OPTIONS.filter((s) => statusFilters.has(s)),
+          exportFormat,
+        });
+
+        if (result.error || !result.preset) {
+          setPresetError(result.error ?? "Failed to save preset.");
+          setPresetAnnouncement(result.error ?? "Failed to save preset.");
+          return;
+        }
+
+        setPresets(result.presets);
+        setActivePresetId(result.preset.id);
+        setPresetMode("idle");
+        setPresetNameInput("");
+        setPresetAnnouncement(`Saved preset "${result.preset.name}".`);
+      } else if (presetMode === "renaming" && activePreset) {
+        const result = renameReportPreset(activePreset.id, presetNameInput);
+        if (result.error || !result.preset) {
+          setPresetError(result.error ?? "Failed to rename preset.");
+          setPresetAnnouncement(result.error ?? "Failed to rename preset.");
+          return;
+        }
+
+        setPresets(result.presets);
+        setPresetMode("idle");
+        setPresetNameInput("");
+        setPresetAnnouncement(`Renamed preset to "${result.preset.name}".`);
+      }
+    },
+    [
+      presetMode,
+      canExport,
+      relativeDateRange,
+      startDate,
+      endDate,
+      grouping,
+      orderedSelectedFields,
+      statusFilters,
+      exportFormat,
+      presetNameInput,
+      activePreset,
+    ]
+  );
+
+  const handleDeletePreset = useCallback(() => {
+    if (!activePreset) return;
+    const deletedName = activePreset.name;
+    const result = deleteReportPreset(activePreset.id);
+    if (result.deleted) {
+      setPresets(result.presets);
+      setActivePresetId("");
+      setPresetMode("idle");
+      setPresetError("");
+      setPresetAnnouncement(`Deleted preset "${deletedName}".`);
+    }
+  }, [activePreset]);
 
   const handleExport = useCallback(() => {
     if (!canExport) return;
@@ -164,8 +363,175 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
         </button>
       </div>
 
+      <section
+        aria-label="Report presets"
+        className="mb-6 p-4 rounded-md"
+        style={{
+          backgroundColor: "var(--color-surface-raised)",
+          border: "1px solid var(--color-border-default)",
+        }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <label
+              className="block text-sm font-medium text-[var(--color-text-primary)] mb-1"
+              htmlFor="report-preset-select"
+            >
+              Saved Presets ({presets.length}/{MAX_REPORT_PRESETS})
+            </label>
+            <select
+              id="report-preset-select"
+              value={activePresetId}
+              onChange={(e) => handleSelectPreset(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+              style={{
+                borderColor: "var(--color-border-default)",
+                backgroundColor: "var(--color-bg-primary)",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              <option value="">
+                {presets.length === 0 ? "No saved presets" : "Select a preset..."}
+              </option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleStartSavePreset}
+              disabled={!canExport || presets.length >= MAX_REPORT_PRESETS}
+              className="px-3 py-2 text-sm font-medium rounded-md border disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+              style={{
+                borderColor: "var(--color-border-default)",
+                backgroundColor: "var(--color-bg-primary)",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Save Preset
+            </button>
+            {activePreset && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleStartRenamePreset}
+                  className="px-3 py-2 text-sm font-medium rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                  style={{
+                    borderColor: "var(--color-border-default)",
+                    backgroundColor: "var(--color-bg-primary)",
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeletePreset}
+                  className="px-3 py-2 text-sm font-medium rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                  style={{
+                    borderColor: "var(--color-error-border)",
+                    backgroundColor: "var(--color-bg-primary)",
+                    color: "var(--color-error-text)",
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {presetMode !== "idle" && (
+          <form onSubmit={handleConfirmPresetForm} className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+            <div className="flex-1">
+              <label
+                htmlFor="preset-name-input"
+                className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1"
+              >
+                {presetMode === "saving" ? "New preset name" : "Rename preset"}
+              </label>
+              <input
+                ref={presetInputRef}
+                id="preset-name-input"
+                type="text"
+                value={presetNameInput}
+                onChange={(e) => setPresetNameInput(e.target.value)}
+                placeholder="e.g. Monthly Active Streams"
+                aria-invalid={!!presetError}
+                aria-describedby={presetError ? "preset-error" : undefined}
+                className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                style={{
+                  borderColor: presetError ? "var(--color-error-border)" : "var(--color-border-default)",
+                  backgroundColor: "var(--color-bg-primary)",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="px-3 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                style={{ backgroundColor: "var(--color-accent-primary)" }}
+              >
+                {presetMode === "saving" ? "Confirm Save" : "Confirm Rename"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelPresetForm}
+                className="px-3 py-2 text-sm font-medium rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                style={{
+                  borderColor: "var(--color-border-default)",
+                  backgroundColor: "var(--color-bg-primary)",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {presetError && (
+          <p id="preset-error" role="alert" className="mt-2 text-sm" style={{ color: "var(--color-error-text)" }}>
+            {presetError}
+          </p>
+        )}
+
+        <div role="status" aria-live="polite" className="sr-only">
+          {presetAnnouncement}
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="relativeDateRange">
+              Date Range Preset
+            </label>
+            <select
+              id="relativeDateRange"
+              value={relativeDateRange}
+              onChange={(e) => handleRelativeDateRangeChange(e.target.value as RelativeDateRange | "")}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+              style={{
+                borderColor: "var(--color-border-default)",
+                backgroundColor: "var(--color-bg-primary)",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              <option value="">Custom</option>
+              {RELATIVE_DATE_RANGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-1" htmlFor="startDate">
               Start Date
@@ -174,7 +540,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               type="date"
               id="startDate"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => handleStartDateChange(e.target.value)}
               aria-invalid={!!dateError}
               aria-describedby={dateError ? "date-error" : undefined}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
@@ -189,7 +555,7 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               type="date"
               id="endDate"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => handleEndDateChange(e.target.value)}
               aria-invalid={!!dateError}
               aria-describedby={dateError ? "date-error" : undefined}
               className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
@@ -236,6 +602,31 @@ export default function ReportBuilderPanel({ streams, onClose }: ReportBuilderPa
               <option value="Recipient">By Recipient</option>
               <option value="Status">By Status</option>
             </select>
+          </div>
+
+          <div>
+            <span className="block text-sm font-medium text-[var(--color-text-primary)] mb-1">Status Filters</span>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Status filters">
+              {STATUS_OPTIONS.map((status) => {
+                const active = statusFilters.has(status);
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => handleStatusToggle(status)}
+                    className="px-3 py-1 text-xs font-medium rounded-full border focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
+                    style={{
+                      borderColor: active ? "var(--color-accent-primary)" : "var(--color-border-default)",
+                      backgroundColor: active ? "var(--color-accent-primary)" : "var(--color-bg-primary)",
+                      color: active ? "#ffffff" : "var(--color-text-secondary)",
+                    }}
+                  >
+                    {status}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>

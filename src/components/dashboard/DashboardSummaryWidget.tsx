@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { formatUsdc } from "../../lib/formatters";
+import { useI18n } from "../../i18n";
 
 /**
  * The treasury summary strip: three independent read-only cards.
@@ -27,6 +28,7 @@ export default function DashboardSummaryWidget({
   withdrawable,
   loading,
 }: DashboardSummaryWidgetProps) {
+  const { t } = useI18n();
   // Each card resolves on its own: the count needs only `streams`, and the
   // two amounts are already derived in the parent, so none of them wait on a
   // sibling widget. The placeholders below are the pre-existing dashboard
@@ -38,13 +40,13 @@ export default function DashboardSummaryWidget({
   return (
     <section
       data-widget="summary"
-      aria-label="Treasury summary"
+      aria-label={t("dashboard.summary.aria")}
       aria-busy={loading}
       style={cardGrid}
     >
-      <Card label="Active Streams" value={streamCountValue} />
-      <Card label="Total Streaming" value={totalStreamingValue} />
-      <Card label="Withdrawable" value={withdrawableValue} />
+      <Card label={t("dashboard.summary.activeStreams")} value={streamCountValue} />
+      <Card label={t("dashboard.summary.totalStreaming")} value={totalStreamingValue} />
+      <Card label={t("dashboard.summary.withdrawable")} value={withdrawableValue} />
     </section>
   );
 }
