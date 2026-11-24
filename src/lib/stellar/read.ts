@@ -1,5 +1,4 @@
 import {
-  Address,
   Contract,
   Networks,
   TransactionBuilder,
@@ -40,6 +39,12 @@ function asBigInt(value: unknown): bigint | null {
   return null;
 }
 
+function decimalToStroops(value: string): bigint | null {
+  const match = /^(\\d+)(?:\\.(\\d{1,7}))?$/.exec(value);
+  if (!match) return null;
+  return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
+}
+
 function dateToSeconds(value: string): bigint | null {
   const milliseconds = Date.parse(value);
   return Number.isFinite(milliseconds)
@@ -75,9 +80,11 @@ export function compareStreamWithContract(
   compareValue(mismatches, "sender", api.treasuryAddress, field(chain, "sender"));
   compareValue(mismatches, "recipient", api.recipientAddress, field(chain, "recipient"));
 
-  const deposit = Number.isFinite(api.depositAmount)
-    ? BigInt(Math.round(api.depositAmount * 10_000_000))
-    : null;
+  const deposit = api.depositAmountRaw
+    ? decimalToStroops(api.depositAmountRaw)
+    : Number.isSafeInteger(api.depositAmount * 10_000_000)
+      ? BigInt(Math.round(api.depositAmount * 10_000_000))
+      : null;
   const chainDeposit = asBigInt(field(chain, "deposited"));
   if (deposit !== null && chainDeposit !== null && deposit !== chainDeposit) {
     mismatches.push({

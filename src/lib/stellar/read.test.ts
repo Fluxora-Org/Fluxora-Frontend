@@ -13,7 +13,8 @@ const api = {
   asset: "USDC",
   status: "Active",
   monthlyRate: 1,
-  depositAmount: 9_007_199_254.740991,
+  depositAmount: 90_071_992_547.40991,
+  depositAmountRaw: "90071992547.4099100",
   streamedAmount: 0,
   withdrawableAmount: 0,
   remainingAmount: 9_007_199_254.740991,
@@ -33,7 +34,7 @@ describe("compareStreamWithContract", () => {
     const result = compareStreamWithContract(api, {
       sender: "GSENDER",
       recipient: "GRECIPIENT",
-      deposited: "900719925474099100",
+      deposited: "9007199254740991000",
       start_time: "1767225600",
       end_time: "1769904000",
       status: 0,

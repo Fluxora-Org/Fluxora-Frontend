@@ -18,6 +18,8 @@ export interface StreamRecord {
   id: string;
   /** Numeric Soroban contract stream ID. Never infer this from the API/event ID. */
   onChainStreamId?: string;
+  /** Exact decimal API representation, retained for lossless on-chain amount checks. */
+  depositAmountRaw?: string;
   /** Only explicitly public streams may expose stream fields in OG images. */
   public?: boolean;
   /** Non-empty friendly name of the stream */
@@ -362,6 +364,7 @@ export function normalizeStreamRecord(raw: unknown): StreamRecord {
   return {
     id: readString(source.id),
     onChainStreamId: readOnChainStreamId(source),
+    depositAmountRaw: typeof source.depositAmount === "string" && /^\\d+(?:\\.\\d+)?$/.test(source.depositAmount.trim()) ? source.depositAmount.trim() : undefined,
     name: readString(source.name, "Untitled stream"),
     recipientName: readString(source.recipientName, "Unknown recipient"),
     recipientAddress: sanitizeStellarAddress(source.recipientAddress),
