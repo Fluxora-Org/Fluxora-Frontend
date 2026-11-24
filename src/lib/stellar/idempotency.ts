@@ -20,10 +20,10 @@ export function generateIdempotencyKey(): string {
 export function savePendingTx(
   params: Record<string, unknown> = {},
   txHash: string | null = null,
+  idempotencyKey: string = generateIdempotencyKey(),
 ): string {
-  const key = generateIdempotencyKey();
   const pending: PendingTransaction = {
-    idempotencyKey: key,
+    idempotencyKey,
     txHash,
     params,
     createdAt: Date.now(),
@@ -33,7 +33,7 @@ export function savePendingTx(
   } catch {
     // sessionStorage may be unavailable in some environments
   }
-  return key;
+  return idempotencyKey;
 }
 
 export function loadPendingTx(): PendingTransaction | null {
