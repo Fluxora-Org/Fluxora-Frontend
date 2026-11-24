@@ -283,7 +283,8 @@ export function useTransactionSubmission(
       }
       // Submission errors (e.g. wallet rejection) do not have a txHash
       // to resolve, so we skip onResolved here.
-      throw new Error(message);
+      // @ts-expect-error ES2022 ErrorOptions ({ cause }) is supported at runtime; tsconfig lib is ES2020.
+      throw new Error(message, { cause: err });
     }
   }, [clearPendingTx, params, poll, reconcileAndResume, submit]);
 

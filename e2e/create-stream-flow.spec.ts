@@ -165,7 +165,7 @@ async function stubSorobanRpc(page: Page): Promise<void> {
       | { method?: string }
       | null;
     const method = body?.method;
-    let result: Record<string, unknown> = {};
+    let result: Record<string, unknown>;
 
     switch (method) {
       case "getLatestLedger":

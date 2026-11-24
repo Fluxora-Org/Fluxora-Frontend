@@ -47,7 +47,7 @@ async function stubConnectedWallet(page: Page) {
           error: "",
         };
 
-        let payload: Record<string, unknown> = {};
+        let payload: Record<string, unknown>;
         switch (data.type) {
           case "REQUEST_CONNECTION_STATUS":
             payload = { isConnected: true };

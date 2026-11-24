@@ -51,7 +51,7 @@ const EDGE_W_MIN = 1;
 const EDGE_W_MAX = 7;
 
 function rateVal(rate: string): number {
-  const n = parseFloat(rate.replace(/[^0-9.\-]/g, ""));
+  const n = parseFloat(rate.replace(/[^0-9.-]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
