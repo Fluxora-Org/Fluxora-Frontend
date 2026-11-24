@@ -111,6 +111,8 @@ describe("useRouteFocus — AC1: focus placement on route change", () => {
     // Navigate to Dashboard
     await act(async () => {
       getByRole("link", { name: "Dashboard" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf(); // second rAF removes tmp tabIndex
     });
@@ -124,6 +126,8 @@ describe("useRouteFocus — AC1: focus placement on route change", () => {
 
     await act(async () => {
       getByRole("link", { name: "Streams" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -137,6 +141,8 @@ describe("useRouteFocus — AC1: focus placement on route change", () => {
 
     await act(async () => {
       getByRole("link", { name: "Recipient" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -150,6 +156,8 @@ describe("useRouteFocus — AC1: focus placement on route change", () => {
 
     await act(async () => {
       getByRole("link", { name: "Treasury" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -187,6 +195,8 @@ describe("useRouteFocus — AC1: focus placement on route change", () => {
 
     await act(async () => {
       getByRole("button", { name: "Go" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -209,6 +219,8 @@ describe("useRouteFocus — AC2: route change announcement", () => {
 
     await act(async () => {
       getByRole("link", { name: "Streams" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -223,6 +235,8 @@ describe("useRouteFocus — AC2: route change announcement", () => {
 
     await act(async () => {
       getByRole("link", { name: "Recipient" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -286,6 +300,8 @@ describe("useRouteFocus — AC3: focus on back navigation", () => {
     // Navigate forward to Streams
     await act(async () => {
       getByRole("button", { name: "Go to Streams" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -297,6 +313,8 @@ describe("useRouteFocus — AC3: focus on back navigation", () => {
     // Navigate back to Dashboard
     await act(async () => {
       getByRole("button", { name: "Back" }).click();
+    });
+    act(() => {
       flushRaf();
       flushRaf();
     });
@@ -323,6 +341,8 @@ describe("useRouteFocus — AC4: focus placement across multiple routes", () => 
 
       await act(async () => {
         getByRole("link", { name: link }).click();
+      });
+      act(() => {
         flushRaf();
         flushRaf();
       });

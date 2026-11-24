@@ -1,39 +1,49 @@
 import { test, expect } from '@playwright/test';
 
 test('landing page hero renders without layout shift', async ({ page }) => {
-  let cls = 0;
-  page.on('console', msg => console.log(msg.text()));
+  await page.addInitScript(() => {
+    const target = window as Window & { __landingCls?: number };
+    target.__landingCls = 0;
 
-  await page.goto('/', { waitUntil: 'networkidle' });
-  
-  await page.waitForTimeout(2000);
+    let sessionValue = 0;
+    let sessionStart: number | undefined;
+    let previousEntryTime = 0;
 
-  const clsScore = await page.evaluate(() => {
-    return new Promise<number>((resolve) => {
-      let clsValue = 0;
-      if (!window.PerformanceObserver) {
-        resolve(0);
-        return;
-      }
-      const observer = new PerformanceObserver((entryList) => {
-        for (const entry of entryList.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            clsValue += (entry as any).value;
-          }
+    new PerformanceObserver((entryList) => {
+      for (const entry of entryList.getEntries()) {
+        const shift = entry as PerformanceEntry & {
+          hadRecentInput: boolean;
+          value: number;
+        };
+        if (shift.hadRecentInput) continue;
+
+        if (
+          sessionStart === undefined ||
+          shift.startTime - previousEntryTime >= 1_000 ||
+          shift.startTime - sessionStart > 5_000
+        ) {
+          sessionValue = 0;
+          sessionStart = shift.startTime;
         }
-      });
-      try {
-        observer.observe({ type: 'layout-shift', buffered: true });
-        setTimeout(() => {
-          observer.disconnect();
-          resolve(clsValue);
-        }, 500);
-      } catch (e) {
-        resolve(0);
+
+        sessionValue += shift.value;
+        target.__landingCls = Math.max(target.__landingCls ?? 0, sessionValue);
+        previousEntryTime = shift.startTime;
       }
-    });
+    }).observe({ type: 'layout-shift', buffered: true });
   });
 
-  console.log('CLS Score:', clsScore);
+  await page.goto('/', { waitUntil: 'load' });
+  await expect(
+    page.getByRole('heading', { level: 1, name: /the future of/i }),
+  ).toBeVisible();
+  await page.waitForTimeout(2_000);
+
+  const clsScore = await page.evaluate(
+    () => (window as Window & { __landingCls?: number }).__landingCls,
+  );
+  if (clsScore === undefined) {
+    throw new Error('The browser did not report cumulative layout shift');
+  }
   expect(clsScore).toBeLessThanOrEqual(0.1);
 });
