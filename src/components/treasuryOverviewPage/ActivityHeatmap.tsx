@@ -51,14 +51,11 @@ const HeatmapTooltip: React.FC<HeatmapTooltipProps> = ({ activeCell, content }) 
     }
 
     // Compute standard positions relative to viewport (fixed)
-    let tooltipLeft = trigger.left + trigger.width / 2 - tooltipWidth / 2;
-    let tooltipTop = 0;
-
-    if (bestPosition === "top") {
-      tooltipTop = trigger.top - 8 - tooltipHeight;
-    } else {
-      tooltipTop = trigger.bottom + 8;
-    }
+    const tooltipLeft = trigger.left + trigger.width / 2 - tooltipWidth / 2;
+    const tooltipTop =
+      bestPosition === "top"
+        ? trigger.top - 8 - tooltipHeight
+        : trigger.bottom + 8;
 
     // Keep inside viewport with safety margin
     const safetyMargin = 12;

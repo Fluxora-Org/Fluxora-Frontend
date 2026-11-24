@@ -11,6 +11,7 @@ import {
   contrastRatio,
   isValidHex,
   normaliseHex,
+  ALLOWED_TOKEN_KEYS,
   LOCKED_TOKEN_KEYS,
   CONTRAST_PAIRS,
   WCAG_AA_NORMAL,
@@ -45,6 +46,8 @@ export const MAX_TOKEN_KEY_LENGTH = 128;
 export const MAX_TOKEN_VALUE_LENGTH = 1024;
 export const MAX_LABEL_LENGTH = 256;
 export const MAX_THEME_ID_LENGTH = 128;
+export const MAX_THEME_IMPORT_BYTES = 32 * 1024;
+export const THEME_FILE_VERSION = 1;
 
 function isJsonValue(value: unknown, seen: Set<object>): boolean {
   if (
@@ -1229,4 +1232,98 @@ export function validateThemeDraft(params: {
     ok: true,
     definition: buildCustomThemeDefinition(themeId, label, draft),
   };
+}
+
+function assertValidThemeTokens(tokens: unknown): asserts tokens is ThemeEditorDraft {
+  if (
+    tokens === null ||
+    typeof tokens !== "object" ||
+    Array.isArray(tokens)
+  ) {
+    throw new Error("Theme tokens must be a JSON object.");
+  }
+
+  const entries = Object.entries(tokens);
+  if (entries.length === 0) {
+    throw new Error("Theme file must include at least one token.");
+  }
+
+  for (const [key, value] of entries) {
+    if (!ALLOWED_TOKEN_KEYS.some((allowedKey) => allowedKey === key)) {
+      throw new Error(`Unknown theme token "${key}".`);
+    }
+    if (typeof value !== "string") {
+      throw new Error(`Theme token "${key}" must be a colour string.`);
+    }
+
+    const format = validateColorFormat(value);
+    if (!format.isValid) {
+      throw new Error(`Invalid theme token "${key}": ${format.message}`);
+    }
+  }
+
+  const validation = validateThemeDraft({
+    themeId: "imported-theme",
+    label: "Imported theme",
+    draft: tokens as ThemeEditorDraft,
+  });
+  if (!validation.ok) {
+    throw new Error(
+      `Theme palette is invalid: ${validation.errors.map((error) => error.message).join(" ")}`,
+    );
+  }
+}
+
+/**
+ * Serializes a validated theme palette into the versioned interchange format.
+ */
+export function exportThemeTokens(tokens: ThemeEditorDraft): string {
+  assertValidThemeTokens(tokens);
+  const serialized = JSON.stringify(
+    { version: THEME_FILE_VERSION, tokens },
+    null,
+    2,
+  );
+  if (new TextEncoder().encode(serialized).byteLength > MAX_THEME_IMPORT_BYTES) {
+    throw new Error(
+      `Theme file exceeds the maximum size of ${MAX_THEME_IMPORT_BYTES} bytes.`,
+    );
+  }
+  return serialized;
+}
+
+/**
+ * Parses and validates a complete versioned theme file before returning tokens.
+ */
+export function importThemeTokens(payload: string): ThemeEditorDraft {
+  if (typeof payload !== "string") {
+    throw new Error("Theme file contents must be text.");
+  }
+  if (new TextEncoder().encode(payload).byteLength > MAX_THEME_IMPORT_BYTES) {
+    throw new Error(
+      `Theme file exceeds the maximum size of ${MAX_THEME_IMPORT_BYTES} bytes.`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    throw new Error("Theme file is not valid JSON.");
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Theme file must contain a JSON object.");
+  }
+
+  const file = parsed as Record<string, unknown>;
+  if (Object.keys(file).some((key) => key !== "version" && key !== "tokens")) {
+    throw new Error("Theme file contains an unknown property.");
+  }
+  if (file.version !== THEME_FILE_VERSION) {
+    throw new Error(`Unsupported theme file version "${String(file.version)}".`);
+  }
+
+  assertValidThemeTokens(file.tokens);
+  return { ...file.tokens };
 }

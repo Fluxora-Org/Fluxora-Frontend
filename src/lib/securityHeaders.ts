@@ -115,6 +115,36 @@ export const SECURITY_HEADERS: Record<string, string> = {
 };
 
 /**
+ * Embed widget CSP: the /embed/streams/* route must be frameable by host
+ * sites, so frame-ancestors is relaxed here. All other directives stay the same.
+ * X-Frame-Options is removed for this route because it cannot express an
+ * allow-list and would override frame-ancestors in legacy browsers.
+ */
+export const EMBED_CSP_DIRECTIVES = CSP_DIRECTIVES.replace(
+  "frame-ancestors 'none';",
+  "frame-ancestors *;"
+);
+
+/**
+ * Headers for the embed route: identical to SECURITY_HEADERS except for the
+ * CSP frame-ancestors directive and the absence of X-Frame-Options.
+ */
+export const EMBED_SECURITY_HEADERS: Record<string, string> = Object.fromEntries(
+  Object.entries(SECURITY_HEADERS).filter(([key]) => key !== "X-Frame-Options").map(
+    ([key, value]) =>
+      key === "Content-Security-Policy" ? [key, EMBED_CSP_DIRECTIVES] : [key, value]
+  )
+);
+
+/**
+ * Production-only HSTS header. Must only be emitted over HTTPS (e.g. Vercel
+ * production deployments), never by the local preview/dev server.
+ */
+export const HSTS_HEADER: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+};
+
+/**
  * Returns a new header record with every SECURITY_HEADERS entry merged into
  * the provided base object. Existing keys in `base` are NOT overwritten so
  * callers may pre-set headers that need to be different for specific routes

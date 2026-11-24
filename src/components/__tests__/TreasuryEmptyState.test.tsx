@@ -126,13 +126,16 @@ describe("TreasuryEmptyState — prop forwarding contract", () => {
         onRetry={onRetry}
       />
     );
-    // Verify variant is treasury
-    expect(screen.getByRole("region", { name: "Treasury empty state" })).toBeInTheDocument();
-    // Verify walletConnected is forwarded (shows Create stream CTA)
-    expect(screen.getByRole("button", { name: "Create stream" })).toBeInTheDocument();
-    // Verify error is forwarded
-    expect(screen.getByText("Test error")).toBeInTheDocument();
-    // Verify onRetry is forwarded (retry button exists)
+    // When error is set, EmptyState renders the distinct error state rather than the empty treasury state
+    expect(screen.getByRole("region", { name: "Error state" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Treasury empty state" })).not.toBeInTheDocument();
+    // Verify walletConnected=true is forwarded (connected error description)
+    expect(screen.getByText(/this may be a temporary issue/i)).toBeInTheDocument();
+    // Verify error is forwarded in an alert banner
+    expect(screen.getByRole("alert")).toHaveTextContent("Test error");
+    // Verify onRetry is forwarded (retry button exists) and error CTA replaces Create stream
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create stream" })).not.toBeInTheDocument();
   });
 });

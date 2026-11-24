@@ -113,8 +113,8 @@ export function groupStreams(
 }
 
 function escapeCsvCell(value: string): string {
-  const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  if (/[",\n]/.test(safeValue)) {
+  const safeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  if (/[",\n\r]/.test(safeValue)) {
     return `"${safeValue.replace(/"/g, '""')}"`;
   }
   return safeValue;

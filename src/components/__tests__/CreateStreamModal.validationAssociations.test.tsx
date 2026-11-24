@@ -20,7 +20,7 @@ describe("CreateStreamModal field descriptions", () => {
       );
       selectSingleStreamInContainer(container);
       const dialog = screen.getByRole("dialog", { name: /create stream/i });
-      fireEvent.change(within(dialog).getByLabelText(/recipient/i), {
+      fireEvent.change(within(dialog).getByLabelText(/^recipient/i), {
         target: { value: RECIPIENT },
       });
       fireEvent.change(within(dialog).getByLabelText(/deposit amount/i), {

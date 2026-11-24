@@ -6,7 +6,8 @@ import './index.css'; /* Tailwind, design tokens, and global app styles */
 import './styles/accessibility.css'; /* Global focus management & a11y */
 import { HelmetProvider } from 'react-helmet-async';
 import { isSupportedBrowser } from './lib/browserSupport';
-import { config, configError } from './lib/config';
+import { config, configError, describeConfigForLog } from './lib/config';
+import { logger } from './lib/logger';
 import { initWebVitals } from './lib/webVitals';
 
 const root = document.getElementById('root')!;
@@ -19,7 +20,7 @@ if (configError) {
 }
 
 if (import.meta.env.DEV) {
-  console.log('[Startup] Active configuration:', config);
+  logger.debug('[Startup] Active configuration', describeConfigForLog(config));
 }
 
 if (!isSupportedBrowser(navigator.userAgent)) {

@@ -66,10 +66,11 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     try {
       await navigator.clipboard.writeText(text);
       return true;
-    } catch {
+    } catch (error) {
       // The Clipboard API can reject with NotAllowedError (e.g. permission
-      // denied / insecure context). Treat that as a failure rather than
-      // silently retrying a fallback that would likely also be blocked.
+      // denied / insecure context). Surface the failure to the caller instead
+      // of swallowing it; do not retry a fallback that would likely be blocked.
+      console.error("[useClipboard] clipboard write failed", error);
       return false;
     }
   }

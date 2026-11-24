@@ -35,14 +35,14 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number];
 /** The step a user starts on when there is no valid persisted progress. */
 export const ONBOARDING_INITIAL_STEP: OnboardingStepId = ONBOARDING_STEPS[0];
 
-/** The step that marks the flow as finished. */
+/** The step from which the user completes the flow. */
 export const ONBOARDING_FINAL_STEP: OnboardingStepId =
   ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1];
 
 export interface OnboardingProgress {
   /** Current step id. Always one of {@link ONBOARDING_STEPS}. */
   step: OnboardingStepId;
-  /** True once the user has reached the final step and completed the flow. */
+  /** True once the user has completed the flow from the final step. */
   completed: boolean;
 }
 
@@ -217,10 +217,11 @@ export function writeOnboardingProgress(
 
 /**
  * Advances progress to the next step, or marks the flow complete when the
- * final step is reached.
+ * user advances from the final step.
  *
- * Completion is idempotent: calling this again on a completed flow returns an
- * equivalent, already-completed progress object.
+ * Reaching the final step is not completion: the user must still act on that
+ * step. Completion is idempotent — calling this again on a completed flow
+ * returns an equivalent, already-completed progress object.
  */
 export function advanceOnboardingProgress(
   progress: OnboardingProgress,
@@ -238,7 +239,7 @@ export function advanceOnboardingProgress(
 
   return {
     step: nextStep,
-    completed: nextStep === ONBOARDING_FINAL_STEP,
+    completed: false,
   };
 }
 
