@@ -469,6 +469,27 @@ export async function withdraw(
 }
 
 /**
+ * Tops up an existing stream on the Soroban smart contract, adding funds to
+ * its remaining balance.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications (types and 7-decimal scaling).
+ * @param sender - The Stellar address funding the top-up.
+ * @param streamId - The ID of the stream to top up.
+ * @param amount - The amount to add, scaled to 7 decimals (as a string).
+ */
+export async function topUpStream(
+  sender: string,
+  streamId: string,
+  amount: string
+): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  const args = [
+    encodeAddress(sender),
+    encodeU64(streamId),
+    encodeU64(amount),
+  ];
+  return await executeInvocation("top_up_stream", args);
+}
+
+/**
  * Pauses a stream on the Soroban smart contract.
  * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
  * @param sender - The Stellar address of the sender/owner.

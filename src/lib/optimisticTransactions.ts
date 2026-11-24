@@ -1,7 +1,7 @@
 /**
  * Centralized optimistic transaction store.
  *
- * Tracks in-flight operations (create, cancel, withdraw) and deterministically
+ * Tracks in-flight operations (create, cancel, withdraw, topup) and deterministically
  * resolves them to "confirmed" or "rolled-back" when the transaction lifecycle
  * completes. Rollback decisions are persisted to sessionStorage so a page
  * reload during polling never re-renders a stale optimistic row.
@@ -22,7 +22,7 @@ import type { StreamRecord } from "../data/streamRecords";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type OperationKind = "create" | "cancel" | "withdraw";
+export type OperationKind = "create" | "cancel" | "withdraw" | "topup";
 
 /**
  * Lifecycle of an optimistic operation.
@@ -50,6 +50,8 @@ export interface OptimisticOperation {
    * - For `create`: the optimistic `StreamRecord` to insert.
    * - For `cancel` / `withdraw`: the stream ID being acted on, plus any
    *   previous state needed to restore the row.
+   * - For `topup`: `streamId` plus `amount` — the canonical decimal display
+   *   string added to the stream's deposit/remaining balances while pending.
    */
   data: Record<string, unknown>;
   /** Timestamp when the operation was registered. */

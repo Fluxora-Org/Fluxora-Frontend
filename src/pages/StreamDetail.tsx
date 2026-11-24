@@ -15,6 +15,22 @@ import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
 import { Share2 } from "lucide-react";
+import { topUpStream } from "../lib/stellar/tx";
+import { useTransactionSubmission } from "../hooks/useTransactionSubmission";
+import { useOptimisticStreams } from "../hooks/useOptimisticStreams";
+import {
+  addOptimistic,
+  confirmOptimistic,
+  rollbackOptimistic,
+} from "../lib/optimisticTransactions";
+import InputWithUnit from "../components/InputWithUnit";
+import ValidationMessage from "../components/ValidationMessage";
+import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
+import {
+  amountToSmallestUnitsString,
+  parseAmountExact,
+} from "../lib/createStreamAmounts";
+import { compareAmountStrings } from "../lib/amountPrecision";
 
 /**
  * Stream status presentation
@@ -129,7 +145,7 @@ export default function StreamDetail() {
 
   const [isOgModalOpen, setIsOgModalOpen] = useState(false);
   const shareTriggerRef = useRef<HTMLButtonElement>(null);
-  const [stream, setStream] = useState<StreamRecord | null | undefined>(
+  const [serverStream, setServerStream] = useState<StreamRecord | null | undefined>(
     undefined,
   );
   const [error, setError] = useState<string | null>(null);
@@ -137,13 +153,150 @@ export default function StreamDetail() {
   const currentDate = useTickingNow({ precision: "minute" });
 
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
+  const [topUpValidationError, setTopUpValidationError] = useState<string | null>(null);
+  const { announcement, alertAnnouncement, announceStatus, announceAlert } =
+    useLiveAnnouncer();
+  // Ref to the in-flight optimistic top-up op so onResolved can confirm or
+  // roll it back once receipt polling reaches a terminal state.
+  const topUpOpIdRef = useRef<string | null>(null);
+  const prevTopUpTxStatusRef = useRef<string>("idle");
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a
   // still-pending older one before it has a chance to resolve and
   // overwrite state.
   const activeCancelRef = useRef<(() => void) | null>(null);
+
+  // Merge pending optimistic top-ups into the displayed record so the
+  // remaining balance reflects the submitted amount before the server
+  // refetch lands. Server record stays authoritative once the op resolves.
+  const { streams: optimisticStreams } = useOptimisticStreams({
+    streams: serverStream ? [serverStream] : [],
+  });
+
+  const txSubmission = useTransactionSubmission({
+    submit: async () => {
+      if (!accountId || !streamId) {
+        throw new Error(
+          "Connect your Stellar wallet and reload this stream before topping up.",
+        );
+      }
+      // The contract expects the amount in 7-decimal smallest units; the
+      // exact decimal string is converted without passing through `number`.
+      const amountSmallestUnits = amountToSmallestUnitsString(topUpAmount, 7);
+      const response = await topUpStream(accountId, streamId, amountSmallestUnits);
+      if (!response.txHash) {
+        throw new Error("Missing transaction hash from Stellar RPC.");
+      }
+      const op = addOptimistic(
+        "topup",
+        {
+          streamId,
+          amount: parseAmountExact(topUpAmount),
+          asset: serverStream?.asset ?? "USDC",
+        },
+        response.txHash,
+      );
+      topUpOpIdRef.current = op.id;
+      return { txHash: response.txHash };
+    },
+    params: { streamId, amount: topUpAmount },
+    onResolved: (outcome, resolvedTxHash) => {
+      const opId = topUpOpIdRef.current;
+      topUpOpIdRef.current = null;
+      if (outcome === "confirmed") {
+        if (opId) {
+          // Refetch the authoritative record first so the optimistic delta
+          // is replaced by server truth, then mark the op confirmed.
+          void (async () => {
+            try {
+              if (streamId) {
+                const fresh = await getStreamById(decodeURIComponent(streamId));
+                if (fresh) setServerStream(fresh);
+              }
+            } catch {
+              // A failed refetch must not block resolving the op — the
+              // confirmed transaction is authoritative on-chain.
+            } finally {
+              confirmOptimistic(opId);
+            }
+          })();
+        }
+      } else if (opId) {
+        rollbackOptimistic(opId, `Top-up ${outcome}: ${resolvedTxHash}`);
+      }
+    },
+  });
+
+  // Announce top-up lifecycle transitions to screen readers. Submission
+  // errors surface via the assertive region; progress stays polite.
+  useEffect(() => {
+    if (prevTopUpTxStatusRef.current === txSubmission.status) return;
+    prevTopUpTxStatusRef.current = txSubmission.status;
+    switch (txSubmission.status) {
+      case "submitting":
+        announceStatus("Top-up submitted. Waiting for confirmation.");
+        break;
+      case "pending":
+        announceStatus("Top-up transaction is pending confirmation.");
+        break;
+      case "confirmed":
+        announceStatus("Top-up confirmed.");
+        break;
+      case "failed":
+        announceAlert(txSubmission.error ?? "Top-up failed.");
+        break;
+      case "timeout":
+        announceAlert("Top-up confirmation timed out.");
+        break;
+      default:
+        break;
+    }
+  }, [txSubmission.status, txSubmission.error, announceStatus, announceAlert]);
+
+  const validateTopUpAmount = (): string | null => {
+    const exact = parseAmountExact(topUpAmount);
+    if (exact === "") {
+      return topUpAmount.trim() === ""
+        ? "Enter an amount to top up."
+        : "Enter a valid amount.";
+    }
+    if (compareAmountStrings(exact, "0") <= 0) {
+      return "Amount must be greater than zero.";
+    }
+    return null;
+  };
+
+  const handleTopUpSubmit = () => {
+    const validationError = validateTopUpAmount();
+    if (validationError) {
+      setTopUpValidationError(validationError);
+      announceAlert(validationError);
+      return;
+    }
+    if (!accountId) {
+      const message = "Connect your Stellar wallet to top up this stream.";
+      setTopUpValidationError(message);
+      announceAlert(message);
+      return;
+    }
+    setTopUpValidationError(null);
+    void txSubmission.submit().catch(() => {
+      // The hook records submission failures in txSubmission.error/status;
+      // this catch only prevents an unhandled rejection.
+    });
+  };
+
+  const topUpDisplayStatus: TransactionStatus =
+    txSubmission.status === "confirmed"
+      ? "confirmed"
+      : txSubmission.status === "timeout"
+        ? "timeout"
+        : txSubmission.status === "failed"
+          ? "rejected"
+          : txSubmission.status === "idle"
+            ? "idle"
+            : "pending";
 
   useEffect(() => {
     // In compare mode the individual panes manage their own fetches
@@ -153,7 +306,7 @@ export default function StreamDetail() {
     }
 
     if (!streamId) {
-      setStream(null);
+      setServerStream(null);
       setLoading(false);
       return;
     }
@@ -176,7 +329,7 @@ export default function StreamDetail() {
     getStreamById(decodeURIComponent(streamId), controller.signal)
       .then((result) => {
         if (!cancelled) {
-          setStream(result);
+          setServerStream(result);
           setLoading(false);
         }
         if (activeCancelRef.current === cancelThisFetch) {
@@ -252,7 +405,7 @@ export default function StreamDetail() {
   // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
     { label: "Streams", to: "/app/streams" },
-    { label: stream?.name ?? streamId ?? "Stream" },
+    { label: serverStream?.name ?? streamId ?? "Stream" },
   ];
 
   if (loading) {
@@ -297,7 +450,7 @@ export default function StreamDetail() {
       getStreamById(decodeURIComponent(streamId), controller.signal)
         .then((result) => {
           if (!cancelled) {
-            setStream(result);
+            setServerStream(result);
             setLoading(false);
           }
           if (activeCancelRef.current === cancelThisFetch) {
@@ -363,7 +516,7 @@ export default function StreamDetail() {
     );
   }
 
-  if (stream === null) {
+  if (serverStream === null) {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
         <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
@@ -403,12 +556,16 @@ export default function StreamDetail() {
     );
   }
 
-  if (!stream) {
+  if (!serverStream) {
     // Unreachable in practice: loading/error/null are handled above, so by
-    // this point `stream` is always a resolved StreamRecord. This guard only
+    // this point `serverStream` is always a resolved StreamRecord. This guard only
     // exists to satisfy TypeScript's control-flow narrowing across state.
     return null;
   }
+
+  // The record rendered below merges any pending optimistic top-up delta
+  // into the server-authoritative stream.
+  const stream: StreamRecord = optimisticStreams[0] ?? serverStream;
 
   const healthColor: Record<string, string> = {
     Healthy: "var(--color-success, #16a34a)",
@@ -421,6 +578,13 @@ export default function StreamDetail() {
   // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
+      {/* Screen-reader live regions for top-up status announcements. */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
+      </div>
       <Breadcrumb items={breadcrumbItems} />
       <MetaTags stream={stream} />
 
@@ -511,30 +675,49 @@ export default function StreamDetail() {
       </div>
 
       {/* Top-Up Flow */}
-      <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input
-            type="number"
-            aria-label="Top up amount"
-            placeholder="Amount"
-            value={topUpAmount}
-            onChange={(e) => setTopUpAmount(e.target.value)}
-            disabled={topUpStatus === "pending"}
-            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border, #e5e7eb)" }}
-          />
-          <button
-            onClick={() => {
-              setTopUpStatus("pending");
-              setTimeout(() => {
-                if (Number(topUpAmount) <= 0) {
-                  setTopUpStatus("rejected");
-                } else {
-                  setTopUpStatus("confirmed");
+      <section
+        aria-labelledby="top-up-heading"
+        data-testid="top-up-panel"
+        style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}
+      >
+        <h2 id="top-up-heading" style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+          <div style={{ flex: 1 }}>
+            <InputWithUnit
+              id="stream-detail-top-up-amount"
+              unit={stream.asset}
+              inputMode="decimal"
+              aria-label="Top up amount"
+              placeholder="0.00"
+              value={topUpAmount}
+              onChange={(e) => {
+                setTopUpAmount(e.target.value);
+                setTopUpValidationError(null);
+                // Editing the amount after a terminal state starts a fresh
+                // submission lifecycle on the next submit.
+                if (
+                  txSubmission.status === "confirmed" ||
+                  txSubmission.status === "failed" ||
+                  txSubmission.status === "timeout"
+                ) {
+                  txSubmission.reset();
                 }
-              }, 500);
-            }}
-            disabled={topUpStatus === "pending" || !topUpAmount}
+              }}
+              disabled={txSubmission.isSubmitting}
+              hasError={Boolean(topUpValidationError)}
+              aria-describedby={
+                topUpValidationError ? "top-up-amount-error" : undefined
+              }
+            />
+            <ValidationMessage
+              id="top-up-amount-error"
+              message={topUpValidationError ?? ""}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleTopUpSubmit}
+            disabled={txSubmission.isSubmitting || topUpAmount.trim() === ""}
             style={{
               padding: "0.5rem 1rem",
               borderRadius: "4px",
@@ -544,15 +727,33 @@ export default function StreamDetail() {
               fontWeight: 500,
             }}
           >
-            Submit Top Up
+            {txSubmission.isSubmitting ? "Submitting…" : "Submit Top Up"}
           </button>
         </div>
-        {topUpStatus !== "idle" && (
+        {topUpDisplayStatus !== "idle" && (
           <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
-            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpDisplayStatus]}</span>
+            {txSubmission.txHash && (
+              <span
+                data-testid="top-up-tx-hash"
+                style={{ marginLeft: "0.5rem", fontWeight: 400, color: "var(--color-text-secondary, #6b7280)" }}
+              >
+                Tx {txSubmission.txHash.slice(0, 8)}…{txSubmission.txHash.slice(-6)}
+              </span>
+            )}
           </div>
         )}
-      </div>
+        {(txSubmission.status === "failed" || txSubmission.status === "timeout") &&
+          txSubmission.error && (
+            <div
+              role="alert"
+              data-testid="top-up-error"
+              style={{ marginTop: "0.5rem", fontSize: "0.875rem", color: "var(--color-error, #b91c1c)" }}
+            >
+              {txSubmission.error}
+            </div>
+          )}
+      </section>
       {/* Status presentation — always renders a defined state, even for
           statuses this view does not recognise, so the region is never blank. */}
       <section

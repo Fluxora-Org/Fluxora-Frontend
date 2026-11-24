@@ -6,6 +6,11 @@
  *   Rolled-back or confirmed create rows are excluded (the server refetch
  *   supplies the authoritative record once confirmed, and rolled-back
  *   creates were never real).
+ * - **Top-up** operations: pending topup rows raise the matching stream's
+ *   `depositAmount` and `remainingAmount` by the entered amount so the detail
+ *   view reflects the added funds immediately. Rolled-back topups remove the
+ *   delta automatically; confirmed topups rely on the caller's refetch for
+ *   the authoritative balance.
  * - **Cancel / Withdraw** operations: no list-level changes are needed.
  *   The server data already reflects cancellations after refetch, and
  *   withdrawals don't modify the stream list.
@@ -21,6 +26,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StreamRecord } from "../data/streamRecords";
+import { parseAmountString } from "../lib/amountPrecision";
 import {
   getSnapshot,
   subscribe,
@@ -65,6 +71,52 @@ function mergeOptimisticCreateRows(
 }
 
 /**
+ * Convert a topup operation's `amount` payload into a display-unit delta.
+ * The payload stores the canonical decimal string produced by
+ * `parseAmountExact`; `StreamRecord` amounts are `number`s, so the delta is
+ * converted here for presentation only — the on-chain value never passes
+ * through this path.
+ */
+function topUpDelta(op: OptimisticOperation): number | null {
+  const amount = op.data.amount;
+  const exact = typeof amount === "string" ? parseAmountString(amount) : "";
+  if (exact === "") return null;
+  const numeric = Number(exact);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+/**
+ * Apply pending `topup` operations to the matching stream rows, raising
+ * `depositAmount` and `remainingAmount` by the summed delta per stream.
+ * Only `pending` ops contribute — confirmed ops are superseded by the
+ * server-authoritative record and rolled-back ops must not mutate anything.
+ */
+function applyPendingTopUpDeltas(
+  streams: StreamRecord[],
+  pendingOps: OptimisticOperation[],
+): StreamRecord[] {
+  const deltas = new Map<string, number>();
+  for (const op of pendingOps) {
+    if (op.kind !== "topup") continue;
+    const streamId = op.data.streamId as string | undefined;
+    const delta = topUpDelta(op);
+    if (!streamId || delta === null) continue;
+    deltas.set(streamId, (deltas.get(streamId) ?? 0) + delta);
+  }
+  if (deltas.size === 0) return streams;
+
+  return streams.map((stream) => {
+    const delta = deltas.get(stream.id);
+    if (!delta) return stream;
+    return {
+      ...stream,
+      depositAmount: stream.depositAmount + delta,
+      remainingAmount: stream.remainingAmount + delta,
+    };
+  });
+}
+
+/**
  * Options for the `useOptimisticStreams` hook.
  */
 export interface UseOptimisticStreamsOptions {
@@ -76,7 +128,8 @@ export interface UseOptimisticStreamsOptions {
 
 /**
  * Returns a stream list that merges pending optimistic create rows from the
- * server-authoritative list. Rolled-back create rows are filtered out.
+ * server-authoritative list and applies pending top-up deltas to matching
+ * rows. Rolled-back create/topup rows are filtered out or reverted.
  *
  * ### Usage
  *
@@ -105,11 +158,12 @@ export function useOptimisticStreams({
   const snapshot = useMemo(() => getSnapshot(), [tick]);
 
   const merged = useMemo(() => {
-    return mergeOptimisticCreateRows(
+    const withCreates = mergeOptimisticCreateRows(
       serverStreams,
       snapshot.pending,
       snapshot.confirmed,
     );
+    return applyPendingTopUpDeltas(withCreates, snapshot.pending);
   }, [serverStreams, snapshot.pending, snapshot.confirmed]);
 
   return {
