@@ -78,7 +78,7 @@ test("preserves the query through detail navigation, reload, and return to the l
   await expect(page).toHaveURL(/\/app\/streams\/STR-001\?q=str-001/);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Dev Grant - Alice" })).toBeVisible();
-  await page.getByRole("button", { name: "Back to all streams", exact: true }).click();
+  await page.getByTestId("stream-detail-page").getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Streams", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/streams\?q=str-001/);
   await expect(page.getByRole("textbox", { name: searchName })).toHaveValue("str-001");
   await expect(page.getByRole("list", { name: "Stream cards" }).getByRole("heading", { level: 3 })).toHaveText(["Dev Grant - Alice"]);

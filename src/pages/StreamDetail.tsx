@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
+import { parseStreamRouteFilters, serializeStreamRouteFilters } from "../lib/streamFilterParams";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -119,6 +120,8 @@ export function getStreamStatusPresentation(
 export default function StreamDetail() {
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const listQuery = serializeStreamRouteFilters(parseStreamRouteFilters(searchParams));
+  const streamsListPath = `/app/streams${listQuery ? `?${listQuery}` : ""}`;
   const { address: accountId } = useWallet();
   const { viewers, isPresenceEnabled, updateCursor, isLoading } =
     usePresenceViewers(streamId, undefined, accountId ?? undefined);
@@ -231,7 +234,7 @@ export default function StreamDetail() {
         <div style={{ padding: "0.75rem 1.5rem 0" }}>
           <Breadcrumb
             items={[
-              { label: "Streams", to: "/app/streams" },
+              { label: "Streams", to: streamsListPath },
               { label: "Compare" },
             ]}
           />
@@ -242,7 +245,7 @@ export default function StreamDetail() {
           rightId={decodeURIComponent(compareWithId)}
           onExit={() => {
             // Remove compare param — return to single-stream view
-            setSearchParams({});
+            setSearchParams(listQuery);
           }}
         />
       </div>
@@ -251,7 +254,7 @@ export default function StreamDetail() {
 
   // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
-    { label: "Streams", to: "/app/streams" },
+    { label: "Streams", to: streamsListPath },
     { label: stream?.name ?? streamId ?? "Stream" },
   ];
 
@@ -319,7 +322,7 @@ export default function StreamDetail() {
 
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb items={[{ label: "Streams", to: streamsListPath }]} />
         <div
           role="alert"
           style={{
@@ -348,7 +351,7 @@ export default function StreamDetail() {
             Try again
           </button>
           <Link
-            to="/app/streams"
+            to={streamsListPath}
             style={{
               display: "inline-block",
               padding: "0.5rem 1rem",
@@ -366,7 +369,7 @@ export default function StreamDetail() {
   if (stream === null) {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb items={[{ label: "Streams", to: streamsListPath }]} />
         <div
           style={{
             marginTop: "3rem",
@@ -397,7 +400,7 @@ export default function StreamDetail() {
             </code>{" "}
             does not exist or has been removed.
           </p>
-          <Link to="/app/streams">← Back to streams</Link>
+          <Link to={streamsListPath}>← Back to streams</Link>
         </div>
       </div>
     );

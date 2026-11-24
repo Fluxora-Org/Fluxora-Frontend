@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import StreamDetail from "../StreamDetail";
@@ -346,5 +346,20 @@ describe("StreamDetail Page", () => {
     expect(signals.length).toBe(2);
     expect(signals[0]).not.toBe(signals[1]);
     expect(signals[0]?.aborted).toBe(false); // first request completed (rejected) on its own
+  });
+});
+describe("StreamDetail list filter preservation", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  it.each(["success", "not-found", "error"] as const)("keeps whitelisted view filters in %s return links", async (state) => {
+    const request = vi.spyOn(streamsService, "getStreamById");
+    if (state === "error") request.mockRejectedValue(new Error("Network failed"));
+    else request.mockResolvedValue(state === "success" ? mockStream : null);
+    renderWithHelmet(<MemoryRouter initialEntries={["/app/streams/STR-123?status=Paused&q=%2520&evil=ignored"]}>
+      <Routes><Route path="/app/streams/:streamId" element={<StreamDetail />} /></Routes>
+    </MemoryRouter>);
+    await waitFor(() => expect(screen.queryByRole("status", { name: /loading stream/i })).not.toBeInTheDocument());
+    const links = within(screen.getByTestId("stream-detail-page")).getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/app/streams"));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute("href", "/app/streams?status=Paused&q=%2520");
   });
 });
