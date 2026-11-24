@@ -375,7 +375,7 @@ export default function VirtualList<T>({
       }
 
       const currentIndex = focusedRowIndexRef.current ?? pinnedFocusIndex;
-      let nextIndex: number | null = null;
+      let nextIndex: number;
       switch (event.key) {
         case "ArrowDown":
           nextIndex = Math.min((currentIndex ?? -1) + 1, items.length - 1);

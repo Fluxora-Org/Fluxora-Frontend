@@ -87,7 +87,7 @@ export function pseudoLocalize(value: string): string {
   // Use null-byte delimited markers that won't be affected by accent mapping
   const Placeholder_RE = /\{([^{}]+)\}/g;
   const placeholders: string[] = [];
-  let sanitized = value.replace(Placeholder_RE, (_, token) => {
+  const sanitized = value.replace(Placeholder_RE, (_, token) => {
     placeholders.push(`{${token}}`);
     // Use null bytes as delimiters — they pass through map as-is
     return `\x00${placeholders.length - 1}\x00`;

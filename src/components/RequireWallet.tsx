@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
-import { config } from "../lib/config";
+import { config, isE2EEnabled } from "../lib/config";
 import WalletFallback from "./WalletFallback";
 
 const SAFE_DEFAULT = "/app";
@@ -48,7 +48,7 @@ export default function RequireWallet({ children }: RequireWalletProps) {
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}${location.hash}`;
 
-  if (config.demoMode || import.meta.env.VITE_E2E === "true") {
+  if (config.demoMode || isE2EEnabled()) {
     return <>{children}</>;
   }
 

@@ -22,6 +22,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   bootstrapTheme,
   VALID_THEMES,
@@ -69,7 +70,7 @@ function inlineBootstrapSource(): string {
   if (cachedInlineSource !== null) return cachedInlineSource;
 
   const html = readFileSync(
-    new URL("../../../index.html", import.meta.url),
+    resolve(__dirname, "../../../index.html"),
     "utf8",
   );
   const match = html.match(
