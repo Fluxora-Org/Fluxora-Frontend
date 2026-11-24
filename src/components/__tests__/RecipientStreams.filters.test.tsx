@@ -281,6 +281,10 @@ describe("RecipientStreams — populated state", () => {
     // inline after "From:", and the full value appears in more than one node
     // (visible truncation + accessible full value).
     expect(screen.getAllByText(/GABC123/).length).toBeGreaterThan(0);
+    // Without a name (or address-book label) the "From:" line reads
+    // "Treasury" and the sender address is shown by TruncatedAddress below it.
+    expect(screen.getByText(/From:\s*Treasury/)).toBeInTheDocument();
+    expect(screen.getAllByText("GABC123").length).toBeGreaterThan(0);
   });
 
   it("renders amount followed by 'XLM' suffix", async () => {
