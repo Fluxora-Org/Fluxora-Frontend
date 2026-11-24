@@ -172,7 +172,7 @@ export function formatDateWithTimezone(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       return (
         new Intl.DateTimeFormat("en-US", {
@@ -411,7 +411,7 @@ export function getBrowserTimezone(): string {
       return "UTC";
     }
     return tz;
-  } catch (e) {
+  } catch {
     return "UTC";
   }
 }
@@ -457,7 +457,7 @@ export function formatNavbarTime(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       const fallbackOptions: Intl.DateTimeFormatOptions = {
         hour: "numeric",
@@ -490,11 +490,10 @@ export function formatLocalISOWithOffset(
 
   const timezone = tz || getBrowserTimezone();
 
-  if (timezone === "UTC") {
-    return date.toISOString();
-  }
-
   try {
+    const parts = getZonedDateParts(date, timezone);
+    const offset = getTimezoneOffsetMinutes(date, timezone);
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${formatTimezoneOffset(offset)}`;
     const offsetMin = date.getTimezoneOffset();
     const absOffsetMin = Math.abs(offsetMin);
     const offsetHours = Math.floor(absOffsetMin / 60);
@@ -511,9 +510,50 @@ export function formatLocalISOWithOffset(
 
     const offsetStr = `${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetStr}`;
-  } catch (e) {
+  } catch {
     return date.toISOString();
   }
+}
+
+function getZonedDateParts(date: Date, timezone: string): Record<string, string> {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  return Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+}
+
+function getTimezoneOffsetMinutes(date: Date, timezone: string): number {
+  const parts = getZonedDateParts(date, timezone);
+  const zonedAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  const dateToSecond = Math.floor(date.getTime() / 1000) * 1000;
+  return Math.round((zonedAsUtc - dateToSecond) / 60_000);
+}
+
+function formatTimezoneOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absoluteMinutes = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
+  const minutes = String(absoluteMinutes % 60).padStart(2, "0");
+  return `${sign}${hours}:${minutes}`;
 }
 
 /**
@@ -529,9 +569,10 @@ export function getFormattedUTCOffset(
 
   const timezone = tz || getBrowserTimezone();
 
-  if (timezone === "UTC") return "UTC+00:00";
-
   try {
+    return `UTC${formatTimezoneOffset(
+      getTimezoneOffsetMinutes(date, timezone),
+    )}`;
     if (tz && tz !== "UTC") {
       try {
         const utcDateStr = date.toLocaleString("en-US", { timeZone: "UTC" });
@@ -559,7 +600,7 @@ export function getFormattedUTCOffset(
     const sign = offsetMin <= 0 ? "+" : "-";
     const pad = (n: number) => String(n).padStart(2, "0");
     return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
-  } catch (e) {
+  } catch {
     return "UTC+00:00";
   }
 }

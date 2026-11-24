@@ -49,10 +49,7 @@ import {
   PaletteCategory,
 } from './commandPaletteData';
 import { clsx } from 'clsx';
-import {
-  useKeyboardShortcuts,
-  isTextFieldTarget,
-} from '../hooks/useKeyboardShortcuts';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 // ─── CommandPaletteModal ──────────────────────────────────────────────────────
 

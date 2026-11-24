@@ -94,6 +94,11 @@ function buildProps(
     paginatedStreams: [],
     effectiveExpandedId: undefined,
     selectedStreamId: "",
+    selectedStreamIds: new Set(),
+    selectedStreams: [],
+    selectableFilteredCount: 0,
+    bulkResults: [],
+    bulkProgress: null,
     recentlySaved: false,
     renderStream: (stream) => <div data-testid={`card-${stream.id}`}>{stream.name}</div>,
     emptyState: <div data-testid="empty-state">No results</div>,
@@ -102,6 +107,12 @@ function buildProps(
     onSortChange: vi.fn(),
     onPageChange: vi.fn(),
     onItemsPerPageChange: vi.fn(),
+    onStreamSelectionChange: vi.fn(),
+    onPageSelectionChange: vi.fn(),
+    onSelectAllFiltered: vi.fn(),
+    onClearSelection: vi.fn(),
+    onBulkAction: vi.fn(),
+    onRetryBulkFailures: vi.fn(),
     ...overrides,
   };
 }
@@ -332,9 +343,9 @@ describe("StreamsListPanel — pagination", () => {
 // ─── Session persistence indicator ───────────────────────────────────────────
 
 describe("StreamsListPanel — session persistence indicator", () => {
-  // The indicator only claims persistence after a write succeeded (#1663).
+  // Session snapshots remain memory-only under the browser-storage security policy.
   beforeEach(() => {
-    streamsSessionWriteStatus.record(true);
+    streamsSessionWriteStatus.record(false);
   });
 
   afterEach(() => {
@@ -347,24 +358,26 @@ describe("StreamsListPanel — session persistence indicator", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     expect(
       screen.getByRole("img", {
-        name: "Your filters and search are saved on this device",
+        name: "Your filters and search are kept only while this page is open",
       }),
     ).toBeInTheDocument();
   });
 
-  it("passes recentlySaved prop to the indicator", () => {
+  it("does not claim a durable save pulse in memory-only mode", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: true })} />);
-    // The indicator has data-recently-saved attribute when recentlySaved is true
     const indicator = screen.getByRole("img", {
-      name: "Your filters and search are saved on this device",
+      name: "Your filters and search are kept only while this page is open",
     });
-    expect(indicator).toHaveAttribute("data-recently-saved");
+    expect(indicator).not.toHaveAttribute("data-recently-saved");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "For security, session recovery data stays in memory and is discarded when you close or reload this page.",
+    );
   });
 
   it("omits data-recently-saved attribute when recentlySaved is false", () => {
     render(<StreamsListPanel {...buildProps({ recentlySaved: false })} />);
     const indicator = screen.getByRole("img", {
-      name: "Your filters and search are saved on this device",
+      name: "Your filters and search are kept only while this page is open",
     });
     // When false the attribute is not present (undefined → omitted)
     expect(indicator).not.toHaveAttribute("data-recently-saved");
@@ -390,5 +403,106 @@ describe("StreamsListPanel — accessibility", () => {
   it("uses a section element as the outer container", () => {
     const { container } = render(<StreamsListPanel {...buildProps()} />);
     expect(container.querySelector("section.streams-list-shell")).toBeInTheDocument();
+  });
+});
+
+describe("StreamsListPanel — bulk selection and actions", () => {
+  it("announces a mixed current-page checkbox state and selects the page", () => {
+    const onPageSelectionChange = vi.fn();
+    render(
+      <StreamsListPanel
+        {...buildProps({
+          paginatedStreams: [
+            makeStream({ id: "STR-A" }),
+            makeStream({ id: "STR-B" }),
+          ],
+          selectedStreamIds: new Set(["STR-A"]),
+          selectableFilteredCount: 2,
+          onPageSelectionChange,
+        })}
+      />,
+    );
+
+    const pageCheckbox = screen.getByRole("checkbox", {
+      name: "Select current page",
+    });
+    expect(pageCheckbox).toHaveAttribute("aria-checked", "mixed");
+    expect(pageCheckbox).toHaveProperty("indeterminate", true);
+    fireEvent.click(pageCheckbox);
+    expect(onPageSelectionChange).toHaveBeenCalledWith(true);
+  });
+
+  it("selects filtered streams and offers pause/cancel for selected streams", () => {
+    const onSelectAllFiltered = vi.fn();
+    const onBulkAction = vi.fn();
+    render(
+      <StreamsListPanel
+        {...buildProps({
+          paginatedStreams: [makeStream({ id: "STR-A" })],
+          selectedStreamIds: new Set(["STR-A"]),
+          selectedStreams: [makeStream({ id: "STR-A" })],
+          selectableFilteredCount: 3,
+          onSelectAllFiltered,
+          onBulkAction,
+        })}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Select all 3 actionable filtered streams",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pause 1 active" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel 1" }));
+
+    expect(onSelectAllFiltered).toHaveBeenCalledOnce();
+    expect(onBulkAction).toHaveBeenNthCalledWith(1, "pause");
+    expect(onBulkAction).toHaveBeenNthCalledWith(2, "cancel");
+  });
+
+  it("disables completed stream selection and retries failed results only", () => {
+    const onRetryBulkFailures = vi.fn();
+    render(
+      <StreamsListPanel
+        {...buildProps({
+          paginatedStreams: [
+            makeStream({ id: "STR-DONE", status: "Completed" }),
+          ],
+          bulkResults: [
+            {
+              streamId: "STR-A",
+              streamName: "Stream A",
+              action: "cancel",
+              status: "failed",
+              idempotencyKey: "retry-a",
+              error: "Wallet rejected signature",
+            },
+            {
+              streamId: "STR-B",
+              streamName: "Stream B",
+              action: "cancel",
+              status: "skipped",
+              idempotencyKey: "key-b",
+            },
+          ],
+          onRetryBulkFailures,
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole("checkbox", { name: /Select Stream STR-DONE/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Wallet rejected signature/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Retry failed streams only" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry failed streams only" }),
+    );
+    expect(onRetryBulkFailures).toHaveBeenCalledOnce();
   });
 });

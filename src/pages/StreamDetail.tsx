@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { TransactionStatus, TRANSACTION_STATUS_LABELS } from "../lib/transactionState";
+import { TransactionStatus } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -14,6 +14,89 @@ import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
+import { Calendar, Share2 } from "lucide-react";
+import { downloadStreamIcs } from "../lib/icsExport";
+import { ConfirmModal } from "../components/common/ConfirmModal";
+import RequireWalletAction from "../components/RequireWalletAction";
+import { useTransactionSubmission } from "../hooks/useTransactionSubmission";
+import { useOptimisticStreams } from "../hooks/useOptimisticStreams";
+import {
+  addOptimistic,
+  confirmOptimistic,
+  rollbackOptimistic,
+} from "../lib/optimisticTransactions";
+import {
+  cancelStream,
+  decodeContractError,
+  pauseStream,
+  TransactionError,
+} from "../lib/stellar/tx";
+import { useI18n } from "../i18n";
+import { Pause, Share2, XCircle } from "lucide-react";
+
+type StreamActionTranslator = ReturnType<typeof useI18n>["t"];
+
+const CONTRACT_ERROR_I18N_KEYS = {
+  Unauthorized: "streamDetail.error.contract.Unauthorized",
+  NotAdmin: "streamDetail.error.contract.NotAdmin",
+  StreamNotFound: "streamDetail.error.contract.StreamNotFound",
+  StreamAlreadyPaused: "streamDetail.error.contract.StreamAlreadyPaused",
+  StreamNotPaused: "streamDetail.error.contract.StreamNotPaused",
+  StreamTerminated: "streamDetail.error.contract.StreamTerminated",
+} as const;
+
+const CONTRACT_CATEGORY_I18N_KEYS = {
+  authorization: "streamDetail.error.contract.authorization",
+  balance: "streamDetail.error.contract.balance",
+  validation: "streamDetail.error.contract.validation",
+  state: "streamDetail.error.contract.state",
+  unknown: "streamDetail.error.contract.unknown",
+} as const;
+
+function mapStreamActionError(
+  err: unknown,
+  t: StreamActionTranslator,
+): string {
+  const resolveContractTxError = (txErr: TransactionError): string => {
+    const code = txErr.details.code;
+    if (code && code in CONTRACT_ERROR_I18N_KEYS) {
+      return t(
+        CONTRACT_ERROR_I18N_KEYS[code as keyof typeof CONTRACT_ERROR_I18N_KEYS],
+      );
+    }
+    const category = txErr.details.category ?? "unknown";
+    return t(
+      CONTRACT_CATEGORY_I18N_KEYS[
+        category as keyof typeof CONTRACT_CATEGORY_I18N_KEYS
+      ] ?? CONTRACT_CATEGORY_I18N_KEYS.unknown,
+    );
+  };
+
+  if (err instanceof TransactionError) {
+    if (err.type === "rejected") {
+      return t("streamDetail.error.rejected");
+    }
+    if (err.type === "contract") {
+      return resolveContractTxError(err);
+    }
+  }
+
+  const decoded = decodeContractError(err);
+  if (decoded) {
+    return resolveContractTxError(decoded);
+  }
+
+  if (err instanceof Error && err.message) {
+    if (/declined by the user|user_rejected|signature request was declined/i.test(err.message)) {
+      return t("streamDetail.error.rejected");
+    }
+    return err.message;
+  }
+
+  return t("streamDetail.error.generic");
+}
+import { useI18n, type TranslationKey } from "../i18n";
+import { en } from "../i18n/en";
 import { Share2 } from "lucide-react";
 
 /**
@@ -26,52 +109,69 @@ import { Share2 } from "lucide-react";
  * unusual or the page is broken.
  */
 export interface StreamStatusPresentation {
-  /** Human-readable label rendered in the status pill. */
+  /** Human-readable label rendered in the status pill (English source value). */
   label: string;
-  /** One-line explanation of what the status means for the viewer. */
+  /** One-line explanation of what the status means for the viewer (English source value). */
   description: string;
+  /** Catalog key for {@link label}, or null when the label is derived from raw data. */
+  labelKey: TranslationKey | null;
+  /** Catalog key for {@link description}. */
+  descriptionKey: TranslationKey;
   /** Colour used for the status dot and label. */
   color: string;
   /** False when the raw status is not one the view explicitly knows about. */
   recognized: boolean;
 }
 
+interface KnownStreamStatusPresentation {
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  color: string;
+}
+
 const KNOWN_STREAM_STATUS_PRESENTATIONS: Record<
   string,
-  Omit<StreamStatusPresentation, "recognized">
+  KnownStreamStatusPresentation
 > = {
   active: {
-    label: "Active",
-    description: "The stream is live and accrues funds on schedule.",
+    labelKey: "streamDetail.status.active.label",
+    descriptionKey: "streamDetail.status.active.description",
     color: "var(--color-success, #16a34a)",
   },
   paused: {
-    label: "Paused",
-    description:
-      "Accrual is paused. The balance already streamed stays available to the recipient.",
+    labelKey: "streamDetail.status.paused.label",
+    descriptionKey: "streamDetail.status.paused.description",
     color: "var(--color-warning, #d97706)",
   },
   completed: {
-    label: "Completed",
-    description: "The stream finished and its full schedule was delivered.",
+    labelKey: "streamDetail.status.completed.label",
+    descriptionKey: "streamDetail.status.completed.description",
     color: "var(--color-text-secondary, #6b7280)",
   },
   cancelled: {
-    label: "Cancelled",
-    description:
-      "The stream was cancelled before its scheduled end date and no longer accrues.",
+    labelKey: "streamDetail.status.cancelled.label",
+    descriptionKey: "streamDetail.status.cancelled.description",
     color: "var(--color-error, #b91c1c)",
   },
   matured: {
-    label: "Matured",
-    description: "The stream reached maturity and no longer accrues funds.",
+    labelKey: "streamDetail.status.matured.label",
+    descriptionKey: "streamDetail.status.matured.description",
     color: "var(--color-text-secondary, #6b7280)",
   },
 };
 
+const UNKNOWN_STATUS_LABEL_KEY: TranslationKey =
+  "streamDetail.status.unknown.label";
+const UNRECOGNIZED_STATUS_DESCRIPTION_KEY: TranslationKey =
+  "streamDetail.status.unrecognized.description";
+
 /**
  * Resolve the presentation for any status string. Always returns a defined
  * presentation; unknown values get an explicit fallback (never blank).
+ *
+ * `label`/`description` are the English source values (resolved from the
+ * catalog, so the copy is single-sourced); `labelKey`/`descriptionKey` let the
+ * page resolve the copy through the active locale at render time.
  */
 export function getStreamStatusPresentation(
   status: string | null | undefined,
@@ -79,17 +179,33 @@ export function getStreamStatusPresentation(
   const key = typeof status === "string" ? status.trim().toLowerCase() : "";
   const known = key ? KNOWN_STREAM_STATUS_PRESENTATIONS[key] : undefined;
   if (known) {
-    return { ...known, recognized: true };
+    return {
+      label: en[known.labelKey],
+      description: en[known.descriptionKey],
+      labelKey: known.labelKey,
+      descriptionKey: known.descriptionKey,
+      color: known.color,
+      recognized: true,
+    };
   }
-  const label = key ? key.charAt(0).toUpperCase() + key.slice(1) : "Unknown";
   return {
-    label,
-    description:
-      "This status is not recognised by the stream detail view. Confirm the stream state in the treasury console before acting on it.",
+    label: key
+      ? key.charAt(0).toUpperCase() + key.slice(1)
+      : en[UNKNOWN_STATUS_LABEL_KEY],
+    description: en[UNRECOGNIZED_STATUS_DESCRIPTION_KEY],
+    labelKey: key ? null : UNKNOWN_STATUS_LABEL_KEY,
+    descriptionKey: UNRECOGNIZED_STATUS_DESCRIPTION_KEY,
     color: "var(--color-text-secondary, #6b7280)",
     recognized: false,
   };
 }
+
+/**
+ * Fallback message used when a non-Error value is thrown while loading.
+ * Resolved from the catalog so the copy is single-sourced in `en.ts` (it is
+ * captured outside the render path, where the `t()` hook is not available).
+ */
+const FALLBACK_STREAM_LOAD_ERROR: string = en["streamDetail.error.fallbackMessage"];
 
 /**
  * StreamDetail page
@@ -117,9 +233,11 @@ export function getStreamStatusPresentation(
  * - **success**   – full single stream detail layout
  */
 export default function StreamDetail() {
+  const { t } = useI18n();
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { address: accountId } = useWallet();
+  const { address: accountId, connected } = useWallet();
+  const { t } = useI18n();
   const { viewers, isPresenceEnabled, updateCursor, isLoading } =
     usePresenceViewers(streamId, undefined, accountId ?? undefined);
 
@@ -128,6 +246,7 @@ export default function StreamDetail() {
   const isCompareMode = Boolean(compareWithId && streamId);
 
   const [isOgModalOpen, setIsOgModalOpen] = useState(false);
+  const [calendarStatus, setCalendarStatus] = useState("");
   const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
@@ -138,6 +257,68 @@ export default function StreamDetail() {
 
   const [topUpAmount, setTopUpAmount] = useState("");
   const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
+
+  // Pause / Cancel modal & optimistic transaction state
+  const [activeAction, setActiveAction] = useState<"pause" | "cancel" | null>(
+    null,
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
+  const activeActionRef = useRef<"pause" | "cancel" | null>(null);
+  const pendingOpIdRef = useRef<string | null>(null);
+
+  const serverStreams = useMemo(() => (stream ? [stream] : []), [stream]);
+  const { streams: optimisticStreams } = useOptimisticStreams({
+    streams: serverStreams,
+  });
+  const displayStream = optimisticStreams[0] ?? stream;
+
+  const txSubmission = useTransactionSubmission({
+    submit: async () => {
+      const action = activeActionRef.current;
+      if (!action || !accountId || !stream) {
+        throw new Error(t("streamDetail.error.generic"));
+      }
+      const response =
+        action === "pause"
+          ? await pauseStream(accountId, stream.id)
+          : await cancelStream(accountId, stream.id);
+      const txHash =
+        (response as { txHash?: string } | null | undefined)?.txHash ?? "";
+      return { txHash };
+    },
+    onResolved: (outcome) => {
+      const opId = pendingOpIdRef.current;
+      const action = activeActionRef.current;
+      pendingOpIdRef.current = null;
+      if (outcome === "confirmed") {
+        if (opId) confirmOptimistic(opId);
+        if (action) {
+          const nextStatus = (
+            action === "pause" ? "Paused" : "Cancelled"
+          ) as StreamRecord["status"];
+          setStream((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        }
+      } else {
+        if (opId) rollbackOptimistic(opId, `Transaction ${outcome}`);
+      }
+    },
+  });
+
+  // Handle immediate confirmation when submit() resolves without a pollable hash
+  useEffect(() => {
+    if (txSubmission.status === "confirmed" && pendingOpIdRef.current) {
+      const opId = pendingOpIdRef.current;
+      const action = activeActionRef.current;
+      pendingOpIdRef.current = null;
+      confirmOptimistic(opId);
+      if (action) {
+        const nextStatus = (
+          action === "pause" ? "Paused" : "Cancelled"
+        ) as StreamRecord["status"];
+        setStream((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      }
+    }
+  }, [txSubmission.status]);
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a
@@ -186,7 +367,7 @@ export default function StreamDetail() {
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to load stream.",
+            err instanceof Error ? err.message : FALLBACK_STREAM_LOAD_ERROR,
           );
           setLoading(false);
         }
@@ -231,8 +412,8 @@ export default function StreamDetail() {
         <div style={{ padding: "0.75rem 1.5rem 0" }}>
           <Breadcrumb
             items={[
-              { label: "Streams", to: "/app/streams" },
-              { label: "Compare" },
+              { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+              { label: t("streamDetail.breadcrumb.compare") },
             ]}
           />
         </div>
@@ -251,8 +432,8 @@ export default function StreamDetail() {
 
   // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
-    { label: "Streams", to: "/app/streams" },
-    { label: stream?.name ?? streamId ?? "Stream" },
+    { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+    { label: stream?.name ?? streamId ?? t("streamDetail.breadcrumb.stream") },
   ];
 
   if (loading) {
@@ -260,11 +441,11 @@ export default function StreamDetail() {
       <div
         data-testid="stream-detail-page"
         role="status"
-        aria-label="Loading stream"
+        aria-label={t("streamDetail.loading.ariaLabel")}
         aria-busy="true"
         style={{ padding: "1.5rem" }}
       >
-        <span className="sr-only">Loading stream…</span>
+        <span className="sr-only">{t("streamDetail.loading.srText")}</span>
         <Skeleton width={280} height={16} style={{ marginBottom: "1.5rem" }} />
         <Skeleton width={320} height={28} style={{ marginBottom: "0.5rem" }} />
         <Skeleton width="60%" height={14} style={{ marginBottom: "2rem" }} />
@@ -307,7 +488,7 @@ export default function StreamDetail() {
         .catch((err: unknown) => {
           if (!cancelled) {
             setError(
-              err instanceof Error ? err.message : "Failed to load stream.",
+              err instanceof Error ? err.message : FALLBACK_STREAM_LOAD_ERROR,
             );
             setLoading(false);
           }
@@ -319,7 +500,9 @@ export default function StreamDetail() {
 
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+        />
         <div
           role="alert"
           style={{
@@ -330,7 +513,7 @@ export default function StreamDetail() {
             color: "var(--color-error, #b91c1c)",
           }}
         >
-          <strong>Error loading stream:</strong> {error}
+          <strong>{t("streamDetail.error.heading")}</strong> {error}
         </div>
         <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
           <button
@@ -345,7 +528,7 @@ export default function StreamDetail() {
               fontWeight: 500,
             }}
           >
-            Try again
+            {t("streamDetail.action.tryAgain")}
           </button>
           <Link
             to="/app/streams"
@@ -356,7 +539,7 @@ export default function StreamDetail() {
               color: "var(--color-text-secondary, #6b7280)",
             }}
           >
-            ← Back to streams
+            {t("streamDetail.action.backToStreams")}
           </Link>
         </div>
       </div>
@@ -366,7 +549,9 @@ export default function StreamDetail() {
   if (stream === null) {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
-        <Breadcrumb items={[{ label: "Streams", to: "/app/streams" }]} />
+        <Breadcrumb
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+        />
         <div
           style={{
             marginTop: "3rem",
@@ -381,10 +566,10 @@ export default function StreamDetail() {
               marginBottom: "0.5rem",
             }}
           >
-            Stream not found
+            {t("streamDetail.notFound.title")}
           </p>
           <p style={{ marginBottom: "1.5rem" }}>
-            The stream{" "}
+            {t("streamDetail.notFound.beforeCode")}{" "}
             <code
               style={{
                 fontFamily: "monospace",
@@ -395,18 +580,18 @@ export default function StreamDetail() {
             >
               {streamId}
             </code>{" "}
-            does not exist or has been removed.
+            {t("streamDetail.notFound.afterCode")}
           </p>
-          <Link to="/app/streams">← Back to streams</Link>
+          <Link to="/app/streams">{t("streamDetail.action.backToStreams")}</Link>
         </div>
       </div>
     );
   }
 
-  if (!stream) {
+  if (!stream || !displayStream) {
     // Unreachable in practice: loading/error/null are handled above, so by
-    // this point `stream` is always a resolved StreamRecord. This guard only
-    // exists to satisfy TypeScript's control-flow narrowing across state.
+    // this point `displayStream` is always a resolved StreamRecord. This guard
+    // only exists to satisfy TypeScript's control-flow narrowing across state.
     return null;
   }
 
@@ -416,13 +601,89 @@ export default function StreamDetail() {
     Settled: "var(--color-text-secondary, #6b7280)",
   };
 
-  const statusPresentation = getStreamStatusPresentation(stream.status);
+  const statusPresentation = getStreamStatusPresentation(displayStream.status);
+  const normalizedStatus = String(displayStream.status).trim().toLowerCase();
+  const isTerminalStatus =
+    normalizedStatus === "completed" || normalizedStatus === "cancelled";
+  const isPausedStatus = normalizedStatus === "paused";
+  const isSender = Boolean(
+    connected &&
+      accountId &&
+      displayStream.treasuryAddress &&
+      accountId.trim().toUpperCase() ===
+        displayStream.treasuryAddress.trim().toUpperCase(),
+  );
+
+  const openActionModal = (action: "pause" | "cancel") => {
+    setActionError(null);
+    txSubmission.reset();
+    activeActionRef.current = action;
+    setActiveAction(action);
+  };
+
+  const closeActionModal = () => {
+    if (txSubmission.isSubmitting) return;
+    setActiveAction(null);
+    setActionError(null);
+    txSubmission.reset();
+  };
+
+  const handleConfirmAction = async () => {
+    if (!activeAction || !accountId) return;
+    setActionError(null);
+    activeActionRef.current = activeAction;
+    const nextStatus = (
+      activeAction === "pause" ? "Paused" : "Cancelled"
+    ) as StreamRecord["status"];
+    const op = addOptimistic(activeAction, {
+      streamId: displayStream.id,
+      nextStatus,
+    });
+    pendingOpIdRef.current = op.id;
+
+    try {
+      await txSubmission.submit();
+    } catch (err) {
+      if (pendingOpIdRef.current === op.id) {
+        rollbackOptimistic(
+          op.id,
+          err instanceof Error ? err.message : "Transaction failed",
+        );
+        pendingOpIdRef.current = null;
+      }
+      setActionError(mapStreamActionError(err, t));
+    }
+  };
+
+  const modalStatus: "idle" | "pending" | "success" | "error" =
+    txSubmission.status === "submitting" || txSubmission.status === "pending"
+      ? "pending"
+      : txSubmission.status === "confirmed"
+        ? "success"
+        : txSubmission.status === "failed" || txSubmission.status === "timeout"
+          ? "error"
+          : "idle";
+
+  const resolvedErrorMessage =
+    actionError ??
+    (txSubmission.error
+      ? mapStreamActionError(txSubmission.error, t)
+      : t("streamDetail.error.generic"));
+
+  const formattedRemaining = formatAssetAmount(
+    displayStream.remainingAmount,
+    displayStream.asset,
+  );
+  const formattedWithdrawable = formatAssetAmount(
+    displayStream.withdrawableAmount,
+    displayStream.asset,
+  );
 
   // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
       <Breadcrumb items={breadcrumbItems} />
-      <MetaTags stream={stream} />
+      <MetaTags stream={displayStream} />
 
       {/* Header */}
       <div
@@ -454,29 +715,92 @@ export default function StreamDetail() {
           </p>
         </div>
 
+        {/* Header Actions */}
+        <div
         {/* Share & Social Preview Card Trigger */}
         <button
           ref={shareTriggerRef}
           onClick={() => setIsOgModalOpen(true)}
           data-testid="share-og-preview-btn"
-          aria-label={`Share ${stream.name} and preview social card`}
+          aria-label={t("streamDetail.share.ariaLabel", { name: stream.name })}
           style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
-            borderRadius: "8px",
-            border: "1px solid var(--color-border, #e5e7eb)",
-            background: "var(--color-surface-1, #fff)",
-            color: "var(--color-text-primary, #111827)",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            gap: "0.75rem",
+            flexWrap: "wrap",
           }}
         >
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const { hasCliff } = downloadStreamIcs(stream);
+                setCalendarStatus(
+                  hasCliff
+                    ? "Calendar file downloaded with cliff and end dates."
+                    : "Calendar file downloaded with stream end date.",
+                );
+              } catch {
+                setCalendarStatus("Unable to export calendar file.");
+              }
+            }}
+            data-testid="add-to-calendar-btn"
+            aria-label={`Add ${stream.name} dates to calendar`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Calendar size={16} aria-hidden="true" />
+            <span>Add to calendar</span>
+          </button>
+
+          {/* Share & Social Preview Card Trigger */}
+          <button
+            ref={shareTriggerRef}
+            onClick={() => setIsOgModalOpen(true)}
+            data-testid="share-og-preview-btn"
+            aria-label={`Share ${stream.name} and preview social card`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Share2 size={16} />
+            <span>Share / Preview Card</span>
+          </button>
+
+          <span
+            role="status"
+            aria-live="polite"
+            data-testid="calendar-export-status"
+            className="sr-only"
+          >
+            {calendarStatus}
+          </span>
+        </div>
           <Share2 size={16} />
-          <span>Share / Preview Card</span>
+          <span>{t("streamDetail.share.button")}</span>
         </button>
       </div>
 
@@ -503,21 +827,24 @@ export default function StreamDetail() {
             background: "var(--color-surface-2, #f3f4f6)",
             color: healthColor[stream.health] ?? "inherit",
           }}
-          aria-label={`Health status: ${stream.health}`}
+          aria-label={t("streamDetail.health.ariaLabel", { health: stream.health })}
         >
           <span aria-hidden="true">●</span>
-          {stream.health} — {stream.healthNote}
+          {t("streamDetail.health.summary", {
+            health: stream.health,
+            note: stream.healthNote,
+          })}
         </span>
       </div>
 
       {/* Top-Up Flow */}
       <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>Top Up Stream</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>{t("streamDetail.topUp.title")}</h2>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <input
             type="number"
-            aria-label="Top up amount"
-            placeholder="Amount"
+            aria-label={t("streamDetail.topUp.amountAriaLabel")}
+            placeholder={t("streamDetail.topUp.amountPlaceholder")}
             value={topUpAmount}
             onChange={(e) => setTopUpAmount(e.target.value)}
             disabled={topUpStatus === "pending"}
@@ -544,12 +871,15 @@ export default function StreamDetail() {
               fontWeight: 500,
             }}
           >
-            Submit Top Up
+            {t("streamDetail.topUp.submit")}
           </button>
         </div>
         {topUpStatus !== "idle" && (
           <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
-            Status: <span data-testid="top-up-status">{TRANSACTION_STATUS_LABELS[topUpStatus]}</span>
+            {t("streamDetail.topUp.statusLabel")}{" "}
+            <span data-testid="top-up-status">
+              {t(`streamDetail.topUp.status.${topUpStatus}`)}
+            </span>
           </div>
         )}
       </div>
@@ -558,12 +888,12 @@ export default function StreamDetail() {
       <section
         aria-labelledby="stream-status-heading"
         data-testid="stream-status"
-        data-status={String(stream.status).toLowerCase()}
+        data-status={String(displayStream.status).toLowerCase()}
         data-status-recognized={statusPresentation.recognized ? "true" : "false"}
         style={{ marginBottom: "1.5rem" }}
       >
         <h2 id="stream-status-heading" className="sr-only">
-          Stream status
+          {t("streamDetail.status.srHeading")}
         </h2>
         <span
           style={{
@@ -579,7 +909,9 @@ export default function StreamDetail() {
           }}
         >
           <span aria-hidden="true">●</span>
-          {statusPresentation.label}
+          {statusPresentation.labelKey
+            ? t(statusPresentation.labelKey)
+            : statusPresentation.label}
         </span>
         <p
           data-testid="stream-status-description"
@@ -589,7 +921,7 @@ export default function StreamDetail() {
             color: "var(--color-text-secondary, #6b7280)",
           }}
         >
-          {statusPresentation.description}
+          {t(statusPresentation.descriptionKey)}
         </p>
         {!statusPresentation.recognized && (
           <p
@@ -601,9 +933,114 @@ export default function StreamDetail() {
               color: "var(--color-warning, #d97706)",
             }}
           >
-            Unrecognised stream status: <code>{String(stream.status)}</code>
+            Unrecognised stream status: <code>{String(displayStream.status)}</code>
+            {t("streamDetail.status.unrecognized.label")}{" "}
+            <code>{String(stream.status)}</code>
           </p>
         )}
+      </section>
+
+      {/* Sender stream controls (Pause / Cancel) */}
+      <section
+        aria-labelledby="stream-controls-heading"
+        data-testid="stream-controls"
+        style={{
+          marginBottom: "1.5rem",
+          padding: "1rem",
+          borderRadius: "8px",
+          background: "var(--color-surface-1, #fff)",
+          border: "1px solid var(--color-border, #e5e7eb)",
+        }}
+      >
+        <h2
+          id="stream-controls-heading"
+          style={{
+            fontSize: "1rem",
+            fontWeight: 600,
+            margin: 0,
+            marginBottom: "0.75rem",
+          }}
+        >
+          {t("streamDetail.actions.heading")}
+        </h2>
+        <RequireWalletAction>
+          {isTerminalStatus ? (
+            <p
+              data-testid="stream-controls-terminal-notice"
+              style={{
+                margin: 0,
+                fontSize: "0.875rem",
+                color: "var(--color-text-secondary, #6b7280)",
+              }}
+            >
+              {t("streamDetail.actions.completedNotice", {
+                status: statusPresentation.label.toLowerCase(),
+              })}
+            </p>
+          ) : !isSender ? (
+            <p
+              data-testid="stream-controls-not-sender"
+              style={{
+                margin: 0,
+                fontSize: "0.875rem",
+                color: "var(--color-text-secondary, #6b7280)",
+              }}
+            >
+              {t("streamDetail.actions.notSenderNotice", {
+                sender: displayStream.treasuryAddress,
+              })}
+            </p>
+          ) : (
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              {!isPausedStatus && (
+                <button
+                  type="button"
+                  data-testid="pause-stream-btn"
+                  onClick={() => openActionModal("pause")}
+                  disabled={txSubmission.isSubmitting}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "8px",
+                    border: "1px solid var(--color-warning, #d97706)",
+                    background: "var(--color-surface-1, #fff)",
+                    color: "var(--color-warning, #d97706)",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    cursor: txSubmission.isSubmitting ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <Pause size={16} aria-hidden="true" />
+                  <span>{t("streamDetail.actions.pauseBtn")}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid="cancel-stream-btn"
+                onClick={() => openActionModal("cancel")}
+                disabled={txSubmission.isSubmitting}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-error, #b91c1c)",
+                  background: "var(--color-error, #b91c1c)",
+                  color: "#fff",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  cursor: txSubmission.isSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
+                <XCircle size={16} aria-hidden="true" />
+                <span>{t("streamDetail.actions.cancelBtn")}</span>
+              </button>
+            </div>
+          )}
+        </RequireWalletAction>
       </section>
 
       {/* Metrics grid */}
@@ -616,27 +1053,40 @@ export default function StreamDetail() {
         }}
       >
         {[
-          { label: "Status", value: stream.status },
+          { label: "Status", value: displayStream.status },
           {
-            label: "Deposit",
+            id: "status",
+            label: t("streamDetail.metrics.status"),
+            value: stream.status,
+          },
+          {
+            id: "deposit",
+            label: t("streamDetail.metrics.deposit"),
             value: formatAssetAmount(stream.depositAmount, stream.asset),
           },
           {
-            label: "Streamed",
+            id: "streamed",
+            label: t("streamDetail.metrics.streamed"),
             value: formatAssetAmount(stream.streamedAmount, stream.asset),
           },
           {
-            label: "Withdrawable",
+            id: "withdrawable",
+            label: t("streamDetail.metrics.withdrawable"),
             value: formatAssetAmount(stream.withdrawableAmount, stream.asset),
           },
           {
-            label: "Remaining",
+            id: "remaining",
+            label: t("streamDetail.metrics.remaining"),
             value: formatAssetAmount(stream.remainingAmount, stream.asset),
           },
-          { label: "Progress", value: `${stream.progress.toFixed(1)}%` },
-        ].map(({ label, value }) => (
+          {
+            id: "progress",
+            label: t("streamDetail.metrics.progress"),
+            value: `${stream.progress.toFixed(1)}%`,
+          },
+        ].map(({ id, label, value }) => (
           <div
-            key={label}
+            key={id}
             style={{
               padding: "0.875rem 1rem",
               borderRadius: "8px",
@@ -670,7 +1120,7 @@ export default function StreamDetail() {
             marginBottom: "0.75rem",
           }}
         >
-          Timeline
+          {t("streamDetail.timeline.heading")}
         </h2>
         <StreamTimeline
           startDate={stream.startDate}
@@ -680,7 +1130,7 @@ export default function StreamDetail() {
           withdrawableAmount={stream.withdrawableAmount}
           totalAmount={stream.depositAmount}
           status={
-            stream.status.toLowerCase() as
+            displayStream.status.toLowerCase() as
               "active" | "paused" | "completed" | "upcoming"
           }
           isLoading={false}
@@ -688,7 +1138,7 @@ export default function StreamDetail() {
       </section>
 
       {/* Audit note */}
-      {stream.auditNote && (
+      {displayStream.auditNote && (
         <section
           aria-labelledby="stream-audit-heading"
           style={{ marginTop: "1.5rem" }}
@@ -701,7 +1151,7 @@ export default function StreamDetail() {
               marginBottom: "0.375rem",
             }}
           >
-            Audit note
+            {t("streamDetail.audit.heading")}
           </h2>
           <p
             style={{
@@ -709,7 +1159,7 @@ export default function StreamDetail() {
               color: "var(--color-text-secondary, #6b7280)",
             }}
           >
-            {stream.auditNote}
+            {displayStream.auditNote}
           </p>
         </section>
       )}
@@ -719,10 +1169,66 @@ export default function StreamDetail() {
 
       {/* Open Graph Social Preview Modal */}
       <StreamOGPreviewModal
-        stream={stream}
+        stream={displayStream}
         isOpen={isOgModalOpen}
         onClose={() => setIsOgModalOpen(false)}
         triggerRef={shareTriggerRef}
+      />
+
+      {/* Pause / Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={activeAction !== null}
+        title={
+          activeAction === "cancel"
+            ? t("streamDetail.cancel.title", { name: displayStream.name })
+            : t("streamDetail.pause.title", { name: displayStream.name })
+        }
+        description={
+          activeAction === "cancel"
+            ? t("streamDetail.cancel.description", {
+                name: displayStream.name,
+                id: displayStream.id,
+                remaining: formattedRemaining,
+              })
+            : t("streamDetail.pause.description", {
+                name: displayStream.name,
+                id: displayStream.id,
+                withdrawable: formattedWithdrawable,
+              })
+        }
+        confirmText={
+          activeAction === "cancel"
+            ? t("streamDetail.cancel.confirmBtn")
+            : t("streamDetail.pause.confirmBtn")
+        }
+        onConfirm={() => {
+          void handleConfirmAction();
+        }}
+        onCancel={closeActionModal}
+        onRetry={() => {
+          void handleConfirmAction();
+        }}
+        status={modalStatus}
+        errorMessage={resolvedErrorMessage}
+        successMessage={
+          activeAction === "cancel"
+            ? t("streamDetail.cancel.successMessage", {
+                name: displayStream.name,
+              })
+            : t("streamDetail.pause.successMessage", {
+                name: displayStream.name,
+              })
+        }
+        txHash={txSubmission.txHash}
+        destructive={activeAction === "cancel"}
+        requireExplicitConfirmation={activeAction === "cancel"}
+        explicitConfirmationLabel={t(
+          "streamDetail.cancel.explicitConfirmLabel",
+          {
+            name: displayStream.name,
+            remaining: formattedRemaining,
+          },
+        )}
       />
     </div>
   );

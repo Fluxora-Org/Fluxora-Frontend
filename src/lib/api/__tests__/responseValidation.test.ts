@@ -97,7 +97,9 @@ describe("api response validation", () => {
   });
 
   it("resolves conforming stream payloads into validated StreamRecord props", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ data: [validStream()] }));
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ data: [validStream()] })),
+    );
 
     const records = await getStreams();
     const recipientRecords = await getRecipientStreams(VALID_RECIPIENT);

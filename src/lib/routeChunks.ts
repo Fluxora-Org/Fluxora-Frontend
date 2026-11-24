@@ -1,3 +1,5 @@
+import routeBudgetsJson from "../../scripts/route-budgets.json";
+
 /**
  * Route-level code-splitting map used by Vite `manualChunks` and asserted in tests.
  *
@@ -74,16 +76,8 @@ export function resolveRoutePageChunk(
   return undefined;
 }
 
-/** Per-route gzip budget in bytes. */
-export const ROUTE_BUDGETS: Record<RouteChunkName, number> = {
-  "app-dashboard": 120 * 1024,
-  "app-streams": 150 * 1024,
-  "app-stream-detail": 100 * 1024,
-  "app-recipient": 80 * 1024,
-  "app-treasury": 100 * 1024,
-  "app-empty-state-demo": 50 * 1024,
-  "app-embed-stream": 60 * 1024,
-} as const;
+/** Per-route gzip budget in bytes (derived from scripts/route-budgets.json). */
+export const ROUTE_BUDGETS: Record<RouteChunkName, number> = routeBudgetsJson;
 
 /** Throws when two major routes share a chunk name (merge regression). */
 export function assertDistinctRouteChunks(
