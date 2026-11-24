@@ -351,82 +351,10 @@ export const CsvDropZone: React.FC<CsvDropZoneProps> = ({ onParsed }) => {
 
         {zoneState !== "parsing" && zoneState !== "dragging-over" && (
           <span className="csv-drop-zone__hint">
-            Accepts .csv · max {MAX_CSV_ROWS} rows · {MAX_CSV_FILE_SIZE_LABEL}
+            Acce
           </span>
         )}
-
-        </label>
-
-        {/* Visually hidden file input */}
-        <input
-          ref={inputRef}
-          id="csv-file-input"
-          type="file"
-          tabIndex={-1}
-          accept=".csv,text/csv"
-          className="sr-only"
-          aria-label={`Upload CSV file. Accepts .csv format, maximum ${MAX_CSV_ROWS} rows, ${MAX_CSV_FILE_SIZE_LABEL}.`}
-          aria-describedby="csv-upload-status"
-          onChange={onFileChange}
-        />
-
-      {/* ── Live status region (announced to screen readers) ── */}
-      <div
-        id="csv-upload-status"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="csv-drop-zone__live-region"
-      >
-        {statusMessage}
-      </div>
-
-      {/* Error shown below the zone as a ValidationMessage */}
-      {zoneState === "parse-error" && parseError && (
-        <ValidationMessage
-          id="csv-upload-error"
-          message={parseError}
-          type="error"
-        />
-      )}
-
-      {/* Success file info */}
-      {zoneState === "parsed" && parsedFileName && (
-        <ValidationMessage
-          id="csv-upload-success"
-          message={`${parsedFileName} — ${parsedRowCount} row${parsedRowCount !== 1 ? "s" : ""} detected`}
-          type="success"
-        />
-      )}
-
-      {/* ── Template download link ── */}
-      <div className="csv-drop-zone__template">
-        <button
-          type="button"
-          className="csv-template-link"
-          onClick={handleTemplateDownload}
-          aria-label="Download CSV template file"
-        >
-          <svg
-            width="14"
-            height="14"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"
-            />
-          </svg>
-          Download CSV template
-        </button>
-      </div>
+      </label>
     </div>
   );
 };
-
-export default CsvDropZone;

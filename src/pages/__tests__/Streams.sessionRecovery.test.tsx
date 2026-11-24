@@ -6,7 +6,9 @@ import { ToastProvider } from "../../components/toast/ToastProvider";
 import { streamRecords } from "../../data/streamRecords";
 import {
   DEFAULT_STREAMS_FILTERS,
+  readStreamsSession,
   writeStreamsSession,
+  clearStreamsSession,
 } from "../../lib/streamsSessionRecovery";
 
 const ALICE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -59,9 +61,13 @@ describe("Streams session recovery account isolation", () => {
     mockWalletAddress.current = ALICE;
     mockWalletLoading.current = false;
     localStorage.clear();
+    clearStreamsSession(ALICE);
+    clearStreamsSession(BOB);
   });
 
   afterEach(() => {
+    clearStreamsSession(ALICE);
+    clearStreamsSession(BOB);
     vi.restoreAllMocks();
   });
 
@@ -155,6 +161,8 @@ describe("Streams session recovery account isolation", () => {
         }),
       ).toBeInTheDocument();
     });
+
+    expect(readStreamsSession(Date.now(), ALICE)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     expect(searchInput).toHaveValue("bob-only");

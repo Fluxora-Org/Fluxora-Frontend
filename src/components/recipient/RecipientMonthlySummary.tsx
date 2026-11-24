@@ -2,15 +2,12 @@ import { useState, useMemo, useCallback } from "react";
 import { Printer, ChevronLeft, ChevronRight } from "lucide-react";
 import type { StreamRecord } from "../../data/streamRecords";
 import { computeMonthlySummary, type MonthlySummary } from "../../utils/monthlySummary";
+import { useI18n } from "../../i18n";
+import { formatAssetAmount } from "../../lib/formatters";
 
 interface RecipientMonthlySummaryProps {
   streams: StreamRecord[];
 }
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 function today() {
   const d = new Date();
@@ -18,6 +15,7 @@ function today() {
 }
 
 export default function RecipientMonthlySummary({ streams }: RecipientMonthlySummaryProps) {
+  const { t } = useI18n();
   const { year: currentYear, month: currentMonth } = useMemo(() => today(), []);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -49,17 +47,17 @@ export default function RecipientMonthlySummary({ streams }: RecipientMonthlySum
     window.print();
   }, []);
 
-  const label = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
+  const label = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(selectedYear, selectedMonth - 1, 1));
 
   return (
-    <section className="recipient-monthly-summary" aria-label={`Monthly summary for ${label}`}>
-      <div className="recipient-monthly-summary__toolbar" role="toolbar" aria-label="Select summary month">
+    <section className="recipient-monthly-summary" aria-label={t("recipient.monthly.aria", { label })}>
+      <div className="recipient-monthly-summary__toolbar" role="toolbar" aria-label={t("recipient.monthly.toolbar")}>
         <div className="recipient-monthly-summary__picker">
           <button
             type="button"
             onClick={goPrevMonth}
             className="recipient-monthly-summary__nav-btn"
-            aria-label="Previous month"
+            aria-label={t("recipient.monthly.previous")}
           >
             <ChevronLeft size={18} />
           </button>
@@ -68,7 +66,7 @@ export default function RecipientMonthlySummary({ streams }: RecipientMonthlySum
             type="button"
             onClick={goNextMonth}
             className="recipient-monthly-summary__nav-btn"
-            aria-label="Next month"
+            aria-label={t("recipient.monthly.next")}
           >
             <ChevronRight size={18} />
           </button>
@@ -77,63 +75,63 @@ export default function RecipientMonthlySummary({ streams }: RecipientMonthlySum
           type="button"
           onClick={handlePrint}
           className="recipient-monthly-summary__print-btn"
-          aria-label={`Print monthly summary for ${label}`}
+          aria-label={t("recipient.monthly.print")}
           disabled={!summary.hasActivity}
         >
           <Printer size={16} aria-hidden="true" />
-          Print monthly summary
+          {t("recipient.monthly.print")}
         </button>
       </div>
 
       {!summary.hasActivity ? (
         <div className="recipient-monthly-summary__empty" role="status" aria-live="polite">
-          <p>No streaming activity in {label}.</p>
+          <p>{t("recipient.monthly.empty", { label })}</p>
         </div>
       ) : (
         <div className="recipient-monthly-summary__content">
           <h2 className="recipient-monthly-summary__heading">
-            Printable Monthly Summary — {label}
+            {t("recipient.monthly.printable", { label })}
           </h2>
 
           <div className="recipient-monthly-summary__table-wrap">
-            <table aria-label={`Monthly streaming summary for ${label}`}>
-              <caption>Monthly streaming summary — {label}</caption>
+            <table aria-label={t("recipient.monthly.tableAria", { label })}>
+              <caption>{t("recipient.monthly.caption", { label })}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Sender</th>
-                  <th scope="col">Rate</th>
-                  <th scope="col">Streamed</th>
-                  <th scope="col">Withdrawn</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">{t("recipient.monthly.sender")}</th>
+                  <th scope="col">{t("recipient.monthly.rate")}</th>
+                  <th scope="col">{t("recipient.monthly.streamed")}</th>
+                  <th scope="col">{t("recipient.monthly.withdrawn")}</th>
+                  <th scope="col">{t("recipient.monthly.status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {summary.perStream.map((s) => (
                   <tr key={s.id}>
-                    <td data-label="Sender">{s.senderName}</td>
-                    <td data-label="Rate" className="recipient-col-right">
-                      {s.status === "Active" ? `${s.monthlyRate.toLocaleString()} /mo` : s.status}
+                    <td data-label={t("recipient.monthly.sender")}>{s.senderName}</td>
+                    <td data-label={t("recipient.monthly.rate")} className="recipient-col-right">
+                      {s.status === "Active" ? formatAssetAmount(s.monthlyRate, "USDC", "/mo") : s.status}
                     </td>
-                    <td data-label="Streamed" className="recipient-col-right">
-                      {s.amountStreamedInMonth.toLocaleString()} USDC
+                    <td data-label={t("recipient.monthly.streamed")} className="recipient-col-right">
+                      {formatAssetAmount(s.amountStreamedInMonth, "USDC")}
                     </td>
-                    <td data-label="Withdrawn" className="recipient-col-right">
+                    <td data-label={t("recipient.monthly.withdrawn")} className="recipient-col-right">
                       {s.amountWithdrawnInMonth > 0
-                        ? `${s.amountWithdrawnInMonth.toLocaleString()} USDC`
+                        ? formatAssetAmount(s.amountWithdrawnInMonth, "USDC")
                         : "—"}
                     </td>
-                    <td data-label="Status">
-                      {s.isCurrentlyAccruing ? "Accrued (mid-accrual)" : s.status}
+                    <td data-label={t("recipient.monthly.status")}>
+                      {s.isCurrentlyAccruing ? t("recipient.monthly.accruedStatus") : s.status}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="recipient-monthly-summary__totals-row">
-                  <td colSpan={2}>Totals</td>
-                  <td className="recipient-col-right">{summary.totalStreamed.toLocaleString()} USDC</td>
-                  <td className="recipient-col-right">{summary.totalWithdrawn.toLocaleString()} USDC</td>
-                  <td>{summary.withdrawableNow.toLocaleString()} avail</td>
+                  <td colSpan={2}>{t("recipient.monthly.totals")}</td>
+                  <td className="recipient-col-right">{formatAssetAmount(summary.totalStreamed, "USDC")}</td>
+                  <td className="recipient-col-right">{formatAssetAmount(summary.totalWithdrawn, "USDC")}</td>
+                  <td>{t("recipient.monthly.available", { amount: formatAssetAmount(summary.withdrawableNow, "USDC") })}</td>
                 </tr>
               </tfoot>
             </table>
@@ -141,16 +139,16 @@ export default function RecipientMonthlySummary({ streams }: RecipientMonthlySum
 
           <div className="recipient-monthly-summary__aggregate">
             <div className="recipient-monthly-summary__aggregate-row">
-              <span>Total accrued (month)</span>
-              <strong>{summary.totalStreamed.toLocaleString()} USDC</strong>
+              <span>{t("recipient.monthly.accrued")}</span>
+              <strong>{formatAssetAmount(summary.totalStreamed, "USDC")}</strong>
             </div>
             <div className="recipient-monthly-summary__aggregate-row">
-              <span>Total withdrawn (month)</span>
-              <strong>{summary.totalWithdrawn.toLocaleString()} USDC</strong>
+              <span>{t("recipient.monthly.withdrawnTotal")}</span>
+              <strong>{formatAssetAmount(summary.totalWithdrawn, "USDC")}</strong>
             </div>
             <div className="recipient-monthly-summary__aggregate-row">
-              <span>Currently withdrawable</span>
-              <strong>{summary.withdrawableNow.toLocaleString()} USDC</strong>
+              <span>{t("recipient.monthly.currentlyWithdrawable")}</span>
+              <strong>{formatAssetAmount(summary.withdrawableNow, "USDC")}</strong>
             </div>
           </div>
         </div>
