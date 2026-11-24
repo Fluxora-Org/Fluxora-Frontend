@@ -4,6 +4,7 @@ test('landing page hero renders without layout shift', async ({ page }) => {
   await page.addInitScript(() => {
     const target = window as Window & { __landingCls?: number };
     target.__landingCls = 0;
+  const cls = 0;
   page.on('console', msg => console.log(msg.text()));
 
     let sessionValue = 0;
