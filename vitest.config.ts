@@ -53,7 +53,6 @@ export default defineConfig({
       "src/components/wallet-connect/__tests__/reconnectViewState.test.tsx",
       "src/components/wallet-connect/__tests__/Walletcontext.test.tsx",
       "src/hooks/__tests__/useOnlineStatus.test.tsx",
-      "src/hooks/__tests__/useRouteFocus.test.tsx",
       "src/i18n/__tests__/missingTranslationFallback.test.tsx",
       "src/i18n/__tests__/pseudoLocaleCoverage.test.tsx",
       "src/lib/__tests__/browserStorageSecurity.test.ts",
