@@ -44,12 +44,16 @@ const STAGE_GUIDANCE: Partial<Record<WalletStage, StageGuidance>> = {
   rejected: {
     message: "Wallet connection was not approved.",
     nextStep:
-      "Open your wallet extension and approve the connection request, then reload this page to try again.",
+      "Open your wallet extension and approve the connection request, then reload this page.",
   },
   "network-mismatch": {
     message: "Your wallet is on the wrong network.",
     nextStep:
-      "Switch your wallet to the Stellar network Fluxora expects, then reload this page to try again.",
+      "Switch your wallet to the Stellar network, then reload this page to try again.",
+  },
+  "not-connected": {
+    message: "Your wallet is not connected.",
+    nextStep: "Connect your wallet to access this feature.",
   },
   "not-connected": {
     message: "Your wallet is not connected.",
@@ -95,17 +99,18 @@ const STAGE_ACCENT_BACKGROUND: Partial<Record<WalletStage, string>> = {
  * @see https://github.com/Fluxora-Org/Fluxora-Frontend/issues/1666
  */
 export default function WalletFallback({
-  stage = "loading-data",
+  stage = "restoring",
 }: {
   stage?: WalletStage;
 }) {
   const label = stageLabel(stage);
   const guidance = STAGE_GUIDANCE[stage];
+  const isLoadingStage = stage === "restoring" || stage === "loading-data";
 
   return (
     <main
       role="status"
-      aria-busy="true"
+      aria-busy={isLoadingStage ? "true" : "false"}
       aria-live="polite"
       aria-label={label}
       className="wallet-fallback"
@@ -206,7 +211,7 @@ export default function WalletFallback({
       {/* Table skeleton – matches RecentStreams table */}
       <div style={{ marginTop: "1.5rem" }} aria-hidden="true">
         <SkeletonCard style={{ padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table role="table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["STREAM", "RECIPIENT", "RATE", "STATUS"].map((col) => (
