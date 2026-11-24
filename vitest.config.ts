@@ -34,7 +34,6 @@ export default defineConfig({
       "src/components/__tests__/GetStartedCTA.test.tsx",
       "src/components/__tests__/RequireWalletAction.test.tsx",
       "src/components/__tests__/SessionRecoveryBanner.test.tsx",
-      "src/components/__tests__/TreasuryEmptyState.test.tsx",
       "src/components/__tests__/untrusted-metadata.security.test.tsx",
       "src/components/__tests__/WalletFallback.test.tsx",
       "src/components/common/TruncatedReveal.test.tsx",
