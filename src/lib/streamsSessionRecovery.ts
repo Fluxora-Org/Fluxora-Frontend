@@ -1,3 +1,16 @@
+/**
+ * Persistence + validation for the Streams page session-recovery feature.
+ * See docs/STREAMS_SESSION_RECOVERY_SPEC.md for the full design rationale —
+ * in particular §2 ("what is safe to restore") before changing this file.
+ *
+ * ACCOUNT SCOPING (#1440):
+ * Session data (filters, drafts) is scoped by wallet address to prevent
+ * cross-account data leakage. Switching wallets invalidates the previous
+ * account's cached session.
+ */
+
+export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
+
 import {
   createStorageWriteStatus,
   getBrowserStorage,
@@ -49,6 +62,9 @@ export interface StreamsSessionSnapshot {
 }
 
 type StorageReader = Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>;
+export const STREAMS_SESSION_SCHEMA_VERSION = 2 as const;
+
+type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {
@@ -147,6 +163,11 @@ function normalizeSnapshot(
 }
 
 /** True when the draft contains a non-default value worth resuming. */
+function getStorageKey(accountAddress: string): string {
+  return `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${accountAddress}`;
+}
+
+/** True when the draft has any recipient/deposit/schedule detail worth resuming. */
 export function isDraftMeaningful(
   draft: StreamDraftSnapshot | null | undefined,
 ): draft is StreamDraftSnapshot {
@@ -163,6 +184,7 @@ export function isDraftMeaningful(
 }
 
 /** True when the filter snapshot differs from the page defaults. */
+/** True when the filter snapshot differs from the page's defaults. */
 export function isFilterSnapshotMeaningful(
   filters: StreamsFilterSnapshot,
 ): boolean {

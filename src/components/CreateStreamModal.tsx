@@ -41,6 +41,7 @@ import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import TruncatedAddress from './common/TruncatedAddress';
+import AccrualPreview from './AccrualPreview';
 import { parseCsvNumber } from './csv-upload/csvParser';
 import { CsvParseCancelledError, parseCsvAsync } from './csv-upload/csvParseClient';
 import type { CsvParseTask } from './csv-upload/csvParseClient';
@@ -2435,6 +2436,25 @@ export default function CreateStreamModal({
               const reviewRecipient = recipient.trim();
               const reviewDeposit = formatReviewDeposit(depositAmount);
               const durationUnit = formatDurationUnit(duration, t);
+              // Accrual-preview inputs mirror buildSubmissionPayload() so the
+              // curve reflects exactly what will be submitted.
+              const rawStartMs =
+                startTimeOption === "now"
+                  ? Date.now()
+                  : new Date(customStartDate).getTime();
+              const reviewStartMs = Number.isFinite(rawStartMs)
+                ? rawStartMs
+                : Date.now();
+              const reviewDurationDays = parseFloat(duration) || 0;
+              const reviewEndMs =
+                reviewStartMs +
+                Math.floor(reviewDurationDays * 24 * 60 * 60 * 1000);
+              const reviewCliffMs =
+                cliffEnabled && cliffDate ? new Date(cliffDate).getTime() : null;
+              const reviewTotalMinor = amountToSmallestUnits(
+                depositAmount,
+                USDC_DECIMAL_PLACES,
+              );
               return (
                 <>
                   <hr className="divider" />
@@ -2708,6 +2728,19 @@ export default function CreateStreamModal({
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="review-card review-card-vertical">
+                    <div className="review-card-header">
+                      <div className="review-card-title">Accrual preview</div>
+                    </div>
+                    <AccrualPreview
+                      total={reviewTotalMinor}
+                      startMs={reviewStartMs}
+                      cliffMs={reviewCliffMs}
+                      endMs={reviewEndMs}
+                      decimals={USDC_DECIMAL_PLACES}
+                    />
                   </div>
 
                    {streamError && (

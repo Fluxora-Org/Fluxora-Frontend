@@ -27,7 +27,21 @@ vi.mock("../wallet-connect/Walletcontext", () => ({
 describe("GetStartedCTA", () => {
   beforeEach(() => {
     mockNavigate.mockClear();
-    vi.mocked(useWallet).mockReturnValue({ connected: true } as any);
+    vi.mocked(useWallet).mockReturnValue({
+      address: null,
+      network: null,
+      connected: false,
+      error: null,
+      loading: false,
+      accountContextVersion: 0,
+      connectionStatus: "disconnected",
+      reconnect: async () => {},
+      expectedNetwork: "TESTNET",
+      expectedNetworkLabel: "Testnet",
+      isNetworkMismatch: false,
+      connect: () => {},
+      disconnect: () => {},
+    });
   });
 
   it("renders tokenized styles without hardcoded colors", () => {

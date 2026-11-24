@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ShieldAlert, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 export type TransactionStatus = "idle" | "pending" | "success" | "error";
@@ -14,6 +14,11 @@ export interface ConfirmModalProps {
   onCancel: () => void;
   status?: TransactionStatus;
   errorMessage?: string;
+  successMessage?: string;
+  txHash?: string | null;
+  destructive?: boolean;
+  requireExplicitConfirmation?: boolean;
+  explicitConfirmationLabel?: string;
   onRetry?: () => void;
 }
 
@@ -27,11 +32,25 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancel,
   status = "idle",
   errorMessage = "Transaction failed. Please try again.",
+  successMessage = "Transaction confirmed successfully.",
+  txHash = null,
+  destructive = false,
+  requireExplicitConfirmation = false,
+  explicitConfirmationLabel = "I understand this action cannot be undone.",
   onRetry,
 }) => {
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const checkboxRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const [explicitlyConfirmed, setExplicitlyConfirmed] = useState(false);
+
+  // Reset explicit confirmation when modal opens/closes.
+  useEffect(() => {
+    if (!isOpen) {
+      setExplicitlyConfirmed(false);
+    }
+  }, [isOpen]);
 
   // Keep keyboard focus inside the dialog and restore it when the dialog closes.
   useEffect(() => {
@@ -39,6 +58,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
     previousActiveElementRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusTimer = window.setTimeout(() => {
+      if (requireExplicitConfirmation && checkboxRef.current) {
+        checkboxRef.current.focus();
+      } else {
+        confirmBtnRef.current?.focus();
+      }
+    }, 50);
 
     const handleTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
@@ -82,6 +109,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     }, 50);
     return () => window.clearTimeout(focusTimer);
   }, [isOpen, status]);
+  }, [isOpen, requireExplicitConfirmation]);
 
   // Escape key handler
   useEffect(() => {
@@ -110,10 +138,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   const renderStatusMessage = () => {
     if (isPending) return "Transaction in progress...";
-    if (isSuccess) return "Transaction confirmed successfully.";
+    if (isSuccess) return successMessage;
     if (isError) return errorMessage;
     return null;
   };
+
+  const isConfirmDisabled =
+    isPending || (requireExplicitConfirmation && !explicitlyConfirmed);
+
+  const confirmButtonClass = destructive
+    ? "flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-lg transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+    : "flex-1 py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-sm shadow-lg transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]";
 
   const statusColor = isError
     ? "text-red-600 bg-red-50 border-red-200"
@@ -164,8 +199,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           ref={confirmBtnRef}
           type="button"
           onClick={onConfirm}
-          disabled={isPending}
-          className="flex-1 py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold text-sm shadow-lg transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]"
+          disabled={isConfirmDisabled}
+          className={confirmButtonClass}
         >
           {isPending ? (
             <span className="flex items-center justify-center gap-2">
@@ -198,11 +233,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       ref={modalRef}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
     >
-      <div className="w-full max-w-mdd bg-[var(--surface-base)] border border-[var(--border-neutral)] rounded-2xl shadow-2xl p-6 space-y-5 text-left relative animate-scale-up">
-        /* Header Icon */
+      <div className="w-full max-w-md bg-[var(--surface-base)] border border-[var(--border-neutral)] rounded-2xl shadow-2xl p-6 space-y-5 text-left relative animate-scale-up">
+        {/* Header Icon */}
         <div className="flex items-start justify-between">
           <div
-            className={`w-12 h-12 rounded-xl bg-[var(--surface-sunken)] border border-[var(--border-neutral)] flex items-center justify-center ${isSuccess ? "text-green-600" : isError ? "text-red-600" : "text-[var(--text-vivid)]"}`}
+            className={`w-12 h-12 rounded-xl bg-[var(--surface-sunken)] border border-[var(--border-neutral)] flex items-center justify-center ${isSuccess ? "text-green-600" : isError ? "text-red-600" : destructive ? "text-red-600" : "text-[var(--text-vivid)]"}`}
           >
             {renderStatusIcon()}
           </div>
@@ -218,7 +253,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
         </div>
 
-        /* Text Content */
+        {/* Text Content */}
         <div className="space-y-2">
           <h2
             id="confirm-modal-heading"
@@ -232,18 +267,39 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           >
             {description}
           </p>
+          {requireExplicitConfirmation && status === "idle" && (
+            <label className="mt-3 flex items-start gap-2.5 text-sm text-[var(--text-vivid)] cursor-pointer select-none">
+              <input
+                ref={checkboxRef}
+                type="checkbox"
+                checked={explicitlyConfirmed}
+                onChange={(e) => setExplicitlyConfirmed(e.target.checked)}
+                data-testid="confirm-modal-explicit-checkbox"
+                className="mt-1 h-4 w-4 rounded border-[var(--border-neutral)]"
+              />
+              <span>{explicitConfirmationLabel}</span>
+            </label>
+          )}
           {renderStatusMessage() && (
             <div
               className={`mt-3 p-3 rounded-lg border text-sm font-medium ${statusColor}`}
               role="status"
               aria-live="polite"
             >
-              {renderStatusMessage()}
+              <p className="m-0">{renderStatusMessage()}</p>
+              {isSuccess && txHash && (
+                <p
+                  data-testid="confirm-modal-receipt"
+                  className="mt-1.5 mb-0 text-xs font-mono break-all opacity-90"
+                >
+                  Receipt: {txHash}
+                </p>
+              )}
             </div>
           )}
         </div>
 
-        /* Actions */
+        {/* Actions */}
         <div className="flex items-center gap-3 pt-2">
           {renderActions()}
         </div>

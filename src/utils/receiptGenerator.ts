@@ -222,7 +222,11 @@ export function drawReceiptToCanvas(
   ctx.strokeStyle = isPending ? "#F59E0B" : "#10B981";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(60, 160, 160, 34, 6) : ctx.rect(60, 160, 160, 34);
+  if (ctx.roundRect) {
+    ctx.roundRect(60, 160, 160, 34, 6);
+  } else {
+    ctx.rect(60, 160, 160, 34);
+  }
   ctx.fill();
   ctx.stroke();
 

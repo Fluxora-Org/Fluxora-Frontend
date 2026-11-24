@@ -1,6 +1,5 @@
 import React from "react";
 import "./StreamTimeline.css";
-import { useI18n } from "../i18n";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { createDateTimeFormat, formatNumber } from "../lib/formatters";
 
@@ -41,7 +40,6 @@ type TransactionStatus =
 const TransactionDemo: React.FC<{
   mockOutcome: Exclude<TransactionStatus, "idle" | "pending">;
 }> = ({ mockOutcome }) => {
-  const { t } = useI18n();
   const [status, setStatus] = React.useState<TransactionStatus>("idle");
   const [message, setMessage] = React.useState(
     "Transaction state idle. Click submit to start.",
@@ -145,7 +143,6 @@ export const StreamTimeline: React.FC<StreamTimelineProps> = ({
   showTransactionDemo = false,
   transactionDemoOutcome = "confirmed",
 }) => {
-  const { t } = useI18n();
   const prefersReducedMotion = usePrefersReducedMotion();
   const [animateClass, setAnimateClass] = React.useState("");
   const prevStatusRef = React.useRef(status);

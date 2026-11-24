@@ -518,13 +518,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       try {
         const addrResult = await getAddress();
         if (watcherGenerationRef.current !== generation) return;
-        
+
         if (addrResult.error || !addrResult.address || !isValidStellarAddress(addrResult.address)) {
           if (stateRef.current.connected) {
-            applyAccountChange(DISCONNECTED);
+            markDropped();
+            void checkConnection();
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
     }, WALLET_WATCH_INTERVAL_MS);

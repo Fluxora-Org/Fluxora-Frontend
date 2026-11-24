@@ -5,6 +5,11 @@ import { HelmetProvider } from "react-helmet-async";
 import StreamDetail, { getStreamStatusPresentation } from "../StreamDetail";
 import * as streamsService from "../../lib/api/streamsService";
 import type { StreamRecord, StreamStatus } from "../../data/streamRecords";
+// The test setup globally mocks the i18n module; unmock it so the page renders
+// through the real provider and the zx pseudo-locale assertions below are
+// meaningful (see src/i18n/__tests__/missingTranslationFallback.test.tsx).
+vi.unmock("../../i18n");
+import { I18nProvider } from "../../i18n";
 
 const baseStream: StreamRecord = {
   id: "STR-1640",
@@ -34,13 +39,15 @@ const baseStream: StreamRecord = {
 function renderStreamDetail(stream: StreamRecord) {
   vi.spyOn(streamsService, "getStreamById").mockResolvedValue(stream);
   return render(
-    <HelmetProvider>
-      <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
-        <Routes>
-          <Route path="/app/streams/:streamId" element={<StreamDetail />} />
-        </Routes>
-      </MemoryRouter>
-    </HelmetProvider>,
+    <I18nProvider>
+      <HelmetProvider>
+        <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
+          <Routes>
+            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </HelmetProvider>
+    </I18nProvider>,
   );
 }
 
@@ -96,13 +103,15 @@ describe("StreamDetail status presentation", () => {
     );
 
     render(
-      <HelmetProvider>
-        <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
-          <Routes>
-            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
-          </Routes>
-        </MemoryRouter>
-      </HelmetProvider>,
+      <I18nProvider>
+        <HelmetProvider>
+          <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
+            <Routes>
+              <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </HelmetProvider>
+      </I18nProvider>,
     );
 
     expect(
@@ -117,17 +126,57 @@ describe("StreamDetail status presentation", () => {
     );
 
     render(
-      <HelmetProvider>
-        <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
-          <Routes>
-            <Route path="/app/streams/:streamId" element={<StreamDetail />} />
-          </Routes>
-        </MemoryRouter>
-      </HelmetProvider>,
+      <I18nProvider>
+        <HelmetProvider>
+          <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
+            <Routes>
+              <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </HelmetProvider>
+      </I18nProvider>,
     );
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByTestId("stream-status")).not.toBeInTheDocument();
+  });
+
+  it("renders catalog copy pseudo-localized when the page is shown under the zx locale (#2112)", async () => {
+    vi.spyOn(streamsService, "getStreamById").mockResolvedValue({
+      ...baseStream,
+      status: "Active" as StreamStatus,
+    });
+
+    render(
+      <I18nProvider defaultLocale="zx">
+        <HelmetProvider>
+          <MemoryRouter initialEntries={["/app/streams/STR-1640"]}>
+            <Routes>
+              <Route path="/app/streams/:streamId" element={<StreamDetail />} />
+            </Routes>
+          </MemoryRouter>
+        </HelmetProvider>
+      </I18nProvider>,
+    );
+
+    const region = await screen.findByTestId("stream-status");
+
+    // The sr-only status heading is catalog copy: under zx it must carry the
+    // pseudo-locale markers instead of the bare English string.
+    const srHeading = within(region).getByText(
+      (_, element) =>
+        element?.tagName.toLowerCase() === "h2" &&
+        element?.id === "stream-status-heading",
+    );
+    expect(srHeading.textContent ?? "").toMatch(/^\[.+\]$/s);
+    expect(srHeading.textContent).not.toBe("Stream status");
+
+    // The status pill label and description come from the catalog too: the
+    // heading, pill, and description all render pseudo-localized under zx,
+    // so no English copy bypasses the i18n layer in this region.
+    expect(
+      within(region).getAllByText(/^\[.+\]$/s).length,
+    ).toBeGreaterThanOrEqual(3);
   });
 });
 

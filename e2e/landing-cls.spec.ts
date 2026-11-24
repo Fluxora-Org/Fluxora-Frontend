@@ -4,6 +4,8 @@ test('landing page hero renders without layout shift', async ({ page }) => {
   await page.addInitScript(() => {
     const target = window as Window & { __landingCls?: number };
     target.__landingCls = 0;
+  const cls = 0;
+  page.on('console', msg => console.log(msg.text()));
 
     let sessionValue = 0;
     let sessionStart: number | undefined;
@@ -29,6 +31,15 @@ test('landing page hero renders without layout shift', async ({ page }) => {
         sessionValue += shift.value;
         target.__landingCls = Math.max(target.__landingCls ?? 0, sessionValue);
         previousEntryTime = shift.startTime;
+      });
+      try {
+        observer.observe({ type: 'layout-shift', buffered: true });
+        setTimeout(() => {
+          observer.disconnect();
+          resolve(clsValue);
+        }, 500);
+      } catch {
+        resolve(0);
       }
     }).observe({ type: 'layout-shift', buffered: true });
   });

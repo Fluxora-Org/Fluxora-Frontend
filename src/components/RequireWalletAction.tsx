@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
 import { useWallet } from "./wallet-connect/Walletcontext";
 import { sanitizeReturnTo } from "./RequireWallet";
 import { isE2EEnabled } from "../lib/config";
@@ -26,11 +25,6 @@ export default function RequireWalletAction({
   children,
 }: RequireWalletActionProps) {
   const wallet = useWallet();
-  const location = useLocation();
-
-  const returnTo = sanitizeReturnTo(
-    `${location.pathname}${location.search}${location.hash}`,
-  );
 
   // End-to-end runs drive these flows without a browser wallet extension, so
   // the action guard passes through when VITE_E2E is enabled.
