@@ -9,6 +9,10 @@ import WalletIcon from "./WalletIcon";
 import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 import { useWalletStateMachine } from "./wallet-connect/useWalletStateMachine";
 import { useI18n } from "../i18n";
+import freighterIcon from "../assets/images/freighter.svg";
+import albedoIcon from "../assets/images/albedo.svg";
+import walletconnectIcon from "../assets/images/walletconnect.svg";
+import hardwareIcon from "../assets/images/hardware.svg";
 
 /** Duration (ms) before the Freighter network check is considered hung. */
 const NETWORK_TIMEOUT_MS = 5000;
@@ -434,7 +438,7 @@ export default function ConnectWalletModal({
       name: "Freighter",
       description: t("connectWallet.walletDescription.freighter"),
       icon: "🚀",
-      iconSrc: "/src/assets/images/freighter.svg",
+      iconSrc: freighterIcon,
       action: handleFreighterClick,
     },
     {
@@ -442,7 +446,7 @@ export default function ConnectWalletModal({
       name: "Albedo",
       description: t("connectWallet.walletDescription.albedo"),
       icon: "⭐",
-      iconSrc: "/src/assets/images/albedo.svg",
+      iconSrc: albedoIcon,
       action: onConnectAlbedo ?? (() => {}),
       disabled: !onConnectAlbedo,
     },
@@ -451,7 +455,7 @@ export default function ConnectWalletModal({
       name: "WalletConnect",
       description: t("connectWallet.walletDescription.walletConnect"),
       icon: "🔗",
-      iconSrc: "/src/assets/images/walletconnect.svg",
+      iconSrc: walletconnectIcon,
       action: onConnectWalletConnect ?? (() => {}),
       disabled: !onConnectWalletConnect,
     },
@@ -460,7 +464,7 @@ export default function ConnectWalletModal({
       name: "Hardware Wallet",
       description: t("connectWallet.walletDescription.hardware"),
       icon: "🛠️",
-      iconSrc: "/src/assets/images/hardware.svg",
+      iconSrc: hardwareIcon,
       action: handleHardwareClick,
     },
   ];
