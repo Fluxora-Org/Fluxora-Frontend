@@ -50,6 +50,9 @@ import {
   resolvePreviewTokens,
   createInitialDraft,
   resetDraftToDefaults,
+  exportThemeTokens,
+  importThemeTokens,
+  MAX_THEME_IMPORT_BYTES,
   type ThemeEditorDraft,
 } from "./themeEditorModel";
 
@@ -446,11 +449,16 @@ export default function ThemeEditorPanel({
 
   const formRef = useRef<HTMLFormElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Local draft values — seeded from the current applied theme or defaults.
   const [draft, setDraft] = useState<ThemeEditorDraft>(() =>
     createInitialDraft(customTheme),
   );
+  const [fileStatus, setFileStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [label, setLabel] = useState<string>(customTheme?.label ?? "My Brand Theme");
   const [themeId, setThemeId] = useState<string>(customTheme?.id ?? "org-brand");
 
@@ -483,6 +491,74 @@ export default function ThemeEditorPanel({
     if (!isAuthorized) return;
     applyCustomTheme();
   }, [applyCustomTheme, isAuthorized]);
+
+  const handleExport = useCallback(() => {
+    if (!isAuthorized) return;
+
+    try {
+      const contents = exportThemeTokens(draft);
+      const url = URL.createObjectURL(
+        new Blob([contents], { type: "application/json" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "fluxora-theme.json";
+      try {
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      setFileStatus({
+        type: "success",
+        message: "Theme exported as fluxora-theme.json.",
+      });
+    } catch (error) {
+      setFileStatus({
+        type: "error",
+        message:
+          error instanceof Error
+            ? `Theme export failed: ${error.message}`
+            : "Theme export failed. Please try again.",
+      });
+    }
+  }, [draft, isAuthorized]);
+
+  const handleImport = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
+      event.currentTarget.value = "";
+      if (!file || !isAuthorized) return;
+
+      if (file.size > MAX_THEME_IMPORT_BYTES) {
+        setFileStatus({
+          type: "error",
+          message: `Theme file exceeds the maximum size of ${MAX_THEME_IMPORT_BYTES} bytes.`,
+        });
+        return;
+      }
+
+      try {
+        const importedDraft = importThemeTokens(await file.text());
+        setDraft(importedDraft);
+        setTouched(new Set(Object.keys(importedDraft)));
+        setFileStatus({
+          type: "success",
+          message: "Theme imported. Preview it before applying.",
+        });
+      } catch (error) {
+        setFileStatus({
+          type: "error",
+          message:
+            error instanceof Error
+              ? `Theme import failed: ${error.message}`
+              : "Theme import failed. Please check the file and try again.",
+        });
+      }
+    },
+    [isAuthorized],
+  );
 
   const handleCancel = useCallback(() => {
     clearCustomTheme();
@@ -833,6 +909,54 @@ export default function ThemeEditorPanel({
             aria-label="Theme actions"
             style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
           >
+            <button
+              type="button"
+              disabled={!isAuthorized}
+              onClick={handleExport}
+              style={{
+                minHeight: "44px",
+                padding: "0 16px",
+                borderRadius: "var(--radius-md, 8px)",
+                border: "1px solid var(--color-border-default, #e0e6ed)",
+                background: "var(--color-bg-primary, #fff)",
+                color: "var(--color-text-secondary, #4a5565)",
+                font: "var(--font-label-lg, 500 14px/20px sans-serif)",
+                fontWeight: 600,
+                cursor: !isAuthorized ? "not-allowed" : "pointer",
+                opacity: !isAuthorized ? 0.6 : 1,
+              }}
+            >
+              Export theme
+            </button>
+            <button
+              type="button"
+              disabled={!isAuthorized}
+              onClick={() => importInputRef.current?.click()}
+              style={{
+                minHeight: "44px",
+                padding: "0 16px",
+                borderRadius: "var(--radius-md, 8px)",
+                border: "1px solid var(--color-border-default, #e0e6ed)",
+                background: "var(--color-bg-primary, #fff)",
+                color: "var(--color-text-secondary, #4a5565)",
+                font: "var(--font-label-lg, 500 14px/20px sans-serif)",
+                fontWeight: 600,
+                cursor: !isAuthorized ? "not-allowed" : "pointer",
+                opacity: !isAuthorized ? 0.6 : 1,
+              }}
+            >
+              Import theme
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              aria-label="Theme JSON file"
+              tabIndex={-1}
+              disabled={!isAuthorized}
+              onChange={handleImport}
+              style={{ display: "none" }}
+            />
             {/* Preview / re-preview */}
             <button
               type="submit"
@@ -915,6 +1039,23 @@ export default function ThemeEditorPanel({
               {isApplied || isPreviewing ? "Reset to Default" : "Cancel"}
             </button>
           </div>
+          {fileStatus && (
+            <p
+              role={fileStatus.type === "error" ? "alert" : "status"}
+              aria-live={fileStatus.type === "error" ? "assertive" : "polite"}
+              aria-atomic="true"
+              style={{
+                margin: 0,
+                color:
+                  fileStatus.type === "error"
+                    ? "var(--color-danger, #ef4444)"
+                    : "var(--color-success, #10b981)",
+                fontSize: "13px",
+              }}
+            >
+              {fileStatus.message}
+            </p>
+          )}
         </form>
 
         {/* Live preview */}

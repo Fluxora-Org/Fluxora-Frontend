@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useWidgetLayout } from "../useWidgetLayout";
 import { Metric } from "../Metric";
+import { logger } from "../../../lib/logger";
 
 // Mock the useWallet hook
 let mockWalletAddress: string | null = null;
@@ -112,7 +113,7 @@ describe("useWidgetLayout hook", () => {
   });
 
   it("recovers from parse failure and logs a warning", () => {
-    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     
     // Put corrupt JSON in localStorage
     localStorage.setItem("fluxora:treasury:widget-layout", "{invalid-json-corrupt");
@@ -122,13 +123,16 @@ describe("useWidgetLayout hook", () => {
     // Should fall back to default order
     expect(result.current.layout.widgets).toHaveLength(3);
     expect(result.current.layout.widgets[0].id).toBe("total-balance");
-    expect(consoleWarnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Failed to load layout from localStorage, falling back to default.",
+      expect.any(SyntaxError),
+    );
 
-    consoleWarnSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it("recovers from localStorage.setItem failure in saveLayout", () => {
-    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
     const setItemSpy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
@@ -160,9 +164,12 @@ describe("useWidgetLayout hook", () => {
     });
     expect(result.current.layout.widgets[0].id).toBe("total-balance");
 
-    expect(consoleWarnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Failed to persist layout to localStorage.",
+      expect.any(Error),
+    );
 
-    consoleWarnSpy.mockRestore();
+    warnSpy.mockRestore();
     setItemSpy.mockRestore();
   });
 

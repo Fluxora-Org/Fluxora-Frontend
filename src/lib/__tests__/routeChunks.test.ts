@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import routeBudgetsJson from "../../../scripts/route-budgets.json";
 import {
   EAGER_PAGE_MODULES,
   REQUIRED_PRODUCTION_ROUTE_CHUNKS,
@@ -215,8 +216,8 @@ describe("formatRouteChunkSizeReport", () => {
     const report = formatRouteChunkSizeReport(sizes);
     const lines = report.split("\n");
 
-    // Find the data rows (skip header)
-    const dataLines = lines.slice(3);
+    // Find the data rows (skip 4 header lines: title, underline, columns, separator)
+    const dataLines = lines.slice(4);
     expect(dataLines[0]).toContain("large");
     expect(dataLines[1]).toContain("medium");
     expect(dataLines[2]).toContain("small");
@@ -294,5 +295,9 @@ describe("ROUTE_BUDGETS", () => {
     for (const budget of Object.values(ROUTE_BUDGETS)) {
       expect(budget % 1024).toBe(0);
     }
+  });
+
+  it("matches the budgets shipped in scripts/route-budgets.json", () => {
+    expect(ROUTE_BUDGETS).toEqual(routeBudgetsJson);
   });
 });

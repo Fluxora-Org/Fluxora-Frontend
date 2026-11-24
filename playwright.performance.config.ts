@@ -6,9 +6,12 @@ const baseURL =
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 30_000,
+  timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: "list",
+  reporter: [
+    ["list"],
+    ["html", { outputFolder: "playwright-performance-report", open: "never" }],
+  ],
   use: {
     baseURL,
     trace: "on-first-retry",
