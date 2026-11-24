@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getAddress,
   getNetwork,
@@ -34,7 +34,7 @@ const APPROVED_ADDRESS =
   "GATDOSCZNJ5YZHNOX7IOD4QDCQSTMR2YNF5IXHFNX3H6B4ICCMSDLOWN";
 
 function WalletProbe() {
-  const { address, connected, error, network, loading, connect } = useWallet();
+  const { address, connected, error, network, loading, connectionStatus, connect } = useWallet();
 
   return (
     <>
@@ -45,6 +45,7 @@ function WalletProbe() {
           error: error?.type ?? null,
           network,
           loading,
+          connectionStatus,
         })}
       </output>
       <button
@@ -313,7 +314,7 @@ describe("WalletProvider session expiry", () => {
     vi.useRealTimers();
   });
 
-  it("reflects an expired session as disconnected", async () => {
+  it("reflects an expired session as dropped (session preserved)", async () => {
     renderWalletProvider();
 
     await waitFor(() =>
@@ -331,8 +332,9 @@ describe("WalletProvider session expiry", () => {
 
     await waitFor(() =>
       expect(walletState()).toMatchObject({
-        connected: false,
-        address: null,
+        connected: true,
+        address: APPROVED_ADDRESS,
+        connectionStatus: "dropped",
       }),
     );
   });
