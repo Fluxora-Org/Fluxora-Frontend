@@ -295,7 +295,7 @@ function readOnChainStreamId(source: Record<string, unknown>): string | undefine
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
     return String(value);
   }
-  if (typeof value === "string" && /^(0|[1-9]\\d*)$/.test(value.trim())) {
+  if (typeof value === "string" && /^(0|[1-9]\d*)$/.test(value.trim())) {
     return value.trim();
   }
   return undefined;
@@ -364,7 +364,7 @@ export function normalizeStreamRecord(raw: unknown): StreamRecord {
   return {
     id: readString(source.id),
     onChainStreamId: readOnChainStreamId(source),
-    depositAmountRaw: typeof source.depositAmount === "string" && /^\\d+(?:\\.\\d+)?$/.test(source.depositAmount.trim()) ? source.depositAmount.trim() : undefined,
+    depositAmountRaw: typeof source.depositAmount === "string" && /^\d+(?:\.\d+)?$/.test(source.depositAmount.trim()) ? source.depositAmount.trim() : undefined,
     name: readString(source.name, "Untitled stream"),
     recipientName: readString(source.recipientName, "Unknown recipient"),
     recipientAddress: sanitizeStellarAddress(source.recipientAddress),

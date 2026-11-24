@@ -40,7 +40,7 @@ function asBigInt(value: unknown): bigint | null {
 }
 
 function decimalToStroops(value: string): bigint | null {
-  const match = /^(\\d+)(?:\\.(\\d{1,7}))?$/.exec(value);
+  const match = /^(\d+)(?:\.(\d{1,7}))?$/.exec(value);
   if (!match) return null;
   return BigInt(match[1]) * 10_000_000n + BigInt((match[2] ?? "").padEnd(7, "0"));
 }
