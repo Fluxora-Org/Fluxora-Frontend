@@ -40,17 +40,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     previousActiveElementRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-    const focusTimer = window.setTimeout(() => {
-      if (status === "idle") confirmBtnRef.current?.focus();
-    }, 50);
-
     const handleTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
 
       const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
-      if (!focusable?.length) return;
+      if (!focusable?.length) {
+        event.preventDefault();
+        modalRef.current?.focus();
+        return;
+      }
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -65,11 +65,22 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
     document.addEventListener("keydown", handleTab);
     return () => {
-      window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", handleTab);
       previousActiveElementRef.current?.focus();
       previousActiveElementRef.current = null;
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const focusTimer = window.setTimeout(() => {
+      if (status === "idle") {
+        confirmBtnRef.current?.focus();
+      } else if (status === "pending") {
+        modalRef.current?.focus();
+      }
+    }, 50);
+    return () => window.clearTimeout(focusTimer);
   }, [isOpen, status]);
 
   // Escape key handler
@@ -183,6 +194,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-modal-heading"
       aria-describedby="confirm-modal-desc"
+      tabIndex={-1}
       ref={modalRef}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
     >

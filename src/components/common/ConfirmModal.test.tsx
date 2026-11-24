@@ -100,6 +100,18 @@ describe("ConfirmModal keyboard accessibility", () => {
 
     expect(onCancel).not.toHaveBeenCalled();
   });
+
+  it("keeps focus in the dialog while a transaction becomes pending", async () => {
+    const { rerender } = render(<ConfirmModal {...modalProps} />);
+    const dialog = screen.getByRole("dialog");
+    const confirmButton = screen.getByRole("button", { name: "Confirm" });
+
+    await waitFor(() => expect(confirmButton).toHaveFocus());
+    rerender(<ConfirmModal {...modalProps} status="pending" />);
+
+    await waitFor(() => expect(dialog).toHaveFocus());
+    expect(document.activeElement).toBe(dialog);
+  });
 });
 
 describe("ConfirmModal transaction announcements", () => {

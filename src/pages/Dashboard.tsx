@@ -19,6 +19,7 @@ import {
   writeOnboardingDismissed,
 } from "../lib/onboarding";
 import { formatAssetAmount } from "../lib/formatters";
+import { useI18n } from "../i18n";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -29,6 +30,7 @@ import "../design-tokens.css";
 const cardGrid: React.CSSProperties = { display: "grid", gap: "1rem" };
 const card: React.CSSProperties = { border: "1px solid var(--border)", padding: "1rem", borderRadius: "8px" };
 export default function Dashboard() {
+  const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -73,35 +75,35 @@ export default function Dashboard() {
     }
 
     if (!loading && streams.length > 0) {
-      announce(`${streams.length} active streams loaded.`);
+      announce(t("dashboard.announcement.streamsLoaded", { count: streams.length }));
     }
-  }, [loading, streams.length, announce]);
+  }, [loading, streams.length, announce, t]);
 
   useEffect(() => {
     if (walletConnected && walletAddress) {
       announce(
-        `Wallet connected: ${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`,
+        t("dashboard.announcement.walletConnected", { address: `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` }),
       );
     }
-  }, [walletConnected, walletAddress, announce]);
+  }, [walletConnected, walletAddress, announce, t]);
 
   useEffect(() => {
     if (withdrawable !== null) {
       announce(
-        `Available balance updated to ${formatAssetAmount(withdrawable, "USDC")}.`,
+        t("dashboard.announcement.balanceUpdated", { amount: formatAssetAmount(withdrawable, "USDC") }),
       );
     }
-  }, [withdrawable, announce]);
+  }, [withdrawable, announce, t]);
 
   useEffect(() => {
     if (error) {
       const message =
         error === "Unable to load treasury data."
-          ? "Failed to load dashboard data."
-          : `Failed to load dashboard data: ${error}`;
+          ? t("dashboard.error.loadFallback")
+          : t("dashboard.error.load", { error });
       announceAlert(message);
     }
-  }, [error, announceAlert]);
+  }, [error, announceAlert, t]);
 
   const handleDismissOnboarding = () => {
     setShowOnboarding(false);
@@ -121,7 +123,7 @@ export default function Dashboard() {
     setIsModalOpen(false);
     setToast({
       message:
-        "Stream created successfully. Review the new stream from the treasury overview.",
+        t("dashboard.toast.streamCreated"),
       variant: "success",
     });
   };
@@ -129,7 +131,7 @@ export default function Dashboard() {
   const handleWalletProviderUnavailable = (providerName: string) => {
     setIsWalletModalOpen(false);
     setToast({
-      message: `${providerName} connection is not available in this demo yet. Try again once wallet integration is enabled.`,
+      message: t("dashboard.toast.providerUnavailable", { providerName }),
       variant: "error",
     });
   };
@@ -139,7 +141,7 @@ export default function Dashboard() {
 
   return (
     <main id="main-content">
-      <MetaTags title="Dashboard" />
+      <MetaTags title={t("dashboard.title")} />
     <div className="dashboard-content">
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -149,11 +151,10 @@ export default function Dashboard() {
       </div>
 
       <h1 className="text-heading-1" style={{ marginTop: 0 }}>
-        Treasury overview
+        {t("dashboard.heading")}
       </h1>
       <p className="text-body-lg" style={{ color: "var(--muted)" }}>
-        Treasury overview and active stream summary. Connect your wallet to see
-        real-time capital flow.
+        {t("dashboard.description")}
       </p>
 
       {!walletConnected && !showOnboarding && (
@@ -182,22 +183,21 @@ export default function Dashboard() {
               />
             </svg>
             <span className="text-body-md" style={{ color: "var(--text)" }}>
-              Connect your Stellar wallet to see real balances and create
-              streams.
+              {t("dashboard.wallet.connectPrompt")}
             </span>
           </div>
           <Button
             type="button"
             variant="secondary"
             onClick={() => setIsWalletModalOpen(true)}
-            aria-label="Connect Stellar wallet"
+            aria-label={t("dashboard.wallet.connectAria")}
           >
-            Connect wallet
+            {t("dashboard.wallet.connectAria")}
           </Button>
         </div>
       )}
 
-      <WidgetErrorBoundary name="Treasury summary" onRetry={refetch}>
+      <WidgetErrorBoundary name={t("dashboard.summary.boundary")} onRetry={refetch}>
         <DashboardSummaryWidget
           streamCount={streams.length}
           totalStreaming={totalStreaming}
@@ -210,14 +210,14 @@ export default function Dashboard() {
         <div role="alert" style={walletBannerStyle}>
           <span style={{ color: "var(--text)" }}>{error}</span>
           <Button type="button" variant="secondary" onClick={refetch}>
-            Retry
+            {t("dashboard.retry")}
           </Button>
         </div>
       )}
 
       {loading || hasError || hasStreams ? (
         <>
-          <WidgetErrorBoundary name="Recent streams" onRetry={refetch}>
+          <WidgetErrorBoundary name={t("dashboard.streams.boundary")} onRetry={refetch}>
             <DashboardStreamsWidget
               streams={streams}
               loading={loading}
@@ -233,9 +233,9 @@ export default function Dashboard() {
               type="button"
               variant="primary"
               onClick={() => setIsModalOpen(true)}
-              aria-label="Create stream"
+              aria-label={t("dashboard.createStream")}
             >
-              Create stream
+              {t("dashboard.createStream")}
             </Button>
           )}
         </>

@@ -1,33 +1,20 @@
-import { logger } from "./logger";
-
-/**
- * Persistence + validation for the Streams page session-recovery feature.
- * See docs/STREAMS_SESSION_RECOVERY_SPEC.md for the full design rationale —
- * in particular §2 ("what is safe to restore") before changing this file.
- *
- * ACCOUNT SCOPING (#1440):
- * Session data (filters, drafts) is scoped by wallet address to prevent
- * cross-account data leakage. Switching wallets invalidates the previous
- * account's cached session.
- */
-
-export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
-
 import {
   createStorageWriteStatus,
   getBrowserStorage,
-  readBrowserStorage,
   removeBrowserStorage,
-  writeBrowserStorage,
 } from "./browserStorage";
 
 /**
- * Outcome of the most recent session write, so the persistence indicator only
- * claims persistence after a write actually reached storage (#1663).
+ * Streams recovery is intentionally memory-only. Browser storage is readable
+ * by every script running on this origin and must not contain wallet-linked
+ * filters, recipient addresses, or unsubmitted payment drafts.
+ *
+ * Snapshots can survive component remounts during the current page lifetime,
+ * but are discarded automatically when the page is closed or reloaded.
  */
-export const streamsSessionWriteStatus = createStorageWriteStatus();
 
-/** Snapshots older than this are treated as stale and never offered for restore. */
+export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
+export const STREAMS_SESSION_SCHEMA_VERSION = 2 as const;
 export const STREAMS_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export interface StreamsFilterSnapshot {
@@ -39,9 +26,8 @@ export interface StreamsFilterSnapshot {
 }
 
 /**
- * Fields safe to restore from an in-progress, unsubmitted create-stream draft.
- * Deliberately excludes anything set only after the review step (step 3) —
- * recipient/deposit/schedule inputs only, never submission or tx state.
+ * Only unsubmitted form values from steps 1 and 2 are safe to retain in memory.
+ * Transaction state and review/submit state are deliberately excluded.
  */
 export interface StreamDraftSnapshot {
   step: 1 | 2;
@@ -57,25 +43,12 @@ export interface StreamDraftSnapshot {
 
 export interface StreamsSessionSnapshot {
   savedAt: number;
-  /** The wallet address this session belongs to. Used to invalidate on account switch. */
   accountAddress: string;
   filters: StreamsFilterSnapshot;
   draft: StreamDraftSnapshot | null;
 }
 
-export const STREAMS_SESSION_SCHEMA_VERSION = 2 as const;
-const LEGACY_STREAMS_SESSION_SCHEMA_VERSION = 1 as const;
-const SUPPORTED_STREAMS_SESSION_VERSIONS = new Set<number>([
-  LEGACY_STREAMS_SESSION_SCHEMA_VERSION,
-  STREAMS_SESSION_SCHEMA_VERSION,
-]);
-
-type StreamsSessionEnvelope = {
-  version: number;
-  data: unknown;
-};
-
-type StorageReader = Pick<Storage, "getItem">;
+type StorageReader = Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>;
 type StorageWriter = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {
@@ -89,27 +62,91 @@ export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {
 export const DEFAULT_STREAM_DRAFT_ACCRUAL_RATE = "38.62";
 export const DEFAULT_STREAM_DRAFT_DURATION = "1";
 
+/** This status reports browser persistence, not the in-memory recovery cache. */
+export const streamsSessionWriteStatus = createStorageWriteStatus();
+
+const sessionsByAccount = new Map<string, StreamsSessionSnapshot>();
+
 function getLocalStorage(): Storage | null {
   return getBrowserStorage("localStorage");
 }
 
-/**
- * Normalizes a wallet address for the isolated session namespace.
- */
 function normalizeAccountAddress(accountAddress: string): string | null {
   const normalized = accountAddress.trim();
   return normalized || null;
-}
-
-function getStorageKey(accountAddress: string): string {
-  return `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${accountAddress}`;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** True when the draft has any recipient/deposit/schedule detail worth resuming. */
+function parseFilters(raw: unknown): StreamsFilterSnapshot {
+  if (!isPlainObject(raw)) return { ...DEFAULT_STREAMS_FILTERS };
+
+  return {
+    statusFilter:
+      typeof raw.statusFilter === "string"
+        ? raw.statusFilter
+        : DEFAULT_STREAMS_FILTERS.statusFilter,
+    searchQuery:
+      typeof raw.searchQuery === "string"
+        ? raw.searchQuery
+        : DEFAULT_STREAMS_FILTERS.searchQuery,
+    sortBy:
+      typeof raw.sortBy === "string"
+        ? raw.sortBy
+        : DEFAULT_STREAMS_FILTERS.sortBy,
+    currentPage:
+      typeof raw.currentPage === "number" && Number.isFinite(raw.currentPage)
+        ? Math.max(1, Math.floor(raw.currentPage))
+        : DEFAULT_STREAMS_FILTERS.currentPage,
+    itemsPerPage:
+      typeof raw.itemsPerPage === "number" && Number.isFinite(raw.itemsPerPage)
+        ? Math.max(1, Math.floor(raw.itemsPerPage))
+        : DEFAULT_STREAMS_FILTERS.itemsPerPage,
+  };
+}
+
+function parseDraft(raw: unknown): StreamDraftSnapshot | null {
+  if (!isPlainObject(raw)) return null;
+
+  return {
+    step: raw.step === 2 ? 2 : 1,
+    recipient: typeof raw.recipient === "string" ? raw.recipient : "",
+    depositAmount:
+      typeof raw.depositAmount === "string" ? raw.depositAmount : "",
+    accrualRate:
+      typeof raw.accrualRate === "string"
+        ? raw.accrualRate
+        : DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
+    duration:
+      typeof raw.duration === "string"
+        ? raw.duration
+        : DEFAULT_STREAM_DRAFT_DURATION,
+    startTimeOption: raw.startTimeOption === "custom" ? "custom" : "now",
+    customStartDate:
+      typeof raw.customStartDate === "string" ? raw.customStartDate : "",
+    cliffEnabled: raw.cliffEnabled === true,
+    cliffDate: typeof raw.cliffDate === "string" ? raw.cliffDate : "",
+  };
+}
+
+function normalizeSnapshot(
+  raw: unknown,
+  savedAt: number,
+  accountAddress: string,
+): StreamsSessionSnapshot | null {
+  if (!isPlainObject(raw) || !isPlainObject(raw.filters)) return null;
+
+  return {
+    savedAt,
+    accountAddress,
+    filters: parseFilters(raw.filters),
+    draft: raw.draft === null ? null : parseDraft(raw.draft),
+  };
+}
+
+/** True when the draft contains a non-default value worth resuming. */
 export function isDraftMeaningful(
   draft: StreamDraftSnapshot | null | undefined,
 ): draft is StreamDraftSnapshot {
@@ -125,7 +162,7 @@ export function isDraftMeaningful(
   );
 }
 
-/** True when the filter snapshot differs from the page's defaults. */
+/** True when the filter snapshot differs from the page defaults. */
 export function isFilterSnapshotMeaningful(
   filters: StreamsFilterSnapshot,
 ): boolean {
@@ -138,171 +175,80 @@ export function isFilterSnapshotMeaningful(
   );
 }
 
-function parseFilters(raw: unknown): StreamsFilterSnapshot {
-  if (!isPlainObject(raw)) {
-    return DEFAULT_STREAMS_FILTERS;
-  }
-
-  const f = raw;
-  return {
-    statusFilter:
-      typeof f.statusFilter === "string"
-        ? f.statusFilter
-        : DEFAULT_STREAMS_FILTERS.statusFilter,
-    searchQuery:
-      typeof f.searchQuery === "string"
-        ? f.searchQuery
-        : DEFAULT_STREAMS_FILTERS.searchQuery,
-    sortBy:
-      typeof f.sortBy === "string" ? f.sortBy : DEFAULT_STREAMS_FILTERS.sortBy,
-    currentPage:
-      typeof f.currentPage === "number" && Number.isFinite(f.currentPage)
-        ? f.currentPage
-        : DEFAULT_STREAMS_FILTERS.currentPage,
-    itemsPerPage:
-      typeof f.itemsPerPage === "number" && Number.isFinite(f.itemsPerPage)
-        ? f.itemsPerPage
-        : DEFAULT_STREAMS_FILTERS.itemsPerPage,
-  };
-}
-
-function parseDraft(raw: unknown): StreamDraftSnapshot | null {
-  if (!isPlainObject(raw)) return null;
-
-  const d = raw;
-  return {
-    step: d.step === 2 ? 2 : 1,
-    recipient: typeof d.recipient === "string" ? d.recipient : "",
-    depositAmount:
-      typeof d.depositAmount === "string" ? d.depositAmount : "",
-    accrualRate:
-      typeof d.accrualRate === "string"
-        ? d.accrualRate
-        : DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
-    duration:
-      typeof d.duration === "string" ? d.duration : DEFAULT_STREAM_DRAFT_DURATION,
-    startTimeOption: d.startTimeOption === "custom" ? "custom" : "now",
-    customStartDate:
-      typeof d.customStartDate === "string" ? d.customStartDate : "",
-    cliffEnabled: d.cliffEnabled === true,
-    cliffDate: typeof d.cliffDate === "string" ? d.cliffDate : "",
-  };
-}
-
-function parseSnapshotData(raw: unknown): StreamsSessionSnapshot | null {
-  if (!isPlainObject(raw)) return null;
-
-  if (typeof raw.savedAt !== "number" || !Number.isFinite(raw.savedAt)) {
-    return null;
-  }
-  if (typeof raw.accountAddress !== "string" || raw.accountAddress.trim() === "") {
-    return null;
-  }
-  if (!isPlainObject(raw.filters)) return null;
-
-  const snapshot: StreamsSessionSnapshot = {
-    savedAt: raw.savedAt,
-    accountAddress: raw.accountAddress.trim(),
-    filters: parseFilters(raw.filters),
-    draft: isPlainObject(raw.draft) ? parseDraft(raw.draft) : null,
-  };
-
-  return snapshot;
-}
-
-function parseVersionedSnapshot(raw: string): StreamsSessionSnapshot | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  if (!isPlainObject(parsed)) return null;
-
-  const version = typeof parsed.version === "number" ? parsed.version : undefined;
-  const envelope: StreamsSessionEnvelope | null =
-    typeof version === "number" ? { version, data: parsed.data } : null;
-
-  if (envelope) {
-    if (!SUPPORTED_STREAMS_SESSION_VERSIONS.has(envelope.version)) {
-      return null;
-    }
-
-    const migrated = parseSnapshotData(envelope.data);
-    if (!migrated) return null;
-
-    if (envelope.version === LEGACY_STREAMS_SESSION_SCHEMA_VERSION) {
-      return {
-        savedAt: migrated.savedAt,
-        accountAddress: migrated.accountAddress,
-        filters: migrated.filters,
-        draft: migrated.draft,
-      };
-    }
-
-    return migrated;
-  }
-
-  return parseSnapshotData(parsed);
-}
-
 /**
- * Reads the persisted streams session snapshot for the given account,
- * discarding it if malformed, older than STREAMS_SESSION_MAX_AGE_MS, or
- * belongs to a different account.
- *
- * @param now - Current timestamp in epoch milliseconds
- * @param accountAddress - The wallet address to scope the session to
- * @param storage - Storage interface (injectable for testing)
- * @returns The snapshot if valid and matches the account, null otherwise
+ * Reads only the current page's in-memory snapshot for the requested account.
+ * Any legacy browser-storage copy is removed without being read or restored.
  */
 export function readStreamsSession(
   now: number,
   accountAddress: string,
   storage: StorageReader | null = getLocalStorage(),
 ): StreamsSessionSnapshot | null {
-  // Session recovery can include recipient addresses and draft payment data.
-  // Those values must never be written to origin-readable browser storage.
-  void now;
-  void accountAddress;
-  void storage;
-  return null;
+  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
+  if (!normalizedAccountAddress || !Number.isFinite(now)) return null;
+
+  // Remove any snapshot written by an older build before considering recovery.
+  // New session data is never read from or written to browser storage.
+  if (storage?.removeItem) {
+    removeBrowserStorage(
+      `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${normalizedAccountAddress}`,
+      storage as Pick<Storage, "removeItem">,
+    );
+    streamsSessionWriteStatus.record(false);
+  }
+
+  const snapshot = sessionsByAccount.get(normalizedAccountAddress);
+  if (!snapshot) return null;
+
+  if (
+    snapshot.accountAddress !== normalizedAccountAddress ||
+    now < snapshot.savedAt ||
+    now - snapshot.savedAt > STREAMS_SESSION_MAX_AGE_MS
+  ) {
+    sessionsByAccount.delete(normalizedAccountAddress);
+    return null;
+  }
+
+  return {
+    ...snapshot,
+    filters: { ...snapshot.filters },
+    draft: snapshot.draft ? { ...snapshot.draft } : null,
+  };
 }
 
 /**
- * Persists the current filters/draft snapshot for the given account.
- * Best-effort; failures are swallowed and recorded in
- * `streamsSessionWriteStatus`.
- *
- * @param snapshot - The session data to persist (without savedAt/accountAddress)
- * @param now - Current timestamp in epoch milliseconds
- * @param accountAddress - The wallet address to scope the session to
- * @param storage - Storage interface (injectable for testing)
- * @returns true only when the snapshot reached storage
+ * Keeps a validated snapshot in memory for the current page lifetime.
+ * Returns false because no browser-storage write is attempted or claimed.
  */
 export function writeStreamsSession(
   snapshot: Omit<StreamsSessionSnapshot, "savedAt" | "accountAddress">,
   now: number,
   accountAddress: string,
-  storage: StorageWriter | null = getLocalStorage(),
+  storage: StorageWriter | null = null,
 ): boolean {
-  void snapshot;
-  void now;
-  void accountAddress;
   void storage;
+  const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
+  if (!normalizedAccountAddress || !Number.isFinite(now)) return false;
+
+  const normalizedSnapshot = normalizeSnapshot(
+    snapshot,
+    now,
+    normalizedAccountAddress,
+  );
+  if (!normalizedSnapshot) {
+    streamsSessionWriteStatus.record(false);
+    return false;
+  }
+
+  sessionsByAccount.set(normalizedAccountAddress, normalizedSnapshot);
   streamsSessionWriteStatus.record(false);
   return false;
 }
 
 /**
- * Clears the persisted session for the given account. Used on explicit
- * "Start fresh", every clean CreateStreamModal close path, and on successful
- * stream creation — never leave behind a draft that could imply a transaction
- * was completed.
- *
- * @param accountAddress - The wallet address whose session to clear
- * @param storage - Storage interface (injectable for testing)
+ * Clears the in-memory snapshot and removes any legacy persisted copy for the
+ * account. This cleanup is allowed even though new session data is never
+ * written to browser storage.
  */
 export function clearStreamsSession(
   accountAddress: string,
@@ -311,7 +257,11 @@ export function clearStreamsSession(
   const normalizedAccountAddress = normalizeAccountAddress(accountAddress);
   if (!normalizedAccountAddress) return;
 
-  streamsSessionWriteStatus.record(
-    removeBrowserStorage(getStorageKey(normalizedAccountAddress), storage),
+  sessionsByAccount.delete(normalizedAccountAddress);
+  removeBrowserStorage(
+    `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${normalizedAccountAddress}`,
+    storage,
   );
+  // Removal is cleanup, not evidence that a session snapshot was persisted.
+  streamsSessionWriteStatus.record(false);
 }

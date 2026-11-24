@@ -81,6 +81,16 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
+// jsdom does not implement navigator.onLine. Provide a default so hooks that
+// probe it don't crash. Individual tests can override this with Object.defineProperty.
+if (typeof navigator !== 'undefined' && !('onLine' in navigator)) {
+  Object.defineProperty(navigator, 'onLine', {
+    writable: true,
+    configurable: true,
+    value: true,
+  });
+}
+
 if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,
@@ -135,6 +145,10 @@ const createStorageMock = () => {
       store = {};
     }),
     key: vi.fn((index: number) => Object.keys(store)[index] || null),
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as unknown as Storage;
   };
 
   Object.defineProperty(mock, 'length', {
