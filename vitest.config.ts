@@ -62,7 +62,6 @@ export default defineConfig({
       "src/lib/__tests__/shareWorkspaces.test.ts",
       "src/lib/__tests__/routeChunks.test.ts",
       "src/lib/__tests__/streamsSessionRecovery.test.ts",
-      "src/lib/api/__tests__/responseValidation.test.ts",
       "src/pages/__tests__/Streams.pagination.test.tsx",
       "src/pages/__tests__/Streams.sessionRecovery.test.tsx",
       "src/pages/__tests__/TreasuryPage.test.tsx",
