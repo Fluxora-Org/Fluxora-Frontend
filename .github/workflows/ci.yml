@@ -52,11 +52,9 @@ jobs:
 
       # TODO(drips-wave): re-enable — Playwright e2e run takes ~48 min and many specs fail on main
       - name: Install Playwright Browsers
-        if: false
         run: npx playwright install --with-deps chromium firefox
 
       - name: Run E2E tests
-        if: false
         run: npm run test:e2e
         env:
           CI: true

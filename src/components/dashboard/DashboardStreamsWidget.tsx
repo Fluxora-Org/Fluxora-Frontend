@@ -1,5 +1,6 @@
 import Button from "../Button";
 import RecentStreams, { type Stream } from "../RecentStreams";
+import { useI18n } from "../../i18n";
 
 /**
  * The "recent streams" widget.
@@ -28,6 +29,7 @@ export default function DashboardStreamsWidget({
   onRetry,
   onCreateStream,
 }: DashboardStreamsWidgetProps) {
+  const { t } = useI18n();
   return (
     <section data-widget="streams">
       <RecentStreams
@@ -42,9 +44,9 @@ export default function DashboardStreamsWidget({
           type="button"
           variant="primary"
           onClick={onCreateStream}
-          aria-label="Create stream"
+          aria-label={t("dashboard.createStream")}
         >
-          Create stream
+          {t("dashboard.createStream")}
         </Button>
       )}
     </section>
