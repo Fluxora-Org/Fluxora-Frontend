@@ -139,7 +139,9 @@ const createStorageMock = () => {
     removeItem: vi.fn((key: string) => { delete store[key]; }),
     clear: vi.fn(() => { store = {}; }),
     key: vi.fn((index: number) => Object.keys(store)[index] || null),
-    length: 0,
+    get length() {
+      return Object.keys(store).length;
+    },
   } as unknown as Storage;
 };
 if (typeof window !== 'undefined') {
