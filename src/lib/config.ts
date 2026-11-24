@@ -323,3 +323,19 @@ export function loadConfig(env: ImportMetaEnv): LoadedConfig {
 }
 
 export const { config, error: configError } = loadConfig(import.meta.env);
+
+/**
+ * Returns a non-sensitive summary of the active configuration suitable for
+ * debug logging. Intentionally omits `rpcUrl`, `apiUrl`, `streamContractId`,
+ * `networkLabel`, and `networkPassphrase` so deployment details never reach
+ * the browser console or end up in screenshots and bug reports.
+ */
+export function describeConfigForLog(
+  cfg: AppConfig,
+): { network: string; demoMode: boolean; useMocks: boolean } {
+  return {
+    network: cfg.network,
+    demoMode: cfg.demoMode,
+    useMocks: cfg.useMocks,
+  };
+}
