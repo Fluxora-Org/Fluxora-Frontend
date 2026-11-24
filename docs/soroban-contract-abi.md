@@ -41,6 +41,23 @@ Withdraws accrued funds from an active stream.
 
 ---
 
+### `top_up_stream`
+
+Adds funds to an existing stream's remaining balance. The sender must be the
+stream owner (same authorization rule as `create_stream` funding).
+
+| Argument Order | Name        | ScVal Type | Encoder Helper  | Description / Units                                   |
+| -------------- | ----------- | ---------- | --------------- | ----------------------------------------------------- |
+| 1              | `sender`    | `Address`  | `encodeAddress` | The Stellar address funding the top-up.               |
+| 2              | `stream_id` | `u64`      | `encodeU64`     | The numerical ID of the stream.                       |
+| 3              | `amount`    | `u64`      | `encodeU64`     | Amount to add, scaled to 7 decimals.                  |
+
+*Note: this entrypoint mirrors `withdraw`'s argument layout. The function name
+and signature should be re-confirmed with contract maintainers before mainnet
+use.*
+
+---
+
 ### `pause_stream`
 
 Pauses an active stream, halting further accrual.
