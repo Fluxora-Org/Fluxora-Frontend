@@ -172,7 +172,7 @@ export function formatDateWithTimezone(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       return (
         new Intl.DateTimeFormat("en-US", {
@@ -411,7 +411,7 @@ export function getBrowserTimezone(): string {
       return "UTC";
     }
     return tz;
-  } catch (e) {
+  } catch {
     return "UTC";
   }
 }
@@ -457,7 +457,7 @@ export function formatNavbarTime(
     }
 
     return formatted;
-  } catch (e) {
+  } catch {
     try {
       const fallbackOptions: Intl.DateTimeFormatOptions = {
         hour: "numeric",
@@ -511,7 +511,7 @@ export function formatLocalISOWithOffset(
 
     const offsetStr = `${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetStr}`;
-  } catch (e) {
+  } catch {
     return date.toISOString();
   }
 }
@@ -559,7 +559,7 @@ export function getFormattedUTCOffset(
     const sign = offsetMin <= 0 ? "+" : "-";
     const pad = (n: number) => String(n).padStart(2, "0");
     return `UTC${sign}${pad(offsetHours)}:${pad(offsetMinutes)}`;
-  } catch (e) {
+  } catch {
     return "UTC+00:00";
   }
 }

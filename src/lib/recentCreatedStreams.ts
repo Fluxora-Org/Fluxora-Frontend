@@ -5,7 +5,6 @@ export interface RecentCreatedStream {
 }
 
 const RECENT_CREATED_STREAMS_KEY = "fluxora.recent-created-streams";
-const MAX_RECENT_CREATED_STREAMS = 10;
 
 function readRecentCreatedStreams(): RecentCreatedStream[] {
   return [];
@@ -15,13 +14,6 @@ export function rememberCreatedStream(
   stream: Omit<RecentCreatedStream, "createdAt">,
 ): RecentCreatedStream {
   const record = { ...stream, createdAt: new Date().toISOString() };
-  const recent = [
-    record,
-    ...readRecentCreatedStreams().filter(
-      (item) => item.streamId !== stream.streamId,
-    ),
-  ].slice(0, MAX_RECENT_CREATED_STREAMS);
-
   return record;
 }
 

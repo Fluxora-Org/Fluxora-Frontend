@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { Stream } from "../components/RecentStreams";
-import RecentStreams from "../components/RecentStreams";
 import CreateStreamModal from "../components/CreateStreamModal";
 import type { StreamCreatedData } from "../components/CreateStreamModal";
 import TreasuryEmptyState from "../components/TreasuryEmptyState";
@@ -21,13 +20,10 @@ import {
 import { formatAssetAmount } from "../lib/formatters";
 import { toRecentStream } from "../lib/recentStreamMapper";
 import Button from "../components/Button";
-import ErrorBoundary from "../components/ErrorBoundary";
 import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
 import DashboardSummaryWidget from "../components/dashboard/DashboardSummaryWidget";
 import DashboardStreamsWidget from "../components/dashboard/DashboardStreamsWidget";
 import "../design-tokens.css";
-const cardGrid: React.CSSProperties = { display: "grid", gap: "1rem" };
-const card: React.CSSProperties = { border: "1px solid var(--border)", padding: "1rem", borderRadius: "8px" };
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -110,11 +106,6 @@ export default function Dashboard() {
   const handleOpenOnboarding = () => {
     writeOnboardingDismissed(false);
     setShowOnboarding(true);
-  };
-
-  const handleOnboardingCreateStream = () => {
-    setShowOnboarding(false);
-    setIsModalOpen(true);
   };
 
   const handleStreamCreated = (_data?: StreamCreatedData) => {
@@ -246,7 +237,6 @@ export default function Dashboard() {
           onCreateStream={() => setIsModalOpen(true)}
           onConnectWallet={() => setIsWalletModalOpen(true)}
           onDismiss={handleDismissOnboarding}
-          onRetry={refetch}
         />
       ) : (
         <TreasuryEmptyState

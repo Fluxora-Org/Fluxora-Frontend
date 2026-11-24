@@ -55,17 +55,11 @@ describe("property test", () => {
           
           let sumStreamed = 0;
           let sumWithdrawn = 0;
-          let sumWithdrawable = 0;
           
           for (const s of summary.perStream) {
              sumStreamed += s.amountStreamedInMonth;
              sumWithdrawn += s.amountWithdrawnInMonth;
           }
-          
-          // wait withdrawableNow comes from original streams, filtered?
-          // let's check the code: withdrawableNow += stream.withdrawableAmount;
-          // it aggregates over streams that are "activeInMonth"
-          let expectedWithdrawable = 0;
           
           expect(summary.totalStreamed).toBe(sumStreamed);
           expect(summary.totalWithdrawn).toBe(sumWithdrawn);

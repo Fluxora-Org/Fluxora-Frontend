@@ -3,7 +3,6 @@ import "./CsvDropZone.css";
 import type { UploadZoneState } from "./types";
 import {
   buildTemplateCsv,
-  MAX_CSV_FILE_SIZE_BYTES,
   MAX_CSV_FILE_SIZE_LABEL,
   MAX_CSV_ROWS,
 } from './csvParser';
@@ -18,13 +17,6 @@ export interface CsvDropZoneProps {
   /** Called when a file has been successfully read. */
   onParsed: (result: ParseResult, fileName: string, rawText: string) => void;
 }
-
-const ACCEPTED_MIME = new Set([
-  "text/csv",
-  "application/csv",
-  "application/vnd.ms-excel",
-  "text/plain",
-]);
 
 /**
  * CsvDropZone — drag-and-drop / click-to-browse CSV upload zone.

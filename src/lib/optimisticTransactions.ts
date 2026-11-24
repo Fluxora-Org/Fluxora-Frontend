@@ -18,8 +18,6 @@
  * @module
  */
 
-import type { StreamRecord } from "../data/streamRecords";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type OperationKind = "create" | "cancel" | "withdraw";

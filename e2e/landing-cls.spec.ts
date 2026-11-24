@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 
 test('landing page hero renders without layout shift', async ({ page }) => {
-  let cls = 0;
   page.on('console', msg => console.log(msg.text()));
 
   await page.goto('/', { waitUntil: 'networkidle' });
@@ -28,7 +27,7 @@ test('landing page hero renders without layout shift', async ({ page }) => {
           observer.disconnect();
           resolve(clsValue);
         }, 500);
-      } catch (e) {
+      } catch {
         resolve(0);
       }
     });

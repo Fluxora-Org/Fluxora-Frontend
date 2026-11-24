@@ -1,5 +1,3 @@
-import { logger } from "./logger";
-
 /**
  * Persistence + validation for the Streams page session-recovery feature.
  * See docs/STREAMS_SESSION_RECOVERY_SPEC.md for the full design rationale —
@@ -16,9 +14,7 @@ export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
 import {
   createStorageWriteStatus,
   getBrowserStorage,
-  readBrowserStorage,
   removeBrowserStorage,
-  writeBrowserStorage,
 } from "./browserStorage";
 
 /**
@@ -64,16 +60,6 @@ export interface StreamsSessionSnapshot {
 }
 
 export const STREAMS_SESSION_SCHEMA_VERSION = 2 as const;
-const LEGACY_STREAMS_SESSION_SCHEMA_VERSION = 1 as const;
-const SUPPORTED_STREAMS_SESSION_VERSIONS = new Set<number>([
-  LEGACY_STREAMS_SESSION_SCHEMA_VERSION,
-  STREAMS_SESSION_SCHEMA_VERSION,
-]);
-
-type StreamsSessionEnvelope = {
-  version: number;
-  data: unknown;
-};
 
 type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -105,10 +91,6 @@ function getStorageKey(accountAddress: string): string {
   return `${STREAMS_SESSION_STORAGE_KEY_PREFIX}_${accountAddress}`;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /** True when the draft has any recipient/deposit/schedule detail worth resuming. */
 export function isDraftMeaningful(
   draft: StreamDraftSnapshot | null | undefined,
@@ -136,115 +118,6 @@ export function isFilterSnapshotMeaningful(
     filters.currentPage !== DEFAULT_STREAMS_FILTERS.currentPage ||
     filters.itemsPerPage !== DEFAULT_STREAMS_FILTERS.itemsPerPage
   );
-}
-
-function parseFilters(raw: unknown): StreamsFilterSnapshot {
-  if (!isPlainObject(raw)) {
-    return DEFAULT_STREAMS_FILTERS;
-  }
-
-  const f = raw;
-  return {
-    statusFilter:
-      typeof f.statusFilter === "string"
-        ? f.statusFilter
-        : DEFAULT_STREAMS_FILTERS.statusFilter,
-    searchQuery:
-      typeof f.searchQuery === "string"
-        ? f.searchQuery
-        : DEFAULT_STREAMS_FILTERS.searchQuery,
-    sortBy:
-      typeof f.sortBy === "string" ? f.sortBy : DEFAULT_STREAMS_FILTERS.sortBy,
-    currentPage:
-      typeof f.currentPage === "number" && Number.isFinite(f.currentPage)
-        ? f.currentPage
-        : DEFAULT_STREAMS_FILTERS.currentPage,
-    itemsPerPage:
-      typeof f.itemsPerPage === "number" && Number.isFinite(f.itemsPerPage)
-        ? f.itemsPerPage
-        : DEFAULT_STREAMS_FILTERS.itemsPerPage,
-  };
-}
-
-function parseDraft(raw: unknown): StreamDraftSnapshot | null {
-  if (!isPlainObject(raw)) return null;
-
-  const d = raw;
-  return {
-    step: d.step === 2 ? 2 : 1,
-    recipient: typeof d.recipient === "string" ? d.recipient : "",
-    depositAmount:
-      typeof d.depositAmount === "string" ? d.depositAmount : "",
-    accrualRate:
-      typeof d.accrualRate === "string"
-        ? d.accrualRate
-        : DEFAULT_STREAM_DRAFT_ACCRUAL_RATE,
-    duration:
-      typeof d.duration === "string" ? d.duration : DEFAULT_STREAM_DRAFT_DURATION,
-    startTimeOption: d.startTimeOption === "custom" ? "custom" : "now",
-    customStartDate:
-      typeof d.customStartDate === "string" ? d.customStartDate : "",
-    cliffEnabled: d.cliffEnabled === true,
-    cliffDate: typeof d.cliffDate === "string" ? d.cliffDate : "",
-  };
-}
-
-function parseSnapshotData(raw: unknown): StreamsSessionSnapshot | null {
-  if (!isPlainObject(raw)) return null;
-
-  if (typeof raw.savedAt !== "number" || !Number.isFinite(raw.savedAt)) {
-    return null;
-  }
-  if (typeof raw.accountAddress !== "string" || raw.accountAddress.trim() === "") {
-    return null;
-  }
-  if (!isPlainObject(raw.filters)) return null;
-
-  const snapshot: StreamsSessionSnapshot = {
-    savedAt: raw.savedAt,
-    accountAddress: raw.accountAddress.trim(),
-    filters: parseFilters(raw.filters),
-    draft: isPlainObject(raw.draft) ? parseDraft(raw.draft) : null,
-  };
-
-  return snapshot;
-}
-
-function parseVersionedSnapshot(raw: string): StreamsSessionSnapshot | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  if (!isPlainObject(parsed)) return null;
-
-  const version = typeof parsed.version === "number" ? parsed.version : undefined;
-  const envelope: StreamsSessionEnvelope | null =
-    typeof version === "number" ? { version, data: parsed.data } : null;
-
-  if (envelope) {
-    if (!SUPPORTED_STREAMS_SESSION_VERSIONS.has(envelope.version)) {
-      return null;
-    }
-
-    const migrated = parseSnapshotData(envelope.data);
-    if (!migrated) return null;
-
-    if (envelope.version === LEGACY_STREAMS_SESSION_SCHEMA_VERSION) {
-      return {
-        savedAt: migrated.savedAt,
-        accountAddress: migrated.accountAddress,
-        filters: migrated.filters,
-        draft: migrated.draft,
-      };
-    }
-
-    return migrated;
-  }
-
-  return parseSnapshotData(parsed);
 }
 
 /**
