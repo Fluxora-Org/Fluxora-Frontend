@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { transactionPollingConfig } from "../lib/transactionConfig";
 import {
-  TransactionError,
   getTransactionStatus as getOnChainStatus,
 } from "../lib/stellar/tx";
 import {

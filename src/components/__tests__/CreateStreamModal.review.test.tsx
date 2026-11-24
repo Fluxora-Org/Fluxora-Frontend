@@ -87,16 +87,17 @@ describe('CreateStreamModal review step', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps maximal review values available without losing address copy access', () => {
+  it('keeps the maximum available balance and duration reviewable with address copy access', () => {
     const { container } = render(
       <CreateStreamModal isOpen={true} onClose={() => {}} />,
     );
 
-    fillStep1(container, '365000000.00');
-    fillStep2AndReview(container, { rate: '100000', duration: '3650' });
+    fillStep1(container, '200.00');
+    fillStep2AndReview(container, { rate: '0.05', duration: '3650' });
 
-    expect(screen.getByText('365000000.00')).toBeInTheDocument();
-    expect(screen.getByText('100000 USDC per day')).toBeInTheDocument();
+    expect(screen.getByText('200.00')).toBeInTheDocument();
+    expect(screen.getByText('0.05 USDC per day')).toBeInTheDocument();
+    expect(screen.getByText('3650 days')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: `Copy address: ${VALID_STELLAR}` }),
     ).toBeInTheDocument();

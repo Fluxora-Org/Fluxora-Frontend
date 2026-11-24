@@ -325,6 +325,9 @@ export default function CreateStreamModal({
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
   // Ref to track the current optimistic operation so onResolved can resolve it.
   const optimisticOpIdRef = useRef<string | null>(null);
+  // Set while a queued offline submission is being flushed so the shared
+  // submit pipeline sends the payload captured at queue time, not live form state.
+  const flushPayloadRef = useRef<StreamSubmissionPayload | null>(null);
 
   const txSubmission = useTransactionSubmission({
     submit: async () => {
@@ -342,14 +345,25 @@ export default function CreateStreamModal({
       const cliffTime = cliffEnabled && cliffDate
         ? Math.floor(new Date(cliffDate).getTime() / 1000)
         : undefined;
-      const response = await createStream(
-        sender,
-        recipient.trim(),
-        amountStr,
-        start,
-        end,
-        cliffTime,
-      );
+      const queued = flushPayloadRef.current;
+      flushPayloadRef.current = null;
+      const response = queued
+        ? await createStream(
+            queued.sender,
+            queued.recipient,
+            queued.amount,
+            queued.start,
+            queued.end,
+            queued.cliffTime,
+          )
+        : await createStream(
+            sender,
+            recipient.trim(),
+            amountStr,
+            start,
+            end,
+            cliffTime,
+          );
       if (!response.txHash) {
         throw new Error("Missing transaction hash from Stellar RPC.");
       }
@@ -431,7 +445,9 @@ export default function CreateStreamModal({
       ? t("createStream.button.submitting")
       : currentStep === 3 && isConfirmationPending
         ? t("createStream.button.confirming")
-        : currentStep === 3 && txSubmission.status === "timeout"
+        : currentStep === 3 &&
+            (txSubmission.status === "timeout" ||
+              txSubmission.status === "failed")
           ? t("createStream.button.retry")
           : currentStep === 2
             ? t("createStream.button.next")
@@ -527,7 +543,17 @@ export default function CreateStreamModal({
       ? Math.floor(new Date(cliffDate).getTime() / 1000)
       : undefined;
 
-    return { sender, recipient: recipient.trim(), amount, start, end, cliffTime };
+    // Omit cliffTime rather than setting it to undefined: the payload must be
+    // plain JSON so the offline action queue accepts it (see
+    // validateEnqueueInput in lib/offlineActionQueue.ts).
+    return {
+      sender,
+      recipient: recipient.trim(),
+      amount,
+      start,
+      end,
+      ...(cliffTime !== undefined ? { cliffTime } : {}),
+    };
   };
 
   /** Submits a payload to the network. Identical for the immediate-online
@@ -601,7 +627,11 @@ export default function CreateStreamModal({
   ]);
 
   useEffect(() => {
-    if (txSubmission.status !== "failed" || !submittedTxHash) {
+    if (
+      (txSubmission.status !== "failed" &&
+        txSubmission.status !== "timeout") ||
+      !submittedTxHash
+    ) {
       return;
     }
 
@@ -649,35 +679,37 @@ export default function CreateStreamModal({
       setQueuedSubmission(null); // Clear the queued banner
       updateActionStatus(nextAction.id, 'processing');
 
+      const isOwnSubmission = queuedSubmission?.id === nextAction.id;
+      // Flag before submitting: the confirm effect may fire as soon as the
+      // poller reports "confirmed" and must pick the queue-flush toast.
+      if (isOwnSubmission) flushedFromQueueRef.current = true;
+      flushPayloadRef.current = payload;
+
       try {
-        const response = await createStream(
-          payload.sender,
-          payload.recipient,
-          payload.amount,
-          payload.start,
-          payload.end,
-          payload.cliffTime,
-        );
+        // Same pipeline as an online submit (spec: queue-flush-success), so
+        // the poller confirms the tx and the existing confirm effect closes
+        // the modal, calls onStreamCreated and shows the success toast.
+        await txSubmission.submit();
         if (cancelled) return;
-        
-        if (!response.txHash) {
-          throw new Error("Missing transaction hash from Stellar RPC.");
-        }
-        
+
         updateActionStatus(nextAction.id, 'completed');
         dequeueAction(nextAction.id);
-        setSubmittedTxHash(response.txHash);
-        
+
         // Update UI if this was our queued submission
-        if (queuedSubmission?.id === nextAction.id) {
+        if (isOwnSubmission) {
           pendingSubmissionRef.current = null;
-          flushedFromQueueRef.current = true;
           setQueuedSubmission(null);
         }
-        
+
         setQueueLength(getQueueLength());
       } catch (err) {
+        flushPayloadRef.current = null;
+        flushedFromQueueRef.current = false;
         if (cancelled) return;
+
+        // The failure is surfaced by the queue-flush banner below; clear the
+        // generic step-3 failure state so the message is not shown twice.
+        txSubmission.reset();
         
         const errorMessage = getStreamErrorMessage(err);
         
@@ -992,6 +1024,16 @@ export default function CreateStreamModal({
           expected: wallet.expectedNetwork,
           actual: wallet.network?.toUpperCase() || "",
         }));
+        return;
+      }
+
+      // Re-check step-1 fields against the *current* wallet: an account switch
+      // after step 1 can make the recipient equal to the new sender
+      // (ACCOUNT_SWITCH_INVARIANTS_SPEC.md, Property 2: no self-payment).
+      // Return to step 1 so the field error is visible before signing.
+      if (!validateStep1()) {
+        setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
+        setCurrentStep(1);
         return;
       }
 
@@ -2785,7 +2827,9 @@ export default function CreateStreamModal({
                        </span>
                      </div>
                    )}
-                   {(txSubmission.status === "timeout" || txSubmission.status === "failed") && (
+                   {(txSubmission.status === "timeout" ||
+                     txSubmission.status === "failed") &&
+                     !streamError && (
                      <div
                        className="transaction-status-box transaction-status-box--error"
                        role="alert"
@@ -3578,5 +3622,3 @@ export default function CreateStreamModal({
     </div>
   );
 }
-
-

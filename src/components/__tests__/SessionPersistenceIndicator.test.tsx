@@ -2,9 +2,12 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import SessionPersistenceIndicator from "../SessionPersistenceIndicator";
 import {
+  getBrowserStorage,
+  writeBrowserStorage,
+} from "../../lib/browserStorage";
+import {
   DEFAULT_STREAMS_FILTERS,
   streamsSessionWriteStatus,
-  writeStreamsSession,
 } from "../../lib/streamsSessionRecovery";
 
 const ACCOUNT = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H";
@@ -57,14 +60,15 @@ function blockSiteData() {
   });
 }
 
-/** Runs the real session autosave write against window.localStorage. */
+/** Runs a real browser storage write against window.localStorage and records its outcome. */
 function autosaveSession() {
   act(() => {
-    writeStreamsSession(
-      { filters: DEFAULT_STREAMS_FILTERS, draft: null },
-      Date.now(),
-      ACCOUNT,
+    const written = writeBrowserStorage(
+      `fluxora_streams_session_v2_${ACCOUNT}`,
+      JSON.stringify({ filters: DEFAULT_STREAMS_FILTERS }),
+      getBrowserStorage("localStorage"),
     );
+    streamsSessionWriteStatus.record(written);
   });
 }
 

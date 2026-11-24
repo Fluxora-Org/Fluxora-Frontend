@@ -20,10 +20,18 @@ This document describes the behavior around theme editing controls and contrast 
 4. **Responsive States**:
    - The panel uses a responsive grid injected via a `<style>` tag, breaking at 768px and 1280px. The preview strip collapses below the form on smaller screens, ensuring readability on mobile.
 
+## Theme File Import / Export
+
+- Export writes the editor's draft as a versioned JSON object with `version: 1` and a `tokens` map.
+- Import accepts JSON files up to 32 KiB. It rejects unsupported versions, unknown properties or token keys, malformed or translucent colours, and palettes that fail the editor's WCAG contrast checks.
+- Validation completes before the draft is changed, so a failed import never applies a partial palette. A successful import populates the draft for preview; the user must still preview and apply it.
+- Success and failure messages are announced through a live region. Import and export actions are disabled when the editor is unauthorized.
+
 ## Expected Regression Surface
 
 When making changes to `ThemeEditorPanel.tsx` or related contrast utilities, developers should watch out for:
 - **Async Validations**: Introducing async checks for contrast would require adding loading states, breaking the current synchronous "no-loading" guarantee.
 - **Keyboard Trap / ARIA Changes**: Modifying the native color picker must not expose it to the tab order, which would break the established accessible text input flow.
+- **Theme File Validation**: Keep import atomic and reject unknown tokens before updating the draft. Reuse the editor's format and contrast validators for both imported and exported palettes.
 - **Fallback Hex Values**: If the fallback mechanism (`isValidHex`) is altered, an empty string could cause NaN contrast results or React crashes.
 - **Responsive Layout Breakage**: The inline `<style>` injection is crucial for the layout; removing it or altering the grid variables might overlap the preview and form on mobile views.
