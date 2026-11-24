@@ -19,7 +19,7 @@ export default defineConfig({
       "e2e/**",
       ".kilo/**",
       ".kiro/**",
-      // TODO(drips-wave): re-enable — these 58 test files fail on main (drift between
+      // TODO(drips-wave): re-enable — remaining test files fail on main (drift between
       // components and tests after merged PRs); skipped to get CI green.
       "src/components/__tests__/CreateStreamModal.accountSwitch.test.tsx",
       "src/components/__tests__/CreateStreamModal.dryRun.test.tsx",
@@ -72,9 +72,6 @@ export default defineConfig({
       "src/lib/api/__tests__/responseValidation.test.ts",
       "src/pages/__tests__/Streams.pagination.test.tsx",
       "src/pages/__tests__/Streams.sessionRecovery.test.tsx",
-      "src/pages/__tests__/TreasuryPage.test.tsx",
-      "src/pages/Dashboard.test.tsx",
-      "src/pages/Recipient.test.tsx",
       "src/theme/__tests__/themeBootstrapPreference.test.ts",
       "src/theme/__tests__/themeEditorRevertDefaults.test.tsx",
       "src/utils/monthlySummary.test.ts",
