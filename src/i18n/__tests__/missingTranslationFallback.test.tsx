@@ -7,7 +7,7 @@
  *   - The raw translation key is never produced when a source value exists.
  *   - The pseudo-locale (`zx`) makes the fallback visible: translated strings
  *     carry the `[...]` markers, while a fallback source string does not.
- *   - `checkLocale` detects a missing key (warning) and an unused/extra key
+ *   - `checkLocale` detects a missing key (error) and an unused/extra key
  *     (error), so catalog drift cannot land silently.
  *
  * `src/test/setup.ts` globally mocks the i18n module for component tests, so
@@ -94,11 +94,11 @@ describe("i18n — a missing translation falls back visibly", () => {
       catalog,
     );
 
-    const missing = report.warnings
+    const missing = report.errors
       .filter((issue) => issue.kind === "MISSING_KEY")
       .map((issue) => issue.key);
     expect(missing).toContain(MISSING_KEY);
-    expect(report.errors).toHaveLength(0);
+    expect(report.warnings).toHaveLength(0);
   });
 
   it("detects an unused (extra) key with checkLocale", () => {

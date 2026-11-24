@@ -18,11 +18,9 @@
  * @module
  */
 
-import type { StreamRecord } from "../data/streamRecords";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type OperationKind = "create" | "cancel" | "withdraw";
+export type OperationKind = "create" | "pause" | "cancel" | "withdraw";
 
 /**
  * Lifecycle of an optimistic operation.

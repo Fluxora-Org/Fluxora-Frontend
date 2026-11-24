@@ -14,16 +14,31 @@ export function generateIdempotencyKey(): string {
   ) {
     return crypto.randomUUID();
   }
-  return `tx_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+  // randomUUID is unavailable (older browsers). Fall back to getRandomValues,
+  // which is cryptographically random and available wherever crypto exists.
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `tx_${hex}`;
+  }
+
+  // crypto is entirely absent (unusual: non-secure legacy context).
+  // Throw rather than silently produce a weak key that could allow a
+  // double-submitted transaction to bypass the idempotency guard.
+  throw new Error(
+    "generateIdempotencyKey: crypto API unavailable. " +
+      "Secure key generation is not possible in this environment.",
+  );
 }
 
 export function savePendingTx(
   params: Record<string, unknown> = {},
   txHash: string | null = null,
+  idempotencyKey: string = generateIdempotencyKey(),
 ): string {
-  const key = generateIdempotencyKey();
   const pending: PendingTransaction = {
-    idempotencyKey: key,
+    idempotencyKey,
     txHash,
     params,
     createdAt: Date.now(),
@@ -33,7 +48,7 @@ export function savePendingTx(
   } catch {
     // sessionStorage may be unavailable in some environments
   }
-  return key;
+  return idempotencyKey;
 }
 
 export function loadPendingTx(): PendingTransaction | null {

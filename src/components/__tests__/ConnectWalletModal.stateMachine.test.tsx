@@ -32,6 +32,17 @@ vi.mock("@stellar/freighter-api", () => ({
   getNetwork: vi.fn(),
 }));
 
+// Albedo drives the same modal state machine through the real adapter; the SDK
+// itself is mocked so no popup is opened in tests.
+const mockAlbedoPublicKey = vi.hoisted(() => vi.fn());
+vi.mock("@albedo-link/intent", () => ({
+  default: {
+    publicKey: mockAlbedoPublicKey,
+    tx: vi.fn(),
+    forgetImplicitSession: vi.fn(),
+  },
+}));
+
 vi.mock("../../lib/stellarNetwork", () => ({
   getExpectedStellarNetwork: () => "TESTNET",
   isStellarNetworkMismatch: vi.fn(
@@ -122,9 +133,9 @@ describe("ConnectWalletModal — idle (default) state", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("Albedo and WalletConnect buttons are disabled when handlers are absent", () => {
+  it("Albedo is selectable while WalletConnect stays disabled", () => {
     renderModal();
-    expect(screen.getByLabelText("Albedo — coming soon")).toBeDisabled();
+    expect(screen.getByLabelText("Connect with Albedo")).toBeEnabled();
     expect(screen.getByLabelText("WalletConnect — coming soon")).toBeDisabled();
   });
 });
@@ -135,6 +146,7 @@ describe("ConnectWalletModal — controlled errorState prop", () => {
   const cases = [
     ["not_installed", "error-state-not-installed"],
     ["rejected", "error-state-rejected"],
+    ["popup_blocked", "error-state-popup-blocked"],
     ["network_mismatch", "error-state-network-mismatch"],
     ["network_timeout", "error-state-network-timeout"],
     ["device-searching", "error-state-device-searching"],
@@ -362,6 +374,57 @@ describe("ConnectWalletModal — network_timeout", () => {
   });
 });
 
+// ─── 7b. Albedo connection ───────────────────────────────────────────────────
+
+describe("ConnectWalletModal — Albedo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedIsMobile.mockReturnValue(false);
+  });
+
+  it("connects, calls onConnectAlbedo and closes after approval", async () => {
+    mockAlbedoPublicKey.mockResolvedValue({ pubkey: VALID_ADDRESS });
+    const onConnectAlbedo = vi.fn();
+    const onClose = vi.fn();
+
+    renderModal({ onConnectAlbedo, onClose });
+    fireEvent.click(screen.getByLabelText("Connect with Albedo"));
+
+    await waitFor(() => expect(onConnectAlbedo).toHaveBeenCalledOnce());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(mockAlbedoPublicKey).toHaveBeenCalledOnce();
+  });
+
+  it("shows the popup-blocked screen when the browser blocks the popup", async () => {
+    const originalOpen = window.open;
+    window.open = vi.fn(() => null) as unknown as typeof window.open;
+    mockAlbedoPublicKey.mockImplementation(() => {
+      window.open("https://albedo.link/confirm");
+      return new Promise(() => {});
+    });
+
+    try {
+      renderModal();
+      fireEvent.click(screen.getByLabelText("Connect with Albedo"));
+      await screen.findByTestId("error-state-popup-blocked");
+      expect(screen.getByText("Wallet Popup Blocked")).toBeInTheDocument();
+    } finally {
+      window.open = originalOpen;
+    }
+  });
+
+  it("shows the rejected screen when the Albedo request is declined", async () => {
+    mockAlbedoPublicKey.mockRejectedValue({
+      code: -4,
+      message: "Action request was rejected by the user.",
+    });
+
+    renderModal();
+    fireEvent.click(screen.getByLabelText("Connect with Albedo"));
+    await screen.findByTestId("error-state-rejected");
+  });
+});
+
 // ─── 8. Duplicate request prevention (guard) ─────────────────────────────────
 
 describe("ConnectWalletModal — duplicate request prevention", () => {
@@ -546,8 +609,8 @@ describe("ConnectWalletModal — accessibility", () => {
 
   it("disabled wallet options have aria-disabled attribute", () => {
     renderModal();
-    const albedoBtn = screen.getByLabelText("Albedo — coming soon");
-    expect(albedoBtn).toHaveAttribute("aria-disabled", "true");
+    const walletConnectBtn = screen.getByLabelText("WalletConnect — coming soon");
+    expect(walletConnectBtn).toHaveAttribute("aria-disabled", "true");
   });
 });
 
