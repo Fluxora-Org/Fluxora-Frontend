@@ -31,7 +31,6 @@ export default defineConfig({
       "src/components/__tests__/ErrorBoundary.telemetry.test.tsx",
       "src/components/__tests__/GetStartedCTA.test.tsx",
       "src/components/__tests__/RequireWalletAction.test.tsx",
-      "src/components/__tests__/SessionPersistenceIndicator.test.tsx",
       "src/components/__tests__/SessionRecoveryBanner.test.tsx",
       "src/components/__tests__/TreasuryEmptyState.test.tsx",
       "src/components/__tests__/untrusted-metadata.security.test.tsx",
