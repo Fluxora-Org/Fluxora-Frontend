@@ -5,12 +5,12 @@
  * shell: search input, status-filter buttons, sort selector, the VirtualList
  * of StreamCards, and the Pagination bar.
  *
- * It receives all data and callbacks as props and holds no async or
- * session-recovery state of its own — making it straightforward to render in
- * isolation for snapshot / interaction testing.
+ * Applied filters and callbacks arrive as props; only the uncommitted search
+ * draft lives here. Data fetching and session recovery remain in the page hook.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { MAX_STREAM_SEARCH_LENGTH } from "../../lib/streamFilterParams";
 import Input from "../../components/Input";
 import { Pagination } from "../../components/Pagination";
 import VirtualList from "../../components/VirtualList";
@@ -44,6 +44,8 @@ export interface StreamsListPanelProps {
   statusFilters: StatusFilter[];
   filterLabels: Record<StatusFilter, string>;
   searchQuery: string;
+  /** Navigation identity cancels drafts when a saved view applies the same query. */
+  searchResetKey?: string;
   sortBy: StreamSortMode;
 
   // ── Pagination state ─────────────────────────────────────────────────────────
@@ -85,7 +87,7 @@ export interface StreamsListPanelProps {
 
 /**
  * Renders the streams list shell with controls and paginated card list.
- * All data comes from props; no internal state or side effects.
+ * Applied filters come from props; the search draft commits after a debounce.
  */
 export function StreamsListPanel({
   titleText,
@@ -99,6 +101,7 @@ export function StreamsListPanel({
   statusFilter,
   statusFilters,
   filterLabels,
+  searchResetKey,
   searchQuery,
   sortBy,
   currentPage,
@@ -116,6 +119,27 @@ export function StreamsListPanel({
   onPageChange,
   onItemsPerPageChange,
 }: StreamsListPanelProps) {
+  // This is an uncommitted input draft; the URL remains the applied filter.
+  const [draft, setDraft] = useState(searchQuery);
+  const onSearchChangeRef = useRef(onSearchChange);
+  onSearchChangeRef.current = onSearchChange;
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    clearTimeout(timer.current);
+    setDraft(searchQuery);
+  }, [
+    searchQuery,
+    searchResetKey,
+    statusFilter,
+    sortBy,
+    currentPage,
+    itemsPerPage,
+  ]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const commitDraft = () => {
+    clearTimeout(timer.current);
+    if (draft !== searchQuery) onSearchChangeRef.current(draft);
+  };
   return (
     <section className="streams-list-shell">
       <div className="streams-list-head">
@@ -132,8 +156,21 @@ export function StreamsListPanel({
               id="streams-search"
               aria-label={searchAriaLabel}
               placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
+              maxLength={MAX_STREAM_SEARCH_LENGTH}
+              value={draft}
+              onBlur={commitDraft}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitDraft();
+              }}
+              onChange={(e) => {
+                const value = e.target.value.slice(0, MAX_STREAM_SEARCH_LENGTH);
+                setDraft(value);
+                clearTimeout(timer.current);
+                timer.current = setTimeout(
+                  () => onSearchChangeRef.current(value),
+                  300,
+                );
+              }}
             />
           </div>
           <div

@@ -3,6 +3,8 @@ import { sanitizeStellarAddress } from "../data/streamRecords";
 import type { StreamsFilters } from "./api/streamsService";
 import type { StreamSortMode } from "./streamSorting";
 
+export const MAX_STREAM_SEARCH_LENGTH = 120;
+
 export type StreamStatusFilter = "All" | StreamStatus;
 
 export const VALID_STATUS_FILTERS: readonly StreamStatusFilter[] = [
@@ -107,7 +109,7 @@ function getFirstParam(params: URLSearchParams, ...keys: string[]): string | nul
     const values = params.getAll(key);
     for (const val of values) {
       if (typeof val === "string" && val.length > 0) {
-        return safeDecode(val);
+        return val; // URLSearchParams has already decoded this value.
       }
     }
   }
@@ -135,11 +137,13 @@ export function parseStatusFilter(raw: string | null | undefined): StreamStatusF
 export function parseSearchFilter(raw: string | null | undefined): string {
   if (!raw) return DEFAULT_STREAM_ROUTE_FILTERS.search;
   let sanitized = "";
-  for (let i = 0; i < raw.length; i++) {
-    const code = raw.charCodeAt(i);
-    // Exclude ASCII control characters 0x00-0x1F and 0x7F
+  for (const char of raw.trim()) {
+    const code = char.codePointAt(0)!;
+    // Keep printable characters and whitespace without splitting a Unicode pair.
     if ((code >= 32 && code !== 127) || code === 9 || code === 10 || code === 13) {
-      sanitized += raw[i];
+      const printable = code >= 0xd800 && code <= 0xdfff ? "\uFFFD" : char;
+      if (sanitized.length + printable.length > MAX_STREAM_SEARCH_LENGTH) break;
+      sanitized += printable;
     }
   }
   return sanitized.trim();

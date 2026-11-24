@@ -15,8 +15,11 @@
  *  7. Display flags — showEmptyState, hasStreams
  */
 
+import { MemoryRouter } from "react-router-dom";
+import { createElement, type PropsWithChildren } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as recovery from "../lib/streamsSessionRecovery";
 import { useStreamsData } from "./useStreamsData";
 import type { StreamRecord } from "../data/streamRecords";
 
@@ -56,9 +59,12 @@ vi.mock("../hooks/useOptimisticStreams", () => ({
   }),
 }));
 
+const mockWalletAddress = { current: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" };
+beforeEach(() => { mockWalletAddress.current = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"; });
+
 vi.mock("../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
-    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    address: mockWalletAddress.current,
     network: "TESTNET",
     connected: true,
     loading: false,
@@ -68,11 +74,12 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+const mockAnnounce = vi.fn();
 vi.mock("../hooks/useLiveAnnouncer", () => ({
   useLiveAnnouncer: () => ({
     announcement: "",
     alertAnnouncement: "",
-    announce: vi.fn(),
+    announce: mockAnnounce,
     announceStatus: vi.fn(),
     announceAlert: vi.fn(),
   }),
@@ -123,7 +130,7 @@ function makeStream(overrides: Partial<StreamRecord> = {}): StreamRecord {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderDataHook() {
-  return renderHook(() => useStreamsData());
+  return renderHook(() => useStreamsData(), { wrapper: ({ children }: PropsWithChildren) => createElement(MemoryRouter, null, children) });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -773,5 +780,63 @@ describe("useStreamsData — visibleStreams reflects all streams when no filters
 
     const { result } = renderDataHook();
     expect(result.current.streams.some((r) => r.id === "UNIQUE-001")).toBe(true);
+  });
+});
+
+describe("useStreamsData URL search", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockTreasuryState.loading = false;
+    mockTreasuryState.streams = [makeStream({ id: "STR-XYZ", name: "Unrelated", recipientName: "Recipient", recipientAddress: "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P" })];
+  });
+  it.each(["str-xyz", "gajcgn", "icca3p"]) ("loads and matches URL query %s", (search) => {
+    const { result } = renderHook(() => useStreamsData(), { wrapper: ({ children }: PropsWithChildren) => createElement(MemoryRouter, { initialEntries: [`/?q=${search}`] }, children) });
+    expect(result.current.searchQuery).toBe(search);
+    expect(result.current.visibleStreams).toHaveLength(1);
+  });
+  it("treats regex punctuation literally and applies combined views", () => {
+    const { result } = renderDataHook();
+    act(() => result.current.setSearchQuery(".*"));
+    expect(result.current.visibleStreams).toEqual([]);
+    act(() => result.current.applyRouteFilters({ ...result.current.routeFilters, search: "STR-XYZ", status: "Paused" }));
+    expect(result.current.visibleStreams).toEqual([]);
+    act(() => result.current.resetRouteFilters());
+    expect(result.current.visibleStreams).toHaveLength(1);
+  });
+});
+
+it("preserves existing restore and account isolation paths when a snapshot is supplied", () => {
+  localStorage.clear();
+  const account = mockWalletAddress.current;
+  const read = vi.spyOn(recovery, "readStreamsSession").mockImplementation((_now, address) => address === account ? {
+    savedAt: Date.now(), accountAddress: account,
+    filters: { statusFilter: "Paused", searchQuery: "Recovered", sortBy: "name", currentPage: 1, itemsPerPage: 20 }, draft: null,
+  } : null);
+  const { result, rerender } = renderHook(() => useStreamsData(), { wrapper: ({ children }: PropsWithChildren) => createElement(MemoryRouter, { initialEntries: ["/?q=from-url"] }, children) });
+  expect(result.current.searchQuery).toBe("from-url");
+  expect(result.current.bannerState).toBe("detected");
+  act(() => result.current.handleRestoreSession());
+  expect(result.current.routeFilters).toMatchObject({ status: "Paused", search: "Recovered", sort: "name", pageSize: 20 });
+  mockWalletAddress.current = "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P";
+  rerender();
+  expect(result.current.routeFilters).toMatchObject({ status: "All", search: "", sort: "recent" });
+  expect(result.current.detectedSnapshot).toBeNull();
+  read.mockRestore();
+});
+
+describe("search result announcements", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  it("announces the filtered result count through useLiveAnnouncer", () => {
+    mockAnnounce.mockClear();
+    mockTreasuryState.loading = false;
+    mockTreasuryState.streams = [makeStream({ id: "STR-XYZ", name: "Alice" }), makeStream({ id: "STR-OTHER", name: "Bob" })];
+    const { result } = renderDataHook();
+    act(() => result.current.setSearchQuery("str-xyz"));
+    act(() => vi.advanceTimersByTime(300));
+    expect(mockAnnounce).toHaveBeenLastCalledWith("Showing 1 stream.");
+    act(() => result.current.setSearchQuery("no-match"));
+    act(() => vi.advanceTimersByTime(300));
+    expect(mockAnnounce).toHaveBeenLastCalledWith("Showing 0 streams.");
   });
 });
