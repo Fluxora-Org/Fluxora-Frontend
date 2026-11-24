@@ -158,6 +158,11 @@ export default defineConfig({
         // Online/offline status tracking
         "src/hooks/useOnlineStatus.ts",
 >>>>>>> Stashed changes
+        // Streams service and Stellar transaction layer
+        "src/lib/api/streamsService.ts",
+        "src/lib/stellar/tx.ts",
+        "src/lib/stellar/idempotency.ts",
+        "src/lib/stellar/telemetry.ts",
       ],
       exclude: [
         "src/components/**/*.test.tsx",
