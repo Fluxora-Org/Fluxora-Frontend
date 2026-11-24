@@ -14,7 +14,8 @@ import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
-import { Share2 } from "lucide-react";
+import { Calendar, Share2 } from "lucide-react";
+import { downloadStreamIcs } from "../lib/icsExport";
 
 /**
  * Stream status presentation
@@ -128,6 +129,7 @@ export default function StreamDetail() {
   const isCompareMode = Boolean(compareWithId && streamId);
 
   const [isOgModalOpen, setIsOgModalOpen] = useState(false);
+  const [calendarStatus, setCalendarStatus] = useState("");
   const shareTriggerRef = useRef<HTMLButtonElement>(null);
   const [stream, setStream] = useState<StreamRecord | null | undefined>(
     undefined,
@@ -454,30 +456,84 @@ export default function StreamDetail() {
           </p>
         </div>
 
-        {/* Share & Social Preview Card Trigger */}
-        <button
-          ref={shareTriggerRef}
-          onClick={() => setIsOgModalOpen(true)}
-          data-testid="share-og-preview-btn"
-          aria-label={`Share ${stream.name} and preview social card`}
+        {/* Header Actions */}
+        <div
           style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
-            borderRadius: "8px",
-            border: "1px solid var(--color-border, #e5e7eb)",
-            background: "var(--color-surface-1, #fff)",
-            color: "var(--color-text-primary, #111827)",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            gap: "0.75rem",
+            flexWrap: "wrap",
           }}
         >
-          <Share2 size={16} />
-          <span>Share / Preview Card</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const { hasCliff } = downloadStreamIcs(stream);
+                setCalendarStatus(
+                  hasCliff
+                    ? "Calendar file downloaded with cliff and end dates."
+                    : "Calendar file downloaded with stream end date.",
+                );
+              } catch {
+                setCalendarStatus("Unable to export calendar file.");
+              }
+            }}
+            data-testid="add-to-calendar-btn"
+            aria-label={`Add ${stream.name} dates to calendar`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Calendar size={16} aria-hidden="true" />
+            <span>Add to calendar</span>
+          </button>
+
+          {/* Share & Social Preview Card Trigger */}
+          <button
+            ref={shareTriggerRef}
+            onClick={() => setIsOgModalOpen(true)}
+            data-testid="share-og-preview-btn"
+            aria-label={`Share ${stream.name} and preview social card`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              borderRadius: "8px",
+              border: "1px solid var(--color-border, #e5e7eb)",
+              background: "var(--color-surface-1, #fff)",
+              color: "var(--color-text-primary, #111827)",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Share2 size={16} />
+            <span>Share / Preview Card</span>
+          </button>
+
+          <span
+            role="status"
+            aria-live="polite"
+            data-testid="calendar-export-status"
+            className="sr-only"
+          >
+            {calendarStatus}
+          </span>
+        </div>
       </div>
 
       {/* Presence Badge Container */}
