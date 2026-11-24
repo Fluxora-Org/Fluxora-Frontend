@@ -718,6 +718,16 @@ describe("navbar timezone utilities", () => {
     expect(isoResult).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
+  it("formats ISO timestamps and UTC offsets in the requested timezone", () => {
+    const testDate = new Date("2026-07-28T14:45:00.000Z");
+    expect(formatLocalISOWithOffset(testDate, "Asia/Kolkata")).toBe(
+      "2026-07-28T20:15:00+05:30",
+    );
+    expect(getFormattedUTCOffset(testDate, "Asia/Kolkata")).toBe(
+      "UTC+05:30",
+    );
+  });
+
   it("getFormattedUTCOffset returns correct offset format", () => {
     const testDate = new Date("2026-07-28T14:45:00.000Z");
     expect(getFormattedUTCOffset(testDate, "UTC")).toBe("UTC+00:00");

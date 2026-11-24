@@ -8,6 +8,8 @@ import { getNetworkLabel } from "../lib/config";
 import WalletIcon from "./WalletIcon";
 import { isMobileViewport, VIEWPORT_RESIZE_DEBOUNCE_MS } from "../lib/breakpoints";
 import { useWalletStateMachine } from "./wallet-connect/useWalletStateMachine";
+import { albedoProvider } from "./wallet-connect/walletProviders";
+import { toWalletProviderError } from "./wallet-connect/walletProvider";
 import { useI18n } from "../i18n";
 import freighterIcon from "../assets/images/freighter.svg";
 import albedoIcon from "../assets/images/albedo.svg";
@@ -32,6 +34,25 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * Maps an Albedo connect failure to the machine's error states. A blocked popup
+ * and a stalled popup keep their own screens; anything else is a rejection.
+ */
+function mapAlbedoErrorToState(
+  error: unknown,
+): "not_installed" | "rejected" | "popup_blocked" | "network_timeout" {
+  switch (toWalletProviderError(error, "rejected").type) {
+    case "popup_blocked":
+      return "popup_blocked";
+    case "timeout":
+      return "network_timeout";
+    case "not_installed":
+      return "not_installed";
+    default:
+      return "rejected";
+  }
+}
+
 export interface ConnectWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,6 +67,7 @@ export interface ConnectWalletModalProps {
   errorState?:
     | "not_installed"
     | "rejected"
+    | "popup_blocked"
     | "network_mismatch"
     | "network_timeout"
     | "device-searching"
@@ -95,6 +117,7 @@ const stableExpectedNetworkLabel = getNetworkLabel(getExpectedStellarNetwork());
 type LegacyErrorState =
   | "not_installed"
   | "rejected"
+  | "popup_blocked"
   | "network_mismatch"
   | "network_timeout"
   | "device-searching"
@@ -137,6 +160,10 @@ export default function ConnectWalletModal({
   // synchronously (avoids stale closure issues with the ref inside the hook).
   const isRequestInFlight = useRef(false);
 
+  // Which wallet the last connect attempt targeted, so RETRY re-attempts the
+  // same wallet instead of always falling back to Freighter.
+  const lastAttemptProviderRef = useRef<"freighter" | "albedo">("freighter");
+
   const { t } = useI18n();
   const { connect } = useWallet();
 
@@ -158,6 +185,7 @@ export default function ConnectWalletModal({
     switch (machineState) {
       case "not_installed":        return "not_installed";
       case "rejected":             return "rejected";
+      case "popup_blocked":        return "popup_blocked";
       case "network_mismatch":     return "network_mismatch";
       case "network_timeout":      return "network_timeout";
       case "device_searching":     return "device-searching";
@@ -260,6 +288,7 @@ export default function ConnectWalletModal({
   const handleFreighterClick = async () => {
     // Machine-level guard: SELECT_FREIGHTER is ignored while in-flight.
     if (isRequestInFlight.current) return;
+    lastAttemptProviderRef.current = "freighter";
 
     // Drive the machine into the connecting state BEFORE marking in-flight,
     // so the machine's send() guard (which checks the hook's inFlightRef) does
@@ -326,14 +355,53 @@ export default function ConnectWalletModal({
     }
   };
 
-  /** Retry Freighter connection from an error state. */
-  const handleRetryFreighter = () => {
+  /**
+   * Handle Albedo selection. Albedo resolves via a popup, and the adapter maps
+   * blocked/closed/stalled popups to distinct error categories.
+   */
+  const handleAlbedoClick = async () => {
+    if (isRequestInFlight.current) return;
+    lastAttemptProviderRef.current = "albedo";
+
+    send({ type: "SELECT_ALBEDO" });
+
+    isRequestInFlight.current = true;
+    setRequestInFlight(true);
+    setConnectingId("albedo");
+
+    try {
+      const account = await albedoProvider.connect();
+
+      const expectedNet = getExpectedStellarNetwork();
+      if (account.network.toUpperCase() !== expectedNet.toUpperCase()) {
+        send({ type: "ERROR", error: "network_mismatch" });
+        return;
+      }
+
+      connect(account.address, account.network, "albedo");
+      send({ type: "CONNECTION_SUCCESS" });
+      if (onConnectAlbedo) {
+        onConnectAlbedo();
+      }
+      onClose();
+    } catch (err) {
+      send({ type: "ERROR", error: mapAlbedoErrorToState(err) });
+    } finally {
+      isRequestInFlight.current = false;
+      setRequestInFlight(false);
+      setConnectingId(null);
+    }
+  };
+
+  /** Retry the connection from an error state, targeting the same wallet. */
+  const handleRetryConnection = () => {
+    const provider = lastAttemptProviderRef.current;
     send({ type: "RETRY" });
     if (onRetryConnection) {
       onRetryConnection();
     }
     // Re-attempt the connection after driving the machine to `connecting`.
-    void handleFreighterClick();
+    void (provider === "albedo" ? handleAlbedoClick() : handleFreighterClick());
   };
 
   /** Return to the wallet selection list (idle). */
@@ -446,6 +514,8 @@ export default function ConnectWalletModal({
       name: "Albedo",
       description: t("connectWallet.walletDescription.albedo"),
       icon: "⭐",
+      iconSrc: "/src/assets/images/albedo.svg",
+      action: handleAlbedoClick,
       iconSrc: albedoIcon,
       action: onConnectAlbedo ?? (() => {}),
       disabled: !onConnectAlbedo,
@@ -698,7 +768,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleRetryFreighter}
+                onClick={handleRetryConnection}
                 aria-label={t("connectWallet.rejected.ariaRetry")}
               >
                 <RefreshCw size={18} />
@@ -712,6 +782,45 @@ export default function ConnectWalletModal({
               >
                 <ArrowLeft size={16} style={{ marginRight: 8 }} />
                 {t("connectWallet.rejected.backBtn")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ERROR STATE: Wallet Popup Blocked */}
+        {effectiveDisplayState === "popup_blocked" && (
+          <div className={styles.errorContainer} data-testid="error-state-popup-blocked">
+            <div className={`${styles.errorIcon} ${styles.iconRejected}`} aria-hidden="true">
+              <AlertCircle size={28} />
+            </div>
+
+            <span className={styles.badge} id="badge-popup-blocked">{t("connectWallet.popupBlocked.badge")}</span>
+            <h2 id="connect-wallet-modal-title" className={styles.errorTitle}>
+              {t("connectWallet.popupBlocked.title")}
+            </h2>
+            <p id="connect-wallet-modal-description" className={styles.errorDescription}>
+              {t("connectWallet.popupBlocked.description")}
+            </p>
+
+            <div className={styles.actionGroup}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                data-autofocus="true"
+                onClick={handleRetryConnection}
+                aria-label={t("connectWallet.popupBlocked.ariaRetry")}
+              >
+                <RefreshCw size={18} />
+                {t("connectWallet.popupBlocked.retryBtn")}
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={handleBackToWalletSelection}
+                aria-label={t("connectWallet.popupBlocked.ariaBack")}
+              >
+                <ArrowLeft size={16} style={{ marginRight: 8 }} />
+                {t("connectWallet.popupBlocked.backBtn")}
               </button>
             </div>
           </div>
@@ -758,7 +867,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleRetryFreighter}
+                onClick={handleRetryConnection}
                 aria-label={t("connectWallet.networkMismatch.ariaCheck")}
               >
                 <RefreshCw size={18} />
@@ -797,7 +906,7 @@ export default function ConnectWalletModal({
                 type="button"
                 className={styles.primaryButton}
                 data-autofocus="true"
-                onClick={handleRetryFreighter}
+                onClick={handleRetryConnection}
                 aria-label={t("connectWallet.timeout.ariaRetry")}
               >
                 <RefreshCw size={18} />
@@ -1243,6 +1352,20 @@ export default function ConnectWalletModal({
                 aria-pressed={effectiveDisplayState === "rejected"}
               >
                 Rejected
+              </button>
+              <button
+                type="button"
+                className={`${styles.previewButton} ${
+                  effectiveDisplayState === "popup_blocked" ? styles.previewButtonActive : ""
+                }`}
+                onClick={() => {
+                  setIsSimulatingHardwareFlow(false);
+                  send({ type: "SELECT_ALBEDO" });
+                  send({ type: "ERROR", error: "popup_blocked" });
+                }}
+                aria-pressed={effectiveDisplayState === "popup_blocked"}
+              >
+                Popup Blocked
               </button>
               <button
                 type="button"

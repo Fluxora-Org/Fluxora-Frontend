@@ -10,6 +10,8 @@ export interface AccountContextMessage {
   address: string | null;
   network: string | null;
   connected: boolean;
+  /** Wallet that owns the session ("freighter" | "albedo"), when known. */
+  providerId?: string | null;
   /** Wall-clock ordering prevents an older delayed tab message winning. */
   changedAt: number;
   source: string;
@@ -33,6 +35,9 @@ function isAccountContextMessage(
     (typeof message.address === "string" || message.address === null) &&
     (typeof message.network === "string" || message.network === null) &&
     typeof message.connected === "boolean" &&
+    (message.providerId === undefined ||
+      message.providerId === null ||
+      typeof message.providerId === "string") &&
     typeof message.changedAt === "number" &&
     Number.isFinite(message.changedAt) &&
     typeof message.source === "string"

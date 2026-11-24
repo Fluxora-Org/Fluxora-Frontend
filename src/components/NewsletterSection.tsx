@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   subscribeNewsletter,
   type NewsletterResult,
@@ -68,6 +68,13 @@ export default function NewsletterSection() {
   const [email, setEmail] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const messageId = feedback
     ? feedback.type === "error"
@@ -90,22 +97,37 @@ export default function NewsletterSection() {
       return;
     }
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setFeedback(null);
     setSubmitting(true);
 
     try {
-      const result = await subscribeNewsletter(email);
+      const result = await subscribeNewsletter(email, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
       setFeedback(FEEDBACK_BY_RESULT[result]);
       if (result === "success") {
         setEmail("");
       }
-    } catch {
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) {
+        return;
+      }
       setFeedback({
         message: "We couldn't subscribe you right now. Please try again.",
         type: "error",
       });
     } finally {
-      setSubmitting(false);
+      if (!controller.signal.aborted) {
+        setSubmitting(false);
+      }
     }
   };
 

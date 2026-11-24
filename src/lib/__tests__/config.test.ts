@@ -4,6 +4,7 @@ import {
   getNetworkExplorerPath,
   getNetworkLabel,
   getNetworkPassphrase,
+  isE2EEnabled,
   parseBooleanFlag,
   validateUrl,
   validateContractId,
@@ -49,6 +50,12 @@ describe("config", () => {
     expect(() => createConfig(env({ VITE_NETWORK: "futurenet" }))).toThrow(
       /VITE_NETWORK/,
     );
+  });
+
+  it("exposes the E2E flag without components reading import.meta.env", () => {
+    expect(isE2EEnabled({ VITE_E2E: "true" } as ImportMetaEnv)).toBe(true);
+    expect(isE2EEnabled({ VITE_E2E: "false" } as ImportMetaEnv)).toBe(false);
+    expect(isE2EEnabled({} as ImportMetaEnv)).toBe(false);
   });
 
   it("normalizes labels, passphrases, and boolean flags", () => {
