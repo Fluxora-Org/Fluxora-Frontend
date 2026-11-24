@@ -53,8 +53,6 @@ export default defineConfig({
       "src/components/Streams/StreamCreatedModal.keyboard.test.tsx",
       "src/components/Streams/StreamsListPanel.test.tsx",
       "src/components/StreamsLoading.layoutShift.test.tsx",
-      "src/components/wallet-connect/__tests__/reconnectViewState.test.tsx",
-      "src/components/wallet-connect/__tests__/Walletcontext.test.tsx",
       "src/hooks/__tests__/useOnlineStatus.test.tsx",
       "src/hooks/__tests__/useRouteFocus.test.tsx",
       "src/i18n/__tests__/missingTranslationFallback.test.tsx",
