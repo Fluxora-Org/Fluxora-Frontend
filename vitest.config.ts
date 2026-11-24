@@ -51,8 +51,6 @@ export default defineConfig({
       "src/i18n/__tests__/missingTranslationFallback.test.tsx",
       "src/i18n/__tests__/pseudoLocaleCoverage.test.tsx",
       "src/lib/__tests__/browserStorageSecurity.test.ts",
-      "src/lib/__tests__/config.test.ts",
-      "src/lib/__tests__/configBoundary.test.ts",
       "src/lib/__tests__/createStreamAmounts.property.test.ts",
       "src/lib/__tests__/createStreamAmounts.test.ts",
       "src/lib/__tests__/onboarding.test.ts",
