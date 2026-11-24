@@ -73,14 +73,22 @@ To enable WebKit on a macOS CI runner:
 
 ## Landing performance budget
 
-The landing route has a production-build FCP budget of 1,800 ms. The dedicated
-check uses Chromium at a fixed 1280x720 viewport with 4x CPU throttling and
-40 ms / 1.5 Mbps network emulation, so measurements remain comparable across
-releases and fail CI when the budget is exceeded:
+The landing route has a production-build median FCP budget of 1,800 ms across
+three uncached navigations. Each run uses Chromium at a fixed 1280x720 viewport
+with 4x CPU throttling and 40 ms / 1.5 Mbps network emulation. The performance
+gate also measures CLS from navigation using the Web Vitals session-window
+definition, with a maximum score of 0.1:
 
 ```bash
 npm run test:performance
 ```
+
+The HTML report is written to `playwright-performance-report/`. To adjust a
+budget, first capture repeated measurements on the production preview under
+the same emulation settings, investigate and fix regressions rather than
+raising the limit to accommodate noise, then update the corresponding constant
+or assertion in `landing-performance.spec.ts` or `landing-cls.spec.ts` and
+document the rationale here.
 
 ### Browser-specific notes
 

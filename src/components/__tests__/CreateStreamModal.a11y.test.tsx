@@ -34,7 +34,7 @@ async function flushAnimationFrame() {
 }
 
 function fillValidStepOne(dialog: HTMLElement) {
-  fireEvent.change(within(dialog).getByLabelText(/recipient/i), {
+  fireEvent.change(within(dialog).getByLabelText(/^recipient/i), {
     target: { value: VALID_STELLAR },
   });
   fireEvent.change(within(dialog).getByLabelText(/deposit amount/i), {
