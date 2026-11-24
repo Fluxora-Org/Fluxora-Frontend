@@ -16,6 +16,17 @@ export const IS_DEV = !!import.meta.env.DEV;
 export const E2E_FORCE_SHARE_FAILURE =
   IS_DEV && parseBooleanFlag(import.meta.env.VITE_E2E_FORCE_SHARE_FAILURE);
 
+/**
+ * True when the app is running under Playwright, which drives wallet-gated
+ * flows without a browser wallet extension.
+ *
+ * Guards consume this accessor instead of reading `import.meta.env` directly
+ * so the environment read stays inside the config module.
+ */
+export function isE2EEnabled(env: ImportMetaEnv = import.meta.env): boolean {
+  return env.VITE_E2E === "true";
+}
+
 const NETWORK_LABELS: Record<StellarNetwork, string> = {
   PUBLIC: "Public Network (Mainnet)",
   TESTNET: "Testnet",
@@ -71,7 +82,10 @@ export function validateUrl(
   try {
     parsed = new URL(trimmed);
   } catch {
-    return { field, message: `${field} must be an absolute HTTPS URL (HTTP is only allowed for localhost during development).` };
+    return {
+      field,
+      message: `${field} is not a valid URL; provide an absolute HTTPS URL (HTTP is only allowed for localhost during development).`,
+    };
   }
 
   const isLocal =
@@ -82,7 +96,7 @@ export function validateUrl(
 
   return {
     field,
-    message: `${field} must use HTTPS (HTTP is only allowed for localhost during development).`,
+    message: `${field} must use HTTPS; ${parsed.protocol} is not allowed (HTTP is only allowed for localhost during development).`,
   };
 }
 
@@ -111,7 +125,7 @@ export function validateContractId(
   if (!STELLAR_CONTRACT_ID_RE.test(trimmed)) {
     return {
       field,
-      message: `${field} must be a valid 56-character Stellar contract ID starting with C.`,
+      message: `${field} must be a valid 56-character Strkey Stellar contract ID starting with C.`,
     };
   }
   return trimmed;

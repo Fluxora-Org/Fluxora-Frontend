@@ -12,21 +12,16 @@ export interface SessionPersistenceIndicatorProps {
 const LABELS: Record<StorageWriteStatus, string> = {
   unknown: "Your filters and search haven't been saved on this device yet",
   available: "Your filters and search are saved on this device",
-  unavailable: "Your filters and search aren't being saved",
+  unavailable: "Your filters and search are kept only while this page is open",
 };
 
 const UNAVAILABLE_MESSAGE =
-  "Your filters and search can't be saved in this browser because site data is blocked or storage is full.";
+  "For security, session recovery data stays in memory and is discarded when you close or reload this page.";
 
 /**
- * Small, always-visible indicator that filters/search are being remembered
- * locally — so users understand persistence is happening *before* a crash
- * ever occurs, not just when the recovery banner shows up after one.
- * See docs/STREAMS_SESSION_RECOVERY_SPEC.md §5.
- *
- * It reflects the real outcome of the latest session write (#1663): it only
- * claims persistence after a write succeeded, and when writes fail it says so
- * through a polite live region.
+ * Small, always-visible indicator that communicates the current session
+ * recovery policy. Sensitive wallet-linked filters and drafts remain in
+ * memory only; they are never claimed as durable browser-storage writes.
  */
 export default function SessionPersistenceIndicator({
   recentlySaved,

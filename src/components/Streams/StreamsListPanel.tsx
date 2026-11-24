@@ -10,12 +10,20 @@
  * isolation for snapshot / interaction testing.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import Input from "../../components/Input";
 import { Pagination } from "../../components/Pagination";
 import VirtualList from "../../components/VirtualList";
 import SessionPersistenceIndicator from "../../components/SessionPersistenceIndicator";
 import type { StreamRecord } from "../../data/streamRecords";
+import type {
+  BulkStreamAction,
+  BulkStreamActionProgress,
+  BulkStreamActionResult,
+} from "../../lib/bulkStreamActions";
+import {
+  getStreamSelectionState,
+} from "../../lib/streamSelection";
 import type { StreamSortMode } from "../../lib/streamSorting";
 import type { StatusFilter } from "../../pages/useStreamsData";
 
@@ -55,6 +63,11 @@ export interface StreamsListPanelProps {
   paginatedStreams: StreamRecord[];
   effectiveExpandedId: string | undefined;
   selectedStreamId: string;
+  selectedStreamIds: ReadonlySet<string>;
+  selectedStreams: StreamRecord[];
+  selectableFilteredCount: number;
+  bulkResults: BulkStreamActionResult[];
+  bulkProgress: BulkStreamActionProgress | null;
 
   // ── Session persistence ──────────────────────────────────────────────────────
   recentlySaved: boolean;
@@ -79,6 +92,12 @@ export interface StreamsListPanelProps {
   onSortChange: (sort: StreamSortMode) => void;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (limit: number) => void;
+  onStreamSelectionChange: (streamId: string, selected: boolean) => void;
+  onPageSelectionChange: (selected: boolean) => void;
+  onSelectAllFiltered: () => void;
+  onClearSelection: () => void;
+  onBulkAction: (action: BulkStreamAction) => void;
+  onRetryBulkFailures: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -107,6 +126,11 @@ export function StreamsListPanel({
   paginatedStreams,
   effectiveExpandedId: _effectiveExpandedId,
   selectedStreamId: _selectedStreamId,
+  selectedStreamIds,
+  selectedStreams,
+  selectableFilteredCount,
+  bulkResults,
+  bulkProgress,
   recentlySaved,
   renderStream,
   emptyState,
@@ -115,7 +139,38 @@ export function StreamsListPanel({
   onSortChange,
   onPageChange,
   onItemsPerPageChange,
+  onStreamSelectionChange,
+  onPageSelectionChange,
+  onSelectAllFiltered,
+  onClearSelection,
+  onBulkAction,
+  onRetryBulkFailures,
 }: StreamsListPanelProps) {
+  const selectablePageIds = paginatedStreams
+    .filter((stream) => stream.status !== "Completed")
+    .map((stream) => stream.id);
+  const pageSelectionState = getStreamSelectionState(
+    selectedStreamIds,
+    selectablePageIds,
+  );
+  const pageCheckboxRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (pageCheckboxRef.current) {
+      pageCheckboxRef.current.indeterminate = pageSelectionState === "mixed";
+    }
+  }, [pageSelectionState]);
+
+  const selectedActiveCount = selectedStreams.filter(
+    (stream) => stream.status === "Active",
+  ).length;
+  const selectedActionableCount = selectedStreams.filter(
+    (stream) => stream.status !== "Completed",
+  ).length;
+  const hasFailedResults = bulkResults.some(
+    (result) => result.status === "failed",
+  );
+
   return (
     <section className="streams-list-shell">
       <div className="streams-list-head">
@@ -169,6 +224,112 @@ export function StreamsListPanel({
         </div>
       </div>
 
+      <div className="streams-bulk-controls">
+        <div className="streams-selection-controls">
+          <label className="streams-selection-checkbox">
+            <input
+              ref={pageCheckboxRef}
+              type="checkbox"
+              aria-label="Select current page"
+              aria-checked={
+                pageSelectionState === "mixed"
+                  ? "mixed"
+                  : pageSelectionState === "all"
+              }
+              checked={pageSelectionState === "all"}
+              disabled={selectablePageIds.length === 0}
+              onChange={(event) => onPageSelectionChange(event.target.checked)}
+            />
+            <span>Select page ({selectablePageIds.length})</span>
+          </label>
+          <button
+            type="button"
+            className="streams-bulk-link"
+            disabled={selectableFilteredCount === 0}
+            onClick={onSelectAllFiltered}
+          >
+            Select all {selectableFilteredCount} actionable filtered streams
+          </button>
+        </div>
+
+        {selectedStreamIds.size > 0 && (
+          <div
+            className="streams-bulk-actions"
+            role="group"
+            aria-label="Bulk stream actions"
+          >
+            <span>{selectedStreamIds.size} selected</span>
+            <button
+              type="button"
+              className="streams-secondary-button"
+              disabled={selectedActiveCount === 0 || Boolean(bulkProgress)}
+              onClick={() => onBulkAction("pause")}
+            >
+              Pause {selectedActiveCount} active
+            </button>
+            <button
+              type="button"
+              className="streams-secondary-button"
+              disabled={selectedActionableCount === 0 || Boolean(bulkProgress)}
+              onClick={() => onBulkAction("cancel")}
+            >
+              Cancel {selectedActionableCount}
+            </button>
+            <button
+              type="button"
+              className="streams-bulk-link"
+              disabled={Boolean(bulkProgress)}
+              onClick={onClearSelection}
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+      </div>
+
+      {bulkProgress && (
+        <p className="streams-bulk-progress" role="status" aria-live="polite">
+          Processing {bulkProgress.completed + 1} of {bulkProgress.total}:{" "}
+          {bulkProgress.currentStream.name}. Your wallet may ask you to sign
+          each transaction.
+        </p>
+      )}
+
+      {bulkResults.length > 0 && (
+        <section
+          className="streams-bulk-results"
+          aria-label="Bulk action results"
+          aria-live="polite"
+        >
+          <h3>Bulk {bulkResults[0]!.action} results</h3>
+          <ul>
+            {bulkResults.map((result) => (
+              <li key={`${result.action}-${result.streamId}`}>
+                <span>
+                  {result.streamName}:{" "}
+                  {result.status === "success"
+                    ? "Succeeded"
+                    : result.status === "failed"
+                      ? "Failed"
+                      : "Not submitted"}
+                </span>
+                {result.error && <span> — {result.error}</span>}
+              </li>
+            ))}
+          </ul>
+          {hasFailedResults && (
+            <button
+              type="button"
+              className="streams-secondary-button"
+              disabled={Boolean(bulkProgress)}
+              onClick={onRetryBulkFailures}
+            >
+              Retry failed streams only
+            </button>
+          )}
+        </section>
+      )}
+
       <VirtualList
         ariaLabel={listAriaLabel}
         className="streams-list"
@@ -176,7 +337,24 @@ export function StreamsListPanel({
         estimateSize={STREAM_CARD_ESTIMATED_HEIGHT}
         getKey={(stream) => stream.id}
         items={paginatedStreams}
-        renderItem={renderStream}
+        renderItem={(stream) => (
+          <div className="streams-list-selection-row">
+            <div className="streams-list-selection-cell">
+              <input
+                type="checkbox"
+                aria-label={`Select ${stream.name}`}
+                checked={selectedStreamIds.has(stream.id)}
+                disabled={stream.status === "Completed"}
+                onChange={(event) =>
+                  onStreamSelectionChange(stream.id, event.target.checked)
+                }
+              />
+            </div>
+            <div className="streams-list-selection-content">
+              {renderStream(stream)}
+            </div>
+          </div>
+        )}
         threshold={STREAMS_VIRTUALIZATION_THRESHOLD}
       />
 

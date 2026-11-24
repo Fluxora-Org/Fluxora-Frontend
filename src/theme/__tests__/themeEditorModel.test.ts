@@ -31,6 +31,10 @@ import {
   buildCustomThemeDefinition,
   validateThemeDraft,
   validateThemeEditorInput,
+  exportThemeTokens,
+  importThemeTokens,
+  MAX_THEME_IMPORT_BYTES,
+  THEME_FILE_VERSION,
   ThemeEditorModelInputError,
   MAX_THEME_EDITOR_PAYLOAD_BYTES,
   MAX_TOKEN_KEY_LENGTH,
@@ -77,6 +81,59 @@ describe("themeEditorModel — translucent color detection", () => {
     expect(isTranslucentColor("#ffffff")).toBe(false);
     expect(isTranslucentColor("#1a1f36")).toBe(false);
     expect(isTranslucentColor("")).toBe(false);
+  });
+});
+
+describe("themeEditorModel — theme file import and export", () => {
+  const tokens = { ...DEFAULTS };
+
+  it("round-trips a versioned palette without changing token values", () => {
+    const serialized = exportThemeTokens(tokens);
+    expect(JSON.parse(serialized)).toEqual({
+      version: THEME_FILE_VERSION,
+      tokens,
+    });
+    expect(importThemeTokens(serialized)).toEqual(tokens);
+  });
+
+  it("rejects malformed JSON, unsupported versions, and unknown properties", () => {
+    expect(() => importThemeTokens("{")).toThrow(/not valid JSON/i);
+    expect(() =>
+      importThemeTokens(JSON.stringify({ version: 2, tokens })),
+    ).toThrow(/unsupported theme file version/i);
+    expect(() =>
+      importThemeTokens(JSON.stringify({ version: 1, tokens, extra: true })),
+    ).toThrow(/unknown property/i);
+  });
+
+  it("rejects unknown tokens, malformed colors, and contrast failures", () => {
+    expect(() =>
+      importThemeTokens(
+        JSON.stringify({ version: 1, tokens: { "--unknown-token": "#fff" } }),
+      ),
+    ).toThrow(/unknown theme token/i);
+    expect(() =>
+      importThemeTokens(
+        JSON.stringify({
+          version: 1,
+          tokens: { "--color-accent-primary": "not-a-color" },
+        }),
+      ),
+    ).toThrow(/invalid theme token/i);
+    expect(() =>
+      importThemeTokens(
+        JSON.stringify({
+          version: 1,
+          tokens: { "--color-accent-primary": "#ffffff" },
+        }),
+      ),
+    ).toThrow(/contrast/i);
+  });
+
+  it("rejects files larger than the import limit before parsing", () => {
+    expect(() =>
+      importThemeTokens(" ".repeat(MAX_THEME_IMPORT_BYTES + 1)),
+    ).toThrow(/maximum size/i);
   });
 });
 
