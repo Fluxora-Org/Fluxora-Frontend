@@ -27,6 +27,10 @@ import { isDraftMeaningful } from "../lib/streamsSessionRecovery";
 import CreateStreamFab from "../components/CreateStreamFab";
 import { StreamsListPanel } from "../components/Streams/StreamsListPanel";
 import {
+  ConfirmModal,
+  type TransactionStatus,
+} from "../components/common/ConfirmModal";
+import {
   useStreamsData,
   STATUS_FILTERS,
   MAX_LOADING_RETRIES,
@@ -52,8 +56,26 @@ import type {
   StreamStatus,
 } from "../data/streamRecords";
 import type { StreamSortMode } from "../lib/streamSorting";
+import {
+  executeBulkStreamAction,
+  type BulkStreamAction,
+  type BulkStreamActionProgress,
+  type BulkStreamActionResult,
+  type BulkStreamActionTarget,
+} from "../lib/bulkStreamActions";
+import {
+  toggleStreamGroupSelection,
+  toggleStreamSelection,
+} from "../lib/streamSelection";
+import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 
 const DISCLOSURE_DURATION_MS = 200;
+
+interface BulkActionIntent {
+  action: BulkStreamAction;
+  targets: BulkStreamActionTarget[];
+  retry: boolean;
+}
 
 /**
  * Formats a USDC amount with full fractional precision (2 decimal places).
@@ -834,10 +856,28 @@ export default function Streams() {
   } = data;
 
   const visibleError = isAbortError ? null : error;
+  const {
+    announcement: bulkAnnouncement,
+    alertAnnouncement: bulkAlertAnnouncement,
+    announceStatus,
+    announceAlert,
+  } = useLiveAnnouncer();
 
   // ── Modals ─────────────────────────────────────────────────────────────────
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [selectedBulkStreamIds, setSelectedBulkStreamIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [bulkResults, setBulkResults] = useState<BulkStreamActionResult[]>([]);
+  const [bulkProgress, setBulkProgress] =
+    useState<BulkStreamActionProgress | null>(null);
+  const [bulkActionIntent, setBulkActionIntent] =
+    useState<BulkActionIntent | null>(null);
+  const [bulkTransactionStatus, setBulkTransactionStatus] =
+    useState<TransactionStatus>("idle");
+  const walletAddressRef = useRef(walletAddress);
+  walletAddressRef.current = walletAddress;
   const [createdStream, setCreatedStream] = useState({
     id: "STR-NEW",
     url: "https://fluxora.io/stream/STR-NEW",
@@ -847,6 +887,25 @@ export default function Streams() {
     sender: undefined as string | undefined,
     recipient: undefined as string | undefined,
   });
+
+  useEffect(() => {
+    setSelectedBulkStreamIds(new Set());
+    setBulkResults([]);
+    setBulkProgress(null);
+    setBulkActionIntent(null);
+    setBulkTransactionStatus("idle");
+  }, [walletAddress]);
+
+  useEffect(() => {
+    const streamIds = new Set(streams.map((stream) => stream.id));
+    setSelectedBulkStreamIds((previous) => {
+      const current = [...previous];
+      const remaining = current.filter((id) => streamIds.has(id));
+      return remaining.length === current.length
+        ? previous
+        : new Set(remaining);
+    });
+  }, [streams]);
 
   // ── Rollback toast ─────────────────────────────────────────────────────────
   const rolledBackToastRef = useRef(0);
@@ -904,6 +963,138 @@ export default function Streams() {
   const handleStreamError = useCallback(() => {
     refetch();
   }, [refetch]);
+
+  const selectedBulkStreams = streams.filter((stream) =>
+    selectedBulkStreamIds.has(stream.id),
+  );
+  const selectableFilteredCount = visibleStreams.filter(
+    (stream) => stream.status !== "Completed",
+  ).length;
+
+  const handleBulkActionRequest = useCallback(
+    (action: BulkStreamAction) => {
+      if (!walletAddress) {
+        announceAlert("Connect a treasury wallet before managing streams.");
+        return;
+      }
+
+      const targets = selectedBulkStreams
+        .filter((stream) =>
+          action === "pause"
+            ? stream.status === "Active"
+            : stream.status !== "Completed",
+        )
+        .map(({ id, name, status }) => ({ id, name, status }));
+      if (targets.length === 0) {
+        announceAlert(`No eligible streams are selected to ${action}.`);
+        return;
+      }
+
+      setBulkActionIntent({ action, targets, retry: false });
+      setBulkTransactionStatus("idle");
+    },
+    [announceAlert, selectedBulkStreams, walletAddress],
+  );
+
+  const handleRetryBulkFailures = useCallback(() => {
+    if (!walletAddress) {
+      announceAlert("Connect a treasury wallet before retrying stream actions.");
+      return;
+    }
+
+    const failed = bulkResults.filter((result) => result.status === "failed");
+    if (failed.length === 0) return;
+
+    setBulkActionIntent({
+      action: failed[0]!.action,
+      retry: true,
+      targets: failed.map((result) => ({
+        id: result.streamId,
+        name: result.streamName,
+        idempotencyKey: result.idempotencyKey,
+      })),
+    });
+    setBulkTransactionStatus("idle");
+  }, [announceAlert, bulkResults, walletAddress]);
+
+  const handleConfirmBulkAction = useCallback(async () => {
+    if (!bulkActionIntent || !walletAddress) return;
+
+    const actionIntent = bulkActionIntent;
+    const submittingAddress = walletAddress;
+    setBulkTransactionStatus("pending");
+    setBulkProgress(null);
+    announceStatus(
+      `${actionIntent.retry ? "Retrying" : "Starting"} ${actionIntent.action} for ${actionIntent.targets.length} streams.`,
+    );
+
+    try {
+      const results = await executeBulkStreamAction(
+        actionIntent.action,
+        submittingAddress,
+        actionIntent.targets,
+        {
+          stopOnFailure: true,
+          canContinue: () => walletAddressRef.current === submittingAddress,
+          onProgress: setBulkProgress,
+        },
+      );
+
+      if (walletAddressRef.current !== submittingAddress) return;
+
+      setBulkResults((previous) => {
+        if (!actionIntent.retry) return results;
+        const byId = new Map(previous.map((result) => [result.streamId, result]));
+        for (const result of results) byId.set(result.streamId, result);
+        return [...byId.values()];
+      });
+      const successfulIds = new Set(
+        results
+          .filter((result) => result.status === "success")
+          .map((result) => result.streamId),
+      );
+      if (successfulIds.size > 0) {
+        setSelectedBulkStreamIds((previous) => {
+          const next = new Set(previous);
+          for (const id of successfulIds) next.delete(id);
+          return next;
+        });
+        refetchStreams();
+      }
+
+      const successCount = results.filter(
+        (result) => result.status === "success",
+      ).length;
+      const failureCount = results.filter(
+        (result) => result.status === "failed",
+      ).length;
+      const skippedCount = results.filter(
+        (result) => result.status === "skipped",
+      ).length;
+      const summary = `${successCount} succeeded, ${failureCount} failed, ${skippedCount} not submitted.`;
+      if (failureCount > 0) announceAlert(`Bulk ${actionIntent.action} finished. ${summary}`);
+      else announceStatus(`Bulk ${actionIntent.action} finished. ${summary}`);
+      setBulkActionIntent(null);
+      setBulkTransactionStatus("idle");
+      setBulkProgress(null);
+    } catch (error) {
+      if (walletAddressRef.current !== submittingAddress) return;
+      const message =
+        error instanceof Error ? error.message : "The bulk action could not start.";
+      announceAlert(message);
+      addToast(message, "error");
+      setBulkActionIntent(null);
+      setBulkTransactionStatus("idle");
+      setBulkProgress(null);
+    }
+  }, [
+    addToast,
+    announceAlert,
+    announceStatus,
+    bulkActionIntent,
+    refetchStreams,
+    walletAddress,
+  ]);
 
   const handleCopyRecipient = useCallback(
     async (stream: StreamRecord) => {
@@ -1084,6 +1275,12 @@ export default function Streams() {
       <div aria-live="assertive" aria-atomic="true" className="sr-only">
         {alertAnnouncement}
       </div>
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {bulkAnnouncement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {bulkAlertAnnouncement}
+      </div>
 
       {selectedStream ? (
         <StreamDetail
@@ -1216,6 +1413,11 @@ export default function Streams() {
             paginatedStreams={paginatedStreams}
             effectiveExpandedId={effectiveExpandedId}
             selectedStreamId={selectedStreamId}
+            selectedStreamIds={selectedBulkStreamIds}
+            selectedStreams={selectedBulkStreams}
+            selectableFilteredCount={selectableFilteredCount}
+            bulkResults={bulkResults}
+            bulkProgress={bulkProgress}
             recentlySaved={recentlySaved}
             renderStream={(stream) => (
               <StreamCard
@@ -1258,6 +1460,51 @@ export default function Streams() {
               setItemsPerPage(limit);
               setCurrentPage(1);
             }}
+            onStreamSelectionChange={(streamId, selected) => {
+              const next = toggleStreamSelection(
+                selectedBulkStreamIds,
+                streamId,
+                selected,
+              );
+              setSelectedBulkStreamIds(next);
+              announceStatus(
+                `${next.size} stream${next.size === 1 ? "" : "s"} selected.`,
+              );
+            }}
+            onPageSelectionChange={(selected) => {
+              const pageIds = paginatedStreams
+                .filter((stream) => stream.status !== "Completed")
+                .map((stream) => stream.id);
+              const next = toggleStreamGroupSelection(
+                selectedBulkStreamIds,
+                pageIds,
+                selected,
+              );
+              setSelectedBulkStreamIds(next);
+              announceStatus(
+                `${next.size} stream${next.size === 1 ? "" : "s"} selected.`,
+              );
+            }}
+            onSelectAllFiltered={() => {
+              const filteredIds = visibleStreams
+                .filter((stream) => stream.status !== "Completed")
+                .map((stream) => stream.id);
+              const next = toggleStreamGroupSelection(
+                selectedBulkStreamIds,
+                filteredIds,
+                true,
+              );
+              setSelectedBulkStreamIds(next);
+              announceStatus(
+                `${next.size} stream${next.size === 1 ? "" : "s"} selected. Added ${filteredIds.length} actionable filtered streams.`,
+              );
+            }}
+            onClearSelection={() => {
+              setSelectedBulkStreamIds(new Set());
+              announceStatus("Stream selection cleared.");
+            }}
+            onBulkAction={handleBulkActionRequest}
+            onRetryBulkFailures={handleRetryBulkFailures}
           />
         </>
       )}
@@ -1290,7 +1537,26 @@ export default function Streams() {
           setIsCreateModalOpen(true);
         }}
       />
+      <ConfirmModal
+        isOpen={Boolean(bulkActionIntent)}
+        title={
+          bulkActionIntent
+            ? `${bulkActionIntent.retry ? "Retry" : "Confirm"} bulk ${bulkActionIntent.action}`
+            : "Confirm bulk action"
+        }
+        description={
+          bulkActionIntent
+            ? `${bulkActionIntent.action === "cancel" ? "Cancel" : "Pause"} ${bulkActionIntent.targets.length} stream${bulkActionIntent.targets.length === 1 ? "" : "s"}: ${bulkActionIntent.targets.map((target) => target.name).join(", ")}.${bulkActionIntent.action === "cancel" ? " Cancellation ends these streams." : ""}${bulkProgress ? ` Processing ${bulkProgress.completed + 1} of ${bulkProgress.total}: ${bulkProgress.currentStream.name}.` : " Transactions will run one at a time; your wallet may ask you to sign each one."}`
+            : ""
+        }
+        confirmText={`Confirm ${bulkActionIntent?.action ?? "action"}`}
+        onConfirm={() => void handleConfirmBulkAction()}
+        onCancel={() => {
+          setBulkActionIntent(null);
+          setBulkTransactionStatus("idle");
+        }}
+        status={bulkTransactionStatus}
+      />
     </div>
   );
 }
-

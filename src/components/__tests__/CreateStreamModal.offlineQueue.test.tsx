@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateStreamModal from "../CreateStreamModal";
 import { createStream, getTransactionStatus } from "../../lib/stellar/tx";
@@ -151,13 +151,9 @@ describe("CreateStreamModal offline action queue", () => {
 
     goOnline();
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(createStream).toHaveBeenCalledTimes(1);
+    // useOnlineStatus coalesces connectivity events for 500ms before
+    // publishing, so the flush starts after that settle window.
+    await waitFor(() => expect(createStream).toHaveBeenCalledTimes(1));
     expect(createStream).toHaveBeenCalledWith(
       "GDBWW22BDP5HN3ZTG7LLID665PA72DGOLOONLUM5TKQFRAQA3EYGKIRC",
       VALID_STELLAR,
@@ -173,7 +169,9 @@ describe("CreateStreamModal offline action queue", () => {
     expect(addToast).toHaveBeenCalledWith(
       expect.stringMatching(/queued stream was submitted/i),
       "success",
-      undefined,
+      // 0 = persistent until acknowledged: the flush may finish after the
+      // user closed the modal, so the toast must not auto-dismiss.
+      0,
       expect.objectContaining({
         label: expect.stringMatching(/view stream/i),
         onClick: expect.any(Function),
@@ -199,14 +197,9 @@ describe("CreateStreamModal offline action queue", () => {
 
     goOnline();
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
+    // Wait out useOnlineStatus' 500ms settle window before the flush runs.
     expect(
-      screen.getByText(/queued stream couldn't be submitted/i),
+      await screen.findByText(/queued stream couldn't be submitted/i),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/insufficient balance to fund this stream/i),

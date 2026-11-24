@@ -81,6 +81,16 @@ export function useModalAccessibility({
   // that element is unmounted, so focus would never return to the trigger.
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
+  // Read onClose through a ref so callers may pass a fresh closure on every
+  // render. If onClose were an effect dependency, each re-render of the modal
+  // would tear the effect down and set it up again, re-running the
+  // initial-focus frame and the return-focus cleanup and pulling keyboard
+  // focus away from whatever control the user is operating.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -112,7 +122,7 @@ export function useModalAccessibility({
 
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -167,7 +177,7 @@ export function useModalAccessibility({
         window.requestAnimationFrame(() => elementToFocus.focus());
       }
     };
-  }, [initialFocusRef, isOpen, modalRef, onClose, returnFocusRef]);
+  }, [initialFocusRef, isOpen, modalRef, returnFocusRef]);
 
   return {
     focusableSelector: FOCUSABLE_SELECTOR,

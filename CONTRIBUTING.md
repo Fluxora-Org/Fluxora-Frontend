@@ -267,6 +267,26 @@ npm run format:check
 
 The repo uses ESLint flat config with TypeScript, React Hooks, and React Refresh rules. Prettier handles formatting for `src/**/*.{ts,tsx,css}` and top-level config files.
 
+### Recommended editor settings
+
+Editor and hosting configuration is local to each contributor; `.vscode/` and `.replit` are gitignored. In VS Code, the repo's ESLint and Prettier setup works well with these user-level settings:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ]
+}
+```
+
 Both `lint` and `format:check` run in CI. Fix all warnings before pushing — the build fails on lint errors.
 
 ---
