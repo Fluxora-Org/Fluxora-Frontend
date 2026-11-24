@@ -30,6 +30,70 @@ describe("idempotency utilities", () => {
     });
   });
 
+  describe("generateIdempotencyKey — getRandomValues fallback", () => {
+    let originalRandomUUID: typeof crypto.randomUUID | undefined;
+
+    beforeEach(() => {
+      originalRandomUUID = crypto.randomUUID;
+      // Simulate an environment where randomUUID is absent but getRandomValues is present.
+      // @ts-expect-error intentional undefined for fallback branch test
+      crypto.randomUUID = undefined;
+    });
+
+    afterEach(() => {
+      crypto.randomUUID = originalRandomUUID!;
+    });
+
+    it("returns a string with the tx_ prefix", () => {
+      const key = generateIdempotencyKey();
+      expect(key.startsWith("tx_")).toBe(true);
+    });
+
+    it("hex segment is exactly 32 characters (16 bytes)", () => {
+      const key = generateIdempotencyKey();
+      const hex = key.slice("tx_".length);
+      expect(hex).toHaveLength(32);
+      expect(/^[0-9a-f]{32}$/.test(hex)).toBe(true);
+    });
+
+    it("produces 10,000 unique keys with no collisions", () => {
+      const keys = new Set<string>();
+      for (let i = 0; i < 10_000; i++) {
+        keys.add(generateIdempotencyKey());
+      }
+      expect(keys.size).toBe(10_000);
+    });
+
+    it("does not contain Math.random output (no base-36 fragment)", () => {
+      // Math.random fallback produced patterns like tx_<timestamp>_<base36>.
+      // The getRandomValues fallback has no underscore after tx_.
+      const key = generateIdempotencyKey();
+      const hex = key.slice("tx_".length);
+      // A second underscore would indicate the old timestamp_random format.
+      expect(hex.includes("_")).toBe(false);
+    });
+  });
+
+  describe("generateIdempotencyKey — crypto absent", () => {
+    let originalCrypto: Crypto;
+
+    beforeEach(() => {
+      originalCrypto = globalThis.crypto;
+      // @ts-expect-error intentional undefined to test no-crypto branch
+      globalThis.crypto = undefined;
+    });
+
+    afterEach(() => {
+      globalThis.crypto = originalCrypto;
+    });
+
+    it("throws when crypto is entirely unavailable", () => {
+      expect(() => generateIdempotencyKey()).toThrow(
+        "generateIdempotencyKey: crypto API unavailable",
+      );
+    });
+  });
+
   describe("savePendingTx and loadPendingTx", () => {
     it("persists a pending transaction to sessionStorage", () => {
       const key = savePendingTx({ recipient: "G..." }, "tx-hash-123");
