@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StreamsTable from "./StreamsTable";
 import type { Stream } from "./Stream";
 import StreamsLoading from "../StreamsLoading";
 import EmptyState from "../EmptyState";
-import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
 import { DemoDataBadge } from "./DemoBanner";
+import RecentStreamsGraph from "../RecentStreamsGraph";
 import "./RecentStreams.css";
 
 interface RecentStreamsProps {
@@ -51,7 +51,7 @@ const EDGE_W_MIN = 1;
 const EDGE_W_MAX = 7;
 
 function rateVal(rate: string): number {
-  const n = parseFloat(rate.replace(/[^0-9.\-]/g, ""));
+  const n = parseFloat(rate.replace(/[^0-9.-]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
@@ -523,7 +523,7 @@ export default function RecentStreams({
 
       <div className="flex-1">
         <div className={viewMode === "graph" ? "hidden md:block" : "hidden"}>
-          <GraphView streams={streams} />
+          <RecentStreamsGraph streams={streams} />
         </div>
 
         <div className={viewMode === "table" ? "block" : "block md:hidden"}>

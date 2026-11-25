@@ -11,7 +11,7 @@ vi.mock("../wallet-connect/Walletcontext", () => ({
 
 const ACCOUNT_A = "GA_ACCOUNT_A";
 const ACCOUNT_B = "GB_ACCOUNT_B";
-const offer = () => screen.queryByText(/restore your previous session/i);
+const offer = () => screen.queryByText(/restore(d)? your previous session/i);
 
 describe("SessionRecoveryBanner account scoping", () => {
   beforeEach(() => {

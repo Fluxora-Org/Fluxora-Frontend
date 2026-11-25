@@ -19,7 +19,7 @@
  * @module
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { StreamRecord } from "../data/streamRecords";
 import {
   getSnapshot,
@@ -27,22 +27,50 @@ import {
   type OptimisticOperation,
 } from "../lib/optimisticTransactions";
 
+function applyOptimisticStatusUpdates(
+  streams: StreamRecord[],
+  pendingOps: OptimisticOperation[],
+): StreamRecord[] {
+  const statusOverrides = new Map<string, StreamRecord["status"]>();
+  for (const op of pendingOps) {
+    if (op.kind !== "pause" && op.kind !== "cancel") continue;
+    const streamId = (op.data.streamId ?? op.data.id) as string | undefined;
+    if (!streamId) continue;
+    const nextStatus =
+      (op.data.nextStatus as StreamRecord["status"] | undefined) ??
+      (op.kind === "pause" ? "Paused" : ("Cancelled" as StreamRecord["status"]));
+    statusOverrides.set(streamId, nextStatus);
+  }
+
+  if (statusOverrides.size === 0) return streams;
+
+  return streams.map((stream) => {
+    const override = statusOverrides.get(stream.id);
+    if (!override) return stream;
+    return {
+      ...stream,
+      status: override,
+      _optimistic: true,
+    } as StreamRecord & { _optimistic?: boolean };
+  });
+}
+
 /**
  * Merge server-authoritative streams with any pending optimistic `create`
- * rows. Rolled-back or already-confirmed create rows are excluded because
- * they either never existed (rolled-back) or the server record will replace
- * them on the next refetch (confirmed).
+ * rows and pending `pause` / `cancel` status transitions. Rolled-back or
+ * already-confirmed rows are excluded so the server record stays authoritative.
  */
 function mergeOptimisticCreateRows(
   serverStreams: StreamRecord[],
   pendingOps: OptimisticOperation[],
   confirmedOps: OptimisticOperation[],
 ): StreamRecord[] {
+  const withStatusUpdates = applyOptimisticStatusUpdates(serverStreams, pendingOps);
   const createPending = pendingOps.filter((op) => op.kind === "create");
   const createConfirmed = confirmedOps.filter((op) => op.kind === "create");
-  if (createPending.length === 0) return serverStreams;
+  if (createPending.length === 0) return withStatusUpdates;
 
-  const serverIds = new Set(serverStreams.map((s) => s.id));
+  const serverIds = new Set(withStatusUpdates.map((s) => s.id));
   const confirmedIds = new Set(
     createConfirmed.map((op) => (op.data.id ?? op.data.streamId) as string).filter(Boolean),
   );
@@ -61,7 +89,7 @@ function mergeOptimisticCreateRows(
     }
   }
 
-  return [...serverStreams, ...optimisticRows];
+  return [...withStatusUpdates, ...optimisticRows];
 }
 
 /**

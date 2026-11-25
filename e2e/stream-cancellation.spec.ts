@@ -27,6 +27,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const TREASURY_URL = "/app/treasurypage";
 const KNOWN_STREAM_ID = "STR-001";
+const SENDER_ADDRESS = "GAJSINKGK5UHTCU3VS645X7QAEJCGNCFKZTXRCM2VO6M3XXPAAISFPVT";
 const MOCK_ADDRESS = "GAJCGNCFKZTXRCM2VO6M3XXPAAISEM2EKVTHPCEZVK54ZXPO74ICCA3P";
 const ACTION_BUTTON = /^Actions for stream/;
 const CANCEL_ITEM = "Pause/Cancel";
@@ -35,9 +36,9 @@ const CANCEL_ITEM = "Pause/Cancel";
  * Minimal Freighter provider stub so `/app/*` passes RequireWallet. It answers
  * the read-only status/address/network probes and never signs anything.
  */
-async function stubConnectedWallet(page: Page) {
+async function stubConnectedWallet(page: Page, address: string = MOCK_ADDRESS) {
   await page.addInitScript(
-    ({ address }) => {
+    ({ addr }) => {
       (window as unknown as { freighter: boolean }).freighter = true;
       window.addEventListener("message", (event: MessageEvent) => {
         const data = event.data;
@@ -53,7 +54,7 @@ async function stubConnectedWallet(page: Page) {
           messagedId: data.messageId,
           error: "",
         };
-        let payload: Record<string, unknown> = {};
+        let payload: Record<string, unknown>;
         switch (data.type) {
           case "REQUEST_CONNECTION_STATUS":
             payload = { isConnected: true };
@@ -65,7 +66,7 @@ async function stubConnectedWallet(page: Page) {
           case "REQUEST_PUBLIC_KEY":
           case "REQUEST_ACCESS":
           case "REQUEST_USER_INFO":
-            payload = { publicKey: address, address };
+            payload = { publicKey: addr, address: addr };
             break;
           case "REQUEST_NETWORK":
           case "REQUEST_NETWORK_DETAILS":
@@ -89,7 +90,7 @@ async function stubConnectedWallet(page: Page) {
         );
       });
     },
-    { address: MOCK_ADDRESS }
+    { addr: address }
   );
 }
 
@@ -153,18 +154,53 @@ test.describe("Stream cancellation control", () => {
     await expect(completedRow.getByRole("menuitem", { name: CANCEL_ITEM })).toBeDisabled();
   });
 
-  test("the stream detail route exposes no cancel action", async ({ page }) => {
-    // Characterises the gap #1759 hit: cancelling is not available on the
-    // stream detail page, only the (stubbed) row-menu item above.
+  test("non-sender sees explanation instead of Pause/Cancel actions on stream detail", async ({
+    page,
+  }) => {
+    await page.goto(`/app/streams/${KNOWN_STREAM_ID}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByTestId("stream-controls-not-sender")).toBeVisible();
+    await expect(page.getByTestId("pause-stream-btn")).toHaveCount(0);
+    await expect(page.getByTestId("cancel-stream-btn")).toHaveCount(0);
+  });
+
+  test("sender can open Pause and destructive Cancel confirmations on stream detail", async ({
+    page,
+  }) => {
+    await stubConnectedWallet(page, SENDER_ADDRESS);
     await page.goto(`/app/streams/${KNOWN_STREAM_ID}`, {
       waitUntil: "domcontentloaded",
     });
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-    await expect(
-      page.getByRole("button", { name: /cancel (stream|this stream|streaming)/i })
-    ).toHaveCount(0);
-    await expect(page.getByRole("menuitem", { name: CANCEL_ITEM })).toHaveCount(0);
+    const pauseBtn = page.getByTestId("pause-stream-btn");
+    const cancelBtn = page.getByTestId("cancel-stream-btn");
+    await expect(pauseBtn).toBeVisible();
+    await expect(cancelBtn).toBeVisible();
+
+    // Open Pause confirmation modal
+    await pauseBtn.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(KNOWN_STREAM_ID);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+
+    // Open Cancel confirmation modal and verify explicit confirmation gate
+    await cancelBtn.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(KNOWN_STREAM_ID);
+    const confirmCancelBtn = dialog.getByRole("button", { name: "Cancel stream" });
+    await expect(confirmCancelBtn).toBeDisabled();
+
+    await page.getByTestId("confirm-modal-explicit-checkbox").check();
+    await expect(confirmCancelBtn).toBeEnabled();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
   });
 });

@@ -322,6 +322,11 @@ export function useStreamsData(): StreamsDataResult {
     }
 
     const isAccountChange = hasCheckedSessionRef.current;
+    const previousAccountAddress = recoveryAccountRef.current;
+    if (previousAccountAddress && previousAccountAddress !== accountAddress) {
+      clearStreamsSession(previousAccountAddress);
+    }
+
     recoveryAccountRef.current = accountAddress;
     hasCheckedSessionRef.current = true;
     sessionResolvedRef.current = true;

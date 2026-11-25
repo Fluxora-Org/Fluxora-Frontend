@@ -21,7 +21,7 @@ test.describe("embedded widget display flow", () => {
     });
 
     const widget = page.getByRole("article", {
-      name: new RegExp(`Stream widget:\s*${KNOWN_STREAM_NAME}`, "i"),
+      name: new RegExp(`Stream widget:\\s*${KNOWN_STREAM_NAME}`, "i"),
     });
     await expect(widget).toBeVisible();
 
@@ -44,7 +44,7 @@ test.describe("embedded widget display flow", () => {
 
     // Compact layout has no title heading; identify via article aria-label.
     const widget = page.getByRole("article", {
-      name: new RegExp(`Stream widget:\s*${KNOWN_STREAM_NAME}`, "i"),
+      name: new RegExp(`Stream widget:\\s*${KNOWN_STREAM_NAME}`, "i"),
     });
     await expect(widget).toBeVisible();
     await expect(

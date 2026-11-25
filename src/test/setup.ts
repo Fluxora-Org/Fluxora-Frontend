@@ -81,6 +81,16 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   });
 }
 
+// jsdom does not implement navigator.onLine. Provide a default so hooks that
+// probe it don't crash. Individual tests can override this with Object.defineProperty.
+if (typeof navigator !== 'undefined' && !('onLine' in navigator)) {
+  Object.defineProperty(navigator, 'onLine', {
+    writable: true,
+    configurable: true,
+    value: true,
+  });
+}
+
 if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     configurable: true,
@@ -123,14 +133,53 @@ if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
 // file never throws `ReferenceError: window is not defined`.
 const createStorageMock = () => {
   let store: Record<string, string> = {};
-  return {
+  const mock = {
     getItem: vi.fn((key: string) => (key in store ? store[key] : null)),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value.toString(); }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = String(value);
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
     key: vi.fn((index: number) => Object.keys(store)[index] || null),
-    length: 0,
+    get length() {
+      return Object.keys(store).length;
+    },
   } as unknown as Storage;
+
+  Object.defineProperty(mock, 'length', {
+    get: () => Object.keys(store).length,
+    configurable: true,
+  });
+
+  return new Proxy(mock, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (typeof prop === 'string') {
+        return store[prop];
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    ownKeys() {
+      return Object.keys(store);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      if (typeof prop === 'string' && prop in store) {
+        return {
+          value: store[prop],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, prop);
+    },
+  }) as unknown as Storage;
 };
 if (typeof window !== 'undefined') {
   // configurable so tests can simulate blocked site data, where merely

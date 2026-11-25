@@ -12,7 +12,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within, act } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+  act,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ThemeEditorPanel, {
   ContrastBadge,
@@ -470,5 +476,120 @@ describe("ThemeEditorPanel — edge cases", () => {
     
     expect(firstHex).toHaveValue("#abcdef");
     // Contrast badge or UI should sync but native color picker state is uncontrolled by us except via value bind
+  });
+});
+
+describe("ThemeEditorPanel — theme file actions", () => {
+  it("exports the validated draft as a JSON download", () => {
+    renderPanel();
+    const createDescriptor = Object.getOwnPropertyDescriptor(
+      URL,
+      "createObjectURL",
+    );
+    const revokeDescriptor = Object.getOwnPropertyDescriptor(
+      URL,
+      "revokeObjectURL",
+    );
+    const createObjectURL = vi.fn(() => "blob:theme");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    try {
+      fireEvent.click(screen.getByRole("button", { name: /export theme/i }));
+      expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+      expect(click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:theme");
+      expect(
+        screen.getByText("Theme exported as fluxora-theme.json."),
+      ).toHaveAttribute("role", "status");
+    } finally {
+      if (createDescriptor) {
+        Object.defineProperty(URL, "createObjectURL", createDescriptor);
+      } else {
+        Reflect.deleteProperty(URL, "createObjectURL");
+      }
+      if (revokeDescriptor) {
+        Object.defineProperty(URL, "revokeObjectURL", revokeDescriptor);
+      } else {
+        Reflect.deleteProperty(URL, "revokeObjectURL");
+      }
+    }
+  });
+
+  it("imports a valid file into the draft and announces success", async () => {
+    renderPanel();
+    const contents = JSON.stringify({
+      version: 1,
+      tokens: { "--color-accent-primary": "#005566" },
+    });
+    const file = new File([contents], "palette.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: vi.fn().mockResolvedValue(contents),
+    });
+
+    fireEvent.change(screen.getByLabelText("Theme JSON file"), {
+      target: { files: [file] },
+    });
+
+    expect(
+      await screen.findByText("Theme imported. Preview it before applying."),
+    ).toHaveAttribute("role", "status");
+    expect(
+      screen
+        .getAllByDisplayValue("#005566")
+        .some(
+          (element) =>
+            element instanceof HTMLInputElement && element.type === "text",
+        ),
+    ).toBe(true);
+  });
+
+  it("reports invalid files without replacing the current draft", async () => {
+    renderPanel();
+    const file = new File(["{invalid"], "broken.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: vi.fn().mockResolvedValue("{invalid"),
+    });
+
+    fireEvent.change(screen.getByLabelText("Theme JSON file"), {
+      target: { files: [file] },
+    });
+
+    expect(
+      await screen.findByText(/theme import failed: theme file is not valid json/i),
+    ).toHaveAttribute("role", "alert");
+    expect(
+      screen
+        .getAllByDisplayValue("#0097a7")
+        .some(
+          (element) =>
+            element instanceof HTMLInputElement && element.type === "text",
+        ),
+    ).toBe(true);
+  });
+
+  it("disables import and export when the user is unauthorized", () => {
+    render(
+      <ThemeProvider>
+        <ThemeEditorPanel isAuthorized={false} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: /export theme/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /import theme/i })).toBeDisabled();
   });
 });

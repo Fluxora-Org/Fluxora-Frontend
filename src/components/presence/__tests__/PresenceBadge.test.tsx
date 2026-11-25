@@ -207,14 +207,17 @@ describe("PresenceBadge", () => {
     expect(within(list).getByText("GAAAAA...AWHF")).toBeInTheDocument();
   });
 
-  it("renders raw id when displayName is null and id is not a Stellar address", () => {
+  it("renders 'Anonymous viewer' when displayName is null and id is not a Stellar address", () => {
     render(<PresenceBadge viewers={[mockViewerSimpleId]} />);
     
     const trigger = screen.getByRole("button");
     fireEvent.click(trigger);
     
     const list = screen.getByRole("list");
-    expect(within(list).getByText("simple-id")).toBeInTheDocument();
+    // Issue #1690: raw session ids are not part of the sharing model, so the
+    // list must anonymise them instead of leaking the identifier.
+    expect(within(list).getByText("Anonymous viewer")).toBeInTheDocument();
+    expect(within(list).queryByText("simple-id")).not.toBeInTheDocument();
   });
 
   describe("getInitials edge cases", () => {
