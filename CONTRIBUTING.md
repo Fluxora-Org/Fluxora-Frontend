@@ -265,7 +265,19 @@ npm run format
 npm run format:check
 ```
 
-The repo uses ESLint flat config with TypeScript, React Hooks, and React Refresh rules. Prettier handles formatting for `src/**/*.{ts,tsx,css}` and top-level config files.
+The repo uses ESLint flat config (`eslint.config.js`) with TypeScript, React Hooks, React Refresh rules, and project-specific custom rules:
+
+- **Custom ESLint Rules:**
+  - `eslint-rules/no-float-amount-arithmetic.js`: Prohibits floating-point math on financial amounts. All token calculations must use integer/stroop units or BigInt arithmetic to avoid rounding inaccuracies.
+  - `eslint-rules/no-hardcoded-breakpoints.js`: Enforces the use of responsive theme breakpoint tokens and constants instead of raw pixel values.
+  - `eslint-rules/require-ts-suppression-description.js`: Requires every `@ts-ignore` or `@ts-expect-error` suppression to include an actionable comment explaining the necessity.
+
+### Running Lint Checks
+
+- `npm run lint`: Executes `eslint .` across the repository. CI runs this step right after `Build` and fails on any errors.
+- `npm run lint:fix`: Automatically fixes fixable lint issues where possible across all matching files.
+
+Ensure `npm run lint` exits with code 0 before pushing commits and opening pull requests.
 
 ### Recommended editor settings
 
