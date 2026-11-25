@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { TransactionStatus } from "../lib/transactionState";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { formatAssetAmount } from "../lib/formatters";
@@ -14,12 +13,13 @@ import { usePresenceViewers } from "../hooks/usePresenceViewers";
 import { PresenceBadge, PresenceCursorOverlay } from "../components/presence";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { StreamOGPreviewModal } from "../components/StreamOGPreviewModal";
-import { Calendar, Share2 } from "lucide-react";
+import { Calendar, Pause, Share2, XCircle } from "lucide-react";
 import { downloadStreamIcs } from "../lib/icsExport";
 import { ConfirmModal } from "../components/common/ConfirmModal";
 import RequireWalletAction from "../components/RequireWalletAction";
 import { useTransactionSubmission } from "../hooks/useTransactionSubmission";
 import { useOptimisticStreams } from "../hooks/useOptimisticStreams";
+import { useLiveAnnouncer } from "../hooks/useLiveAnnouncer";
 import {
   addOptimistic,
   confirmOptimistic,
@@ -29,10 +29,20 @@ import {
   cancelStream,
   decodeContractError,
   pauseStream,
+  topUpStream,
   TransactionError,
 } from "../lib/stellar/tx";
-import { useI18n } from "../i18n";
-import { Pause, Share2, XCircle } from "lucide-react";
+import { InputField } from "../components/InputField";
+import { InputWithUnit } from "../components/InputWithUnit";
+import { ValidationMessage } from "../components/ValidationMessage";
+import {
+  amountToSmallestUnitsString,
+  parseAmount,
+  parseAmountExact,
+} from "../lib/createStreamAmounts";
+import { compareAmountStrings } from "../lib/amountPrecision";
+import { useI18n, type TranslationKey } from "../i18n";
+import { en } from "../i18n/en";
 
 type StreamActionTranslator = ReturnType<typeof useI18n>["t"];
 
@@ -95,9 +105,6 @@ function mapStreamActionError(
 
   return t("streamDetail.error.generic");
 }
-import { useI18n, type TranslationKey } from "../i18n";
-import { en } from "../i18n/en";
-import { Share2 } from "lucide-react";
 
 /**
  * Stream status presentation
@@ -253,10 +260,15 @@ export default function StreamDetail() {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [topUpValidationError, setTopUpValidationError] = useState<string | null>(null);
   const currentDate = useTickingNow({ precision: "minute" });
 
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpStatus, setTopUpStatus] = useState<TransactionStatus>("idle");
+  const [topUpError, setTopUpError] = useState<string | null>(null);
+  const [topUpReceipt, setTopUpReceipt] = useState<{ txHash: string; amount: string; asset: string } | null>(null);
+  const topUpAmountRef = useRef("");
+  const topUpOpIdRef = useRef<string | null>(null);
+  const topUpSubmissionPayloadRef = useRef<{ amount: number; exact: string; asset: string } | null>(null);
 
   // Pause / Cancel modal & optimistic transaction state
   const [activeAction, setActiveAction] = useState<"pause" | "cancel" | null>(
@@ -304,6 +316,54 @@ export default function StreamDetail() {
     },
   });
 
+  const topUpSubmission = useTransactionSubmission({
+    params: { action: "top-up", streamId: stream?.id },
+    submit: async () => {
+      const exactAmount = parseAmountExact(topUpAmountRef.current);
+      const scaledAmount = exactAmount === "" ? "0" : amountToSmallestUnitsString(exactAmount, 7);
+      if (
+        !accountId ||
+        !stream ||
+        exactAmount === "" ||
+        compareAmountStrings(exactAmount, "0") <= 0 ||
+        scaledAmount === "0"
+      ) {
+        throw new Error(t("streamDetail.topUp.validation.invalidAmount"));
+      }
+      const response = await topUpStream(accountId, stream.id, scaledAmount);
+      const txHash =
+        (response as { txHash?: string } | null | undefined)?.txHash ?? "";
+      return { txHash };
+    },
+    onResolved: (outcome, txHash) => {
+      const opId = topUpOpIdRef.current;
+      const payload = topUpSubmissionPayloadRef.current;
+      topUpOpIdRef.current = null;
+      topUpSubmissionPayloadRef.current = null;
+      if (outcome === "confirmed") {
+        if (opId) confirmOptimistic(opId);
+        if (payload) {
+          setStream((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  depositAmount: prev.depositAmount + payload.amount,
+                  remainingAmount: prev.remainingAmount + payload.amount,
+                }
+              : prev,
+          );
+          if (txHash) {
+            setTopUpReceipt({ txHash, amount: payload.exact, asset: payload.asset });
+          }
+          setTopUpAmount("");
+          topUpAmountRef.current = "";
+        }
+      } else {
+        if (opId) rollbackOptimistic(opId, `Transaction ${outcome}`);
+      }
+    },
+  });
+
   // Handle immediate confirmation when submit() resolves without a pollable hash
   useEffect(() => {
     if (txSubmission.status === "confirmed" && pendingOpIdRef.current) {
@@ -319,6 +379,34 @@ export default function StreamDetail() {
       }
     }
   }, [txSubmission.status]);
+
+  useEffect(() => {
+    if (topUpSubmission.status !== "confirmed") return;
+    const opId = topUpOpIdRef.current;
+    const payload = topUpSubmissionPayloadRef.current;
+    if (!opId && !payload) return;
+    topUpOpIdRef.current = null;
+    topUpSubmissionPayloadRef.current = null;
+    if (opId) confirmOptimistic(opId);
+    if (payload) {
+      setStream((prev) =>
+        prev
+          ? {
+              ...prev,
+              depositAmount: prev.depositAmount + payload.amount,
+              remainingAmount: prev.remainingAmount + payload.amount,
+            }
+          : prev,
+      );
+      setTopUpReceipt({
+        txHash: topUpSubmission.txHash ?? "submitted",
+        amount: payload.exact,
+        asset: payload.asset,
+      });
+      setTopUpAmount("");
+      topUpAmountRef.current = "";
+    }
+  }, [topUpSubmission.status, topUpSubmission.txHash]);
 
   // Tracks the cancel function of whichever fetch (initial load or a
   // manual retry) is currently in flight, so a newer fetch can cancel a
@@ -403,6 +491,37 @@ export default function StreamDetail() {
       window.removeEventListener("resize", handleScroll);
     };
   }, [isPresenceEnabled, updateCursor]);
+
+  useEffect(() => {
+    topUpSubmission.reset();
+    setTopUpAmount("");
+    topUpAmountRef.current = "";
+    setTopUpError(null);
+    setTopUpReceipt(null);
+    setTopUpValidationError(null);
+    topUpOpIdRef.current = null;
+    topUpSubmissionPayloadRef.current = null;
+  }, [streamId, topUpSubmission.reset]);
+
+  const { announcement, alertAnnouncement, announceStatus, announceAlert } = useLiveAnnouncer();
+  const topUpStatus = topUpSubmission.status;
+  const topUpIsBusy = topUpSubmission.isSubmitting || txSubmission.isSubmitting;
+  const topUpAmountError = topUpValidationError;
+
+  useEffect(() => {
+    if (topUpStatus === "submitting" || topUpStatus === "pending") {
+      announceStatus(t("streamDetail.topUp.status.pending"));
+    } else if (topUpStatus === "confirmed") {
+      announceStatus(t("streamDetail.topUp.status.confirmed"));
+    } else if (topUpStatus === "failed" || topUpStatus === "timeout") {
+      announceAlert(
+        mapStreamActionError(
+          topUpSubmission.error ?? new Error(t("streamDetail.topUp.status.rejected")),
+          t,
+        ),
+      );
+    }
+  }, [topUpStatus, topUpSubmission.error, announceStatus, announceAlert, t]);
 
   // ── Compare mode ──────────────────────────────────────────────────────────
   if (isCompareMode && streamId && compareWithId) {
@@ -655,6 +774,56 @@ export default function StreamDetail() {
     }
   };
 
+  const handleTopUpSubmit = async () => {
+    const exactAmount = parseAmountExact(topUpAmountRef.current);
+    if (
+      exactAmount === "" ||
+      compareAmountStrings(exactAmount, "0") <= 0
+    ) {
+      setTopUpValidationError(t("streamDetail.topUp.validation.invalidAmount"));
+      announceAlert(t("streamDetail.topUp.validation.invalidAmount"));
+      return;
+    }
+    if (!accountId || !displayStream) {
+      setTopUpValidationError(t("streamDetail.topUp.validation.walletRequired"));
+      announceAlert(t("streamDetail.topUp.validation.walletRequired"));
+      return;
+    }
+
+    setTopUpValidationError(null);
+    setTopUpError(null);
+    setTopUpReceipt(null);
+    topUpSubmission.reset();
+
+    const payload = {
+      amount: parseAmount(exactAmount),
+      exact: exactAmount,
+      asset: displayStream.asset,
+    };
+    topUpSubmissionPayloadRef.current = payload;
+    const op = addOptimistic("top-up", {
+      streamId: displayStream.id,
+      amount: payload.amount,
+    });
+    topUpOpIdRef.current = op.id;
+
+    try {
+      await topUpSubmission.submit();
+    } catch (err) {
+      if (topUpOpIdRef.current === op.id) {
+        rollbackOptimistic(
+          op.id,
+          err instanceof Error ? err.message : "Transaction failed",
+        );
+        topUpOpIdRef.current = null;
+      }
+      topUpSubmissionPayloadRef.current = null;
+      const message = mapStreamActionError(err, t);
+      setTopUpError(message);
+      announceAlert(message);
+    }
+  };
+
   const modalStatus: "idle" | "pending" | "success" | "error" =
     txSubmission.status === "submitting" || txSubmission.status === "pending"
       ? "pending"
@@ -682,6 +851,12 @@ export default function StreamDetail() {
   // ── Single-stream detail ──────────────────────────────────────────────────
   return (
     <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        {alertAnnouncement}
+      </div>
       <Breadcrumb items={breadcrumbItems} />
       <MetaTags stream={displayStream} />
 
@@ -840,45 +1015,71 @@ export default function StreamDetail() {
       {/* Top-Up Flow */}
       <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "var(--color-surface-2, #f3f4f6)", borderRadius: "8px" }}>
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", margin: 0 }}>{t("streamDetail.topUp.title")}</h2>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input
-            type="number"
-            aria-label={t("streamDetail.topUp.amountAriaLabel")}
-            placeholder={t("streamDetail.topUp.amountPlaceholder")}
-            value={topUpAmount}
-            onChange={(e) => setTopUpAmount(e.target.value)}
-            disabled={topUpStatus === "pending"}
-            style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--color-border, #e5e7eb)" }}
-          />
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleTopUpSubmit();
+          }}
+          noValidate
+        >
+          <InputField
+            id="stream-detail-top-up-amount"
+            label={t("streamDetail.topUp.amountLabel")}
+            required
+            error={topUpAmountError ?? undefined}
+          >
+            <InputWithUnit
+              id="stream-detail-top-up-amount"
+              unit={displayStream.asset}
+              value={topUpAmount}
+              onChange={(event) => {
+                setTopUpAmount(event.target.value);
+                topUpAmountRef.current = event.target.value;
+                if (topUpValidationError) setTopUpValidationError(null);
+              }}
+              placeholder={t("streamDetail.topUp.amountPlaceholder")}
+              disabled={topUpIsBusy}
+              hasError={Boolean(topUpAmountError)}
+              aria-label={t("streamDetail.topUp.amountAriaLabel")}
+            />
+          </InputField>
           <button
-            onClick={() => {
-              setTopUpStatus("pending");
-              setTimeout(() => {
-                if (Number(topUpAmount) <= 0) {
-                  setTopUpStatus("rejected");
-                } else {
-                  setTopUpStatus("confirmed");
-                }
-              }, 500);
-            }}
-            disabled={topUpStatus === "pending" || !topUpAmount}
+            type="submit"
+            disabled={topUpIsBusy || !topUpAmount}
             style={{
+              marginTop: "0.5rem",
               padding: "0.5rem 1rem",
               borderRadius: "4px",
               background: "var(--color-text-primary, #111827)",
               color: "var(--color-surface-1, #fff)",
-              cursor: "pointer",
+              cursor: topUpIsBusy ? "not-allowed" : "pointer",
               fontWeight: 500,
             }}
           >
-            {t("streamDetail.topUp.submit")}
+            {topUpIsBusy ? t("streamDetail.topUp.submitting") : t("streamDetail.topUp.submit")}
           </button>
-        </div>
+        </form>
+        {topUpError && (
+          <ValidationMessage
+            id="stream-detail-top-up-tx-error"
+            message={topUpError}
+            type="error"
+          />
+        )}
+        {topUpReceipt && (
+          <div data-testid="top-up-receipt" style={{ marginTop: "0.5rem", fontSize: "0.875rem" }}>
+            {t("streamDetail.topUp.receipt", {
+              amount: topUpReceipt.amount,
+              asset: topUpReceipt.asset,
+              txHash: topUpReceipt.txHash,
+            })}
+          </div>
+        )}
         {topUpStatus !== "idle" && (
           <div style={{ marginTop: "0.5rem", fontSize: "0.875rem", fontWeight: 500 }}>
             {t("streamDetail.topUp.statusLabel")}{" "}
             <span data-testid="top-up-status">
-              {t(`streamDetail.topUp.status.${topUpStatus}`)}
+              {t(`streamDetail.topUp.status.${topUpStatus === "failed" ? "rejected" : topUpStatus === "timeout" ? "timeout" : topUpStatus}` as const)}
             </span>
           </div>
         )}

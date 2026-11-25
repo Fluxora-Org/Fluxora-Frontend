@@ -1,6 +1,7 @@
 import {
   Address,
   Contract,
+  ScInt,
   TransactionBuilder,
   Networks,
   rpc as SorobanRpc,
@@ -165,6 +166,18 @@ function encodeU64(val: string | number): xdr.ScVal {
     return xdr.ScVal.scvU64(xdr.Uint64.fromString(String(val)));
   } catch (err: any) {
     throw new TransactionError("simulation", `Failed to encode value as u64 ScVal: ${val}. Error: ${err.message}`);
+  }
+}
+
+/**
+ * Encodes an integer string as an i128 ScVal for contract token amounts.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for scaling rules.
+ */
+function encodeI128(val: string): xdr.ScVal {
+  try {
+    return new ScInt(BigInt(val), { type: "i128" }).toI128();
+  } catch (err: any) {
+    throw new TransactionError("simulation", `Failed to encode value as i128 ScVal: ${val}. Error: ${err.message}`);
   }
 }
 
@@ -503,6 +516,28 @@ export async function withdraw(
     encodeU64(amount),
   ];
   return await executeInvocation("withdraw", args);
+}
+
+/**
+ * Adds funds to an existing stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
+ * @param sender - The Stellar address authorizing the top-up.
+ * @param streamId - The ID of the stream to top up.
+ * @param amount - The amount in the token's smallest units, as an integer string.
+ */
+export async function topUpStream(
+  sender: string,
+  streamId: string,
+  amount: string
+): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  if (!sender) {
+    throw new TransactionError("rejected", "A connected sender address is required for a top-up.");
+  }
+  const args = [
+    encodeU64(streamId),
+    encodeI128(amount),
+  ];
+  return await executeInvocation("top_up", args);
 }
 
 /**
