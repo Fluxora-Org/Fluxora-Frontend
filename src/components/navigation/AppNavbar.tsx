@@ -16,6 +16,7 @@ import {
 
 import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import LanguagePicker from "./LanguagePicker";
 import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
 
 interface AppNavbarProps {
@@ -613,6 +614,9 @@ export default function AppNavbar({
             >
               <Type size={16} aria-hidden="true" />
             </button>
+
+            {/* Language picker */}
+            <LanguagePicker />
 
             {/* Theme toggle */}
             <ThemeSegmentedControl />
