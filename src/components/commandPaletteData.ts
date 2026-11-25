@@ -145,3 +145,166 @@ export const PALETTE_ITEMS: PaletteItem[] = [
     targetPath: "/app/streams",
   },
 ];
+
+/**
+ * Calculates a fuzzy match score for a single word against a query.
+ * Returns 0 if query is not a subsequence of word.
+ */
+function scoreWordSubsequence(word: string, query: string): number {
+  const w = word.toLowerCase();
+  const q = query.toLowerCase();
+  if (w === q) return 1000;
+  if (w.startsWith(q)) return 700 + Math.round((q.length / w.length) * 200);
+
+  let qIdx = 0;
+  let consecutive = 0;
+  let score = 0;
+  let firstMatch = -1;
+  let lastMatch = -1;
+
+  for (let i = 0; i < w.length; i++) {
+    if (qIdx < q.length && w[i] === q[qIdx]) {
+      if (firstMatch === -1) firstMatch = i;
+      lastMatch = i;
+      score += 20;
+      if (i === 0) score += 60; // word-start hit bonus
+      if (consecutive > 0) score += 30 * consecutive; // consecutive hits bonus
+      consecutive++;
+      qIdx++;
+    } else {
+      consecutive = 0;
+    }
+  }
+
+  if (qIdx < q.length) return 0; // Not a subsequence of this word
+
+  const span = lastMatch - firstMatch + 1;
+  score += Math.max(0, 50 - (span - q.length) * 10);
+  return score;
+}
+
+/**
+ * Calculates a fuzzy match score for text against a query.
+ * Handles single-word queries, multi-word queries, and substring/subsequence hits.
+ */
+export function scoreText(text: string, query: string): number {
+  const t = text.toLowerCase().trim();
+  const q = query.toLowerCase().trim();
+
+  if (!t || !q) return 0;
+  if (t === q) return 10000;
+  if (t.startsWith(q)) return 5000 + Math.round((q.length / t.length) * 1000);
+  if (t.includes(q)) return 3000 + Math.round((q.length / t.length) * 500);
+
+  const queryWords = q.split(/\s+/).filter(Boolean);
+  const textWords = t.split(/[\s\-_/.]+/).filter(Boolean);
+
+  if (queryWords.length === 1) {
+    const singleQuery = queryWords[0];
+    let maxWordScore = 0;
+    for (const word of textWords) {
+      const s = scoreWordSubsequence(word, singleQuery);
+      if (s > maxWordScore) {
+        maxWordScore = s;
+      }
+    }
+    if (maxWordScore > 0) return maxWordScore;
+
+    // Check full-string subsequence fallback
+    let qIdx = 0;
+    let consecutive = 0;
+    let score = 0;
+    for (let i = 0; i < t.length; i++) {
+      if (qIdx < singleQuery.length && t[i] === singleQuery[qIdx]) {
+        score += 15;
+        if (i === 0 || /[\s\-_/.]/.test(t[i - 1])) score += 40;
+        if (consecutive > 0) score += 20 * consecutive;
+        consecutive++;
+        qIdx++;
+      } else {
+        consecutive = 0;
+      }
+    }
+    return qIdx === singleQuery.length ? score : 0;
+  }
+
+  // Multi-word query: all query words must match in textWords
+  let totalScore = 0;
+  for (const qWord of queryWords) {
+    let matchedScore = 0;
+    for (const tWord of textWords) {
+      const s = scoreWordSubsequence(tWord, qWord);
+      if (s > matchedScore) {
+        matchedScore = s;
+      }
+    }
+    if (matchedScore === 0) {
+      return 0; // all words in multi-word query must match
+    }
+    totalScore += matchedScore;
+  }
+  return totalScore;
+}
+
+/**
+ * Pure function to score a PaletteItem against a query.
+ * Exact title match is guaranteed to produce an overwhelming score (>1,000,000)
+ * so that it always ranks first.
+ */
+export function scorePaletteItem(item: PaletteItem, query: string): number {
+  const q = query.toLowerCase().trim();
+  if (!q) return 0;
+
+  const titleLower = item.title.toLowerCase().trim();
+  if (titleLower === q) {
+    return 1_000_000;
+  }
+
+  const titleScore = scoreText(item.title, q);
+
+  let bestKeywordScore = 0;
+  for (const kw of item.keywords) {
+    const s = scoreText(kw, q);
+    if (s > bestKeywordScore) {
+      bestKeywordScore = s;
+    }
+  }
+
+  const descScore = scoreText(item.description, q);
+
+  if (titleScore === 0 && bestKeywordScore === 0 && descScore === 0) {
+    return 0;
+  }
+
+  return (titleScore * 10) + (bestKeywordScore * 5) + descScore;
+}
+
+export const CATEGORY_ORDER: Record<PaletteCategory, number> = {
+  Actions: 0,
+  Shortcuts: 1,
+  Help: 2,
+};
+
+/**
+ * Deterministic comparison function:
+ * 1. Score descending
+ * 2. Category ascending (Actions -> Shortcuts -> Help)
+ * 3. Title ascending
+ */
+export function comparePaletteItems(
+  a: PaletteItem,
+  b: PaletteItem,
+  query: string,
+): number {
+  const scoreA = scorePaletteItem(a, query);
+  const scoreB = scorePaletteItem(b, query);
+  if (scoreB !== scoreA) {
+    return scoreB - scoreA;
+  }
+  const catA = CATEGORY_ORDER[a.category] ?? 99;
+  const catB = CATEGORY_ORDER[b.category] ?? 99;
+  if (catA !== catB) {
+    return catA - catB;
+  }
+  return a.title.localeCompare(b.title);
+}
