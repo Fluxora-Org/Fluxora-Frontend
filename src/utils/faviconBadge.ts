@@ -43,7 +43,7 @@ export function formatBadgeCount(count: number): string {
 
 /**
  * Draws the base Fluxora icon grid onto a Canvas2D context.
- * Base icon dimensions match src/public/Icon.svg (viewBox 0 0 20 20).
+ * Base icon dimensions match public/Icon.svg (viewBox 0 0 20 20).
  */
 export function drawBaseIcon(
   ctx: CanvasRenderingContext2D,
@@ -251,13 +251,13 @@ export function updateFaviconBadge(
     faviconLink.id = "favicon";
     faviconLink.rel = "icon";
     faviconLink.type = "image/svg+xml";
-    faviconLink.href = "/src/public/Icon.svg";
+    faviconLink.href = "/Icon.svg";
     document.head.appendChild(faviconLink);
   }
 
   // Preserve initial favicon href for zero-count reset
   if (originalFaviconHref === null) {
-    originalFaviconHref = faviconLink.getAttribute("href") || "/src/public/Icon.svg";
+    originalFaviconHref = faviconLink.getAttribute("href") || "/Icon.svg";
   }
 
   if (count <= 0) {
