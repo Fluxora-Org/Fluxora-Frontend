@@ -225,9 +225,14 @@ describe('RecentStreams – untrusted metadata security', () => {
       );
 
       expect(document.querySelector('script')).toBeNull();
-      // Use container.textContent to find text that may be broken across elements
+      // Use container.textContent to find text that may be broken across elements.
+      // Whitespace-only names are defensively rejected as malformed by RecentStreams.
       const tbody = container.querySelector('tbody');
-      expect(tbody?.textContent).toContain(payload);
+      if (payload.trim() === '') {
+        expect(tbody).toBeNull();
+      } else {
+        expect(tbody?.textContent).toContain(payload);
+      }
       unmount();
     });
   });
