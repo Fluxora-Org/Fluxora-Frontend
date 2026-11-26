@@ -38,7 +38,6 @@ export default defineConfig({
       "src/components/__tests__/SessionRecoveryBanner.test.tsx",
       "src/components/__tests__/SessionPersistenceIndicator.test.tsx",
       "src/components/__tests__/TreasuryEmptyState.test.tsx",
-      "src/components/__tests__/untrusted-metadata.security.test.tsx",
       "src/components/__tests__/WalletFallback.test.tsx",
       "src/components/common/TruncatedReveal.test.tsx",
       "src/components/colorBlindSimulation/__tests__/ColorBlindToggle.test.tsx",
@@ -166,15 +165,12 @@ export default defineConfig({
         "src/hooks/useRouteFocus.ts",
         // Voice mic button — recording state must be conveyed non-visually
         "src/components/voice/VoiceMicButton.tsx",
-<<<<<<< Updated upstream
         // Issue #1687: voice stream identification must refuse ambiguity
         "src/components/voice/streamIdentifier.ts",
         // Issue #1982: InstallPWABanner keyboard and screen-reader coverage
         "src/components/InstallPWABanner.tsx",
-=======
         // Online/offline status tracking
         "src/hooks/useOnlineStatus.ts",
->>>>>>> Stashed changes
         // Streams service and Stellar transaction layer
         "src/lib/api/streamsService.ts",
         "src/lib/stellar/tx.ts",

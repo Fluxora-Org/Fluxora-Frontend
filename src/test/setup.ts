@@ -149,7 +149,6 @@ const createStorageMock = () => {
       return Object.keys(store).length;
     },
   } as unknown as Storage;
-  };
 
   Object.defineProperty(mock, 'length', {
     get: () => Object.keys(store).length,
