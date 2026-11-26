@@ -8,6 +8,7 @@ import {
   getTransactionStatus,
   TransactionError,
   decodeContractError,
+  toErrorMessage,
   withTimeout,
   FREIGHTER_NETWORK_TIMEOUT_MS,
   getNetworkPassphrase,
@@ -775,6 +776,68 @@ describe("Soroban transaction layer (tx.ts)", () => {
       expect(error).toBeInstanceOf(TransactionError);
       expect(error.type).toBe("rpc");
       expect(error.message).toContain("Freighter not connected or unavailable.");
+    });
+  });
+
+  // ── 5. Non-Error throws & toErrorMessage ───────────────────────────────────
+
+  describe("non-Error throws and toErrorMessage", () => {
+    it("extracts messages from Error, string, object, and undefined values", () => {
+      expect(toErrorMessage(new Error("boom"))).toBe("boom");
+      expect(toErrorMessage("plain string error")).toBe("plain string error");
+      expect(toErrorMessage({ message: "object message" })).toBe("object message");
+      expect(toErrorMessage({ error: "object error field" })).toBe("object error field");
+      expect(toErrorMessage({ code: 500 })).toBe('{"code":500}');
+      expect(toErrorMessage(undefined)).toBe("undefined");
+      expect(toErrorMessage(null)).toBe("null");
+    });
+
+    it("handles string throws from simulateTransaction", async () => {
+      serverInstance.simulateTransaction.mockRejectedValue("rpc string failure");
+
+      await expect(
+        createStream(mockAddress, mockAddress, "1000", 100, 1000),
+      ).rejects.toMatchObject({
+        type: "rpc",
+        message: "Soroban RPC simulation failed to execute: rpc string failure",
+        details: { retryable: true },
+      });
+    });
+
+    it("handles plain object throws from wallet signing", async () => {
+      vi.mocked(freighter.signTransaction).mockRejectedValue({ code: "user_rejected" });
+
+      await expect(
+        createStream(mockAddress, mockAddress, "1000", 100, 1000),
+      ).rejects.toMatchObject({
+        type: "rejected",
+        message: "Transaction signature request was declined by the user.",
+        details: { retryable: true },
+      });
+    });
+
+    it("handles undefined throws from wallet signing and RPC calls", async () => {
+      vi.mocked(freighter.signTransaction).mockRejectedValue(undefined);
+
+      await expect(
+        createStream(mockAddress, mockAddress, "1000", 100, 1000),
+      ).rejects.toMatchObject({
+        type: "unknown",
+        message: "Freighter signing failed: undefined",
+      });
+
+      serverInstance.sendTransaction.mockRejectedValue(undefined);
+      vi.mocked(freighter.signTransaction).mockImplementation(async (xdrString) => ({
+        signedTxXdr: xdrString,
+        signerAddress: mockAddress,
+      }));
+
+      await expect(
+        createStream(mockAddress, mockAddress, "1000", 100, 1000),
+      ).rejects.toMatchObject({
+        type: "rpc",
+        message: "Failed to submit signed transaction to RPC: undefined",
+      });
     });
   });
 });
