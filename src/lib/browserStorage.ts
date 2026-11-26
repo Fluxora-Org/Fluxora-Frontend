@@ -1,5 +1,8 @@
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
+export const ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT =
+  "fluxora:account-browser-storage-cleared";
+
 const fallbackValues = new WeakMap<object, Map<string, string>>();
 
 function getFallbackValues(storage: object): Map<string, string> {
@@ -100,24 +103,32 @@ export function clearAccountBrowserStorage(): void {
     "fluxora_pending_stream_tx",
     "fluxora_optimistic_operations",
     "fluxora.recent-created-streams",
+    "fluxora_address_book",
     "fluxora_backup_pin",
     "fluxora_biometric_enrolled",
     "fluxora_security_gate_enabled",
     "fluxora-share-workspaces",
     "fluxora:session-recovery",
+    "fluxora_command_palette_recents",
   ]);
   try {
     const keys = Array.from({ length: local.length }, (_, index) => local.key(index))
       .filter((key): key is string => Boolean(key));
     for (const key of keys) {
-      if (
-        sensitiveKeys.has(key) ||
+      if (sensitiveKeys.has(key)) {
+        removeBrowserStorage(key, local);
+      } else if (
         key.startsWith("fluxora:session-recovery:v1:") ||
         key.startsWith("fluxora_streams_session_v2_")
-      ) local.removeItem(key);
+      ) {
+        local.removeItem(key);
+      }
     }
   } catch {
     // Best effort: preserve the disconnect path if storage is unavailable.
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT));
   }
 }
 
@@ -157,4 +168,52 @@ export function createStorageWriteStatus() {
       set("unknown");
     },
   };
+}
+
+export const COMMAND_PALETTE_RECENTS_STORAGE_KEY =
+  "fluxora_command_palette_recents";
+export const MAX_COMMAND_PALETTE_RECENTS = 5;
+
+/** Read stored recent command palette item IDs (up to MAX_COMMAND_PALETTE_RECENTS). */
+export function getRecentPaletteItemIds(
+  storage: Pick<Storage, "getItem"> | null = getBrowserStorage("localStorage"),
+): string[] {
+  const raw = readBrowserStorage(COMMAND_PALETTE_RECENTS_STORAGE_KEY, storage);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((id): id is string => typeof id === "string")
+        .slice(0, MAX_COMMAND_PALETTE_RECENTS);
+    }
+  } catch {
+    // Return empty on corrupt storage
+  }
+  return [];
+}
+
+/** Record a recently used palette item ID in MRU order. */
+export function saveRecentPaletteItemId(
+  id: string,
+  storage: StorageLike | null = getBrowserStorage("localStorage"),
+): void {
+  if (!id) return;
+  const current = getRecentPaletteItemIds(storage as Storage);
+  const updated = [id, ...current.filter((existing) => existing !== id)].slice(
+    0,
+    MAX_COMMAND_PALETTE_RECENTS,
+  );
+  writeBrowserStorage(
+    COMMAND_PALETTE_RECENTS_STORAGE_KEY,
+    JSON.stringify(updated),
+    storage,
+  );
+}
+
+/** Clear recently used palette item IDs from storage. */
+export function clearRecentPaletteItemIds(
+  storage: Pick<Storage, "removeItem"> | null = getBrowserStorage("localStorage"),
+): void {
+  removeBrowserStorage(COMMAND_PALETTE_RECENTS_STORAGE_KEY, storage);
 }

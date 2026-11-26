@@ -6,6 +6,9 @@ import './index.css'; /* Tailwind, design tokens, and global app styles */
 import './styles/accessibility.css'; /* Global focus management & a11y */
 import { HelmetProvider } from 'react-helmet-async';
 import { isSupportedBrowser } from './lib/browserSupport';
+import { config, configError, describeConfigForLog } from './lib/config';
+import { logger } from './lib/logger';
+import { initWebVitals } from './lib/webVitals';
 import { config, configError } from './lib/config';
 import { registerServiceWorker } from './lib/registerServiceWorker';
 
@@ -19,7 +22,7 @@ if (configError) {
 }
 
 if (import.meta.env.DEV) {
-  console.log('[Startup] Active configuration:', config);
+  logger.debug('[Startup] Active configuration', describeConfigForLog(config));
 }
 
 if (!isSupportedBrowser(navigator.userAgent)) {
@@ -33,6 +36,8 @@ if (!isSupportedBrowser(navigator.userAgent)) {
     </main>,
   );
 } else {
+  initWebVitals();
+
   // Resolve and apply the theme before React renders to prevent a flash of the
   // wrong theme (FOUC). The ThemeProvider owns it from here on.
   initTheme();

@@ -1,4 +1,10 @@
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  act,
+  fireEvent,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Streams from "./Streams";
@@ -9,6 +15,12 @@ import {
 } from "../lib/streamSorting";
 import { streamRecords, type StreamRecord } from "../data/streamRecords";
 import { ToastProvider } from "../components/toast/ToastProvider";
+import { clearPendingTx } from "../lib/stellar/idempotency";
+
+const mockStreamTransactions = vi.hoisted(() => ({
+  pauseStream: vi.fn(),
+  cancelStream: vi.fn(),
+}));
 
 /**
  * Mutable ref that the `useTreasury` mock reads. Defaults to the real
@@ -16,6 +28,9 @@ import { ToastProvider } from "../components/toast/ToastProvider";
  * before rendering when they need a different dataset.
  */
 const mockStreamsRef: { current: StreamRecord[] } = { current: streamRecords };
+const mockWalletRef = vi.hoisted(() => ({
+  current: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+}));
 
 vi.mock("../components/treasuryOverviewPage/useTreasury", () => ({
   useTreasury: () => ({
@@ -46,7 +61,9 @@ vi.mock("../hooks/useOptimisticStreams", () => ({
 
 vi.mock("../components/wallet-connect/Walletcontext", () => ({
   useWallet: () => ({
-    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    get address() {
+      return mockWalletRef.current;
+    },
     network: "TESTNET",
     connected: true,
     loading: false,
@@ -61,6 +78,7 @@ vi.mock("../components/wallet-connect/Walletcontext", () => ({
 
 vi.mock("../lib/stellar/tx", () => ({
   getTransactionStatus: vi.fn().mockResolvedValue("pending"),
+  ...mockStreamTransactions,
 }));
 
 type MatchMediaChangeHandler = (event: MediaQueryListEvent) => void;
@@ -94,7 +112,7 @@ function mockMatchMedia(matches: boolean) {
 }
 
 function renderStreams() {
-  return render(
+  const createTree = () => (
     <ToastProvider>
       <MemoryRouter initialEntries={["/app/streams"]}>
         <Routes>
@@ -102,8 +120,13 @@ function renderStreams() {
           <Route path="/app/streams/:streamId" element={<Streams />} />
         </Routes>
       </MemoryRouter>
-    </ToastProvider>,
+    </ToastProvider>
   );
+  const rendered = render(createTree());
+  return {
+    ...rendered,
+    rerenderStreams: () => rendered.rerender(createTree()),
+  };
 }
 
 async function finishLoading() {
@@ -273,6 +296,17 @@ describe("Streams page sorting (integration)", () => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     mockMatchMedia(false);
     fixtureSeq = 0;
+    mockWalletRef.current =
+      "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+    mockStreamTransactions.pauseStream.mockReset();
+    mockStreamTransactions.cancelStream.mockReset();
+    mockStreamTransactions.pauseStream.mockResolvedValue({
+      status: "SUCCESS",
+    });
+    mockStreamTransactions.cancelStream.mockResolvedValue({
+      status: "SUCCESS",
+    });
+    clearPendingTx();
   });
 
   afterEach(() => {
@@ -282,6 +316,9 @@ describe("Streams page sorting (integration)", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     mockStreamsRef.current = streamRecords;
+    mockWalletRef.current =
+      "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+    clearPendingTx();
   });
 
   it("renders cards newest-first on the default recent sort and stays stable on rerender", async () => {
@@ -347,6 +384,95 @@ describe("Streams page sorting (integration)", () => {
     expect(cards[1]!.textContent).toContain("TieRate2");
     expect(cards[2]!.textContent).toContain("TieRate");
     expect(cards[3]!.textContent).toContain("Low");
+  });
+
+  it("clears bulk selection when the connected wallet account changes", async () => {
+    const { rerenderStreams } = renderStreams();
+    await finishLoading();
+
+    const firstSelectable = streamRecords.find(
+      (stream) => stream.status !== "Completed",
+    )!;
+    const streamCheckbox = screen.getByRole("checkbox", {
+      name: `Select ${firstSelectable.name}`,
+    });
+    fireEvent.click(streamCheckbox);
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+    mockWalletRef.current =
+      "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    await act(async () => {
+      rerenderStreams();
+    });
+
+    expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: `Select ${firstSelectable.name}`,
+      }),
+    ).not.toBeChecked();
+  });
+
+  it("confirms a bulk pause and retries only the failed stream", async () => {
+    mockStreamsRef.current = [
+      makeStream({ id: "1", name: "Alpha grant" }),
+      makeStream({ id: "2", name: "Beta grant" }),
+    ];
+    mockStreamTransactions.pauseStream
+      .mockRejectedValueOnce(new Error("Wallet rejected signature"))
+      .mockResolvedValueOnce({ status: "SUCCESS" });
+    renderStreams();
+    await finishLoading();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Alpha grant" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Beta grant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pause 2 active" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Confirm bulk pause" });
+    expect(dialog).toHaveTextContent("Alpha grant, Beta grant");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Confirm pause" }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockStreamTransactions.pauseStream).toHaveBeenCalledOnce();
+    expect(mockStreamTransactions.pauseStream).toHaveBeenCalledWith(
+      mockWalletRef.current,
+      "1",
+    );
+    expect(screen.getByText("Bulk pause results")).toBeInTheDocument();
+    expect(screen.getByText("Alpha grant: Failed")).toBeInTheDocument();
+    expect(screen.getByText("Beta grant: Not submitted")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry failed streams only" }),
+    );
+    const retryDialog = screen.getByRole("dialog", {
+      name: "Retry bulk pause",
+    });
+    expect(retryDialog).toHaveTextContent("Alpha grant");
+    expect(retryDialog).not.toHaveTextContent("Beta grant");
+    fireEvent.click(
+      within(retryDialog).getByRole("button", { name: "Confirm pause" }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockStreamTransactions.pauseStream).toHaveBeenCalledTimes(2);
+    expect(mockStreamTransactions.pauseStream).toHaveBeenNthCalledWith(
+      2,
+      mockWalletRef.current,
+      "1",
+    );
+    expect(screen.getByText("Alpha grant: Succeeded")).toBeInTheDocument();
+    expect(screen.getByText("Beta grant: Not submitted")).toBeInTheDocument();
   });
 
   it("renders the not-found state for an unknown stream id", async () => {

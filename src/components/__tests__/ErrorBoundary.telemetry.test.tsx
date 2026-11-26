@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ErrorBoundary, { createConsoleReporter } from '../ErrorBoundary';
 import { createTelemetryErrorReporter } from '../../lib/stellar/telemetry';
+import { resetLogSink, setLogSink, type LogEntry } from '../../lib/logger';
 
 const SAMPLE_ADDRESS = 'GAEA6FQ5EQVTEOKAI5HFKXDDNJYXQ74GRWKJXIVJWC335ROM2PNODIMK';
 const SAMPLE_HASH = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
@@ -52,19 +53,25 @@ describe('ErrorBoundary — telemetry redaction (#1450)', () => {
     expect(payload.error.message).not.toContain(SAMPLE_HASH);
   });
 
-  it('createConsoleReporter emits redacted console output with no raw identifiers', () => {
-    const reporter = createConsoleReporter();
+  it('createConsoleReporter emits redacted output through the logging sink with no raw identifiers', () => {
+    const entries: LogEntry[] = [];
+    setLogSink((entry) => entries.push(entry));
+    try {
+      const reporter = createConsoleReporter();
 
-    reporter(
-      new Error(`Failed for recipient ${SAMPLE_ADDRESS} tx ${SAMPLE_HASH}`),
-      { componentStack: 'test' },
-    );
+      reporter(
+        new Error(`Failed for recipient ${SAMPLE_ADDRESS} tx ${SAMPLE_HASH}`),
+        { componentStack: 'test' },
+      );
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    const logged = JSON.stringify(consoleErrorSpy.mock.calls[0]);
-    expect(logged).not.toContain(SAMPLE_ADDRESS);
-    expect(logged).not.toContain(SAMPLE_HASH);
-    expect(logged).toContain('[addr:');
-    expect(logged).toContain('[tx:');
+      expect(entries).toHaveLength(1);
+      const logged = JSON.stringify(entries[0]);
+      expect(logged).not.toContain(SAMPLE_ADDRESS);
+      expect(logged).not.toContain(SAMPLE_HASH);
+      expect(logged).toContain('[addr:');
+      expect(logged).toContain('[tx:');
+    } finally {
+      resetLogSink();
+    }
   });
 });

@@ -28,9 +28,24 @@ vi.mock("../wallet-connect/Walletcontext", () => ({
   }),
 }));
 
+const STAGE_LABELS: Record<string, string> = {
+  restoring: "Restoring wallet session…",
+  "loading-data": "Loading wallet data…",
+  rejected: "Wallet connection was not approved.",
+  "network-mismatch": "Your wallet is on the wrong network.",
+  "no-wallet": "No Stellar wallet extension was detected.",
+  "not-connected": "Your wallet is not connected.",
+};
+
 vi.mock("../WalletFallback", () => ({
   default: ({ stage }: { stage?: string }) => (
-    <div data-testid="wallet-fallback" data-stage={stage}>
+    <div
+      data-testid="wallet-fallback"
+      data-stage={stage}
+      role="status"
+      aria-live="polite"
+      aria-label={stage ? STAGE_LABELS[stage] : undefined}
+    >
       Wallet fallback: {stage}
     </div>
   ),

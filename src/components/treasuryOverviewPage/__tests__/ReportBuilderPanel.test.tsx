@@ -5,6 +5,7 @@ import type { Stream } from "../Stream";
 import {
   downloadReportCSV,
   printReportAsPDF,
+  MAX_REPORT_RANGE_DAYS,
 } from "../../../utils/reportExporter";
 
 const addToast = vi.fn();
@@ -30,7 +31,7 @@ const fixtureStreams: Stream[] = [
     recipient: "GAAAAA",
     rate: "100 USDC",
     accruedAmount: 500,
-    status: "Active", accruedAmount: 0, startDate: "2026-01-01",
+    status: "Active",
     startDate: "2026-01-10",
   },
   {
@@ -39,7 +40,7 @@ const fixtureStreams: Stream[] = [
     recipient: "GBBBBB",
     rate: "50 USDC",
     accruedAmount: 250,
-    status: "Paused", accruedAmount: 0, startDate: "2026-01-01",
+    status: "Paused",
     startDate: "2026-03-15",
   },
   {
@@ -47,7 +48,8 @@ const fixtureStreams: Stream[] = [
     name: "Stream Gamma",
     recipient: "GAAAAA",
     rate: "200 USDC",
-    status: "Completed", accruedAmount: 0, startDate: "2026-01-01",
+    accruedAmount: 0,
+    status: "Completed",
     startDate: "2026-06-01",
   },
 ];
@@ -284,6 +286,20 @@ describe("ReportBuilderPanel", () => {
     expect(screen.queryByText("End date must be on or after the start date.")).not.toBeInTheDocument();
   });
 
+  it("allows the maximum report range and rejects a longer range", () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("Start Date"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2027-01-01" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText("End Date"), { target: { value: "2027-01-02" } });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      `Date range cannot exceed ${MAX_REPORT_RANGE_DAYS} days.`,
+    );
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeDisabled();
+  });
+
   // ── Keyboard handling ─────────────────────────────────────────────────
 
   it("calls onClose when Escape key is pressed", () => {
@@ -306,7 +322,7 @@ describe("ReportBuilderPanel", () => {
         name: "Stream No Date",
         recipient: "GCCCCC",
         rate: "75 USDC",
-        status: "Active", accruedAmount: 0, startDate: "2026-01-01",
+        status: "Active",
       },
     ];
     renderPanel(streamsWithMissingDates);
@@ -451,7 +467,7 @@ describe("ReportBuilderPanel", () => {
         name: "Stream No Accrued",
         recipient: "GDDDDD",
         rate: "30 USDC",
-        status: "Active", accruedAmount: 0, startDate: "2026-01-01",
+        status: "Active",
         startDate: "2026-02-01",
       },
     ];

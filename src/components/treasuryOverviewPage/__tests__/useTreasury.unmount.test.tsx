@@ -1,217 +1,170 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTreasury, useRecipientStreams } from "../useTreasury";
 import * as streamsService from "../../../lib/api/streamsService";
+import { streamRecords } from "../../../data/streamRecords";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 describe("useTreasury - unmount cancellation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
-  it("prevents state updates after unmount on delayed success", async () => {
-    const mockMetrics = [{ label: "Test", value: "100" }];
-    const mockStreams = [
-      { id: "1", status: "Active", depositAmount: 10, withdrawableAmount: 5, asset: "XLM" },
-    ];
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    vi.spyOn(streamsService, "getTreasuryMetrics").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => resolve(mockMetrics), 100);
-        })
-    );
-
-    vi.spyOn(streamsService, "getStreams").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => resolve(mockStreams), 100);
-        })
-    );
+  it("does not commit delayed data after unmount", async () => {
+    const metrics = deferred<Awaited<ReturnType<typeof streamsService.getTreasuryMetrics>>>();
+    const streams = deferred<Awaited<ReturnType<typeof streamsService.getStreams>>>();
+    vi.spyOn(streamsService, "getTreasuryMetrics").mockReturnValue(metrics.promise);
+    vi.spyOn(streamsService, "getStreams").mockReturnValue(streams.promise);
 
     const { result, unmount } = renderHook(() => useTreasury());
-
-    // Verify initial loading state
     expect(result.current.loading).toBe(true);
 
-    // Unmount before the promise resolves
+    const metricsSignal = vi.mocked(streamsService.getTreasuryMetrics).mock.calls[0]?.[0]?.signal;
+    const streamsSignal = vi.mocked(streamsService.getStreams).mock.calls[0]?.[1]?.signal;
     unmount();
 
-    // Wait for the delayed promises to resolve
-    await waitFor(() => {
-      expect(streamsService.getTreasuryMetrics).toHaveBeenCalled();
-    }, { timeout: 200 });
+    expect(metricsSignal?.aborted).toBe(true);
+    expect(streamsSignal?.aborted).toBe(true);
 
-    // If state updates occurred after unmount, this would cause React warnings
-    // The test passes if no console warnings appear
-  });
-
-  it("prevents state updates after unmount on delayed failure", async () => {
-    vi.spyOn(streamsService, "getTreasuryMetrics").mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Network error")), 100);
-        })
-    );
-
-    vi.spyOn(streamsService, "getStreams").mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Network error")), 100);
-        })
-    );
-
-    const { result, unmount } = renderHook(() => useTreasury());
-
-    // Verify initial loading state
-    expect(result.current.loading).toBe(true);
-
-    // Unmount before the promise rejects
-    unmount();
-
-    // Wait for the delayed promises to reject
-    await waitFor(
-      () => {
-        expect(streamsService.getTreasuryMetrics).toHaveBeenCalled();
-      },
-      { timeout: 200 }
-    );
-
-    // If state updates occurred after unmount, this would cause React warnings
-    // The test passes if no console warnings appear
-  });
-
-  it("prevents state updates after rapid unmount/remount", async () => {
-    const mockMetrics = [{ label: "Test", value: "100" }];
-    const mockStreams = [
-      { id: "1", status: "Active", depositAmount: 10, withdrawableAmount: 5, asset: "XLM" },
-    ];
-
-    vi.spyOn(streamsService, "getTreasuryMetrics").mockResolvedValue(mockMetrics);
-    vi.spyOn(streamsService, "getStreams").mockResolvedValue(mockStreams);
-
-    const { result, unmount, rerender } = renderHook(() => useTreasury());
-
-    // Unmount quickly
-    unmount();
-
-    // Remount immediately
-    const { result: result2 } = renderHook(() => useTreasury());
-
-    // The new mount should work correctly
-    await waitFor(() => {
-      expect(result2.current.loading).toBe(false);
+    await act(async () => {
+      metrics.resolve([{ icon: null, label: "Test", value: "100", desc: "" }]);
+      streams.resolve(streamRecords);
+      await Promise.resolve();
     });
 
-    expect(result2.current.metrics).toEqual(mockMetrics);
-    expect(result2.current.streams).toEqual(mockStreams);
+    expect(result.current).toMatchObject({
+      loading: true,
+      metrics: [],
+      streams: [],
+      error: null,
+    });
+  });
+
+  it("does not commit delayed failures after unmount", async () => {
+    const metrics = deferred<Awaited<ReturnType<typeof streamsService.getTreasuryMetrics>>>();
+    const streams = deferred<Awaited<ReturnType<typeof streamsService.getStreams>>>();
+    vi.spyOn(streamsService, "getTreasuryMetrics").mockReturnValue(metrics.promise);
+    vi.spyOn(streamsService, "getStreams").mockReturnValue(streams.promise);
+
+    const { result, unmount } = renderHook(() => useTreasury());
+    unmount();
+
+    await act(async () => {
+      metrics.reject(new Error("Network error"));
+      streams.reject(new Error("Network error"));
+      await Promise.resolve();
+    });
+
+    expect(result.current).toMatchObject({
+      loading: true,
+      metrics: [],
+      streams: [],
+      error: null,
+    });
+  });
+
+  it("allows a new mount to load while an unmounted request is pending", async () => {
+    const metrics = [{ icon: null, label: "Test", value: "100", desc: "" }];
+    vi.spyOn(streamsService, "getTreasuryMetrics").mockResolvedValue(metrics);
+    vi.spyOn(streamsService, "getStreams").mockResolvedValue(streamRecords);
+
+    const { unmount } = renderHook(() => useTreasury());
+    unmount();
+    const { result } = renderHook(() => useTreasury());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.metrics).toEqual(metrics);
+    expect(result.current.streams).toEqual(streamRecords);
   });
 });
 
 describe("useRecipientStreams - unmount cancellation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
-  it("prevents state updates after unmount on delayed success", async () => {
-    const mockStreams = [
-      { id: "1", status: "Active", depositAmount: 10, withdrawableAmount: 5, asset: "XLM" },
-    ];
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    vi.spyOn(streamsService, "getRecipientStreams").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => resolve(mockStreams), 100);
-        })
-    );
+  it("does not commit delayed data after unmount", async () => {
+    const streams = deferred<Awaited<ReturnType<typeof streamsService.getRecipientStreams>>>();
+    const getRecipientStreams = vi.spyOn(streamsService, "getRecipientStreams").mockReturnValue(streams.promise);
+    const recipient = streamRecords[0]!.recipientAddress;
 
-    const { result, unmount } = renderHook(() =>
-      useRecipientStreams("GABC1234567890")
-    );
-
-    // Verify initial loading state
-    expect(result.current.loading).toBe(true);
-
-    // Unmount before the promise resolves
+    const { result, unmount } = renderHook(() => useRecipientStreams(recipient));
+    const signal = getRecipientStreams.mock.calls[0]?.[1]?.signal;
     unmount();
 
-    // Wait for the delayed promise to resolve
-    await waitFor(
-      () => {
-        expect(streamsService.getRecipientStreams).toHaveBeenCalled();
-      },
-      { timeout: 200 }
-    );
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      streams.resolve(streamRecords.filter((stream) => stream.recipientAddress === recipient));
+      await Promise.resolve();
+    });
 
-    // If state updates occurred after unmount, this would cause React warnings
-    // The test passes if no console warnings appear
+    expect(result.current).toMatchObject({
+      loading: true,
+      streams: [],
+      error: null,
+    });
   });
 
-  it("prevents state updates after unmount on delayed failure", async () => {
-    vi.spyOn(streamsService, "getRecipientStreams").mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Network error")), 100);
-        })
-    );
-
-    const { result, unmount } = renderHook(() =>
-      useRecipientStreams("GABC1234567890")
-    );
-
-    // Verify initial loading state
-    expect(result.current.loading).toBe(true);
-
-    // Unmount before the promise rejects
+  it("does not commit delayed failures after unmount", async () => {
+    const streams = deferred<Awaited<ReturnType<typeof streamsService.getRecipientStreams>>>();
+    const getRecipientStreams = vi.spyOn(streamsService, "getRecipientStreams").mockReturnValue(streams.promise);
+    const { result, unmount } = renderHook(() => useRecipientStreams("GABC1234567890"));
+    const signal = getRecipientStreams.mock.calls[0]?.[1]?.signal;
     unmount();
 
-    // Wait for the delayed promise to reject
-    await waitFor(
-      () => {
-        expect(streamsService.getRecipientStreams).toHaveBeenCalled();
-      },
-      { timeout: 200 }
-    );
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      streams.reject(new Error("Network error"));
+      await Promise.resolve();
+    });
 
-    // If state updates occurred after unmount, this would cause React warnings
-    // The test passes if no console warnings appear
+    expect(result.current).toMatchObject({
+      loading: true,
+      streams: [],
+      error: null,
+    });
   });
 
-  it("prevents state updates after address change triggers unmount", async () => {
-    const mockStreams1 = [{ id: "1", status: "Active", depositAmount: 10, withdrawableAmount: 5, asset: "XLM" }];
-    const mockStreams2 = [{ id: "2", status: "Active", depositAmount: 20, withdrawableAmount: 10, asset: "XLM" }];
-
-    let resolveCount = 0;
-    vi.spyOn(streamsService, "getRecipientStreams").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolveCount++;
-            resolve(resolveCount === 1 ? mockStreams1 : mockStreams2);
-          }, 100);
-        })
-    );
+  it("ignores an old recipient response after the address changes", async () => {
+    const oldRequest = deferred<Awaited<ReturnType<typeof streamsService.getRecipientStreams>>>();
+    const firstRecord = streamRecords[0]!;
+    const oldAddress = firstRecord.recipientAddress;
+    const newAddress = `G${"B".repeat(55)}`;
+    const newRecord = { ...firstRecord, id: "new-recipient-stream", recipientAddress: newAddress };
+    vi.spyOn(streamsService, "getRecipientStreams")
+      .mockReturnValueOnce(oldRequest.promise)
+      .mockResolvedValueOnce([newRecord]);
 
     const { result, rerender } = renderHook(
       ({ address }) => useRecipientStreams(address),
-      { initialProps: { address: "GABC1234567890" } }
+      { initialProps: { address: oldAddress } },
     );
 
-    // Change address before first request resolves
-    rerender({ address: "GDEF0987654321" });
+    rerender({ address: newAddress });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
-    // Wait for both requests to potentially resolve
-    await waitFor(
-      () => {
-        expect(streamsService.getRecipientStreams).toHaveBeenCalledTimes(2);
-      },
-      { timeout: 200 }
-    );
-
-    // Should only have data from the second request
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    await act(async () => {
+      oldRequest.resolve([firstRecord]);
+      await Promise.resolve();
     });
 
-    expect(result.current.streams).toEqual(mockStreams2);
+    expect(result.current.streams).toEqual([newRecord]);
   });
 });

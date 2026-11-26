@@ -1,28 +1,34 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { History, RotateCcw, X } from "lucide-react";
+import { useWallet } from "./wallet-connect/Walletcontext";
+import {
+  clearSession,
+  loadSession,
+  purgeForeignSessions,
+} from "../lib/sessionRecovery";
 import "./session-recovery-banner.css";
 
 export type SessionRecoveryBannerState = "detected" | "restored" | "start-fresh";
 
 export interface SessionRecoveryBannerProps {
   /** Which sub-state to render — see docs/STREAMS_SESSION_RECOVERY_SPEC.md §3 */
-  state: SessionRecoveryBannerState;
+  state?: SessionRecoveryBannerState;
   /** epoch ms the snapshot was saved at, used for the "~X ago" copy */
-  savedAt: number;
+  savedAt?: number;
   /** epoch ms "now" — passed in rather than read via Date.now() so this stays testable */
-  now: number;
+  now?: number;
   /** whether the snapshot also contains a meaningful, resumable create-stream draft */
-  hasDraft: boolean;
+  hasDraft?: boolean;
   /** The account that is currently signed in / connected. */
-  accountId: string | null | undefined;
+  accountId?: string | null | undefined;
   /** The account that created the snapshot. A missing value (e.g. a legacy,
    *  unscoped snapshot) is treated as foreign and fails closed. */
-  snapshotAccountId: string | null | undefined;
-  onRestore: () => void;
-  onStartFresh: () => void;
-  onResumeDraft: () => void;
+  snapshotAccountId?: string | null | undefined;
+  onRestore?: (state?: unknown) => void;
+  onStartFresh?: () => void;
+  onResumeDraft?: () => void;
   /** Dismiss ("ignore") — hides the banner without applying or clearing anything */
-  onDismiss: () => void;
+  onDismiss?: () => void;
   /** Called (silently, no UI) when the snapshot belongs to a different account
    *  so the parent can delete it from storage. */
   onDiscard?: () => void;
@@ -43,31 +49,53 @@ function formatElapsed(savedAt: number, now: number): string {
   return "yesterday";
 }
 
-export default function SessionRecoveryBanner({
-  state,
-  savedAt,
-  now,
-  hasDraft,
-  accountId,
-  snapshotAccountId,
+export function SessionRecoveryBanner({
+  state: propState,
+  savedAt: propSavedAt,
+  now: propNow,
+  hasDraft: propHasDraft = false,
+  accountId: propAccountId,
+  snapshotAccountId: propSnapshotAccountId,
   onRestore,
   onStartFresh,
   onResumeDraft,
   onDismiss,
   onDiscard,
 }: SessionRecoveryBannerProps) {
+  const wallet = useWallet();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
 
+  const isControlled = propState !== undefined;
+  const effectiveAccountId =
+    propAccountId !== undefined ? propAccountId : (wallet?.address ?? null);
+
+  if (!isControlled && effectiveAccountId) {
+    purgeForeignSessions(effectiveAccountId);
+  }
+  const loadedSession =
+    !isControlled && effectiveAccountId ? loadSession(effectiveAccountId) : null;
+
+  const effectiveSnapshotAccountId = isControlled
+    ? propSnapshotAccountId
+    : (loadedSession?.accountId ?? null);
+
   // A snapshot may only be offered to the account that created it. Both ids
   // must be present and equal; anything else fails closed.
-  const isOwnSession = Boolean(accountId) && accountId === snapshotAccountId;
+  const isOwnSession =
+    Boolean(effectiveAccountId) &&
+    effectiveAccountId === effectiveSnapshotAccountId;
 
   // Foreign snapshots are discarded silently: no banner, no alert, no error.
   useEffect(() => {
     if (!isOwnSession) onDiscardRef.current?.();
-  }, [isOwnSession, accountId, snapshotAccountId]);
+  }, [isOwnSession, effectiveAccountId, effectiveSnapshotAccountId]);
+
+  const state = isControlled ? propState : "detected";
+  const savedAt = propSavedAt ?? loadedSession?.savedAt ?? 0;
+  const now = propNow ?? Date.now();
+  const hasDraft = propHasDraft;
 
   // Move focus to the banner heading whenever its state changes so screen
   // reader and keyboard users notice the offer/confirmation immediately,
@@ -76,12 +104,28 @@ export default function SessionRecoveryBanner({
     if (isOwnSession) headingRef.current?.focus();
   }, [state, isOwnSession]);
 
-  if (!isOwnSession) return null;
+  if (!isOwnSession || (!isControlled && !loadedSession)) return null;
 
   // Defense in depth: even if a stale handler fires, it cannot act on a
   // session that is not the current account's.
-  const guard = (fn: () => void) => () => {
-    if (isOwnSession) fn();
+  const guard = (fn?: () => void) => () => {
+    if (isOwnSession) fn?.();
+  };
+
+  const handleRestore = () => {
+    if (!isControlled && effectiveAccountId) {
+      clearSession(effectiveAccountId);
+      onRestore?.(loadedSession?.state);
+    } else {
+      onRestore?.();
+    }
+  };
+
+  const handleStartFresh = () => {
+    if (!isControlled && effectiveAccountId) {
+      clearSession(effectiveAccountId);
+    }
+    onStartFresh?.();
   };
 
   const elapsed = formatElapsed(savedAt, now);
@@ -131,14 +175,14 @@ export default function SessionRecoveryBanner({
               <button
                 type="button"
                 className="session-recovery-banner__action session-recovery-banner__action--primary"
-                onClick={guard(onRestore)}
+                onClick={guard(handleRestore)}
               >
                 Restore
               </button>
               <button
                 type="button"
                 className="session-recovery-banner__action session-recovery-banner__action--secondary"
-                onClick={guard(onStartFresh)}
+                onClick={guard(handleStartFresh)}
               >
                 Start fresh
               </button>
@@ -194,3 +238,5 @@ export default function SessionRecoveryBanner({
     </div>
   );
 }
+
+export default SessionRecoveryBanner;

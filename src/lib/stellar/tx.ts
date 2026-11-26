@@ -1,13 +1,15 @@
 import {
   Address,
   Contract,
+  ScInt,
   TransactionBuilder,
   Networks,
   rpc as SorobanRpc,
   xdr,
 } from "@stellar/stellar-sdk";
-import { signTransaction, getNetwork } from "@stellar/freighter-api";
 import { createConfig } from "../config";
+import { WalletProviderError } from "../../components/wallet-connect/walletProvider";
+import { getActiveWalletProvider } from "../../components/wallet-connect/walletProviders";
 import { transactionConfig } from "../transactionConfig";
 
 /**
@@ -84,15 +86,15 @@ export function decodeContractError(value: unknown): TransactionError | null {
 }
 
 /**
- * Maps Freighter signing errors to a TransactionError.
- * Checks for a structured error code (`user_rejected`) first, then falls back to
- * word-boundary-anchored keyword matching against actual Freighter rejection
- * phrasing.  Errors whose messages do not closely match a known rejection pattern
- * are classified as `"unknown"` so that non-rejection errors (e.g. network
- * timeouts surfaced through the extension bridge) are never misreported as
- * user-declined.
+ * Maps wallet signing errors to a TransactionError.
+ * Checks the shared wallet error categories first (`user_rejected`, popup
+ * blocked, timeout), then falls back to word-boundary-anchored keyword matching
+ * against known rejection phrasing. Errors whose messages do not closely match
+ * a known pattern are classified as `"unknown"` so non-rejection errors (e.g.
+ * network timeouts surfaced through an extension bridge) are never misreported
+ * as user-declined.
  */
-function mapFreighterSigningError(err: any): TransactionError {
+function mapWalletSigningError(err: any, walletName: string): TransactionError {
   const maybeErr = err as { code?: string };
   if (maybeErr.code && maybeErr.code === "user_rejected") {
     return new TransactionError(
@@ -101,6 +103,33 @@ function mapFreighterSigningError(err: any): TransactionError {
       { retryable: true },
     );
   }
+
+  // Providers classify their own failures; plain vendor errors are matched by
+  // message below so unrelated wording (e.g. "network timeout") is untouched.
+  if (err instanceof WalletProviderError) {
+    if (err.type === "rejected") {
+      return new TransactionError(
+        "rejected",
+        "Transaction signature request was declined by the user.",
+        { retryable: true },
+      );
+    }
+    if (err.type === "popup_blocked") {
+      return new TransactionError(
+        "rejected",
+        `The ${walletName} popup was blocked by the browser. Allow popups and try again.`,
+        { retryable: true },
+      );
+    }
+    if (err.type === "timeout") {
+      return new TransactionError(
+        "timeout",
+        `${walletName} did not respond to the signature request in time.`,
+        { retryable: true },
+      );
+    }
+  }
+
   const errMsg = String(err);
   const rejectionKeywords = [/\breject(?:ed)?\b/i, /\bdecline\b/i, /\bcancel\b/i, /\bdismiss\b/i];
   if (rejectionKeywords.some((pattern) => pattern.test(errMsg))) {
@@ -110,7 +139,7 @@ function mapFreighterSigningError(err: any): TransactionError {
       { retryable: true },
     );
   }
-  return new TransactionError("unknown", `Freighter signing failed: ${errMsg}`);
+  return new TransactionError("unknown", `${walletName} signing failed: ${errMsg}`);
 }
 
 /**
@@ -137,6 +166,18 @@ function encodeU64(val: string | number): xdr.ScVal {
     return xdr.ScVal.scvU64(xdr.Uint64.fromString(String(val)));
   } catch (err: any) {
     throw new TransactionError("simulation", `Failed to encode value as u64 ScVal: ${val}. Error: ${err.message}`);
+  }
+}
+
+/**
+ * Encodes an integer string as an i128 ScVal for contract token amounts.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for scaling rules.
+ */
+function encodeI128(val: string): xdr.ScVal {
+  try {
+    return new ScInt(BigInt(val), { type: "i128" }).toI128();
+  } catch (err: any) {
+    throw new TransactionError("simulation", `Failed to encode value as i128 ScVal: ${val}. Error: ${err.message}`);
   }
 }
 
@@ -202,23 +243,27 @@ export async function withTimeout<T>(
 async function validateNetwork(): Promise<void> {
   const appConfig = createConfig(import.meta.env);
   const expectedNet = appConfig.network;
-  let connectedNetRes;
+  const wallet = getActiveWalletProvider();
+
+  let connectedNet: string;
   try {
-    connectedNetRes = await withTimeout(getNetwork(), FREIGHTER_NETWORK_TIMEOUT_MS, "Freighter network check");
+    connectedNet = await withTimeout(
+      wallet.getNetwork(),
+      FREIGHTER_NETWORK_TIMEOUT_MS,
+      `${wallet.name} network check`,
+    );
   } catch (err: any) {
     if (err instanceof TransactionError) {
       throw err;
     }
-    throw new TransactionError("rpc", `Freighter not connected or unavailable. Error: ${err.message || err}`);
+    throw new TransactionError(
+      "rpc",
+      `${wallet.name} not connected or unavailable. Error: ${err?.message || err}`,
+    );
   }
 
-  if (connectedNetRes.error) {
-    throw new TransactionError("rpc", `Freighter wallet returned error: ${connectedNetRes.error}`);
-  }
-
-  const connectedNet = connectedNetRes.network || "";
-  // Freighter typically returns "TESTNET" or "PUBLIC"
-  if (connectedNet.toUpperCase() !== expectedNet.toUpperCase()) {
+  // Wallets typically return "TESTNET" or "PUBLIC"
+  if ((connectedNet || "").toUpperCase() !== expectedNet.toUpperCase()) {
     throw new TransactionError(
       "network_mismatch",
       `Wrong Stellar network. Expected ${expectedNet.toUpperCase()}, but wallet is connected to ${connectedNet.toUpperCase()}.`
@@ -319,19 +364,25 @@ async function executeInvocation(
   // Instantiate RPC server
   const server = new SorobanRpc.Server(rpcUrl);
 
-  // Retrieve sender address from Freighter (the transaction source account)
-  let addrRes;
+  // Retrieve the sender address from the active wallet (the transaction
+  // source account).
+  const wallet = getActiveWalletProvider();
+  let senderAddress: string;
   try {
-    const { getAddress } = await import("@stellar/freighter-api");
-    addrRes = await getAddress();
+    senderAddress = await wallet.getAddress();
   } catch (err: any) {
-    throw new TransactionError("rpc", `Failed to get active address from Freighter: ${err.message || err}`);
+    throw new TransactionError(
+      "rpc",
+      `Failed to get active address from ${wallet.name}: ${err?.message || err}`,
+    );
   }
 
-  if (addrRes.error || !addrRes.address) {
-    throw new TransactionError("rpc", `Freighter returned address error: ${addrRes.error || "No active account"}`);
+  if (!senderAddress) {
+    throw new TransactionError(
+      "rpc",
+      `${wallet.name} returned address error: No active account`,
+    );
   }
-  const senderAddress = addrRes.address;
 
   // Retrieve account details
   let account;
@@ -379,16 +430,15 @@ async function executeInvocation(
   // get the fee-and-footprint-updated Transaction for signing.
   const assembledTx = SorobanRpc.assembleTransaction(tx, sim).build();
 
-  // 5. Sign transaction via Freighter
+  // 5. Sign transaction with the active wallet provider (Freighter or Albedo)
   let signedXdr: string;
   try {
-    const signResult = await signTransaction(assembledTx.toXDR(), {
+    signedXdr = await wallet.signTransaction((assembledTx as any).toXDR(), {
       networkPassphrase: passphrase,
       address: senderAddress,
     });
-    signedXdr = signResult.signedTxXdr;
   } catch (err: any) {
-    throw mapFreighterSigningError(err);
+    throw mapWalletSigningError(err, wallet.name);
   }
 
   // 6. Submit transaction to RPC
@@ -466,6 +516,28 @@ export async function withdraw(
     encodeU64(amount),
   ];
   return await executeInvocation("withdraw", args);
+}
+
+/**
+ * Adds funds to an existing stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
+ * @param sender - The Stellar address authorizing the top-up.
+ * @param streamId - The ID of the stream to top up.
+ * @param amount - The amount in the token's smallest units, as an integer string.
+ */
+export async function topUpStream(
+  sender: string,
+  streamId: string,
+  amount: string
+): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  if (!sender) {
+    throw new TransactionError("rejected", "A connected sender address is required for a top-up.");
+  }
+  const args = [
+    encodeU64(streamId),
+    encodeI128(amount),
+  ];
+  return await executeInvocation("top_up", args);
 }
 
 /**

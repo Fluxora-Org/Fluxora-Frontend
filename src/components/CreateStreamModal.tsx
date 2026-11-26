@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import './CreateStreamModal.css';
 import { InputField } from './InputField';
 import { InputWithUnit } from './InputWithUnit';
+import RecipientAddressPicker from './RecipientAddressPicker';
 import {
   formatAmountString,
   multiplyAmountStrings,
@@ -16,7 +17,7 @@ import { useTransactionSubmission } from '../hooks/useTransactionSubmission';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { createStream } from '../lib/stellar/tx';
 import { addOptimistic, confirmOptimistic, rollbackOptimistic } from '../lib/optimisticTransactions';
-import { isValidStellarAddress, maskAddress } from '../lib/stellar';
+import { isValidStellarAddress } from '../lib/stellar';
 import {
   dequeueAction,
   enqueueAction,
@@ -40,7 +41,8 @@ import CsvDropZone from './csv-upload/CsvDropZone';
 import ColumnMappingStep from './csv-upload/ColumnMappingStep';
 import PreviewValidateStep from './csv-upload/PreviewValidateStep';
 import TruncatedAddress from './common/TruncatedAddress';
-import { parseAndValidateCsv, parseCsvNumber } from './csv-upload/csvParser';
+import AccrualPreview from './AccrualPreview';
+import { parseCsvNumber } from './csv-upload/csvParser';
 import { CsvParseCancelledError, parseCsvAsync } from './csv-upload/csvParseClient';
 import type { CsvParseTask } from './csv-upload/csvParseClient';
 import type { CsvRow, ParseResult, ColumnMapping, BulkStep } from './csv-upload/types';
@@ -55,9 +57,6 @@ import {
 } from '../utils/contrastUtils';
 import { formatReceiptAmount } from '../utils/receiptGenerator';
 import { amountToSmallestUnits } from '../lib/formatters';
-
-/** Maximum time to wait for a transaction receipt before timing out. */
-const RECEIPT_POLL_TIMEOUT_MS = 60_000;
 
 /** Top-level flow mode: choose between single-stream or bulk-CSV. */
 type FlowMode = 'choose' | 'single' | 'bulk';
@@ -309,7 +308,6 @@ export default function CreateStreamModal({
     { id: string; position: number } | null
   >(null);
   const [queueLength, setQueueLength] = useState(0);
-  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   const [queueFlushError, setQueueFlushError] = useState<string | null>(null);
   const [submittedTxHash, setSubmittedTxHash] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -328,11 +326,12 @@ export default function CreateStreamModal({
   const requiredDeposit = calculateRequiredDeposit(accrualRate, duration);
   // Ref to track the current optimistic operation so onResolved can resolve it.
   const optimisticOpIdRef = useRef<string | null>(null);
+  // Set while a queued offline submission is being flushed so the shared
+  // submit pipeline sends the payload captured at queue time, not live form state.
+  const flushPayloadRef = useRef<StreamSubmissionPayload | null>(null);
 
   const txSubmission = useTransactionSubmission({
-    // timeoutMs: RECEIPT_POLL_TIMEOUT_MS,
-    // cancelOnUnmount: true,
-    submit: async (idempotencyKey) => {
+    submit: async () => {
       const sender = wallet.address!;
       const parsedAmount = parseStreamNumber(depositAmount) || 0;
       // Convert the exact entered decimal string into USDC smallest units
@@ -347,14 +346,25 @@ export default function CreateStreamModal({
       const cliffTime = cliffEnabled && cliffDate
         ? Math.floor(new Date(cliffDate).getTime() / 1000)
         : undefined;
-      const response = await createStream(
-        sender,
-        recipient.trim(),
-        amountStr,
-        start,
-        end,
-        cliffTime,
-      );
+      const queued = flushPayloadRef.current;
+      flushPayloadRef.current = null;
+      const response = queued
+        ? await createStream(
+            queued.sender,
+            queued.recipient,
+            queued.amount,
+            queued.start,
+            queued.end,
+            queued.cliffTime,
+          )
+        : await createStream(
+            sender,
+            recipient.trim(),
+            amountStr,
+            start,
+            end,
+            cliffTime,
+          );
       if (!response.txHash) {
         throw new Error("Missing transaction hash from Stellar RPC.");
       }
@@ -436,7 +446,9 @@ export default function CreateStreamModal({
       ? t("createStream.button.submitting")
       : currentStep === 3 && isConfirmationPending
         ? t("createStream.button.confirming")
-        : currentStep === 3 && txSubmission.status === "timeout"
+        : currentStep === 3 &&
+            (txSubmission.status === "timeout" ||
+              txSubmission.status === "failed")
           ? t("createStream.button.retry")
           : currentStep === 2
             ? t("createStream.button.next")
@@ -532,7 +544,17 @@ export default function CreateStreamModal({
       ? Math.floor(new Date(cliffDate).getTime() / 1000)
       : undefined;
 
-    return { sender, recipient: recipient.trim(), amount, start, end, cliffTime };
+    // Omit cliffTime rather than setting it to undefined: the payload must be
+    // plain JSON so the offline action queue accepts it (see
+    // validateEnqueueInput in lib/offlineActionQueue.ts).
+    return {
+      sender,
+      recipient: recipient.trim(),
+      amount,
+      start,
+      end,
+      ...(cliffTime !== undefined ? { cliffTime } : {}),
+    };
   };
 
   /** Submits a payload to the network. Identical for the immediate-online
@@ -606,7 +628,11 @@ export default function CreateStreamModal({
   ]);
 
   useEffect(() => {
-    if (txSubmission.status !== "failed" || !submittedTxHash) {
+    if (
+      (txSubmission.status !== "failed" &&
+        txSubmission.status !== "timeout") ||
+      !submittedTxHash
+    ) {
       return;
     }
 
@@ -651,39 +677,40 @@ export default function CreateStreamModal({
         return; // Skip non-stream actions
       }
 
-      setIsFlushingQueue(true);
       setQueuedSubmission(null); // Clear the queued banner
       updateActionStatus(nextAction.id, 'processing');
 
+      const isOwnSubmission = queuedSubmission?.id === nextAction.id;
+      // Flag before submitting: the confirm effect may fire as soon as the
+      // poller reports "confirmed" and must pick the queue-flush toast.
+      if (isOwnSubmission) flushedFromQueueRef.current = true;
+      flushPayloadRef.current = payload;
+
       try {
-        const response = await createStream(
-          payload.sender,
-          payload.recipient,
-          payload.amount,
-          payload.start,
-          payload.end,
-          payload.cliffTime,
-        );
+        // Same pipeline as an online submit (spec: queue-flush-success), so
+        // the poller confirms the tx and the existing confirm effect closes
+        // the modal, calls onStreamCreated and shows the success toast.
+        await txSubmission.submit();
         if (cancelled) return;
-        
-        if (!response.txHash) {
-          throw new Error("Missing transaction hash from Stellar RPC.");
-        }
-        
+
         updateActionStatus(nextAction.id, 'completed');
         dequeueAction(nextAction.id);
-        setSubmittedTxHash(response.txHash);
-        
+
         // Update UI if this was our queued submission
-        if (queuedSubmission?.id === nextAction.id) {
+        if (isOwnSubmission) {
           pendingSubmissionRef.current = null;
-          flushedFromQueueRef.current = true;
           setQueuedSubmission(null);
         }
-        
+
         setQueueLength(getQueueLength());
       } catch (err) {
+        flushPayloadRef.current = null;
+        flushedFromQueueRef.current = false;
         if (cancelled) return;
+
+        // The failure is surfaced by the queue-flush banner below; clear the
+        // generic step-3 failure state so the message is not shown twice.
+        txSubmission.reset();
         
         const errorMessage = getStreamErrorMessage(err);
         
@@ -712,8 +739,6 @@ export default function CreateStreamModal({
         }
         
         setQueueLength(getQueueLength());
-      } finally {
-        if (!cancelled) setIsFlushingQueue(false);
       }
     };
 
@@ -1003,6 +1028,16 @@ export default function CreateStreamModal({
         return;
       }
 
+      // Re-check step-1 fields against the *current* wallet: an account switch
+      // after step 1 can make the recipient equal to the new sender
+      // (ACCOUNT_SWITCH_INVARIANTS_SPEC.md, Property 2: no self-payment).
+      // Return to step 1 so the field error is visible before signing.
+      if (!validateStep1()) {
+        setTouched(prev => ({ ...prev, recipient: true, depositAmount: true }));
+        setCurrentStep(1);
+        return;
+      }
+
       setError(null);
       setStreamError(null);
       resetTransactionState();
@@ -1025,27 +1060,6 @@ export default function CreateStreamModal({
         onStreamError?.(err);
       }
     }
-  };
-
-  const handleRetryQueuedSubmission = async () => {
-    const payload = pendingSubmissionRef.current;
-    if (!payload) return;
-    setQueueFlushError(null);
-
-    if (!isOnline) {
-      const entry = enqueueAction(payload);
-      setQueuedSubmission({ id: entry.id, position: getQueuePosition(entry.id) });
-      setQueueLength(getQueueLength());
-      return;
-    }
-
-    await submitPayload(payload);
-  };
-
-  const handleEditQueuedSubmission = () => {
-    setQueueFlushError(null);
-    pendingSubmissionRef.current = null;
-    setCurrentStep(1);
   };
 
   const handleBack = () => {
@@ -1880,18 +1894,15 @@ export default function CreateStreamModal({
                     helperText={t("createStream.step1.recipientHelper")}
                     success={recipientSuccess}
                   >
-                    <input
-                      ref={recipientInputRef}
-                      type="text"
-                      className="input-field"
+                    <RecipientAddressPicker
                       value={recipient}
-                      onChange={(e) => {
-                        setRecipient(e.target.value);
+                      onRecipientChange={(value) => {
+                        setRecipient(value);
                         if (errors.recipient) setErrors(prev => ({ ...prev, recipient: undefined }));
                       }}
+                      ref={recipientInputRef}
                       onBlur={() => handleBlur('recipient')}
                       placeholder={t("createStream.step1.recipientPlaceholder")}
-                      autoComplete="off"
                     />
                   </InputField>
 
@@ -2425,6 +2436,25 @@ export default function CreateStreamModal({
               const reviewRecipient = recipient.trim();
               const reviewDeposit = formatReviewDeposit(depositAmount);
               const durationUnit = formatDurationUnit(duration, t);
+              // Accrual-preview inputs mirror buildSubmissionPayload() so the
+              // curve reflects exactly what will be submitted.
+              const rawStartMs =
+                startTimeOption === "now"
+                  ? Date.now()
+                  : new Date(customStartDate).getTime();
+              const reviewStartMs = Number.isFinite(rawStartMs)
+                ? rawStartMs
+                : Date.now();
+              const reviewDurationDays = parseFloat(duration) || 0;
+              const reviewEndMs =
+                reviewStartMs +
+                Math.floor(reviewDurationDays * 24 * 60 * 60 * 1000);
+              const reviewCliffMs =
+                cliffEnabled && cliffDate ? new Date(cliffDate).getTime() : null;
+              const reviewTotalMinor = amountToSmallestUnits(
+                depositAmount,
+                USDC_DECIMAL_PLACES,
+              );
               return (
                 <>
                   <hr className="divider" />
@@ -2700,6 +2730,19 @@ export default function CreateStreamModal({
                     </div>
                   </div>
 
+                  <div className="review-card review-card-vertical">
+                    <div className="review-card-header">
+                      <div className="review-card-title">Accrual preview</div>
+                    </div>
+                    <AccrualPreview
+                      total={reviewTotalMinor}
+                      startMs={reviewStartMs}
+                      cliffMs={reviewCliffMs}
+                      endMs={reviewEndMs}
+                      decimals={USDC_DECIMAL_PLACES}
+                    />
+                  </div>
+
                    {streamError && (
                      <div className="review-error-box" role="alert">
                        <div>
@@ -2817,7 +2860,9 @@ export default function CreateStreamModal({
                        </span>
                      </div>
                    )}
-                   {(txSubmission.status === "timeout" || txSubmission.status === "failed") && (
+                   {(txSubmission.status === "timeout" ||
+                     txSubmission.status === "failed") &&
+                     !streamError && (
                      <div
                        className="transaction-status-box transaction-status-box--error"
                        role="alert"
@@ -2875,18 +2920,15 @@ export default function CreateStreamModal({
                           helperText={t("createStream.step1.recipientHelper")}
                           success={recipientSuccess}
                         >
-                          <input
-                            ref={recipientInputRef}
-                            type="text"
-                            className="input-field"
+                          <RecipientAddressPicker
                             value={recipient}
-                            onChange={(e) => {
-                              setRecipient(e.target.value);
+                            onRecipientChange={(value) => {
+                              setRecipient(value);
                               if (error) setError(null);
                             }}
+                            ref={recipientInputRef}
                             onBlur={() => handleBlur('recipient')}
                             placeholder={t("createStream.step1.recipientPlaceholder")}
-                            autoComplete="off"
                           />
                         </InputField>
 
@@ -3613,5 +3655,3 @@ export default function CreateStreamModal({
     </div>
   );
 }
-
-

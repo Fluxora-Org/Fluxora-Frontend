@@ -30,7 +30,7 @@ async function injectMockWallet(page: import("@playwright/test").Page) {
         }
 
         const { type, messageId } = event.data;
-        let response = {};
+        let response: Record<string, unknown>;
 
         switch (type) {
           case "REQUEST_CONNECTION_STATUS":

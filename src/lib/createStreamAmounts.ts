@@ -13,16 +13,6 @@ const MAX_SANITIZED_INTEGER_DIGITS = 15;
 const MAX_FINITE_AMOUNT = 999_999_999_999_999;
 
 /**
- * Scale factor between a display amount (e.g. `12.34`) and its integer minor
- * units (`1234n`). All amounts in this module are stored as multiples of this
- * value so they stay exact.
- */
-const MINOR_UNITS_SCALE = 10n ** BigInt(AMOUNT_DECIMAL_PLACES);
-
-/** Upper bound, expressed in minor units, that every amount is clamped to. */
-const MAX_MINOR_UNITS = BigInt(MAX_FINITE_AMOUNT) * MINOR_UNITS_SCALE;
-
-/**
  * Keeps user-entered treasury amounts decimal-safe for UI state.
  *
  * The function validates the input strictly:
@@ -132,6 +122,30 @@ export function calculateRequiredDeposit(rate: string, duration: string): string
     return formatAmountString(MAX_SUPPORTED_AMOUNT, AMOUNT_DECIMAL_PLACES);
   }
   return product;
+}
+
+/**
+ * Parse an amount into exact minor units, returning zero for invalid input and
+ * clamping values above the maximum supported amount.
+ */
+export function parseAmountToMinorUnits(value: string): bigint {
+  const exact = parseAmountExact(value);
+  if (exact === "") return 0n;
+
+  const minorUnits = BigInt(toSmallestUnitsString(exact, AMOUNT_DECIMAL_PLACES));
+  return minorUnits > MAX_MINOR_UNITS ? MAX_MINOR_UNITS : minorUnits;
+}
+
+/** Format exact minor units as a decimal amount with fixed precision. */
+export function formatAmountFromMinorUnits(value: bigint): string {
+  const negative = value < 0n;
+  const absoluteValue = negative ? -value : value;
+  const whole = absoluteValue / MINOR_UNITS_SCALE;
+  const fraction = (absoluteValue % MINOR_UNITS_SCALE)
+    .toString()
+    .padStart(AMOUNT_DECIMAL_PLACES, "0");
+
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
 }
 
 /**

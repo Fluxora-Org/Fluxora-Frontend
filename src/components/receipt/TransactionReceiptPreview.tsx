@@ -31,7 +31,6 @@ export const TransactionReceiptPreview: React.FC<TransactionReceiptPreviewProps>
   // receipt or expose an explorer link.
   const isConfirmed = data.status === "confirmed" && Boolean(data.txHash);
   const isFailed = data.status === "failed";
-  const isPending = !isConfirmed && !isFailed;
 
   const handleDownload = async () => {
     setDownloadState("generating");

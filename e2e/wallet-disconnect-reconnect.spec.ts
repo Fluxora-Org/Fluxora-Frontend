@@ -13,6 +13,10 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import {
+  installFreighterMock,
+  setFreighterConnected,
+} from "./helpers/freighterMock";
 
 const STUB_ADDRESS =
   "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -21,88 +25,13 @@ const STUB_NETWORK = "TESTNET";
 // maskAddress(STUB_ADDRESS, 6, 4) → "GAAAAA...AAAA"
 const MASKED_ADDRESS = "GAAAAA...AAAA";
 
-// ─── Freighter stub helpers ───────────────────────────────────────────────────
-
-/**
- * Injects a window-level Freighter stub before any page scripts run.
- * WalletProvider reads from the `@stellar/freighter-api` ES-module which Vite
- * bundles into a vendor chunk; we replace that chunk via page.route below.
- */
-async function injectFreighterStub(page: Page, initiallyConnected: boolean) {
-  await page.addInitScript(
-    ({ address, network, connected }) => {
-      (window as any).__freighterState = { connected };
-
-      (window as any).__freighterStub = {
-        isConnected: () =>
-          Promise.resolve({
-            isConnected: (window as any).__freighterState.connected,
-          }),
-        getAddress: () => {
-          if (!(window as any).__freighterState.connected) {
-            return Promise.resolve({
-              address: "",
-              error: { message: "Not connected" },
-            });
-          }
-          return Promise.resolve({ address });
-        },
-        getNetwork: () => {
-          if (!(window as any).__freighterState.connected) {
-            return Promise.resolve({
-              network: "",
-              error: { message: "Not connected" },
-            });
-          }
-          return Promise.resolve({ network });
-        },
-        requestAccess: () => Promise.resolve({ address }),
-        WatchWalletChanges: class {
-          watch(_cb: unknown) {}
-          stop() {}
-        },
-        isBrowser: true,
-      };
-    },
-    { address: STUB_ADDRESS, network: STUB_NETWORK, connected: initiallyConnected },
-  );
-}
-
-/**
- * Intercepts the Vite vendor-stellar chunk and re-exports it from the
- * window stub so the WalletProvider's ES-module imports resolve correctly.
- */
-async function interceptFreighterBundle(page: Page) {
-  await page.route(/vendor-stellar.*\.js/, async (route) => {
-    const stubModule = `
-const s = window.__freighterStub || {};
-const noop = () => Promise.resolve({ isConnected: false });
-export const isConnected = s.isConnected ? s.isConnected.bind(s) : noop;
-export const getAddress = s.getAddress ? s.getAddress.bind(s) : () => Promise.resolve({ address: '' });
-export const getNetwork = s.getNetwork ? s.getNetwork.bind(s) : () => Promise.resolve({ network: '' });
-export const requestAccess = s.requestAccess ? s.requestAccess.bind(s) : () => Promise.resolve({ address: '' });
-export const WatchWalletChanges = s.WatchWalletChanges ?? class { watch(){} stop(){} };
-export const isBrowser = true;
-export default { isConnected, getAddress, getNetwork, requestAccess, WatchWalletChanges, isBrowser };
-`;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/javascript",
-      body: stubModule,
-    });
-  });
-}
-
-/** Flip the stub's connected flag inside the running page. */
-async function setFreighterConnected(page: Page, connected: boolean) {
-  await page.evaluate((c) => {
-    (window as any).__freighterState = { connected: c };
-  }, connected);
-}
-
 async function setupPage(page: Page, initiallyConnected: boolean) {
-  await injectFreighterStub(page, initiallyConnected);
-  await interceptFreighterBundle(page);
+  await installFreighterMock(page, {
+    address: STUB_ADDRESS,
+    network: STUB_NETWORK,
+    connected: initiallyConnected,
+    autoConnect: initiallyConnected,
+  });
 }
 
 // ─── Selectors ────────────────────────────────────────────────────────────────

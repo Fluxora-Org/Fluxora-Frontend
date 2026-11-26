@@ -10,6 +10,7 @@ import {
   decodeContractError,
   withTimeout,
   FREIGHTER_NETWORK_TIMEOUT_MS,
+  getNetworkPassphrase,
 } from "../tx";
 import * as freighter from "@stellar/freighter-api";
 import { rpc as SorobanRpc, Account, Contract } from "@stellar/stellar-sdk";
@@ -259,7 +260,42 @@ describe("Soroban transaction layer (tx.ts)", () => {
     expect(serverInstance.sendTransaction).toHaveBeenCalled();
   });
 
-  // ── 2. Error Mappings & Validations ────────────────────────────────────────
+  // ── 2. getNetworkPassphrase ─────────────────────────────────────────────────
+
+  describe("getNetworkPassphrase", () => {
+    it("returns TESTNET passphrase for TESTNET", () => {
+      const passphrase = getNetworkPassphrase("TESTNET");
+      expect(passphrase).toBe("Test SDF Network ; September 2015");
+    });
+
+    it("returns TESTNET passphrase for lowercase testnet", () => {
+      const passphrase = getNetworkPassphrase("testnet");
+      expect(passphrase).toBe("Test SDF Network ; September 2015");
+    });
+
+    it("returns PUBLIC passphrase for PUBLIC", () => {
+      const passphrase = getNetworkPassphrase("PUBLIC");
+      expect(passphrase).toBe("Public Global Stellar Network ; September 2015");
+    });
+
+    it("returns PUBLIC passphrase for MAINNET", () => {
+      const passphrase = getNetworkPassphrase("MAINNET");
+      expect(passphrase).toBe("Public Global Stellar Network ; September 2015");
+    });
+
+    it("returns PUBLIC passphrase for lowercase mainnet", () => {
+      const passphrase = getNetworkPassphrase("mainnet");
+      expect(passphrase).toBe("Public Global Stellar Network ; September 2015");
+    });
+
+    it("throws TransactionError for unsupported network", () => {
+      expect(() => getNetworkPassphrase("CUSTOM")).toThrowError(
+        new TransactionError("network_mismatch", "Unsupported network configuration: CUSTOM"),
+      );
+    });
+  });
+
+  // ── 3. Error Mappings & Validations ────────────────────────────────────────
 
   it("should throw network_mismatch error if wallet network does not match VITE_NETWORK", async () => {
     vi.mocked(freighter.getNetwork).mockResolvedValue({
@@ -355,6 +391,14 @@ describe("Soroban transaction layer (tx.ts)", () => {
       expect(error?.message).not.toContain("xdr-data");
     });
 
+    it("maps NotAdmin to authorization category", () => {
+      const error = decodeContractError("Error(Contract, #NotAdmin)");
+      expect(error).toMatchObject({
+        type: "contract",
+        details: { category: "authorization", code: "NotAdmin", retryable: false },
+      });
+    });
+
     it("maps known balance contract codes with retry guidance", () => {
       const error = decodeContractError("Error(Contract, #InsufficientBalance)");
 
@@ -363,6 +407,54 @@ describe("Soroban transaction layer (tx.ts)", () => {
         details: { category: "balance", code: "InsufficientBalance", retryable: true },
       });
       expect(error?.message).toContain("available balance");
+    });
+
+    it("maps InsufficientFunds to balance category", () => {
+      const error = decodeContractError("Error(Contract, #InsufficientFunds)");
+      expect(error).toMatchObject({
+        type: "contract",
+        details: { category: "balance", code: "InsufficientFunds", retryable: true },
+      });
+    });
+
+    it("maps validation contract codes", () => {
+      const amountError = decodeContractError("Error(Contract, #InvalidAmount)");
+      expect(amountError).toMatchObject({
+        type: "contract",
+        details: { category: "validation", code: "InvalidAmount", retryable: true },
+      });
+
+      const timeError = decodeContractError("Error(Contract, #InvalidTime)");
+      expect(timeError).toMatchObject({
+        type: "contract",
+        details: { category: "validation", code: "InvalidTime", retryable: true },
+      });
+    });
+
+    it("maps state contract codes", () => {
+      const notFoundError = decodeContractError("Error(Contract, #StreamNotFound)");
+      expect(notFoundError).toMatchObject({
+        type: "contract",
+        details: { category: "state", code: "StreamNotFound", retryable: false },
+      });
+
+      const pausedError = decodeContractError("Error(Contract, #StreamAlreadyPaused)");
+      expect(pausedError).toMatchObject({
+        type: "contract",
+        details: { category: "state", code: "StreamAlreadyPaused", retryable: false },
+      });
+
+      const notPausedError = decodeContractError("Error(Contract, #StreamNotPaused)");
+      expect(notPausedError).toMatchObject({
+        type: "contract",
+        details: { category: "state", code: "StreamNotPaused", retryable: false },
+      });
+
+      const terminatedError = decodeContractError("Error(Contract, #StreamTerminated)");
+      expect(terminatedError).toMatchObject({
+        type: "contract",
+        details: { category: "state", code: "StreamTerminated", retryable: false },
+      });
     });
 
     it("uses a safe unknown-code fallback", () => {
@@ -375,6 +467,19 @@ describe("Soroban transaction layer (tx.ts)", () => {
       expect(error?.message).toBe("The smart contract rejected this transaction. Check the transaction details and try again if the problem persists.");
       expect(error?.message).not.toContain("AAAA");
       expect(error?.message).not.toContain("GABC");
+    });
+
+    it("returns null for non-matching error patterns", () => {
+      const error = decodeContractError("Some random error message");
+      expect(error).toBeNull();
+    });
+
+    it("handles alternative contract error patterns", () => {
+      const error1 = decodeContractError("contract error: #Unauthorized");
+      expect(error1?.details.code).toBe("Unauthorized");
+
+      const error2 = decodeContractError("contract code=InsufficientBalance");
+      expect(error2?.details.code).toBe("InsufficientBalance");
     });
 
     it("leaves transport and user rejection errors in their existing categories with retry guidance", async () => {

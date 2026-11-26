@@ -6,37 +6,18 @@
  * wallet is switched to Fluxora's expected network.
  */
 import { expect, test, type Page } from "@playwright/test";
+import {
+  installFreighterMock,
+  setFreighterNetwork,
+} from "./helpers/freighterMock";
 
 const ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 async function installFreighterNetworkStub(page: Page) {
-  await page.addInitScript(({ address }) => {
-    (window as any).__fluxoraNetwork = "PUBLIC";
-    (window as any).__freighterStub = {
-      isConnected: () => Promise.resolve({ isConnected: true }),
-      getAddress: () => Promise.resolve({ address }),
-      requestAccess: () => Promise.resolve({ address }),
-      getNetwork: () => Promise.resolve({ network: (window as any).__fluxoraNetwork }),
-      WatchWalletChanges: class { watch() {} stop() {} },
-      isBrowser: true,
-    };
-  }, { address: ADDRESS });
-
-  await page.route(/vendor-stellar.*\.js/, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/javascript",
-      body: `
-        const s = window.__freighterStub;
-        export const isConnected = s.isConnected;
-        export const getAddress = s.getAddress;
-        export const requestAccess = s.requestAccess;
-        export const getNetwork = s.getNetwork;
-        export const WatchWalletChanges = s.WatchWalletChanges;
-        export const isBrowser = true;
-        export default { isConnected, getAddress, requestAccess, getNetwork, WatchWalletChanges, isBrowser };
-      `,
-    });
+  await installFreighterMock(page, {
+    address: ADDRESS,
+    network: "PUBLIC",
+    autoConnect: false,
   });
 }
 
@@ -50,9 +31,7 @@ test.describe("wallet network switching", () => {
     await expect(page.getByTestId("error-state-network-mismatch")).toBeVisible();
     await expect(page.getByText(/expected.*testnet.*mainnet/i)).toBeVisible();
 
-    await page.evaluate(() => {
-      (window as any).__fluxoraNetwork = "TESTNET";
-    });
+    await setFreighterNetwork(page, "TESTNET");
     await page.getByRole("button", { name: /check network configuration again/i }).click();
 
     await expect(page).toHaveURL(/\/app(?:\/)?$/, { timeout: 10_000 });

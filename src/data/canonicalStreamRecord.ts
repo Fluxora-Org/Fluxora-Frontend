@@ -147,7 +147,7 @@ export function normalizeCanonicalStreamRecord(raw: unknown): CanonicalStreamRec
       ? readTokenAmount(source.remainingAmount)
       : deriveRemainingAmount(depositAmount, streamedAmount);
 
-  let progress = 0;
+  let progress: number;
   if (typeof source.progress === "number" && Number.isFinite(source.progress)) {
     progress = Math.min(100, Math.max(0, source.progress));
   } else if (typeof source.progress === "string") {

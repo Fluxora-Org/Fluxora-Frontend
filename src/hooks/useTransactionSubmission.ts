@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { transactionPollingConfig } from "../lib/transactionConfig";
 import {
-  TransactionError,
   getTransactionStatus as getOnChainStatus,
 } from "../lib/stellar/tx";
 import {
@@ -283,7 +282,8 @@ export function useTransactionSubmission(
       }
       // Submission errors (e.g. wallet rejection) do not have a txHash
       // to resolve, so we skip onResolved here.
-      throw new Error(message);
+      // @ts-expect-error ES2022 ErrorOptions ({ cause }) is supported at runtime; tsconfig lib is ES2020.
+      throw new Error(message, { cause: err });
     }
   }, [clearPendingTx, params, poll, reconcileAndResume, submit]);
 

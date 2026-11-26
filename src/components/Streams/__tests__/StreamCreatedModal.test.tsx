@@ -94,16 +94,12 @@ describe("StreamCreatedModal", () => {
     expect(screen.getByRole("button", { name: /copied stream identifier/i })).toBeInTheDocument();
   });
 
-  it("keeps the created stream retrievable after dismissal", () => {
+  it("does not persist created stream details after dismissal", () => {
     render(<StreamCreatedModal {...defaultProps} />);
     fireEvent.click(screen.getByRole("button", { name: /close stream created modal/i }));
 
-    expect(getRecentCreatedStreams()).toEqual([
-      expect.objectContaining({
-        streamId: "STR-123",
-        streamUrl: "https://fluxora.io/stream/STR-123",
-      }),
-    ]);
+    expect(getRecentCreatedStreams()).toEqual([]);
+    expect(sessionStorage.getItem("fluxora.recent-created-streams")).toBeNull();
   });
 
   it("provides a direct stream details anchor", () => {
