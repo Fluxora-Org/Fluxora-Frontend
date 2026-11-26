@@ -19,6 +19,7 @@ import {
   removeBrowserStorage,
   writeBrowserStorage,
 } from "../lib/browserStorage";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 // ─── 1. Core "light | dark" union (unchanged) ────────────────────────────────
 
@@ -232,41 +233,104 @@ export function resolveInitialTheme(): Theme {
   return resolveThemeFromPreference(stored ?? "auto");
 }
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (updateCallback: () => void) => {
+    finished?: Promise<void>;
+  };
+};
+
+export interface ApplyThemeOptions {
+  /** When true, skip all theme transition animations and swap immediately. */
+  reducedMotion?: boolean;
+}
+
 let transitionTimeout: number | undefined;
 let pendingVisibilityListener: (() => void) | null = null;
+let pendingTransitionEndListener: ((event: Event) => void) | null = null;
+
+function isReducedMotionPreferred(): boolean {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
 
 /**
  * Applies a built-in theme or the special `"custom"` marker to `<html>`.
  * This is the **only** place in the app that mutates `data-theme`.
  *
+ * Animates theme changes via the View Transitions API (`document.startViewTransition`)
+ * when supported, falling back to a short `.theme-transitioning` class removed on
+ * `transitionend` (with a timeout fallback). Animations are skipped entirely on
+ * initial paint or when reduced motion is preferred.
+ *
  * @param theme - A validated {@link Theme} or `"custom"`.
+ * @param options - Optional transition settings.
  */
-export function applyTheme(theme: Theme | "custom"): void {
+export function applyTheme(
+  theme: Theme | "custom",
+  options?: ApplyThemeOptions,
+): void {
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;
   if (root.getAttribute("data-theme") === theme) return;
 
   const isInitial = !root.hasAttribute("data-theme");
+  const reducedMotion = options?.reducedMotion ?? isReducedMotionPreferred();
 
-  if (!isInitial) {
-    root.classList.add("theme-transitioning");
+  if (isInitial || reducedMotion) {
+    root.setAttribute("data-theme", theme);
+    return;
   }
 
-  root.setAttribute("data-theme", theme);
+  const doc = document as ViewTransitionDocument;
+  if (typeof doc.startViewTransition === "function" && !document.hidden) {
+    doc.startViewTransition(() => {
+      root.setAttribute("data-theme", theme);
+    });
+    return;
+  }
 
-  if (isInitial) return;
+  const clearPendingListeners = () => {
+    window.clearTimeout(transitionTimeout);
+    transitionTimeout = undefined;
+
+    if (pendingTransitionEndListener) {
+      root.removeEventListener("transitionend", pendingTransitionEndListener);
+      pendingTransitionEndListener = null;
+    }
+
+    if (pendingVisibilityListener) {
+      document.removeEventListener("visibilitychange", pendingVisibilityListener);
+      pendingVisibilityListener = null;
+    }
+  };
 
   const cleanup = () => {
     root.classList.remove("theme-transitioning");
+    clearPendingListeners();
   };
 
-  window.clearTimeout(transitionTimeout);
+  clearPendingListeners();
 
-  if (pendingVisibilityListener) {
-    document.removeEventListener("visibilitychange", pendingVisibilityListener);
-    pendingVisibilityListener = null;
-  }
+  root.classList.add("theme-transitioning");
+  root.setAttribute("data-theme", theme);
+
+  const scheduleCleanup = () => {
+    pendingTransitionEndListener = (event: Event) => {
+      if (event.target === root) {
+        cleanup();
+      }
+    };
+    root.addEventListener("transitionend", pendingTransitionEndListener);
+    transitionTimeout = window.setTimeout(cleanup, 200);
+  };
 
   if (document.hidden) {
     pendingVisibilityListener = () => {
@@ -278,12 +342,12 @@ export function applyTheme(theme: Theme | "custom"): void {
           );
           pendingVisibilityListener = null;
         }
-        transitionTimeout = window.setTimeout(cleanup, 200);
+        scheduleCleanup();
       }
     };
     document.addEventListener("visibilitychange", pendingVisibilityListener);
   } else {
-    transitionTimeout = window.setTimeout(cleanup, 200);
+    scheduleCleanup();
   }
 }
 
@@ -500,15 +564,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Keep hasExplicitChoiceRef in sync with themePreference state
   hasExplicitChoiceRef.current = themePreference !== "auto";
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const prefersReducedMotionRef = useRef<boolean>(prefersReducedMotion);
+  prefersReducedMotionRef.current = prefersReducedMotion;
+
   const isFirstMountRef = useRef<boolean>(true);
   if (isFirstMountRef.current && typeof document !== "undefined") {
     isFirstMountRef.current = false;
     const storedCustom = getStoredCustomTheme();
     if (storedCustom) {
       applyCustomTokens(storedCustom.validatedTokens);
-      applyTheme("custom");
+      applyTheme("custom", { reducedMotion: true });
     } else {
-      applyTheme(theme);
+      applyTheme(theme, { reducedMotion: true });
     }
     applyFontPreference(easyReadFont);
   }
@@ -516,7 +584,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Mirror built-in theme to DOM before paint (only when not in custom mode).
   useLayoutEffect(() => {
     if (document.documentElement.getAttribute("data-theme") !== "custom") {
-      applyTheme(theme);
+      applyTheme(theme, { reducedMotion: prefersReducedMotionRef.current });
     }
   }, [theme]);
 
