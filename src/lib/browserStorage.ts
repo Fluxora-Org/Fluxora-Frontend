@@ -1,5 +1,3 @@
-type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-
 export const ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT =
   "fluxora:account-browser-storage-cleared";
 
@@ -38,7 +36,7 @@ export function readBrowserStorage(
 export function writeBrowserStorage(
   key: string,
   value: string,
-  storage: StorageLike | null,
+  storage: Pick<Storage, "setItem"> | null,
 ): boolean {
   if (!storage) return false;
 
