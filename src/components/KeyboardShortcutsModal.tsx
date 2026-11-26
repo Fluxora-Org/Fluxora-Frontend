@@ -40,6 +40,7 @@ import {
   BookOpen,
   Keyboard as KeyboardIcon,
   CornerDownLeft,
+  Clock,
 } from 'lucide-react';
 import { useModalAccessibility } from './useModalAccessibility';
 import { useTheme } from '../theme/ThemeProvider';
@@ -47,9 +48,16 @@ import {
   PALETTE_ITEMS,
   PaletteItem,
   PaletteCategory,
+  scorePaletteItem,
+  comparePaletteItems,
 } from './commandPaletteData';
 import { clsx } from 'clsx';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import {
+  getRecentPaletteItemIds,
+  saveRecentPaletteItemId,
+  ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT,
+} from '../lib/browserStorage';
 
 // ─── CommandPaletteModal ──────────────────────────────────────────────────────
 
@@ -63,6 +71,45 @@ export function CommandPaletteModal() {
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const validPaletteIds = useMemo(
+    () => new Set(PALETTE_ITEMS.map((item) => item.id)),
+    [],
+  );
+  const validItemMap = useMemo(
+    () => new Map(PALETTE_ITEMS.map((item) => [item.id, item])),
+    [],
+  );
+
+  const [recentIds, setRecentIds] = useState<string[]>(() =>
+    getRecentPaletteItemIds().filter((id) =>
+      PALETTE_ITEMS.some((item) => item.id === id),
+    ),
+  );
+
+  useEffect(() => {
+    if (open) {
+      setRecentIds(
+        getRecentPaletteItemIds().filter((id) => validPaletteIds.has(id)),
+      );
+    }
+  }, [open, validPaletteIds]);
+
+  useEffect(() => {
+    function handleStorageClear() {
+      setRecentIds([]);
+    }
+    window.addEventListener(
+      ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT,
+      handleStorageClear,
+    );
+    return () => {
+      window.removeEventListener(
+        ACCOUNT_BROWSER_STORAGE_CLEARED_EVENT,
+        handleStorageClear,
+      );
+    };
+  }, []);
 
   // ── Assistive-technology safety ───────────────────────────────────────────
   // useKeyboardShortcuts enforces all guards: screen reader detection,
@@ -113,29 +160,63 @@ export function CommandPaletteModal() {
   });
 
   // ── Search / filter logic ─────────────────────────────────────────────────
-  const { flatResults, groupedResults } = useMemo(() => {
-    const lowerQuery = query.toLowerCase().trim();
+  const recentItems = useMemo(() => {
+    if (query.trim()) return [];
+    return recentIds
+      .map((id) => validItemMap.get(id))
+      .filter((item): item is PaletteItem => Boolean(item));
+  }, [query, recentIds, validItemMap]);
 
-    const filtered = lowerQuery
-      ? PALETTE_ITEMS.filter(
-          (item) =>
-            item.title.toLowerCase().includes(lowerQuery) ||
-            item.description.toLowerCase().includes(lowerQuery) ||
-            item.keywords.some((k) => k.toLowerCase().includes(lowerQuery)),
-        )
-      : PALETTE_ITEMS;
+  const { flatResults, groupedResults } = useMemo(() => {
+    const trimmedQuery = query.trim();
+
+    if (trimmedQuery) {
+      const matching = PALETTE_ITEMS.filter(
+        (item) => scorePaletteItem(item, trimmedQuery) > 0,
+      ).sort((a, b) => comparePaletteItems(a, b, trimmedQuery));
+
+      const grouped: Record<PaletteCategory, PaletteItem[]> = {
+        Actions: [],
+        Shortcuts: [],
+        Help: [],
+      };
+      for (const item of matching) {
+        grouped[item.category].push(item);
+      }
+
+      const flat = [
+        ...grouped.Actions,
+        ...grouped.Shortcuts,
+        ...grouped.Help,
+      ];
+
+      return { flatResults: flat, groupedResults: grouped };
+    }
+
+    // Empty query:
+    const recentSet = new Set(recentIds);
+    const nonRecentItems = PALETTE_ITEMS.filter(
+      (item) => !recentSet.has(item.id),
+    );
 
     const grouped: Record<PaletteCategory, PaletteItem[]> = {
       Actions: [],
       Shortcuts: [],
       Help: [],
     };
-    for (const item of filtered) {
+    for (const item of nonRecentItems) {
       grouped[item.category].push(item);
     }
 
-    return { flatResults: filtered, groupedResults: grouped };
-  }, [query]);
+    const flat = [
+      ...recentItems,
+      ...grouped.Actions,
+      ...grouped.Shortcuts,
+      ...grouped.Help,
+    ];
+
+    return { flatResults: flat, groupedResults: grouped };
+  }, [query, recentIds, recentItems]);
 
   // Reset focused index when results change
   useEffect(() => {
@@ -145,6 +226,11 @@ export function CommandPaletteModal() {
   // ── Item selection ────────────────────────────────────────────────────────
   const handleSelectItem = useCallback(
     (item: PaletteItem) => {
+      saveRecentPaletteItemId(item.id);
+      setRecentIds((prev) =>
+        [item.id, ...prev.filter((id) => id !== item.id)].slice(0, 5),
+      );
+
       if (item.actionId === 'toggle-theme') {
         toggleTheme();
         setOpen(false);
@@ -182,6 +268,73 @@ export function CommandPaletteModal() {
   );
 
   const currentFocusedItem = flatResults[focusedIndex] ?? null;
+
+  const renderPaletteItem = (item: PaletteItem) => {
+    const globalIndex = flatResults.findIndex((r) => r.id === item.id);
+    const isFocused = globalIndex === focusedIndex;
+
+    return (
+      <div
+        key={item.id}
+        id={item.id}
+        role="option"
+        aria-selected={isFocused}
+        tabIndex={isFocused ? 0 : -1}
+        onClick={() => handleSelectItem(item)}
+        onMouseEnter={() => setFocusedIndex(globalIndex)}
+        className={clsx(
+          'group relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all border',
+          isFocused
+            ? 'bg-[var(--color-accent-primary)]/10 border-[var(--color-accent-primary)] text-[var(--text-vivid)] shadow-sm'
+            : 'bg-transparent border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]',
+        )}
+      >
+        {/* Active Selection Indicator */}
+        {isFocused && (
+          <div
+            className="absolute left-0 top-2 bottom-2 w-1 bg-[var(--color-accent-primary)] rounded-r-full"
+            aria-hidden="true"
+          />
+        )}
+
+        <div className="flex flex-col gap-0.5 pr-4 pl-1">
+          <span className="text-sm font-semibold text-[var(--text-vivid)] group-hover:text-[var(--color-accent-primary)] transition-colors">
+            {item.title}
+          </span>
+          <span className="text-xs text-[var(--text-muted)] line-clamp-1">
+            {item.description}
+          </span>
+        </div>
+
+        {/* Right: Shortcut Keys or Arrow */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {item.shortcutKeys && item.shortcutKeys.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {item.shortcutKeys.map((key) => (
+                <kbd
+                  key={key}
+                  className="min-w-[20px] h-5 px-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-neutral)] text-[11px] font-mono font-bold text-[var(--text-vivid)] flex items-center justify-center shadow-xs"
+                >
+                  {key}
+                </kbd>
+              ))}
+            </div>
+          ) : (
+            <ArrowRight
+              size={16}
+              className={clsx(
+                'transition-transform',
+                isFocused
+                  ? 'text-[var(--color-accent-primary)] translate-x-0.5'
+                  : 'text-[var(--text-muted)] opacity-0 group-hover:opacity-100',
+              )}
+              aria-hidden="true"
+            />
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!open) return null;
@@ -296,6 +449,24 @@ export function CommandPaletteModal() {
             </div>
           )}
 
+          {/* Recent section when query is empty and recents exist */}
+          {!query && recentItems.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                <Clock
+                  size={13}
+                  className="text-[var(--color-accent-primary)]"
+                  aria-hidden="true"
+                />
+                <span>Recent</span>
+              </div>
+
+              <div className="space-y-0.5">
+                {recentItems.map((item) => renderPaletteItem(item))}
+              </div>
+            </div>
+          )}
+
           {/* No Results State */}
           {flatResults.length === 0 && (
             <div className="py-12 px-6 text-center space-y-3">
@@ -351,74 +522,7 @@ export function CommandPaletteModal() {
                   </div>
 
                   <div className="space-y-0.5">
-                    {items.map((item) => {
-                      const globalIndex = flatResults.findIndex(
-                        (r) => r.id === item.id,
-                      );
-                      const isFocused = globalIndex === focusedIndex;
-
-                      return (
-                        <div
-                          key={item.id}
-                          id={item.id}
-                          role="option"
-                          aria-selected={isFocused}
-                          tabIndex={isFocused ? 0 : -1}
-                          onClick={() => handleSelectItem(item)}
-                          onMouseEnter={() => setFocusedIndex(globalIndex)}
-                          className={clsx(
-                            'group relative flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-all border',
-                            isFocused
-                              ? 'bg-[var(--color-accent-primary)]/10 border-[var(--color-accent-primary)] text-[var(--text-vivid)] shadow-sm'
-                              : 'bg-transparent border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]',
-                          )}
-                        >
-                          {/* Active Selection Indicator */}
-                          {isFocused && (
-                            <div
-                              className="absolute left-0 top-2 bottom-2 w-1 bg-[var(--color-accent-primary)] rounded-r-full"
-                              aria-hidden="true"
-                            />
-                          )}
-
-                          <div className="flex flex-col gap-0.5 pr-4 pl-1">
-                            <span className="text-sm font-semibold text-[var(--text-vivid)] group-hover:text-[var(--color-accent-primary)] transition-colors">
-                              {item.title}
-                            </span>
-                            <span className="text-xs text-[var(--text-muted)] line-clamp-1">
-                              {item.description}
-                            </span>
-                          </div>
-
-                          {/* Right: Shortcut Keys or Arrow */}
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {item.shortcutKeys && item.shortcutKeys.length > 0 ? (
-                              <div className="flex items-center gap-1">
-                                {item.shortcutKeys.map((key) => (
-                                  <kbd
-                                    key={key}
-                                    className="min-w-[20px] h-5 px-1.5 rounded bg-[var(--surface-raised)] border border-[var(--border-neutral)] text-[11px] font-mono font-bold text-[var(--text-vivid)] flex items-center justify-center shadow-xs"
-                                  >
-                                    {key}
-                                  </kbd>
-                                ))}
-                              </div>
-                            ) : (
-                              <ArrowRight
-                                size={16}
-                                className={clsx(
-                                  'transition-transform',
-                                  isFocused
-                                    ? 'text-[var(--color-accent-primary)] translate-x-0.5'
-                                    : 'text-[var(--text-muted)] opacity-0 group-hover:opacity-100',
-                                )}
-                                aria-hidden="true"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {items.map((item) => renderPaletteItem(item))}
                   </div>
                 </div>
               );

@@ -18,6 +18,11 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import {
+  installFreighterMock,
+  setFreighterMode,
+  type FreighterMockMode,
+} from "./helpers/freighterMock";
 
 const STUB_ADDRESS =
   "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -26,78 +31,13 @@ const STUB_NETWORK = "TESTNET";
 // formatAddress(STUB_ADDRESS, 6, 4) → "GAAAAA...AAAA"
 const MASKED_ADDRESS = "GAAAAA...AAAA";
 
-/** Behaviour the stubbed Freighter extension should exhibit. */
-type StubMode = "grants" | "denies" | "missing";
-
-// ─── Freighter stub helpers ───────────────────────────────────────────────────
-
-/**
- * Injects a window-level Freighter stub before any page scripts run. The
- * WalletProvider and ConnectWalletModal read from the `@stellar/freighter-api`
- * ES-module, whose Vite chunk we replace in `interceptFreighterBundle` below.
- */
-async function injectFreighterStub(page: Page, mode: StubMode) {
-  await page.addInitScript(
-    ({ address, network, initialMode }) => {
-      (window as any).__freighterStub = { mode: initialMode };
-      (window as any).__freighterStubAddress = address;
-      (window as any).__freighterStubNetwork = network;
-    },
-    { address: STUB_ADDRESS, network: STUB_NETWORK, initialMode: mode },
-  );
-}
-
-/**
- * Intercepts the Vite vendor-stellar chunk and re-exports it from the window
- * stub so the app's `@stellar/freighter-api` imports resolve to our fake.
- */
-async function interceptFreighterBundle(page: Page) {
-  await page.route(/vendor-stellar.*\.js/, async (route) => {
-    const stubModule = `
-const stub = window.__freighterStub || { mode: 'missing' };
-const address = window.__freighterStubAddress || '';
-const network = window.__freighterStubNetwork || '';
-export const isConnected = () => {
-  if (stub.mode === 'missing') return Promise.resolve({ isConnected: false });
-  return Promise.resolve({ isConnected: true });
-};
-export const getAddress = () => {
-  // Deliberately return no address during silent restore so the provider does
-  // not auto-connect; the user must drive the modal to connect.
-  return Promise.resolve({ address: '' });
-};
-export const getNetwork = () => Promise.resolve({ network });
-export const requestAccess = () => {
-  if (stub.mode === 'grants') return Promise.resolve({ address });
-  return Promise.resolve({ address: '', error: { message: 'User rejected the connection request' } });
-};
-export const WatchWalletChanges = class { watch(){} stop(){} };
-export const isBrowser = true;
-// Present so any other consumer of the chunk links cleanly; never exercised by
-// the connect flow.
-export const signTransaction = () => Promise.resolve({ error: { message: 'stub' } });
-export const signAuthEntry = () => Promise.resolve({ error: { message: 'stub' } });
-export const getNetworkDetails = () => Promise.resolve({ network, networkPassphrase: '' });
-export default { isConnected, getAddress, getNetwork, requestAccess, WatchWalletChanges, isBrowser };
-`;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/javascript",
-      body: stubModule,
-    });
+async function setupPage(page: Page, mode: FreighterMockMode) {
+  await installFreighterMock(page, {
+    address: STUB_ADDRESS,
+    network: STUB_NETWORK,
+    mode,
+    autoConnect: false,
   });
-}
-
-/** Flip the stub's behaviour inside the running page. */
-async function setFreighterMode(page: Page, mode: StubMode) {
-  await page.evaluate((m) => {
-    (window as any).__freighterStub = { ...(window as any).__freighterStub, mode: m };
-  }, mode);
-}
-
-async function setupPage(page: Page, mode: StubMode) {
-  await injectFreighterStub(page, mode);
-  await interceptFreighterBundle(page);
 }
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
