@@ -16,6 +16,10 @@ export interface StreamTimelineEvent {
 export interface StreamRecord {
   /** Unique identifier, e.g., 'STR-001' */
   id: string;
+  /** Numeric Soroban contract stream ID. Never infer this from the API/event ID. */
+  onChainStreamId?: string;
+  /** Exact decimal API representation, retained for lossless on-chain amount checks. */
+  depositAmountRaw?: string;
   /** Only explicitly public streams may expose stream fields in OG images. */
   public?: boolean;
   /** Non-empty friendly name of the stream */
@@ -286,6 +290,17 @@ export function sanitizeStellarAddress(value: unknown): string {
   return "";
 }
 
+function readOnChainStreamId(source: Record<string, unknown>): string | undefined {
+  const value = source.onChainStreamId ?? source.on_chain_stream_id ?? source.stream_id;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return String(value);
+  }
+  if (typeof value === "string" && /^(0|[1-9]\d*)$/.test(value.trim())) {
+    return value.trim();
+  }
+  return undefined;
+}
+
 function readString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
@@ -348,6 +363,8 @@ export function normalizeStreamRecord(raw: unknown): StreamRecord {
 
   return {
     id: readString(source.id),
+    onChainStreamId: readOnChainStreamId(source),
+    depositAmountRaw: typeof source.depositAmount === "string" && /^\d+(?:\.\d+)?$/.test(source.depositAmount.trim()) ? source.depositAmount.trim() : undefined,
     name: readString(source.name, "Untitled stream"),
     recipientName: readString(source.recipientName, "Unknown recipient"),
     recipientAddress: sanitizeStellarAddress(source.recipientAddress),

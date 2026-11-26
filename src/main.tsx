@@ -9,6 +9,8 @@ import { isSupportedBrowser } from './lib/browserSupport';
 import { config, configError, describeConfigForLog } from './lib/config';
 import { logger } from './lib/logger';
 import { initWebVitals } from './lib/webVitals';
+import { config, configError } from './lib/config';
+import { registerServiceWorker } from './lib/registerServiceWorker';
 
 const root = document.getElementById('root')!;
 
@@ -47,4 +49,17 @@ if (!isSupportedBrowser(navigator.userAgent)) {
       </HelmetProvider>
     </React.StrictMode>
   );
+
+  // Register the PWA service worker (no-op in dev, Playwright, or on
+  // browsers without `serviceWorker`). The update prompt is wired via a
+  // CustomEvent the toast layer can listen to without creating a new
+  // import cycle — follow-up in #2045 can lift this straight into
+  // ToastProvider.
+  registerServiceWorker({
+    onUpdateAvailable: ({ reload }) => {
+      window.dispatchEvent(
+        new CustomEvent('fluxora:sw-update-available', { detail: { reload } }),
+      );
+    },
+  });
 }

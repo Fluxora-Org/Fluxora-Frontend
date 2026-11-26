@@ -27,6 +27,33 @@ import {
   type OptimisticOperation,
 } from "../lib/optimisticTransactions";
 
+function applyOptimisticTopUpUpdates(
+  streams: StreamRecord[],
+  pendingOps: OptimisticOperation[],
+): StreamRecord[] {
+  const topUps = new Map<string, number>();
+  for (const op of pendingOps) {
+    if (op.kind !== "top-up") continue;
+    const streamId = (op.data.streamId ?? op.data.id) as string | undefined;
+    const amount = typeof op.data.amount === "number" ? op.data.amount : 0;
+    if (!streamId || !Number.isFinite(amount) || amount <= 0) continue;
+    topUps.set(streamId, (topUps.get(streamId) ?? 0) + amount);
+  }
+
+  if (topUps.size === 0) return streams;
+
+  return streams.map((stream) => {
+    const amount = topUps.get(stream.id);
+    if (!amount) return stream;
+    return {
+      ...stream,
+      depositAmount: stream.depositAmount + amount,
+      remainingAmount: stream.remainingAmount + amount,
+      _optimistic: true,
+    } as StreamRecord & { _optimistic?: boolean };
+  });
+}
+
 function applyOptimisticStatusUpdates(
   streams: StreamRecord[],
   pendingOps: OptimisticOperation[],
@@ -65,7 +92,8 @@ function mergeOptimisticCreateRows(
   pendingOps: OptimisticOperation[],
   confirmedOps: OptimisticOperation[],
 ): StreamRecord[] {
-  const withStatusUpdates = applyOptimisticStatusUpdates(serverStreams, pendingOps);
+  const withTopUps = applyOptimisticTopUpUpdates(serverStreams, pendingOps);
+  const withStatusUpdates = applyOptimisticStatusUpdates(withTopUps, pendingOps);
   const createPending = pendingOps.filter((op) => op.kind === "create");
   const createConfirmed = confirmedOps.filter((op) => op.kind === "create");
   if (createPending.length === 0) return withStatusUpdates;

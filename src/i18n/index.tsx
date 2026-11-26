@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { en } from "./en";
+import { es } from "./es";
 import { createPseudoLocale } from "./zx";
 
 /**
@@ -84,17 +85,47 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * Default Spanish catalog for demonstration and locale-adding documentation verification.
- * Contains translation keys mapped to Spanish copy.
+ * Locales the end user can pick. `zx` is a dev/test pseudo-locale and is
+ * intentionally excluded.
  */
-const es: Partial<TranslationCatalog> = {
-  "createStream.title": "Crear flujo",
-  "createStream.description": "Establezca el destinatario, la financiación y los detalles del calendario para un nuevo flujo Stellar.",
-  "createStream.button.create": "Crear flujo",
-  "createStream.button.next": "Siguiente",
-  "createStream.button.back": "Atrás",
-  "createStream.button.cancel": "Cancelar",
-};
+export const SELECTABLE_LOCALES: ReadonlyArray<{ code: Locale; label: string }> = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+];
+
+const SUPPORTED_LOCALES: ReadonlySet<Locale> = new Set<Locale>(["en", "es", "zx"]);
+
+/** localStorage key used to persist the user-selected locale. */
+export const LOCALE_STORAGE_KEY = "fluxora:locale";
+
+function isLocale(value: unknown): value is Locale {
+  return typeof value === "string" && SUPPORTED_LOCALES.has(value as Locale);
+}
+
+/**
+ * Resolve the initial locale: persisted value → navigator.language → "en".
+ * Pseudo-locale `zx` is never auto-selected from `navigator.language`.
+ */
+function detectInitialLocale(explicitDefault: Locale): Locale {
+  if (typeof window === "undefined") return explicitDefault;
+
+  try {
+    const stored = window.localStorage?.getItem(LOCALE_STORAGE_KEY);
+    if (isLocale(stored)) return stored;
+  } catch {
+    // Storage may be blocked (private mode, no site data). Fall through.
+  }
+
+  try {
+    const nav = window.navigator?.language?.toLowerCase() ?? "";
+    if (nav.startsWith("es")) return "es";
+    if (nav.startsWith("en")) return "en";
+  } catch {
+    // Ignore — fall back to the explicit default.
+  }
+
+  return explicitDefault;
+}
 
 /**
  * Resolves a translation key to its corresponding message, handles fallback,
@@ -165,7 +196,20 @@ interface I18nProviderProps {
  * @param props Component properties containing children and optional default locale.
  */
 export function I18nProvider({ children, defaultLocale = "en" }: I18nProviderProps) {
-  const [locale, setLocale] = useState<Locale>(defaultLocale);
+  const [locale, setLocale] = useState<Locale>(() => detectInitialLocale(defaultLocale));
+
+  // Keep `<html lang>` in sync and persist the choice. Running this in an
+  // effect avoids touching `document` during SSR / test initialisation.
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = locale;
+    }
+    try {
+      window.localStorage?.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      // Storage may be blocked — the choice still applies for this session.
+    }
+  }, [locale]);
 
   // Active catalog selection
   const catalog: TranslationCatalog = (() => {
@@ -184,6 +228,7 @@ export function I18nProvider({ children, defaultLocale = "en" }: I18nProviderPro
   };
 
   const changeLocale = (newLocale: Locale) => {
+    if (!isLocale(newLocale)) return;
     setLocale(newLocale);
   };
 
