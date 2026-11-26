@@ -50,6 +50,7 @@ export default defineConfig({
       "src/components/navigation/__tests__/WalletStatus.copy.test.tsx",
       "src/components/navigation/__tests__/WalletStatus.keyboard.test.tsx",
       "src/components/navigation/__tests__/WalletStatus.share.test.tsx",
+      "src/components/KeyboardShortcutsModal.test.tsx",
       "src/components/Streams/__tests__/StreamCreatedModal.copy.test.tsx",
       "src/components/presence/__tests__/PresenceBadge.test.tsx",
       "src/components/Streams/__tests__/StreamCreatedModal.test.tsx",
