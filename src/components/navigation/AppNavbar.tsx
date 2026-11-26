@@ -8,6 +8,7 @@ import WalletStatus from "./WalletStatus";
 import Breadcrumb, { type BreadcrumbItem } from "./Breadcrumb";
 import { VoiceMicButton } from "../voice/VoiceMicButton";
 import ThemeSegmentedControl from "./ThemeSegmentedControl";
+import LanguagePicker from "./LanguagePicker";
 import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
 import TimezoneIndicator from "./TimezoneIndicator";
 
@@ -477,6 +478,9 @@ export default function AppNavbar({
             >
               <Type size={16} aria-hidden="true" />
             </button>
+
+            {/* Language picker */}
+            <LanguagePicker />
 
             {/* Theme toggle */}
             <ThemeSegmentedControl />
