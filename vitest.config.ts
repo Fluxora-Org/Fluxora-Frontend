@@ -45,7 +45,6 @@ export default defineConfig({
       "src/components/csv-upload/__tests__/CsvDropZone.worker.test.tsx",
       "src/components/csv-upload/__tests__/csvFileValidation.test.tsx",
       "src/components/csv-upload/__tests__/csvLimits.test.ts",
-      "src/components/KeyboardShortcutsModal.test.tsx",
       "src/components/navigation/__tests__/AppNavbar.disconnect.test.tsx",
       "src/components/navigation/__tests__/AppNavbar.routeTransition.test.tsx",
       "src/components/navigation/__tests__/WalletStatus.copy.test.tsx",
