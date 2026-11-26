@@ -1248,6 +1248,12 @@
    ambiguous mid-fade. `prefers-reduced-motion` is handled globally above,
    which also zeroes this duration. */
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--transition-base);
+  animation-timing-function: var(--ease-in-out);
+}
+
 .theme-transitioning,
 .theme-transitioning * {
   transition-property: background-color, border-color, color, fill, stroke;
@@ -1257,6 +1263,18 @@
 
 .theme-transitioning *:focus-visible {
   transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+
+  .theme-transitioning,
+  .theme-transitioning * {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
