@@ -1,4 +1,5 @@
 import {
+  getBrowserStorage,
   readBrowserStorage,
   removeBrowserStorage,
   writeBrowserStorage,
@@ -49,12 +50,21 @@ export interface OnboardingProgress {
 type OnboardingStorageReader = Pick<Storage, "getItem">;
 type OnboardingStorageWriter = Pick<Storage, "removeItem" | "setItem">;
 
-function getLocalStorage(): Storage | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
+type OnboardingProgressStorage = OnboardingStorageReader &
+  Partial<Pick<Storage, "removeItem">>;
 
-  return window.localStorage;
+function getLocalStorage(): Storage | null {
+  return getBrowserStorage("localStorage");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function canRemoveProgress(
+  storage: OnboardingProgressStorage,
+): storage is OnboardingProgressStorage & Pick<Storage, "removeItem"> {
+  return typeof storage.removeItem === "function";
 }
 
 /** The progress a user has when nothing valid is persisted. */
@@ -110,10 +120,10 @@ export function writeOnboardingDismissed(
     writeBrowserStorage(
       ONBOARDING_DISMISSED_STORAGE_KEY,
       ONBOARDING_DISMISSED_VALUE,
-      storage as any,
+      storage,
     );
   } else {
-    removeBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage as any);
+    removeBrowserStorage(ONBOARDING_DISMISSED_STORAGE_KEY, storage);
   }
 }
 
@@ -135,21 +145,20 @@ function parseOnboardingProgress(raw: string | null): OnboardingProgress | null 
     return null;
   }
 
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     return null;
   }
 
-  const envelope = parsed as Record<string, unknown>;
-  if (envelope.version !== ONBOARDING_PROGRESS_SCHEMA_VERSION) {
+  if (parsed.version !== ONBOARDING_PROGRESS_SCHEMA_VERSION) {
     return null;
   }
 
-  const data = envelope.data;
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+  const data = parsed.data;
+  if (!isRecord(data)) {
     return null;
   }
 
-  const { step, completed } = data as Record<string, unknown>;
+  const { step, completed } = data;
   if (!isOnboardingStepId(step) || typeof completed !== "boolean") {
     return null;
   }
@@ -165,7 +174,7 @@ function parseOnboardingProgress(raw: string | null): OnboardingProgress | null 
  * partial write or hand-edited value cannot trap a user in an incomplete flow.
  */
 export function readOnboardingProgress(
-  storage: OnboardingStorageReader & Partial<OnboardingStorageWriter> = getLocalStorage() as any,
+  storage: OnboardingProgressStorage | null = getLocalStorage(),
 ): OnboardingProgress {
   if (!storage) {
     return createInitialOnboardingProgress();
@@ -179,8 +188,8 @@ export function readOnboardingProgress(
   }
 
   // Corrupted or absent: reset rather than block.
-  if (raw !== null && typeof storage.removeItem === "function") {
-    removeBrowserStorage(ONBOARDING_PROGRESS_STORAGE_KEY, storage as any);
+  if (raw !== null && canRemoveProgress(storage)) {
+    removeBrowserStorage(ONBOARDING_PROGRESS_STORAGE_KEY, storage);
   }
 
   return createInitialOnboardingProgress();
@@ -211,7 +220,7 @@ export function writeOnboardingProgress(
       version: ONBOARDING_PROGRESS_SCHEMA_VERSION,
       data: safeProgress,
     }),
-    storage as any,
+    storage,
   );
 }
 
@@ -263,7 +272,7 @@ export function resetOnboardingProgress(
   storage: OnboardingStorageWriter | null = getLocalStorage(),
 ): OnboardingProgress {
   if (storage) {
-    removeBrowserStorage(ONBOARDING_PROGRESS_STORAGE_KEY, storage as any);
+    removeBrowserStorage(ONBOARDING_PROGRESS_STORAGE_KEY, storage);
   }
 
   return createInitialOnboardingProgress();

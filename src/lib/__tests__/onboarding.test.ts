@@ -237,8 +237,10 @@ describe("onboarding step helpers", () => {
 });
 
 describe("onboarding progress", () => {
+  let progressStorage: Storage;
+
   beforeEach(() => {
-    localStorage.clear();
+    progressStorage = new MemoryStorage();
   });
 
   it("starts at the first step and is not complete", () => {
@@ -246,7 +248,7 @@ describe("onboarding progress", () => {
       step: ONBOARDING_INITIAL_STEP,
       completed: false,
     });
-    expect(readOnboardingProgress(localStorage)).toEqual(
+    expect(readOnboardingProgress(progressStorage)).toEqual(
       createInitialOnboardingProgress(),
     );
   });
@@ -254,11 +256,11 @@ describe("onboarding progress", () => {
   it("survives a reload (write then read back from the same storage)", () => {
     writeOnboardingProgress(
       { step: "how-it-works", completed: false },
-      localStorage,
+      progressStorage,
     );
 
     // A "reload" is a fresh read against the same persisted storage.
-    expect(readOnboardingProgress(localStorage)).toEqual({
+    expect(readOnboardingProgress(progressStorage)).toEqual({
       step: "how-it-works",
       completed: false,
     });
@@ -282,16 +284,16 @@ describe("onboarding progress", () => {
 
   it("can be exited from every step, clearing persisted progress", () => {
     for (const step of ONBOARDING_STEPS) {
-      writeOnboardingProgress({ step, completed: false }, localStorage);
-      expect(readOnboardingProgress(localStorage).step).toBe(step);
+      writeOnboardingProgress({ step, completed: false }, progressStorage);
+      expect(readOnboardingProgress(progressStorage).step).toBe(step);
 
-      const reset = resetOnboardingProgress(localStorage);
+      const reset = resetOnboardingProgress(progressStorage);
 
       expect(reset).toEqual(createInitialOnboardingProgress());
-      expect(readOnboardingProgress(localStorage)).toEqual(
+      expect(readOnboardingProgress(progressStorage)).toEqual(
         createInitialOnboardingProgress(),
       );
-      expect(localStorage.getItem(ONBOARDING_PROGRESS_STORAGE_KEY)).toBeNull();
+      expect(progressStorage.getItem(ONBOARDING_PROGRESS_STORAGE_KEY)).toBeNull();
     }
   });
 
@@ -301,6 +303,9 @@ describe("onboarding progress", () => {
       "null",
       "[]",
       '"welcome"',
+      '{"version":1,"__proto__":{"data":{"step":"welcome","completed":true}}}',
+      '{"version":1,"data":[]}',
+      '{"version":1,"data":{"step":{"toString":"welcome"},"completed":true}}',
       JSON.stringify({ version: 999, data: { step: "welcome", completed: false } }),
       JSON.stringify({ version: ONBOARDING_PROGRESS_SCHEMA_VERSION }),
       JSON.stringify({
@@ -314,18 +319,18 @@ describe("onboarding progress", () => {
     ];
 
     for (const raw of corruptedValues) {
-      localStorage.setItem(ONBOARDING_PROGRESS_STORAGE_KEY, raw);
+      progressStorage.setItem(ONBOARDING_PROGRESS_STORAGE_KEY, raw);
 
-      expect(readOnboardingProgress(localStorage)).toEqual(
+      expect(readOnboardingProgress(progressStorage)).toEqual(
         createInitialOnboardingProgress(),
       );
       // The corrupted value is cleared so it cannot block future reads.
-      expect(localStorage.getItem(ONBOARDING_PROGRESS_STORAGE_KEY)).toBeNull();
+      expect(progressStorage.getItem(ONBOARDING_PROGRESS_STORAGE_KEY)).toBeNull();
     }
   });
 
   it("does not throw when storage is unavailable or throws", () => {
-    expect(readOnboardingProgress(null as any)).toEqual(
+    expect(readOnboardingProgress(null)).toEqual(
       createInitialOnboardingProgress(),
     );
     expect(() =>
@@ -376,9 +381,9 @@ describe("onboarding progress", () => {
     expect(third).toEqual(first);
 
     // Persisting completion repeatedly leaves the same readable state.
-    writeOnboardingProgress(first, localStorage);
-    writeOnboardingProgress(second, localStorage);
-    expect(readOnboardingProgress(localStorage)).toEqual(first);
+    writeOnboardingProgress(first, progressStorage);
+    writeOnboardingProgress(second, progressStorage);
+    expect(readOnboardingProgress(progressStorage)).toEqual(first);
   });
 
   it("never advances past the final step", () => {
