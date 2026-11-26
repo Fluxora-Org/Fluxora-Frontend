@@ -9,7 +9,8 @@ To ensure precision and standard representations on-chain, specific scaling rule
 - **Timestamps**: Represented in **Unix epoch seconds**.
 - **Encoder Helpers**: The `tx.ts` module uses specific encoder helpers for `ScVal` conversion.
   - `encodeAddress`: Used for Stellar addresses (`ScValType.scvAddress`).
-  - `encodeU64`: Used for amounts, stream IDs, and timestamps (`ScValType.scvU64`).
+  - `encodeU64`: Used for stream IDs and timestamps (`ScValType.scvU64`).
+  - `encodeI128`: Used for signed token amounts (`ScValType.scvI128`).
 
 *Security Note: Always double-check unit and scaling assumptions before passing arguments to prevent accidental mis-scaled transfers.*
 
@@ -38,6 +39,19 @@ Withdraws accrued funds from an active stream.
 | 1              | `recipient` | `Address`  | `encodeAddress` | The Stellar address withdrawing funds.                |
 | 2              | `stream_id` | `u64`      | `encodeU64`     | The numerical ID of the stream.                       |
 | 3              | `amount`    | `u64`      | `encodeU64`     | Amount to withdraw, scaled to 7 decimals.             |
+
+---
+
+### `top_up`
+
+Adds funds to an existing stream. The contract derives the sender from transaction authorization; no sender argument is encoded.
+
+| Argument Order | Name        | ScVal Type | Encoder Helper  | Description / Units                                   |
+| -------------- | ----------- | ---------- | --------------- | ----------------------------------------------------- |
+| 1              | `stream_id` | `u64`      | `encodeU64`     | The numerical ID of the stream.                       |
+| 2              | `amount`    | `i128`     | `encodeI128`    | Amount to add, scaled to 7 decimals.                  |
+
+*The frontend validates `sender` against the connected wallet before submission but does not encode it as an argument.*
 
 ---
 

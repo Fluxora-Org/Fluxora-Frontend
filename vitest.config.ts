@@ -45,6 +45,11 @@ export default defineConfig({
       "src/components/csv-upload/__tests__/CsvDropZone.worker.test.tsx",
       "src/components/csv-upload/__tests__/csvFileValidation.test.tsx",
       "src/components/csv-upload/__tests__/csvLimits.test.ts",
+      "src/components/navigation/__tests__/AppNavbar.disconnect.test.tsx",
+      "src/components/navigation/__tests__/AppNavbar.routeTransition.test.tsx",
+      "src/components/navigation/__tests__/WalletStatus.copy.test.tsx",
+      "src/components/navigation/__tests__/WalletStatus.keyboard.test.tsx",
+      "src/components/navigation/__tests__/WalletStatus.share.test.tsx",
       "src/components/KeyboardShortcutsModal.test.tsx",
       "src/components/Streams/__tests__/StreamCreatedModal.copy.test.tsx",
       "src/components/presence/__tests__/PresenceBadge.test.tsx",
@@ -161,15 +166,12 @@ export default defineConfig({
         "src/hooks/useRouteFocus.ts",
         // Voice mic button — recording state must be conveyed non-visually
         "src/components/voice/VoiceMicButton.tsx",
-<<<<<<< Updated upstream
         // Issue #1687: voice stream identification must refuse ambiguity
         "src/components/voice/streamIdentifier.ts",
         // Issue #1982: InstallPWABanner keyboard and screen-reader coverage
         "src/components/InstallPWABanner.tsx",
-=======
         // Online/offline status tracking
         "src/hooks/useOnlineStatus.ts",
->>>>>>> Stashed changes
         // Streams service and Stellar transaction layer
         "src/lib/api/streamsService.ts",
         "src/lib/stellar/tx.ts",
