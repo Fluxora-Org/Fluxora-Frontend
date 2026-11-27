@@ -2,8 +2,15 @@ import { Metric } from "./Metric";
 import { Plus } from "lucide-react";
 import React from "react";
 
+/**
+ * What the tray needs to show for a hidden widget. Metric cards pass their
+ * `Metric`; non-metric widgets (e.g. the asset treemap) pass just an icon and
+ * label.
+ */
+export type TrayWidget = Pick<Metric, "icon" | "label">;
+
 interface WidgetTrayProps {
-  hiddenWidgets: { metric: Metric; id: string }[];
+  hiddenWidgets: { metric: TrayWidget; id: string }[];
   onRestore: (id: string) => void;
   onResetAll?: () => void;
   onDragOver?: (e: React.DragEvent, id: string) => void;

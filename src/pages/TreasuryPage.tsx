@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { LayoutGrid } from "lucide-react";
 import DemoBanner, {
   type DemoState,
 } from "../components/treasuryOverviewPage/DemoBanner";
@@ -8,6 +9,17 @@ import Header, {
 import Metrics from "../components/treasuryOverviewPage/Metrics";
 import { lazy, Suspense } from "react";
 import ErrorBoundary from "../components/ErrorBoundary";
+import WidgetErrorBoundary from "../components/WidgetErrorBoundary";
+import {
+  TREASURY_ASSET_TREEMAP_WIDGET_ID,
+  type GridWidget,
+} from "../components/treasuryOverviewPage/widgetLayout";
+import type { MetricToken } from "../components/treasuryOverviewPage/Metric";
+// Lazy so the treemap, its layout maths and precision helpers stay out of the
+// app-treasury route chunk (see scripts/route-budgets.json).
+const TreasuryAssetTreemap = lazy(
+  () => import("../components/treasuryOverviewPage/TreasuryAssetTreemap"),
+);
 const ActivityHeatmap = lazy(
   () => import("../components/treasuryOverviewPage/ActivityHeatmap"),
 );
@@ -23,6 +35,8 @@ const ReportBuilderPanel = lazy(
 import { useTreasuryOverviewData } from "../components/treasuryOverviewPage/useTreasuryOverviewData";
 import { useWallet } from "../components/wallet-connect/Walletcontext";
 import { MetaTags } from "../components/MetaTags";
+
+const NO_ALLOCATION: MetricToken[] = [];
 
 /**
  * TreasuryPage renders the treasury overview.
@@ -48,6 +62,7 @@ export default function TreasuryPage() {
   const {
     metrics,
     streams,
+    assetAllocation,
     isDemoMode,
     loading,
     error,
@@ -57,6 +72,39 @@ export default function TreasuryPage() {
   } = useTreasuryOverviewData(selectedPeriod);
   const { connected: walletConnected } = useWallet();
   const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const allocationTokens = assetAllocation ?? NO_ALLOCATION;
+
+  // Non-metric widgets that share the draggable metrics grid, widget tray
+  // and persisted layout. Each is isolated in its own error boundary.
+  const gridWidgets = useMemo<GridWidget[]>(
+    () => [
+      {
+        id: TREASURY_ASSET_TREEMAP_WIDGET_ID,
+        label: "Asset Allocation",
+        icon: <LayoutGrid size={28} aria-hidden="true" />,
+        defaultSize: "2x1",
+        content: (
+          <WidgetErrorBoundary name="Asset allocation" onRetry={refetch}>
+            <Suspense
+              fallback={
+                <div role="status" className="sr-only">
+                  Loading asset allocation...
+                </div>
+              }
+            >
+              <TreasuryAssetTreemap
+                tokens={allocationTokens}
+                isDemoMode={isDemoMode}
+                onRetry={refetch}
+                showTitle={false}
+              />
+            </Suspense>
+          </WidgetErrorBoundary>
+        ),
+      },
+    ],
+    [allocationTokens, isDemoMode, refetch],
+  );
 
   const demoState: DemoState = loading
     ? "loading"
@@ -147,6 +195,7 @@ export default function TreasuryPage() {
           loading={loading}
           error={error}
           isDemoMode={isDemoMode}
+          extraWidgets={gridWidgets}
         />
       </ErrorBoundary>
       <ErrorBoundary>

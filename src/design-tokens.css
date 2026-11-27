@@ -750,6 +750,39 @@
   }
 }
 
+/* ─── Treemap tokens (docs/TREASURY_ASSET_TREEMAP_SPEC.md §3, §9) ─── */
+:root {
+  --treemap-gap: 2px;
+  --treemap-outer-padding: 4px;
+  --treemap-cell-radius: 4px;
+  --treemap-hover-scale: 1.02;
+  --treemap-hover-transition: transform 150ms var(--ease-out);
+  --treemap-container-bg: var(--color-surface-raised);
+  --treemap-label-bg: color-mix(in srgb, var(--color-surface-default) 88%, transparent);
+  --treemap-label-color: var(--color-text-primary);
+
+  /* Categorical fills: accent ramp first, then spec extensions. */
+  --treemap-fill-0: var(--color-accent-primary);
+  --treemap-fill-1: var(--color-accent-secondary);
+  --treemap-fill-2: var(--color-accent-primary-dark);
+  --treemap-fill-3: var(--color-accent-secondary-dark);
+  --treemap-fill-4: var(--color-accent-primary-darkest);
+  --treemap-fill-5: #6366f1;
+  --treemap-fill-6: #ec4899;
+  --treemap-fill-7: #f59e0b;
+  --treemap-fill-8: #8b5cf6;
+  --treemap-fill-9: #14b8a6;
+  --treemap-fill-other: color-mix(in srgb, var(--color-text-muted) 35%, var(--color-surface-default));
+}
+
+:root[data-theme="dark"] {
+  --treemap-fill-5: #818cf8;
+  --treemap-fill-6: #f472b6;
+  --treemap-fill-7: #fbbf24;
+  --treemap-fill-8: #a78bfa;
+  --treemap-fill-9: #2dd4bf;
+}
+
 /* ═══════════════════════════════════════════════════════════
    8. SHARED UI COMPONENT CLASSES
    ═══════════════════════════════════════════════════════════ */

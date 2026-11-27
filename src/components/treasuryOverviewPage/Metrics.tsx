@@ -3,7 +3,7 @@ import MetricCard from "./MetricCard";
 import { Metric } from "./Metric";
 import { useWidgetLayout, slugify } from "./useWidgetLayout";
 import WidgetTray from "./WidgetTray";
-import { WidgetConfig } from "./widgetLayout";
+import { WidgetConfig, type GridWidget } from "./widgetLayout";
 import { DemoDataBadge } from "./DemoBanner";
 import {
   BREAKPOINT_LG,
@@ -17,6 +17,24 @@ interface MetricsProps {
   loading?: boolean;
   error?: string | null;
   isDemoMode?: boolean;
+  /**
+   * Non-metric widgets (e.g. the asset treemap) that share the draggable grid,
+   * the widget tray and the persisted layout with the metric cards.
+   */
+  extraWidgets?: GridWidget[];
+}
+
+const NO_GRID_WIDGETS: GridWidget[] = [];
+
+interface GridItem {
+  metric: Metric;
+  config: WidgetConfig;
+  /** Custom body for non-metric widgets. */
+  content?: React.ReactNode;
+}
+
+function toPseudoMetric(widget: GridWidget): Metric {
+  return { icon: widget.icon, label: widget.label, value: "", desc: "" };
 }
 
 // Inline useMediaQuery hook for md breakpoint detection (768px)
@@ -45,7 +63,13 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-export default function Metrics({ metrics, loading, error, isDemoMode }: MetricsProps) {
+export default function Metrics({
+  metrics,
+  loading,
+  error,
+  isDemoMode,
+  extraWidgets = NO_GRID_WIDGETS,
+}: MetricsProps) {
   const isMobile = useMediaQuery(mediaDown("md"));
   const {
     layout,
@@ -53,7 +77,7 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
     updateWidgetSize,
     updateWidgetVisibility,
     resetLayout,
-  } = useWidgetLayout(metrics);
+  } = useWidgetLayout(metrics, extraWidgets);
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -68,6 +92,24 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
     if (window.innerWidth >= BREAKPOINT_LG) return 3;
     if (window.innerWidth >= BREAKPOINT_SM) return 2;
     return 1;
+  };
+
+  /**
+   * Swap two widgets' grid positions and persist the result.
+   *
+   * `reorderWidgets` derives `order` from array position, so the swap is done
+   * on a position-sorted copy (swapping only the `order` fields would be
+   * normalised straight back by `reorderWidgets`). State objects are never
+   * mutated in place.
+   */
+  const swapWidgets = (sourceId: string, targetId: string): boolean => {
+    const sorted = [...layout.widgets].sort((a, b) => a.order - b.order);
+    const srcIdx = sorted.findIndex((w) => w.id === sourceId);
+    const destIdx = sorted.findIndex((w) => w.id === targetId);
+    if (srcIdx === -1 || destIdx === -1) return false;
+    [sorted[srcIdx], sorted[destIdx]] = [sorted[destIdx], sorted[srcIdx]];
+    reorderWidgets(sorted);
+    return true;
   };
 
   // Keyboard reorder handler
@@ -89,16 +131,7 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
     }
 
     if (targetIdx >= 0 && targetIdx < visible.length) {
-      const newConfigs = [...layout.widgets];
-      const srcConfigIdx = newConfigs.findIndex((w) => w.id === id);
-      const destConfigIdx = newConfigs.findIndex((w) => w.id === visible[targetIdx].config.id);
-
-      if (srcConfigIdx !== -1 && destConfigIdx !== -1) {
-        const temp = newConfigs[srcConfigIdx].order;
-        newConfigs[srcConfigIdx].order = newConfigs[destConfigIdx].order;
-        newConfigs[destConfigIdx].order = temp;
-
-        reorderWidgets(newConfigs);
+      if (swapWidgets(id, visible[targetIdx].config.id)) {
         setFocusTargetId(id);
 
         const label = visible[idx].metric.label;
@@ -111,17 +144,7 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
   const handleMobileSwap = (id: string, currentIdx: number, targetIdx: number) => {
     const { visible } = orderedMetrics;
     if (targetIdx >= 0 && targetIdx < visible.length) {
-      const newConfigs = [...layout.widgets];
-      const srcConfigIdx = newConfigs.findIndex((w) => w.id === id);
-      const destConfigIdx = newConfigs.findIndex((w) => w.id === visible[targetIdx].config.id);
-
-      if (srcConfigIdx !== -1 && destConfigIdx !== -1) {
-        const temp = newConfigs[srcConfigIdx].order;
-        newConfigs[srcConfigIdx].order = newConfigs[destConfigIdx].order;
-        newConfigs[destConfigIdx].order = temp;
-
-        reorderWidgets(newConfigs);
-
+      if (swapWidgets(id, visible[targetIdx].config.id)) {
         const label = visible[currentIdx].metric.label;
         setAnnouncement(`${label} moved to position ${targetIdx + 1} of ${visible.length}`);
       }
@@ -145,16 +168,18 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
   // Order metrics based on layout configuration
   const orderedMetrics = useMemo(() => {
     const sortedConfigs = [...layout.widgets].sort((a, b) => a.order - b.order);
-    const visible: { metric: Metric; config: WidgetConfig }[] = [];
+    const visible: GridItem[] = [];
     const hidden: { metric: Metric; id: string }[] = [];
 
     sortedConfigs.forEach((config) => {
       const match = metrics.find((m) => slugify(m.label) === config.id);
-      if (match) {
+      const extra = match ? undefined : extraWidgets.find((w) => w.id === config.id);
+      const metric = match ?? (extra ? toPseudoMetric(extra) : undefined);
+      if (metric) {
         if (config.visible) {
-          visible.push({ metric: match, config });
+          visible.push({ metric, config, content: extra?.content });
         } else {
-          hidden.push({ metric: match, id: config.id });
+          hidden.push({ metric, id: config.id });
         }
       }
     });
@@ -171,7 +196,7 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
     });
 
     return { visible, hidden };
-  }, [layout.widgets, metrics]);
+  }, [layout.widgets, metrics, extraWidgets]);
 
   // Drag and Drop Event Handlers
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -212,18 +237,7 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
       const targetIdx = visible.findIndex((item) => item.config.id === targetId);
 
       if (sourceIdx !== -1 && targetIdx !== -1) {
-        const newConfigs = [...layout.widgets];
-        const srcConfigIdx = newConfigs.findIndex((w) => w.id === sourceId);
-        const destConfigIdx = newConfigs.findIndex((w) => w.id === targetId);
-
-        if (srcConfigIdx !== -1 && destConfigIdx !== -1) {
-          const srcOrder = newConfigs[srcConfigIdx].order;
-          const destOrder = newConfigs[destConfigIdx].order;
-          newConfigs[srcConfigIdx] = { ...newConfigs[srcConfigIdx], order: destOrder };
-          newConfigs[destConfigIdx] = { ...newConfigs[destConfigIdx], order: srcOrder };
-
-          reorderWidgets(newConfigs);
-
+        if (swapWidgets(sourceId, targetId)) {
           const label = visible[sourceIdx].metric.label;
           setAnnouncement(`${label} moved to position ${targetIdx + 1} of ${visible.length}`);
         }
@@ -294,8 +308,13 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
         <div
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 items-stretch"
         >
-        {visible.length > 0 ? (
-          visible.map((item, idx) => {
+        {/* Non-metric widgets (e.g. the treemap) do not count as metric cards. */}
+        {!visible.some((item) => item.content === undefined) && (
+          <p className="text-sm col-span-full" style={{ color: "var(--color-text-secondary)" }}>
+            No treasury metrics available.
+          </p>
+        )}
+        {visible.map((item, idx) => {
             const isDragging = draggedId === item.config.id;
             const isDragOver = dragOverId === item.config.id;
             
@@ -376,15 +395,12 @@ export default function Metrics({ metrics, loading, error, isDemoMode }: Metrics
                   currentSize={item.config.size}
                   reorderButtons={mobileReorderButtons}
                   moveMenuOptions={keyboardMoveMenu}
-                />
+                >
+                  {item.content}
+                </MetricCard>
               </div>
             );
-          })
-        ) : (
-          <p className="text-sm col-span-full" style={{ color: "var(--color-text-secondary)" }}>
-            No treasury metrics available.
-          </p>
-        )}
+          })}
         </div>
       </section>
 
