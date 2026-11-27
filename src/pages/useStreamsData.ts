@@ -46,6 +46,12 @@ import {
   type StreamsSessionSnapshot,
   type StreamDraftSnapshot,
 } from "../lib/streamsSessionRecovery";
+import { useStreamRouteFilters } from "../hooks/useStreamRouteFilters";
+import {
+  DEFAULT_STREAM_ROUTE_FILTERS,
+  type StreamRouteFilters,
+} from "../lib/streamFilterParams";
+import { sanitizeStellarAddress } from "../data/streamRecords";
 import type { StreamRecord, StreamStatus } from "../data/streamRecords";
 import { useI18n } from "../i18n";
 import { MAX_LOADING_RETRIES } from "../components/Skeleton";
@@ -91,6 +97,9 @@ export interface StreamsDataResult {
   isAbortError: boolean;
 
   // ── Filter / sort state ───────────────────────────────────────────────────
+  routeFilters: StreamRouteFilters;
+  applyRouteFilters: (filters: StreamRouteFilters) => void;
+  resetRouteFilters: () => void;
   statusFilter: StatusFilter;
   setStatusFilter: (v: StatusFilter) => void;
   searchQuery: string;
@@ -226,9 +235,43 @@ export function useStreamsData(): StreamsDataResult {
   }, [refetch]);
 
   // ── Filter / sort state ────────────────────────────────────────────────────
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<StreamSortMode>("recent");
+  const {
+    filters: routeFilters,
+    setFilters,
+    resetFilters,
+  } = useStreamRouteFilters();
+  const {
+    status: statusFilter,
+    search: searchQuery,
+    sort: sortBy,
+    page: currentPage,
+    pageSize: itemsPerPage,
+  } = routeFilters;
+  const setStatusFilter = useCallback(
+    (status: StatusFilter) => setFilters({ status, page: 1 }),
+    [setFilters],
+  );
+  const setSearchQuery = useCallback(
+    (search: string) => setFilters({ search, page: 1 }, { replace: true }),
+    [setFilters],
+  );
+  const setSortBy = useCallback(
+    (sort: StreamSortMode) => setFilters({ sort, page: 1 }),
+    [setFilters],
+  );
+  const setCurrentPage = useCallback(
+    (page: number) => setFilters({ page }, { replace: true }),
+    [setFilters],
+  );
+  const setItemsPerPage = useCallback(
+    (pageSize: number) => setFilters({ pageSize, page: 1 }),
+    [setFilters],
+  );
+  const applyRouteFilters = useCallback(
+    (filters: StreamRouteFilters) => setFilters({ ...filters, page: 1 }),
+    [setFilters],
+  );
+  const resetRouteFilters = useCallback(() => resetFilters(), [resetFilters]);
 
   const filterLabels: Record<StatusFilter, string> = {
     All: t("streams.filter.all"),
@@ -236,10 +279,6 @@ export function useStreamsData(): StreamsDataResult {
     Paused: t("streams.filter.paused"),
     Completed: t("streams.filter.completed"),
   };
-
-  // ── Pagination state ───────────────────────────────────────────────────────
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // ── Card UI state ──────────────────────────────────────────────────────────
   const [expandedStreamId, setExpandedStreamId] = useState<string>("");
@@ -282,6 +321,7 @@ export function useStreamsData(): StreamsDataResult {
       return;
     }
 
+    const isAccountChange = hasCheckedSessionRef.current;
     const previousAccountAddress = recoveryAccountRef.current;
     if (previousAccountAddress && previousAccountAddress !== accountAddress) {
       clearStreamsSession(previousAccountAddress);
@@ -294,11 +334,8 @@ export function useStreamsData(): StreamsDataResult {
     setBannerState(null);
     setLiveDraft(null);
     setRestoredDraft(null);
-    setStatusFilter("All");
-    setSearchQuery("");
-    setSortBy("recent");
-    setCurrentPage(1);
-    setItemsPerPage(10);
+    if (isAccountChange)
+      setFilters(DEFAULT_STREAM_ROUTE_FILTERS, { replace: true });
     setLastSavedAt(null);
 
     if (!accountAddress) return;
@@ -313,7 +350,7 @@ export function useStreamsData(): StreamsDataResult {
       setDetectedSnapshot(snapshot);
       setBannerState("detected");
     }
-  }, [wallet.loading, walletAddress]);
+  }, [wallet.loading, walletAddress, setFilters]);
 
   const recoveryIdentityMatches =
     recoveryAccountRef.current === (walletAddress || null) && !wallet.loading;
@@ -409,15 +446,18 @@ export function useStreamsData(): StreamsDataResult {
       ? (filters.sortBy as StreamSortMode)
       : "recent";
 
-    setStatusFilter(restoredStatusFilter);
-    setSearchQuery(filters.searchQuery);
-    setSortBy(restoredSortBy);
-    setCurrentPage(Math.max(1, filters.currentPage));
-    setItemsPerPage(Math.max(1, filters.itemsPerPage));
+    setFilters({
+      ...DEFAULT_STREAM_ROUTE_FILTERS,
+      status: restoredStatusFilter,
+      search: filters.searchQuery,
+      sort: restoredSortBy,
+      page: Math.max(1, filters.currentPage),
+      pageSize: Math.max(1, filters.itemsPerPage),
+    });
 
     sessionResolvedRef.current = true;
     setBannerState("restored");
-  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress]);
+  }, [detectedSnapshot, recoveryIdentityMatches, walletAddress, setFilters]);
 
   const handleStartFreshSession = useCallback(() => {
     if (walletAddress) {
@@ -454,12 +494,35 @@ export function useStreamsData(): StreamsDataResult {
         const matchesSearch =
           stream.name.toLowerCase().includes(normalizedSearch) ||
           stream.id.toLowerCase().includes(normalizedSearch) ||
-          stream.recipientName.toLowerCase().includes(normalizedSearch);
-        return matchesStatus && matchesSearch;
+          stream.recipientName.toLowerCase().includes(normalizedSearch) ||
+          [stream.recipientAddress, stream.treasuryAddress].some((address) => {
+            const normalized = sanitizeStellarAddress(
+              address.toUpperCase(),
+            ).toLowerCase();
+            return (
+              normalized.length > 0 && normalized.includes(normalizedSearch)
+            );
+          });
+        const matchesRecipient =
+          !routeFilters.recipient ||
+          stream.recipientAddress === routeFilters.recipient;
+        const matchesTreasury =
+          !routeFilters.treasury ||
+          stream.treasuryAddress === routeFilters.treasury;
+        return (
+          matchesStatus && matchesSearch && matchesRecipient && matchesTreasury
+        );
       }),
       sortBy,
     );
-  }, [searchQuery, sortBy, statusFilter, streams]);
+  }, [
+    searchQuery,
+    sortBy,
+    statusFilter,
+    streams,
+    routeFilters.recipient,
+    routeFilters.treasury,
+  ]);
 
   // Auto-clamp page when total pages shrink below currentPage.
   useEffect(() => {
@@ -467,10 +530,16 @@ export function useStreamsData(): StreamsDataResult {
       1,
       Math.ceil(visibleStreams.length / itemsPerPage),
     );
-    if (currentPage > totalPages) {
+    if (!loading && currentPage > totalPages) {
       setCurrentPage(1);
     }
-  }, [visibleStreams.length, itemsPerPage, currentPage]);
+  }, [
+    visibleStreams.length,
+    itemsPerPage,
+    currentPage,
+    loading,
+    setCurrentPage,
+  ]);
 
   const paginatedStreams = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -536,7 +605,15 @@ export function useStreamsData(): StreamsDataResult {
     }, FILTER_ANNOUNCEMENT_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [announce, searchQuery, sortBy, statusFilter, visibleStreams.length]);
+  }, [
+    announce,
+    searchQuery,
+    sortBy,
+    statusFilter,
+    visibleStreams.length,
+    routeFilters.recipient,
+    routeFilters.treasury,
+  ]);
 
   // ── Abort-error guard ──────────────────────────────────────────────────────
   const isAbortError = Boolean(error && (error as any) instanceof Error && (error as any).name === "AbortError");
@@ -560,6 +637,9 @@ export function useStreamsData(): StreamsDataResult {
     isAbortError,
 
     // filter state
+    routeFilters,
+    applyRouteFilters,
+    resetRouteFilters,
     statusFilter,
     setStatusFilter,
     searchQuery,

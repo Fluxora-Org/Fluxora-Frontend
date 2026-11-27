@@ -10,7 +10,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../i18n";
 import { E2E_FORCE_SHARE_FAILURE } from "../lib/config";
 const CreateStreamModal = lazy(() => import("../components/CreateStreamModal"));
@@ -23,8 +23,10 @@ import StreamsLoading from "../components/StreamsLoading";
 import StreamTimeline from "../components/StreamTimeline";
 import ZeroAccrualBanner from "../components/ZeroAccrualBanner";
 import SessionRecoveryBanner from "../components/SessionRecoveryBanner";
+import { serializeStreamRouteFilters } from "../lib/streamFilterParams";
 import { isDraftMeaningful } from "../lib/streamsSessionRecovery";
 import CreateStreamFab from "../components/CreateStreamFab";
+import { SavedStreamViews } from "../components/Streams/SavedStreamViews";
 import { StreamsListPanel } from "../components/Streams/StreamsListPanel";
 import {
   ConfirmModal,
@@ -802,6 +804,7 @@ export default function Streams() {
   const { t } = useI18n();
 
   // ── All data + filter logic lives in the hook ──────────────────────────────
+  const filterNavigationKey = useLocation().key;
   const data = useStreamsData();
 
   const {
@@ -815,6 +818,9 @@ export default function Streams() {
     isAbortError,
     statusFilter,
     setStatusFilter,
+    routeFilters,
+    applyRouteFilters,
+    resetRouteFilters,
     searchQuery,
     setSearchQuery,
     sortBy,
@@ -854,6 +860,7 @@ export default function Streams() {
     alertAnnouncement,
     clearResolvedOptimisticOps,
   } = data;
+  const streamRouteSearch = serializeStreamRouteFilters(routeFilters, { prefix: true });
 
   const visibleError = isAbortError ? null : error;
   const {
@@ -1148,9 +1155,9 @@ export default function Streams() {
   const handleOpenStreamDetail = useCallback(
     (id: string) => {
       resolveSessionOnInteraction();
-      navigate(`/app/streams/${id}`);
+      navigate(`/app/streams/${id}${streamRouteSearch}`);
     },
-    [navigate, resolveSessionOnInteraction],
+    [navigate, resolveSessionOnInteraction, streamRouteSearch],
   );
 
   const handleAnnounceStreamToggle = useCallback(
@@ -1177,17 +1184,8 @@ export default function Streams() {
    */
   const handleClearFilters = useCallback(() => {
     resolveSessionOnInteraction();
-    setSearchQuery("");
-    setStatusFilter("All");
-    setSortBy("recent");
-    setCurrentPage(1);
-  }, [
-    resolveSessionOnInteraction,
-    setSearchQuery,
-    setStatusFilter,
-    setSortBy,
-    setCurrentPage,
-  ]);
+    resetRouteFilters();
+  }, [resolveSessionOnInteraction, resetRouteFilters]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const selectedStream = streamId
@@ -1225,7 +1223,7 @@ export default function Streams() {
         <MetaTags title="Streams" />
         <StreamNotFound
           streamId={streamId}
-          onBack={() => navigate("/app/streams")}
+          onBack={() => navigate(`/app/streams${streamRouteSearch}`)}
           onCreateStream={handleCreateStream}
         />
 
@@ -1285,7 +1283,7 @@ export default function Streams() {
       {selectedStream ? (
         <StreamDetail
           stream={selectedStream}
-          onBack={() => navigate("/app/streams")}
+          onBack={() => navigate(`/app/streams${streamRouteSearch}`)}
           onCreateSimilar={handleCreateStream}
           onCopyAddress={() => void handleCopyRecipient(selectedStream)}
         />
@@ -1318,7 +1316,7 @@ export default function Streams() {
               <button
                 type="button"
                 className="streams-secondary-button"
-                onClick={() => navigate(`/app/streams/${streams[0]?.id}`)}
+                onClick={() => navigate(`/app/streams/${streams[0]?.id}${streamRouteSearch}`)}
               >
                 {t("streams.hero.featuredBtn")}
               </button>
@@ -1351,7 +1349,7 @@ export default function Streams() {
                 }
                 onAction={() => {
                   const first = streams.find((s) => s.status === "Active");
-                  if (first) navigate(`/app/streams/${first.id}`);
+                  if (first) navigate(`/app/streams/${first.id}${streamRouteSearch}`);
                 }}
                 actionLabel={
                   zeroAccrualReason === "rate-zero"
@@ -1389,6 +1387,13 @@ export default function Streams() {
           </section>
 
           {/* ── Streams list shell — pure presentation via StreamsListPanel ── */}
+          <SavedStreamViews
+            key={walletAddress ?? ""}
+            account={walletAddress ?? ""}
+            filters={routeFilters}
+            onApply={applyRouteFilters}
+            onInteraction={resolveSessionOnInteraction}
+          />
           <StreamsListPanel
             titleText={t("streams.list.title")}
             subtitleText={t("streams.list.subtitle")}
@@ -1405,6 +1410,7 @@ export default function Streams() {
             statusFilter={statusFilter}
             statusFilters={STATUS_FILTERS}
             filterLabels={filterLabels}
+            searchResetKey={filterNavigationKey}
             searchQuery={searchQuery}
             sortBy={sortBy}
             currentPage={currentPage}

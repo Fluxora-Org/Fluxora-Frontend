@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
+import { parseStreamRouteFilters, serializeStreamRouteFilters } from "../lib/streamFilterParams";
 import { getStreamById } from "../lib/api/streamsService";
 import type { StreamRecord } from "../data/streamRecords";
 import { verifyStreamOnChain, type StreamVerification } from "../lib/stellar/read";
@@ -244,8 +245,9 @@ export default function StreamDetail() {
   const { t } = useI18n();
   const { streamId } = useParams<{ streamId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const listQuery = serializeStreamRouteFilters(parseStreamRouteFilters(searchParams));
+  const streamsListPath = `/app/streams${listQuery ? `?${listQuery}` : ""}`;
   const { address: accountId, connected } = useWallet();
-  const { t } = useI18n();
   const { viewers, isPresenceEnabled, updateCursor, isLoading } =
     usePresenceViewers(streamId, undefined, accountId ?? undefined);
 
@@ -568,7 +570,7 @@ export default function StreamDetail() {
         <div style={{ padding: "0.75rem 1.5rem 0" }}>
           <Breadcrumb
             items={[
-              { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+              { label: t("streamDetail.breadcrumb.streams"), to: streamsListPath },
               { label: t("streamDetail.breadcrumb.compare") },
             ]}
           />
@@ -579,7 +581,7 @@ export default function StreamDetail() {
           rightId={decodeURIComponent(compareWithId)}
           onExit={() => {
             // Remove compare param — return to single-stream view
-            setSearchParams({});
+            setSearchParams(listQuery);
           }}
         />
       </div>
@@ -588,7 +590,7 @@ export default function StreamDetail() {
 
   // ── Single-stream loading ─────────────────────────────────────────────────
   const breadcrumbItems = [
-    { label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" },
+    { label: t("streamDetail.breadcrumb.streams"), to: streamsListPath },
     { label: stream?.name ?? streamId ?? t("streamDetail.breadcrumb.stream") },
   ];
 
@@ -657,7 +659,7 @@ export default function StreamDetail() {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
         <Breadcrumb
-          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: streamsListPath }]}
         />
         <div
           role="alert"
@@ -687,7 +689,7 @@ export default function StreamDetail() {
             {t("streamDetail.action.tryAgain")}
           </button>
           <Link
-            to="/app/streams"
+            to={streamsListPath}
             style={{
               display: "inline-block",
               padding: "0.5rem 1rem",
@@ -706,7 +708,7 @@ export default function StreamDetail() {
     return (
       <div data-testid="stream-detail-page" style={{ padding: "1.5rem" }}>
         <Breadcrumb
-          items={[{ label: t("streamDetail.breadcrumb.streams"), to: "/app/streams" }]}
+          items={[{ label: t("streamDetail.breadcrumb.streams"), to: streamsListPath }]}
         />
         <div
           style={{
@@ -738,7 +740,7 @@ export default function StreamDetail() {
             </code>{" "}
             {t("streamDetail.notFound.afterCode")}
           </p>
-          <Link to="/app/streams">{t("streamDetail.action.backToStreams")}</Link>
+          <Link to={streamsListPath}>{t("streamDetail.action.backToStreams")}</Link>
         </div>
       </div>
     );
@@ -929,12 +931,6 @@ export default function StreamDetail() {
 
         {/* Header Actions */}
         <div
-        {/* Share & Social Preview Card Trigger */}
-        <button
-          ref={shareTriggerRef}
-          onClick={() => setIsOgModalOpen(true)}
-          data-testid="share-og-preview-btn"
-          aria-label={t("streamDetail.share.ariaLabel", { name: stream.name })}
           style={{
             display: "flex",
             alignItems: "center",
@@ -982,7 +978,7 @@ export default function StreamDetail() {
             ref={shareTriggerRef}
             onClick={() => setIsOgModalOpen(true)}
             data-testid="share-og-preview-btn"
-            aria-label={`Share ${stream.name} and preview social card`}
+            aria-label={t("streamDetail.share.ariaLabel", { name: stream.name })}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -999,7 +995,7 @@ export default function StreamDetail() {
             }}
           >
             <Share2 size={16} />
-            <span>Share / Preview Card</span>
+            <span>{t("streamDetail.share.button")}</span>
           </button>
 
           <span
@@ -1011,9 +1007,6 @@ export default function StreamDetail() {
             {calendarStatus}
           </span>
         </div>
-          <Share2 size={16} />
-          <span>{t("streamDetail.share.button")}</span>
-        </button>
       </div>
 
       {/* Presence Badge Container */}

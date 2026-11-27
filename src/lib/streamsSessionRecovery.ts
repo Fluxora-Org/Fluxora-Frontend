@@ -9,8 +9,6 @@
  * account's cached session.
  */
 
-export const STREAMS_SESSION_STORAGE_KEY_PREFIX = "fluxora_streams_session_v2";
-
 import {
   createStorageWriteStatus,
   getBrowserStorage,
@@ -62,9 +60,6 @@ export interface StreamsSessionSnapshot {
 }
 
 type StorageReader = Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>;
-export const STREAMS_SESSION_SCHEMA_VERSION = 2 as const;
-
-type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const DEFAULT_STREAMS_FILTERS: StreamsFilterSnapshot = {

@@ -89,6 +89,8 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "html"],
       include: [
+        "src/lib/savedStreamViews.ts",
+        "src/components/Streams/SavedStreamViews.tsx",
         // Public landing page and its lazy-section infrastructure
         "src/pages/Home.tsx",
         "src/components/GlowingDot.tsx",

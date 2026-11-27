@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   ALLOWED_PAGE_SIZES,
@@ -360,4 +361,64 @@ describe("streamFilterParams", () => {
       });
     });
   });
+});
+
+describe("canonical query properties", () => {
+  it("round-trips arbitrary literal queries, including percent encodings", () => {
+    fc.assert(
+      fc.property(fc.string(), (search) => {
+        const canonical = serializeStreamRouteFilters({ search });
+        expect(
+          serializeStreamRouteFilters(parseStreamRouteFilters(canonical)),
+        ).toBe(canonical);
+      }),
+      { numRuns: 1000 },
+    );
+    for (const search of [
+      "%20",
+      "%2520",
+      "#?&+",
+      ".*",
+      "x".repeat(500),
+      " a b ",
+    ]) {
+      expect(
+        parseStreamRouteFilters(serializeStreamRouteFilters({ search })).search,
+      ).toBe(parseSearchFilter(search));
+    }
+  });
+  it("round-trips typed combinations and whitelists arbitrary URL input", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          status: fc.constantFrom("All", "Active", "Paused", "Completed"),
+          search: fc.string(),
+          sort: fc.constantFrom("recent", "name", "rate"),
+          page: fc.integer({ min: 1, max: 10000 }),
+          pageSize: fc.integer({ min: 1, max: 100 }),
+        }),
+        (value) => {
+          const filters = value as StreamRouteFilters;
+          const canonical = serializeStreamRouteFilters(filters);
+          expect(parseStreamRouteFilters(canonical)).toEqual({
+            ...filters,
+            search: parseSearchFilter(filters.search),
+            recipient: undefined,
+            treasury: undefined,
+          });
+        },
+      ),
+      { numRuns: 500 },
+    );
+  });
+});
+
+it("caps Unicode queries without splitting characters or throwing on lone surrogates", () => {
+  const unicode = fc.array(fc.integer({ min: 0, max: 0xffff }), { maxLength: 200 }).map((codes) => String.fromCharCode(...codes));
+  fc.assert(fc.property(unicode, (search) => {
+    const canonical = serializeStreamRouteFilters({ search });
+    expect(serializeStreamRouteFilters(parseStreamRouteFilters(canonical))).toBe(canonical);
+    expect(parseStreamRouteFilters(canonical).search.length).toBeLessThanOrEqual(120);
+  }), { numRuns: 500 });
+  expect(parseSearchFilter("x".repeat(119) + "\u{1F600}")).toBe("x".repeat(119));
 });

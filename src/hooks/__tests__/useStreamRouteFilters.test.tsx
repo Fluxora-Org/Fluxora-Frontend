@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { useStreamRouteFilters } from "../useStreamRouteFilters";
 import { DEFAULT_STREAM_ROUTE_FILTERS } from "../../lib/streamFilterParams";
@@ -300,5 +300,35 @@ describe("useStreamRouteFilters", () => {
 
       expect(result.current.filters).toEqual(DEFAULT_STREAM_ROUTE_FILTERS);
     });
+  });
+});
+
+it("composes batched updates and follows browser back navigation", () => {
+  const { result } = renderHook(
+    () => ({
+      route: useStreamRouteFilters(),
+      navigate: useNavigate(),
+      location: useLocation(),
+    }),
+    { wrapper: createWrapper() },
+  );
+  act(() => {
+    result.current.route.setFilters({ status: "Paused" });
+    result.current.route.setFilters({ search: "%20" }, { replace: true });
+  });
+  expect(result.current.route.filters).toMatchObject({
+    status: "Paused",
+    search: "%20",
+  });
+  expect(result.current.location.search).toContain("q=%2520");
+  act(() => result.current.navigate(-1));
+  expect(result.current.route.filters).toEqual(DEFAULT_STREAM_ROUTE_FILTERS);
+  act(() => {
+    result.current.route.resetFilters();
+    result.current.route.setFilters({ search: "next" });
+  });
+  expect(result.current.route.filters).toMatchObject({
+    status: "All",
+    search: "next",
   });
 });

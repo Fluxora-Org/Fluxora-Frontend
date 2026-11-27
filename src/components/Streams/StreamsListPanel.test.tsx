@@ -15,7 +15,7 @@
  *  9. Accessibility — group/region roles, aria-label attributes
  */
 
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StreamsListPanel } from "./StreamsListPanel";
 import type { StreamsListPanelProps } from "./StreamsListPanel";
@@ -244,14 +244,14 @@ describe("StreamsListPanel — search input", () => {
     expect(screen.getByRole("textbox", { name: "Search streams" })).toHaveValue("alice");
   });
 
-  it("calls onSearchChange with the new value when the input changes", () => {
+  it("calls onSearchChange after the input debounce", async () => {
     const onSearchChange = vi.fn();
     render(<StreamsListPanel {...buildProps({ onSearchChange })} />);
     fireEvent.change(
       screen.getByRole("textbox", { name: "Search streams" }),
       { target: { value: "charlie" } },
     );
-    expect(onSearchChange).toHaveBeenCalledWith("charlie");
+    await waitFor(() => expect(onSearchChange).toHaveBeenCalledWith("charlie"));
   });
 });
 

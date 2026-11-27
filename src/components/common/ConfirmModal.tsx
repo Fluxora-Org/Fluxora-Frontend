@@ -92,24 +92,24 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
     document.addEventListener("keydown", handleTab);
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", handleTab);
       previousActiveElementRef.current?.focus();
       previousActiveElementRef.current = null;
     };
-  }, [isOpen]);
+  }, [isOpen, requireExplicitConfirmation]);
 
   useEffect(() => {
     if (!isOpen) return;
     const focusTimer = window.setTimeout(() => {
-      if (status === "idle") {
+      if (status === "idle" && !requireExplicitConfirmation) {
         confirmBtnRef.current?.focus();
       } else if (status === "pending") {
         modalRef.current?.focus();
       }
     }, 50);
     return () => window.clearTimeout(focusTimer);
-  }, [isOpen, status]);
-  }, [isOpen, requireExplicitConfirmation]);
+  }, [isOpen, status, requireExplicitConfirmation]);
 
   // Escape key handler
   useEffect(() => {

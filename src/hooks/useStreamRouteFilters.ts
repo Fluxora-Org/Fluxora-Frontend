@@ -1,6 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  DEFAULT_STREAM_ROUTE_FILTERS,
   parseStreamRouteFilters,
   serializeStreamRouteFilters,
   type StreamRouteFilters,
@@ -38,6 +39,9 @@ export function useStreamRouteFilters(): UseStreamRouteFiltersResult {
     return parseStreamRouteFilters(searchParams);
   }, [searchParams]);
 
+  const latestFilters = useRef(filters);
+  latestFilters.current = filters;
+
   const setFilters = useCallback(
     (
       updater:
@@ -46,21 +50,28 @@ export function useStreamRouteFilters(): UseStreamRouteFiltersResult {
       options?: { replace?: boolean; serializeOptions?: SerializeOptions },
     ) => {
       const nextPartial =
-        typeof updater === "function" ? updater(filters) : updater;
-      const merged: StreamRouteFilters = { ...filters, ...nextPartial };
+        typeof updater === "function"
+          ? updater(latestFilters.current)
+          : updater;
+      const merged: StreamRouteFilters = {
+        ...latestFilters.current,
+        ...nextPartial,
+      };
       const serialized = serializeStreamRouteFilters(
         merged,
         options?.serializeOptions ?? { omitDefaults: true },
       );
+      latestFilters.current = parseStreamRouteFilters(serialized);
       setSearchParams(new URLSearchParams(serialized), {
         replace: options?.replace ?? false,
       });
     },
-    [filters, setSearchParams],
+    [setSearchParams],
   );
 
   const resetFilters = useCallback(
     (options?: { replace?: boolean }) => {
+      latestFilters.current = { ...DEFAULT_STREAM_ROUTE_FILTERS };
       setSearchParams(new URLSearchParams(), {
         replace: options?.replace ?? false,
       });
