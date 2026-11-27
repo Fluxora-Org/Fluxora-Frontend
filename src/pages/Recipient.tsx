@@ -621,13 +621,22 @@ export default function Recipient() {
       };
       setReceiptData(newReceipt);
       setShowReceiptModal(true);
-      addToast("Withdrawal completed successfully on-chain!", "success", 0);
+      addToast("Withdrawal completed successfully on-chain!", "success", {
+        timeout: 0,
+        persist: {
+          kind: "withdraw",
+          reference: typeof txRes === "string" ? txRes : undefined,
+        },
+      });
       timerRef.current = setTimeout(() => setTxState("idle"), 5000);
     } catch (err: unknown) {
       const error = err as Error;
       setTxState("error");
       setErrorMsg(error.message || "Withdrawal failed.");
-      addToast(`Withdrawal failed: ${error.message || error}`, "error", 0);
+      addToast(`Withdrawal failed: ${error.message || error}`, "error", {
+        timeout: 0,
+        persist: { kind: "transaction-failed" },
+      });
     }
   };
 

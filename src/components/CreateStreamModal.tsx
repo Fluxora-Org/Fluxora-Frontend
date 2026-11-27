@@ -578,7 +578,10 @@ export default function CreateStreamModal({
     } catch (err) {
       const message = getStreamErrorMessage(err);
       setStreamError(message);
-      addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
+      addToast(t("createStream.error.failedWithMessage", { message }), "error", {
+        timeout: 0,
+        persist: { kind: "transaction-failed" },
+      });
       onStreamError?.(err);
     } finally {
       submitInFlightRef.current = false;
@@ -609,12 +612,25 @@ export default function CreateStreamModal({
 
     if (flushedFromQueueRef.current) {
       flushedFromQueueRef.current = false;
-      addToast(t("createStream.queue.flushSuccessToast"), "success", 0, {
-        label: t("createStream.queue.viewStreamAction"),
-        onClick: () => onStreamCreated?.(createdData),
+      addToast(t("createStream.queue.flushSuccessToast"), "success", {
+        timeout: 0,
+        action: {
+          label: t("createStream.queue.viewStreamAction"),
+          onClick: () => onStreamCreated?.(createdData),
+        },
+        persist: {
+          kind: "stream-created",
+          reference: submittedTxHash ?? undefined,
+        },
       });
     } else {
-      addToast(t("createStream.success.message"), "success", 0);
+      addToast(t("createStream.success.message"), "success", {
+        timeout: 0,
+        persist: {
+          kind: "stream-created",
+          reference: submittedTxHash ?? undefined,
+        },
+      });
     }
     onStreamCreated?.(createdData);
     onClose();
@@ -1056,7 +1072,10 @@ export default function CreateStreamModal({
       } catch (err) {
         const message = getStreamErrorMessage(err);
         setStreamError(message);
-        addToast(t("createStream.error.failedWithMessage", { message }), "error", 0);
+        addToast(t("createStream.error.failedWithMessage", { message }), "error", {
+          timeout: 0,
+          persist: { kind: "transaction-failed" },
+        });
         onStreamError?.(err);
       }
     }
@@ -1491,14 +1510,16 @@ export default function CreateStreamModal({
     }
     setIsBulkSubmitting(false);
     if (failCount === 0) {
-      addToast(`${successCount} of ${validRows.length} streams created successfully.`, 'success');
+      addToast(`${successCount} of ${validRows.length} streams created successfully.`, 'success', {
+        persist: { kind: 'stream-created' },
+      });
       onStreamCreated?.();
       onClose();
     } else {
       addToast(
           `${successCount} of ${validRows.length} streams created. ${failCount} failed.`,
           'error',
-          0
+          { timeout: 0, persist: { kind: 'transaction-failed' } },
         );
     }
   };

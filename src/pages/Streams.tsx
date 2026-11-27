@@ -914,7 +914,7 @@ export default function Streams() {
       addToast(
         "A pending stream operation did not confirm on-chain and has been reverted.",
         "error",
-        0
+        { timeout: 0, persist: { kind: "transaction-failed" } },
       );
     }
     rolledBackToastRef.current = rolledBackCount;
@@ -1082,7 +1082,9 @@ export default function Streams() {
       const message =
         error instanceof Error ? error.message : "The bulk action could not start.";
       announceAlert(message);
-      addToast(message, "error");
+      addToast(message, "error", {
+        persist: { kind: "transaction-failed" },
+      });
       setBulkActionIntent(null);
       setBulkTransactionStatus("idle");
       setBulkProgress(null);

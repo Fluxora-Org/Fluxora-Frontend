@@ -22,6 +22,27 @@ pnpm audit --prod   # cross-check against the pnpm lockfile
 npm run build       # confirm the change doesn't affect the production bundle
 ```
 
+## Automated dependency updates
+
+Dependabot is configured in `.github/dependabot.yml` for the `npm` ecosystem
+(which reads the pnpm lockfile at the repository root) and for
+`github-actions`. Both run weekly and cap the number of open update PRs at 5.
+Minor and patch npm updates are grouped, with dedicated groups for
+`@types/*`, `eslint*`, and `@playwright/test`; GitHub Actions minor and patch
+updates are grouped as well.
+
+`@playwright/test` is pinned exactly at `1.61.0` in `package.json`. Major
+bumps are ignored because they can require coordinated changes to Playwright
+browser binaries and CI images, so they need a deliberate, separately reviewed
+update rather than an automatic PR.
+
+Dependabot PRs are never auto-merged. Every update PR must pass
+`npm run audit:supply-chain` before merge. If an update introduces a new
+high/critical vulnerability or a license outside the allowlist, either choose
+a different version or deliberately update
+`scripts/supply-chain-baseline.json` with a `reason` and `reviewBy` date, as
+described in the baseline section below.
+
 ## Design decisions
 
 ### 1. Severity threshold: `high`

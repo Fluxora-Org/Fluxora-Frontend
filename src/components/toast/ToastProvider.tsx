@@ -15,12 +15,21 @@ import ToastNotification, {
   type ToastSoundPreference,
   type ToastVariant,
 } from "../ToastNotification";
+import {
+  recordNotification,
+  type NotificationKind,
+} from "../../lib/notificationHistory";
 
-export type { ToastVariant, ToastSoundPreference };
+export type { ToastVariant, ToastSoundPreference, NotificationKind };
 
 export interface ToastAction {
   label: string;
   onClick: () => void;
+}
+
+export interface NotificationPersistence {
+  kind?: NotificationKind;
+  reference?: string;
 }
 
 export interface ToastOptions {
@@ -30,6 +39,7 @@ export interface ToastOptions {
   id?: string;
   /** Explicit flag indicating whether acknowledgement is required before auto-dismissal. */
   requiresAck?: boolean;
+  persist?: boolean | NotificationPersistence;
 }
 
 export interface Toast {
@@ -172,6 +182,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return toastId;
         }
         recentToasts.current.push({ message, variant, timestamp: now });
+      }
+
+      if (opts.persist) {
+        const settings = typeof opts.persist === "object" ? opts.persist : {};
+        recordNotification({
+          message,
+          variant,
+          kind: settings.kind,
+          reference: settings.reference,
+        });
       }
 
       setToasts((prev) => {

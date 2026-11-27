@@ -11,6 +11,9 @@ import ThemeSegmentedControl from "./ThemeSegmentedControl";
 import LanguagePicker from "./LanguagePicker";
 import { KeyboardShortcutsModal } from "../KeyboardShortcutsModal";
 import TimezoneIndicator from "./TimezoneIndicator";
+import NotificationCenter from "./NotificationCenter";
+
+export { NotificationCenter } from "./NotificationCenter";
 
 interface AppNavbarProps {
   onSidebarToggle?: () => void;
@@ -435,6 +438,11 @@ export default function AppNavbar({
         {/* Right Actions & Time Indicator */}
         <div className="flex items-center gap-3">
           <TimezoneIndicator />
+          <NotificationCenter
+            address={address}
+            network={network}
+            connected={connected}
+          />
 
           {/* Right: Actions (desktop) */}
           <div className="hidden md:flex items-center gap-3">

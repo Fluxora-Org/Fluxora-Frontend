@@ -135,6 +135,9 @@ export default defineConfig({
         "src/utils/contrastUtils.ts",
         // Dynamic favicon badge
         "src/utils/faviconBadge.ts",
+        // Persistent notification centre
+        "src/lib/notificationHistory.ts",
+        "src/components/navigation/NotificationCenter.tsx",
         // Activity Heatmap
         "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
         // Treasury flow Sankey diagram
