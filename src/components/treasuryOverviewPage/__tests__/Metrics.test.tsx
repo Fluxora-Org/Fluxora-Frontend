@@ -135,6 +135,8 @@ describe("Metrics", () => {
 
     beforeEach(() => {
       originalInnerWidth = window.innerWidth;
+      // Reorders persist to localStorage; start each case from the default order.
+      localStorage.clear();
     });
 
     afterEach(() => {

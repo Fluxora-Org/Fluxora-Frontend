@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import type { Metric } from "../components/treasuryOverviewPage/Metric";
+import type { Metric, MetricToken } from "../components/treasuryOverviewPage/Metric";
 import type { Stream } from "../components/treasuryOverviewPage/Stream";
 import Icon from "../assets/Icon.png";
 import Icon1 from "../assets/Icon(1).png";
@@ -80,4 +80,17 @@ export const treasuryDemoStreams: Stream[] = [
     status: "Completed",
     startDate: "2026-05-10",
   },
+];
+
+/**
+ * Demo per-asset breakdown of "Total Streaming" (sums to 48,500) for the
+ * asset-allocation treemap. Kept separate from `treasuryDemoMetrics` so the
+ * metric cards keep rendering their single headline value.
+ */
+export const treasuryDemoAssetAllocation: MetricToken[] = [
+  { asset: "USDC", amount: 31200 },
+  { asset: "XLM", amount: 9800 },
+  { asset: "EURC", amount: 6100 },
+  { asset: "AQUA", amount: 750 },
+  { asset: "yXLM", amount: 650 },
 ];

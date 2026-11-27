@@ -1,10 +1,21 @@
 import { useMemo, useRef } from "react";
 import {
+  treasuryDemoAssetAllocation,
   treasuryDemoMetrics,
   treasuryDemoStreams,
 } from "../../fixtures/treasury";
 import type { StreamRecord } from "../../data/streamRecords";
-import type { Metric } from "./Metric";
+import type { Metric, MetricToken } from "./Metric";
+
+/** Metric whose per-asset tokens feed the asset-allocation treemap. */
+export const ASSET_ALLOCATION_METRIC_LABEL = "Total Streaming";
+const NO_TOKENS: MetricToken[] = [];
+
+/** Pick the token breakdown the asset-allocation treemap visualises. */
+export function selectAllocationTokens(metrics: readonly Metric[] | null | undefined): MetricToken[] {
+  const source = (metrics ?? []).find((m) => m.label === ASSET_ALLOCATION_METRIC_LABEL);
+  return source?.tokens ?? NO_TOKENS;
+}
 import type { Stream } from "./Stream";
 import { useTreasury } from "./useTreasury";
 import { formatAssetAmount } from "../../lib/formatters";
@@ -18,6 +29,11 @@ import {
 export interface TreasuryOverviewData {
   metrics: Metric[];
   streams: Stream[];
+  /**
+   * Per-asset breakdown of treasury value for the asset-allocation treemap
+   * (the "Total Streaming" metric's tokens; a fixture in demo mode).
+   */
+  assetAllocation: MetricToken[];
   isDemoMode: boolean;
   loading: boolean;
   error: string | null;
@@ -103,6 +119,7 @@ export function useTreasuryOverviewData(
       return {
         metrics: treasuryDemoMetrics,
         streams: treasuryDemoStreams,
+        assetAllocation: treasuryDemoAssetAllocation,
         isDemoMode: true,
         loading: false,
         error: null,
@@ -116,6 +133,7 @@ export function useTreasuryOverviewData(
     return {
       metrics: treasury.metrics,
       streams: treasury.streams.map(toLegacyStream),
+      assetAllocation: selectAllocationTokens(treasury.metrics),
       isDemoMode: false,
       loading: treasury.loading,
       error: treasury.error,

@@ -40,6 +40,12 @@ export interface MetricCardProps extends Metric {
   onHide?: () => void;
   currentSize?: "1x1" | "2x1";
   reorderButtons?: React.ReactNode;
+  /**
+   * Custom widget body (e.g. a chart). When provided it replaces the value,
+   * sparkline and description block; the card chrome (drag handle, move and
+   * kebab menus) is unchanged.
+   */
+  children?: React.ReactNode;
   moveMenuOptions?: {
     onMoveLeft?: () => void;
     onMoveRight?: () => void;
@@ -73,6 +79,7 @@ export default function MetricCard({
   currentSize = "1x1",
   reorderButtons,
   moveMenuOptions,
+  children,
 }: MetricCardProps) {
   const { theme } = useOptionalTheme();
   const [canDrag, setCanDrag] = useState(false);
@@ -436,6 +443,12 @@ export default function MetricCard({
         {label}
       </div>
 
+      {children !== undefined ? (
+        <div className="metric-card-body" style={{ minWidth: 0, flex: 1 }}>
+          {children}
+        </div>
+      ) : (
+      <>
       <div
         className="text-2xl font-semibold leading-8 mb-2 flex flex-col gap-1"
         style={{
@@ -478,6 +491,8 @@ export default function MetricCard({
       >
         {desc}
       </p>
+      </>
+      )}
 
       {/* Shared Kebab / Context Menu Popup */}
       {menuState.isOpen && (

@@ -139,6 +139,10 @@ export default defineConfig({
         "src/components/treasuryOverviewPage/ActivityHeatmap.tsx",
         // Treasury flow Sankey diagram
         "src/components/treasuryOverviewPage/TreasuryFlowSankey.tsx",
+        // Treasury asset-allocation treemap (#2048)
+        "src/components/treasuryOverviewPage/TreasuryAssetTreemap.tsx",
+        "src/components/treasuryOverviewPage/treemapLayout.ts",
+        "src/components/treasuryOverviewPage/assetAllocation.ts",
         // Presence feature
         "src/components/presence/PresenceBadge.tsx",
         "src/components/presence/PresenceViewerList.tsx",
