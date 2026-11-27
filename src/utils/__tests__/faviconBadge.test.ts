@@ -114,7 +114,7 @@ describe("faviconBadge utility", () => {
 
     it("restores original icon href when count is reset to 0", () => {
       document.head.innerHTML =
-        '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+        '<link id="favicon" rel="icon" type="image/svg+xml" href="/Icon.svg" />';
 
       // Update to unread 5
       updateFaviconBadge(5);
@@ -123,19 +123,19 @@ describe("faviconBadge utility", () => {
 
       // Update to 0
       updateFaviconBadge(0);
-      expect(updatedLink.getAttribute("href")).toBe("/src/public/Icon.svg");
+      expect(updatedLink.getAttribute("href")).toBe("/Icon.svg");
       expect(updatedLink.getAttribute("type")).toBe("image/svg+xml");
     });
 
     it("resetFaviconBadge restores original favicon", () => {
       document.head.innerHTML =
-        '<link id="favicon" rel="icon" type="image/svg+xml" href="/src/public/Icon.svg" />';
+        '<link id="favicon" rel="icon" type="image/svg+xml" href="/Icon.svg" />';
 
       updateFaviconBadge(7);
       resetFaviconBadge();
 
       const link = document.querySelector("link#favicon") as HTMLLinkElement;
-      expect(link.getAttribute("href")).toBe("/src/public/Icon.svg");
+      expect(link.getAttribute("href")).toBe("/Icon.svg");
     });
   });
 });

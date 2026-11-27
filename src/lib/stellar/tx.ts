@@ -1,6 +1,7 @@
 import {
   Address,
   Contract,
+  ScInt,
   TransactionBuilder,
   Networks,
   rpc as SorobanRpc,
@@ -85,6 +86,32 @@ export function decodeContractError(value: unknown): TransactionError | null {
 }
 
 /**
+ * Extracts a human-readable message from an unknown thrown value.
+ */
+export function toErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  if (err !== null && typeof err === "object") {
+    if ("message" in err && typeof (err as { message?: unknown }).message === "string") {
+      return (err as { message: string }).message;
+    }
+    if ("error" in err && typeof (err as { error?: unknown }).error === "string") {
+      return (err as { error: string }).error;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
+/**
  * Maps wallet signing errors to a TransactionError.
  * Checks the shared wallet error categories first (`user_rejected`, popup
  * blocked, timeout), then falls back to word-boundary-anchored keyword matching
@@ -93,9 +120,13 @@ export function decodeContractError(value: unknown): TransactionError | null {
  * network timeouts surfaced through an extension bridge) are never misreported
  * as user-declined.
  */
-function mapWalletSigningError(err: any, walletName: string): TransactionError {
-  const maybeErr = err as { code?: string };
-  if (maybeErr.code && maybeErr.code === "user_rejected") {
+function mapWalletSigningError(err: unknown, walletName: string): TransactionError {
+  if (
+    err !== null &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "user_rejected"
+  ) {
     return new TransactionError(
       "rejected",
       "Transaction signature request was declined by the user.",
@@ -129,7 +160,7 @@ function mapWalletSigningError(err: any, walletName: string): TransactionError {
     }
   }
 
-  const errMsg = String(err);
+  const errMsg = toErrorMessage(err);
   const rejectionKeywords = [/\breject(?:ed)?\b/i, /\bdecline\b/i, /\bcancel\b/i, /\bdismiss\b/i];
   if (rejectionKeywords.some((pattern) => pattern.test(errMsg))) {
     return new TransactionError(
@@ -163,8 +194,20 @@ export function getNetworkPassphrase(networkName: string): string {
 function encodeU64(val: string | number): xdr.ScVal {
   try {
     return xdr.ScVal.scvU64(xdr.Uint64.fromString(String(val)));
+  } catch (err: unknown) {
+    throw new TransactionError("simulation", `Failed to encode value as u64 ScVal: ${val}. Error: ${toErrorMessage(err)}`);
+  }
+}
+
+/**
+ * Encodes an integer string as an i128 ScVal for contract token amounts.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for scaling rules.
+ */
+function encodeI128(val: string): xdr.ScVal {
+  try {
+    return new ScInt(BigInt(val), { type: "i128" }).toI128();
   } catch (err: any) {
-    throw new TransactionError("simulation", `Failed to encode value as u64 ScVal: ${val}. Error: ${err.message}`);
+    throw new TransactionError("simulation", `Failed to encode value as i128 ScVal: ${val}. Error: ${err.message}`);
   }
 }
 
@@ -175,8 +218,8 @@ function encodeU64(val: string | number): xdr.ScVal {
 function encodeAddress(addr: string): xdr.ScVal {
   try {
     return Address.fromString(addr).toScVal();
-  } catch (err: any) {
-    throw new TransactionError("simulation", `Invalid Stellar address format: ${addr}. Error: ${err.message}`);
+  } catch (err: unknown) {
+    throw new TransactionError("simulation", `Invalid Stellar address format: ${addr}. Error: ${toErrorMessage(err)}`);
   }
 }
 
@@ -239,13 +282,13 @@ async function validateNetwork(): Promise<void> {
       FREIGHTER_NETWORK_TIMEOUT_MS,
       `${wallet.name} network check`,
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof TransactionError) {
       throw err;
     }
     throw new TransactionError(
       "rpc",
-      `${wallet.name} not connected or unavailable. Error: ${err?.message || err}`,
+      `${wallet.name} not connected or unavailable. Error: ${toErrorMessage(err)}`,
     );
   }
 
@@ -291,7 +334,7 @@ async function waitForTransaction(
           { retryable: true },
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof TransactionError) throw err;
       // Network or RPC server errors can be retried during polling
     }
@@ -357,10 +400,10 @@ async function executeInvocation(
   let senderAddress: string;
   try {
     senderAddress = await wallet.getAddress();
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new TransactionError(
       "rpc",
-      `Failed to get active address from ${wallet.name}: ${err?.message || err}`,
+      `Failed to get active address from ${wallet.name}: ${toErrorMessage(err)}`,
     );
   }
 
@@ -375,10 +418,10 @@ async function executeInvocation(
   let account;
   try {
     account = await server.getAccount(senderAddress);
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new TransactionError(
       "rpc",
-      `Failed to load account sequence from RPC. Account may not be funded. Error: ${err.message || err}`
+      `Failed to load account sequence from RPC. Account may not be funded. Error: ${toErrorMessage(err)}`
     );
   }
 
@@ -395,21 +438,22 @@ async function executeInvocation(
     .build();
 
   // 3. Simulate transaction to estimate resource fees and footprint
-  let sim;
+  let sim: SorobanRpc.Api.SimulateTransactionResponse;
   try {
     sim = await server.simulateTransaction(tx);
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new TransactionError(
       "rpc",
-      `Soroban RPC simulation failed to execute: ${err.message || err}`,
+      `Soroban RPC simulation failed to execute: ${toErrorMessage(err)}`,
       { retryable: true },
     );
   }
 
   if (!SorobanRpc.Api.isSimulationSuccess(sim)) {
-    const contractError = decodeContractError(sim.error);
+    const simError = SorobanRpc.Api.isSimulationError(sim) ? sim.error : undefined;
+    const contractError = decodeContractError(simError);
     if (contractError) throw contractError;
-    throw new TransactionError("simulation", `Transaction simulation failed: ${sim.error || "Simulation unsuccessful"}`);
+    throw new TransactionError("simulation", `Transaction simulation failed: ${simError || "Simulation unsuccessful"}`);
   }
 
   // 4. Assemble transaction with simulation resource fees
@@ -420,11 +464,11 @@ async function executeInvocation(
   // 5. Sign transaction with the active wallet provider (Freighter or Albedo)
   let signedXdr: string;
   try {
-    signedXdr = await wallet.signTransaction((assembledTx as any).toXDR(), {
+    signedXdr = await wallet.signTransaction(assembledTx.toXDR(), {
       networkPassphrase: passphrase,
       address: senderAddress,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw mapWalletSigningError(err, wallet.name);
   }
 
@@ -434,8 +478,8 @@ async function executeInvocation(
     submitResponse = await server.sendTransaction(
       TransactionBuilder.fromXDR(signedXdr, passphrase)
     );
-  } catch (err: any) {
-    throw new TransactionError("rpc", `Failed to submit signed transaction to RPC: ${err.message || err}`);
+  } catch (err: unknown) {
+    throw new TransactionError("rpc", `Failed to submit signed transaction to RPC: ${toErrorMessage(err)}`);
   }
 
   if (submitResponse.status === "ERROR") {
@@ -503,6 +547,28 @@ export async function withdraw(
     encodeU64(amount),
   ];
   return await executeInvocation("withdraw", args);
+}
+
+/**
+ * Adds funds to an existing stream on the Soroban smart contract.
+ * @see {@link file:///../../../docs/soroban-contract-abi.md} for ABI specifications.
+ * @param sender - The Stellar address authorizing the top-up.
+ * @param streamId - The ID of the stream to top up.
+ * @param amount - The amount in the token's smallest units, as an integer string.
+ */
+export async function topUpStream(
+  sender: string,
+  streamId: string,
+  amount: string
+): Promise<SorobanRpc.Api.GetTransactionResponse> {
+  if (!sender) {
+    throw new TransactionError("rejected", "A connected sender address is required for a top-up.");
+  }
+  const args = [
+    encodeU64(streamId),
+    encodeI128(amount),
+  ];
+  return await executeInvocation("top_up", args);
 }
 
 /**

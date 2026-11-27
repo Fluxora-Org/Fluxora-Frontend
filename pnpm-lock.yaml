@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@albedo-link/intent':
+        specifier: ^0.13.0
+        version: 0.13.0
       '@stellar/freighter-api':
         specifier: ^6.0.1
         version: 6.0.1
@@ -131,6 +134,9 @@ packages:
 
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
+
+  '@albedo-link/intent@0.13.0':
+    resolution: {integrity: sha512-A8CBXqGQEBMXhwxNXj5inC6HLjyx5Do7jW99NOFeecYd1nPUq8gfM0tvoNoR8H8JQ11aTl9tyQBuu/+l3xeBnQ==}
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -2045,6 +2051,8 @@ packages:
 snapshots:
 
   '@adobe/css-tools@4.4.4': {}
+
+  '@albedo-link/intent@0.13.0': {}
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:

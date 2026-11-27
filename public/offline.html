@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fluxora — Offline</title>
+    <meta name="theme-color" content="#06B6D4" />
+    <style>
+      :root {
+        --bg: #051019;
+        --fg: #e6f1f8;
+        --muted: #8aa1b1;
+        --accent: #06b6d4;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      main {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1rem;
+        box-sizing: border-box;
+      }
+      .card {
+        max-width: 28rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 0 1.25rem;
+      }
+      button {
+        appearance: none;
+        border: 1px solid var(--accent);
+        background: transparent;
+        color: var(--accent);
+        padding: 0.5rem 1.25rem;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover,
+      button:focus-visible {
+        background: var(--accent);
+        color: var(--bg);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>You're offline</h1>
+        <p>
+          This part of Fluxora hasn't been cached yet. Reconnect and try again,
+          or head back to a page you've already opened.
+        </p>
+        <button type="button" onclick="location.reload()">Retry</button>
+      </div>
+    </main>
+  </body>
+</html>
