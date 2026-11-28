@@ -19,3 +19,9 @@ test-results/
 .opencode
 .vscode/
 .replit
+
+# Logs and local scratch files
+*.log
+vitest-full-run.log
+/test-file.txt
+/test-fast-check.ts
