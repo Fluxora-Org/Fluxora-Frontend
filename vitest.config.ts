@@ -70,7 +70,6 @@ export default defineConfig({
       "src/lib/__tests__/config.test.ts",
       "src/lib/__tests__/configBoundary.test.ts",
       "src/lib/__tests__/onboarding.test.ts",
-      "src/lib/__tests__/optimisticTransactions.test.ts",
       "src/lib/__tests__/shareWorkspaces.test.ts",
       "src/lib/__tests__/routeChunks.test.ts",
       "src/lib/__tests__/streamsSessionRecovery.test.ts",

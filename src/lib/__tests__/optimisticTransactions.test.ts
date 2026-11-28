@@ -232,61 +232,67 @@ describe("optimisticTransactions", () => {
     });
   });
 
-  describe("sessionStorage persistence", () => {
-    it("persists operations to sessionStorage", () => {
+  describe("in-memory storage security (no sessionStorage persistence)", () => {
+    it("does not persist pending operations to sessionStorage", () => {
       const op = addOptimistic("create", { id: "STR-030" }, "tx-30");
 
-      const raw = sessionStorage.getItem("fluxora_optimistic_operations");
-      expect(raw).not.toBeNull();
-      const parsed = JSON.parse(raw!);
-      expect(parsed).toHaveLength(1);
-      expect(parsed[0].id).toBe(op.id);
+      expect(sessionStorage.getItem("fluxora_optimistic_operations")).toBeNull();
+      expect(getPendingOperations()).toHaveLength(1);
+      expect(getPendingOperations()[0].id).toBe(op.id);
     });
 
-    it("persists rollback decisions", () => {
+    it("keeps rollback decisions in memory only without writing to sessionStorage", () => {
       const op = addOptimistic("create", { id: "STR-031" });
       rollbackOptimistic(op.id, "timeout");
 
-      const raw = sessionStorage.getItem("fluxora_optimistic_operations");
-      const parsed = JSON.parse(raw!);
-      expect(parsed[0].status).toBe("rolled-back");
-      expect(parsed[0].rollbackReason).toBe("timeout");
+      expect(sessionStorage.getItem("fluxora_optimistic_operations")).toBeNull();
+      const snapshot = getSnapshot();
+      expect(snapshot.rolledBack).toHaveLength(1);
+      expect(snapshot.rolledBack[0].status).toBe("rolled-back");
+      expect(snapshot.rolledBack[0].rollbackReason).toBe("timeout");
     });
 
-    it("survives store reset and reload from sessionStorage", () => {
-      // Add an operation and roll it back
+    it("clears rolled-back operations on store reset instead of rehydrating from sessionStorage", () => {
       const op = addOptimistic("cancel", { streamId: "10" }, "tx-40");
       rollbackOptimistic(op.id, "rejected");
 
       // Reset the in-memory store (simulates page reload)
       resetStore();
 
-      // The store reloads from sessionStorage on next access
       const snapshot = getSnapshot();
-      expect(snapshot.rolledBack).toHaveLength(1);
-      expect(snapshot.rolledBack[0].id).toBe(op.id);
-      expect(snapshot.rolledBack[0].rollbackReason).toBe("rejected");
+      expect(snapshot.rolledBack).toHaveLength(0);
+      expect(sessionStorage.getItem("fluxora_optimistic_operations")).toBeNull();
     });
 
-    it("persists confirm decisions across reload", () => {
+    it("clears confirmed operations on store reset without writing to sessionStorage", () => {
       const op = addOptimistic("create", { id: "STR-040" }, "tx-50");
       confirmOptimistic(op.id);
 
       resetStore();
 
       const snapshot = getSnapshot();
-      expect(snapshot.confirmed).toHaveLength(1);
-      expect(snapshot.confirmed[0].txHash).toBe("tx-50");
+      expect(snapshot.confirmed).toHaveLength(0);
+      expect(sessionStorage.getItem("fluxora_optimistic_operations")).toBeNull();
     });
 
-    it("pending operations remain pending across reload", () => {
-      addOptimistic("create", { id: "STR-050" }, "tx-60");
+    it("ignores pre-seeded sessionStorage entries on reload to avoid leaking stale tx state", () => {
+      sessionStorage.setItem(
+        "fluxora_optimistic_operations",
+        JSON.stringify([
+          {
+            id: "opt_stale",
+            kind: "create",
+            status: "pending",
+            txHash: "tx-60",
+            data: { id: "STR-050" },
+            createdAt: Date.now(),
+          },
+        ]),
+      );
 
       resetStore();
 
-      const pending = getPendingOperations();
-      expect(pending).toHaveLength(1);
-      expect(pending[0].status).toBe("pending");
+      expect(getPendingOperations()).toHaveLength(0);
     });
   });
 
@@ -310,7 +316,8 @@ describe("optimisticTransactions", () => {
   });
 
   describe("clearAll", () => {
-    it("removes all operations and clears sessionStorage", () => {
+    it("removes all operations and clears any legacy sessionStorage entry", () => {
+      sessionStorage.setItem("fluxora_optimistic_operations", "[]");
       addOptimistic("create", { id: "STR-070" });
       addOptimistic("cancel", { streamId: "13" });
 
